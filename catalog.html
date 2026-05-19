@@ -345,6 +345,13 @@ a { color: inherit; text-decoration: none; }
   width: 100%;
   height: 100%;
 }
+.cover-hero-svg,
+.why-portrait-svg,
+.ai-portrait-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 .cover-hero-overlay {
   position: absolute;
   inset: 0;
@@ -1210,23 +1217,67 @@ a { color: inherit; text-decoration: none; }
 .quote-photo {
   width: 84px;
   height: 84px;
-  border-radius: 6px;
+  border-radius: 12px;
   overflow: hidden;
   position: relative;
-  background: linear-gradient(135deg, #E2E8F0, #CBD5E1);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.45) 0, transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(0,0,0,0.20) 0, transparent 55%),
+    linear-gradient(135deg, var(--p-from, #6366F1), var(--p-to, #EC4899));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), 0 6px 18px -8px rgba(15,23,42,0.35);
 }
-.quote-photo image-slot { display: block; width: 100%; height: 100%; }
+.quote-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255,255,255,0.05) 10px 11px),
+    radial-gradient(circle at 50% 110%, rgba(255,255,255,0.20) 0, transparent 50%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.quote-photo image-slot { display: block; width: 100%; height: 100%; position: relative; z-index: 1; }
 .quote-photo .monogram {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   font-family: var(--font-en);
-  font-weight: 700;
-  font-size: 26px;
-  color: var(--ink-3);
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  font-size: 30px;
+  color: rgba(255,255,255,0.96);
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.30);
+  z-index: 2;
 }
+.quote-photo .role-badge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.95);
+  display: grid;
+  place-items: center;
+  z-index: 3;
+  box-shadow: 0 2px 4px rgba(15,23,42,0.20);
+}
+.quote-photo .role-badge svg { width: 11px; height: 11px; color: var(--p-from, #6366F1); }
+
+/* Per-person color gradients */
+.quote-photo[data-p="musk"]     { --p-from: #0F172A; --p-to: #475569; }
+.quote-photo[data-p="nadella"]  { --p-from: #0369A1; --p-to: #06B6D4; }
+.quote-photo[data-p="huang"]    { --p-from: #15803D; --p-to: #84CC16; }
+.quote-photo[data-p="pichai"]   { --p-from: #EA580C; --p-to: #F59E0B; }
+.quote-photo[data-p="franklin"] { --p-from: #92400E; --p-to: #D97706; }
+.quote-photo[data-p="kennedy"]  { --p-from: #1E3A8A; --p-to: #3B82F6; }
+.quote-photo[data-p="drucker"]  { --p-from: #4C1D95; --p-to: #8B5CF6; }
+.quote-photo[data-p="ziglar"]   { --p-from: #B91C1C; --p-to: #F97316; }
+.quote-photo[data-p="branson"]  { --p-from: #BE123C; --p-to: #F43F5E; }
+.quote-photo[data-p="welch"]    { --p-from: #1F2937; --p-to: #0891B2; }
+.quote-photo[data-p="gates"]    { --p-from: #1E40AF; --p-to: #6366F1; }
+.quote-photo[data-p="conant"]   { --p-from: #C2410C; --p-to: #EAB308; }
 .quote-body { padding-top: 4px; }
 .quote-mark {
   font-family: 'Georgia', serif;
@@ -1629,7 +1680,127 @@ a { color: inherit; text-decoration: none; }
     </div>
 
     <div class="cover-hero">
-      <image-slot id="hero-cover" placeholder="דמות מול עיר עתידנית · Hero AI Illustration" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_150511_0ac30315-91ab-4a57-9311-1d793eb6e78c_min.webp"></image-slot>
+      <svg class="cover-hero-svg" viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="ch-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FEF3C7"/>
+            <stop offset="30%" stop-color="#FCE7F3"/>
+            <stop offset="65%" stop-color="#E0E7FF"/>
+            <stop offset="100%" stop-color="#DBEAFE"/>
+          </linearGradient>
+          <linearGradient id="ch-sun" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FBBF24"/>
+            <stop offset="100%" stop-color="#EC4899"/>
+          </linearGradient>
+          <linearGradient id="ch-city" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4C1D95" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#1E3A8A" stop-opacity="0.95"/>
+          </linearGradient>
+          <linearGradient id="ch-figure" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1E1B4B"/>
+            <stop offset="100%" stop-color="#312E81"/>
+          </linearGradient>
+          <radialGradient id="ch-glow" cx="50%" cy="35%" r="50%">
+            <stop offset="0%" stop-color="#FBBF24" stop-opacity="0.7"/>
+            <stop offset="50%" stop-color="#EC4899" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="ch-blur"><feGaussianBlur stdDeviation="3"/></filter>
+        </defs>
+        <!-- sky -->
+        <rect width="400" height="500" fill="url(#ch-sky)"/>
+        <!-- big radial glow -->
+        <ellipse cx="200" cy="180" rx="220" ry="180" fill="url(#ch-glow)"/>
+        <!-- sun -->
+        <circle cx="280" cy="150" r="48" fill="url(#ch-sun)" opacity="0.85"/>
+        <circle cx="280" cy="150" r="64" fill="none" stroke="#F59E0B" stroke-width="1" opacity="0.5"/>
+        <circle cx="280" cy="150" r="82" fill="none" stroke="#EC4899" stroke-width="1" opacity="0.3"/>
+        <!-- back city silhouette -->
+        <g fill="url(#ch-city)" opacity="0.78">
+          <rect x="0"   y="290" width="38" height="130"/>
+          <rect x="38"  y="270" width="28" height="150"/>
+          <rect x="66"  y="310" width="22" height="110"/>
+          <rect x="88"  y="250" width="42" height="170"/>
+          <rect x="130" y="290" width="26" height="130"/>
+          <rect x="156" y="220" width="36" height="200"/>
+          <rect x="192" y="260" width="30" height="160"/>
+          <rect x="222" y="240" width="44" height="180"/>
+          <rect x="266" y="280" width="28" height="140"/>
+          <rect x="294" y="230" width="38" height="190"/>
+          <rect x="332" y="270" width="26" height="150"/>
+          <rect x="358" y="290" width="42" height="130"/>
+        </g>
+        <!-- city window lights -->
+        <g fill="#FBBF24" opacity="0.85">
+          <rect x="98"  y="270" width="3" height="3"/><rect x="106" y="270" width="3" height="3"/><rect x="114" y="270" width="3" height="3"/>
+          <rect x="98"  y="282" width="3" height="3"/><rect x="106" y="282" width="3" height="3"/>
+          <rect x="98"  y="294" width="3" height="3"/><rect x="114" y="294" width="3" height="3"/>
+          <rect x="164" y="240" width="3" height="3"/><rect x="172" y="240" width="3" height="3"/><rect x="180" y="240" width="3" height="3"/>
+          <rect x="164" y="252" width="3" height="3"/><rect x="180" y="252" width="3" height="3"/>
+          <rect x="164" y="264" width="3" height="3"/><rect x="172" y="264" width="3" height="3"/><rect x="180" y="264" width="3" height="3"/>
+          <rect x="230" y="260" width="3" height="3"/><rect x="240" y="260" width="3" height="3"/><rect x="250" y="260" width="3" height="3"/>
+          <rect x="230" y="272" width="3" height="3"/><rect x="250" y="272" width="3" height="3"/>
+          <rect x="302" y="250" width="3" height="3"/><rect x="312" y="250" width="3" height="3"/><rect x="320" y="250" width="3" height="3"/>
+          <rect x="302" y="262" width="3" height="3"/><rect x="312" y="262" width="3" height="3"/>
+        </g>
+        <!-- AI neural network overlay -->
+        <g stroke="#8B5CF6" stroke-width="0.8" fill="none" opacity="0.45">
+          <line x1="60"  y1="80" x2="140" y2="120"/>
+          <line x1="140" y1="120" x2="100" y2="180"/>
+          <line x1="140" y1="120" x2="220" y2="100"/>
+          <line x1="220" y1="100" x2="180" y2="170"/>
+          <line x1="220" y1="100" x2="300" y2="80"/>
+          <line x1="100" y1="180" x2="180" y2="170"/>
+          <line x1="180" y1="170" x2="240" y2="200"/>
+          <line x1="300" y1="80"  x2="340" y2="140"/>
+          <line x1="340" y1="140" x2="240" y2="200"/>
+        </g>
+        <g fill="#8B5CF6" opacity="0.85">
+          <circle cx="60"  cy="80"  r="3"/>
+          <circle cx="140" cy="120" r="4"/>
+          <circle cx="220" cy="100" r="3.5"/>
+          <circle cx="100" cy="180" r="3"/>
+          <circle cx="180" cy="170" r="4"/>
+          <circle cx="300" cy="80"  r="3.5"/>
+          <circle cx="340" cy="140" r="3"/>
+          <circle cx="240" cy="200" r="3"/>
+        </g>
+        <g fill="#EC4899" opacity="0.7">
+          <circle cx="60"  cy="80"  r="6" opacity="0.25"/>
+          <circle cx="220" cy="100" r="6" opacity="0.25"/>
+          <circle cx="180" cy="170" r="6" opacity="0.25"/>
+          <circle cx="300" cy="80"  r="6" opacity="0.25"/>
+        </g>
+        <!-- figure silhouette (lower right) -->
+        <g fill="url(#ch-figure)">
+          <ellipse cx="252" cy="350" rx="22" ry="26"/>
+          <path d="M 222 380 Q 222 376 226 374 L 278 374 Q 282 376 282 380 L 282 470 L 272 500 L 232 500 L 222 470 Z"/>
+        </g>
+        <!-- floating UI cards around figure -->
+        <g>
+          <rect x="60"  y="350" width="80" height="30" rx="6" fill="#FFFFFF" opacity="0.92" stroke="#E2E8F0"/>
+          <circle cx="74" cy="365" r="6" fill="#7C3AED"/>
+          <rect x="86"  y="358" width="44" height="4" rx="2" fill="#94A3B8"/>
+          <rect x="86"  y="366" width="34" height="4" rx="2" fill="#CBD5E1"/>
+
+          <rect x="40"  y="400" width="64" height="64" rx="10" fill="#FFFFFF" opacity="0.95" stroke="#E2E8F0"/>
+          <text x="72" y="432" text-anchor="middle" font-family="Inter, sans-serif" font-size="14" font-weight="700" fill="#7C3AED">AI</text>
+          <rect x="48" y="446" width="48" height="3" rx="1.5" fill="#C7D2FE"/>
+          <rect x="48" y="452" width="32" height="3" rx="1.5" fill="#E0E7FF"/>
+
+          <rect x="310" y="290" width="74" height="34" rx="6" fill="#FFFFFF" opacity="0.92" stroke="#E2E8F0"/>
+          <circle cx="324" cy="307" r="4" fill="#06B6D4"/>
+          <circle cx="338" cy="307" r="4" fill="#EC4899"/>
+          <circle cx="352" cy="307" r="4" fill="#F59E0B"/>
+          <rect x="318" y="316" width="58" height="3" rx="1.5" fill="#CBD5E1"/>
+        </g>
+        <!-- corner sparkles -->
+        <g fill="#F59E0B">
+          <path d="M 50 50 L 53 56 L 59 59 L 53 62 L 50 68 L 47 62 L 41 59 L 47 56 Z"/>
+          <path d="M 350 220 L 352 224 L 356 226 L 352 228 L 350 232 L 348 228 L 344 226 L 348 224 Z"/>
+          <path d="M 180 30 L 182 34 L 186 36 L 182 38 L 180 42 L 178 38 L 174 36 L 178 34 Z" opacity="0.7"/>
+        </g>
+      </svg>
       <div class="cover-hero-overlay"></div>
       <span class="cover-floating-tag t1">AI</span>
       <span class="cover-floating-tag t2">AI AGENTS</span>
@@ -1886,7 +2057,87 @@ a { color: inherit; text-decoration: none; }
     </div>
 
     <div class="why-image">
-      <image-slot id="why-portrait" placeholder="אישה + עיר עתידנית · Why Us Portrait" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_150517_2fb098ad-43ac-486d-b713-626ccda8341d_min.webp"></image-slot>
+      <svg class="why-portrait-svg" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="wp-bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#DBEAFE"/>
+            <stop offset="55%" stop-color="#E0E7FF"/>
+            <stop offset="100%" stop-color="#FAF5FF"/>
+          </linearGradient>
+          <linearGradient id="wp-figure" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1E40AF"/>
+            <stop offset="100%" stop-color="#312E81"/>
+          </linearGradient>
+          <linearGradient id="wp-city" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#475569" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#1E293B" stop-opacity="0.8"/>
+          </linearGradient>
+          <radialGradient id="wp-glow" cx="50%" cy="20%" r="55%">
+            <stop offset="0%" stop-color="#FBBF24" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#FBBF24" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="300" height="400" fill="url(#wp-bg)"/>
+        <ellipse cx="150" cy="100" rx="160" ry="120" fill="url(#wp-glow)"/>
+        <!-- sun -->
+        <circle cx="220" cy="90" r="32" fill="#FBBF24" opacity="0.85"/>
+        <circle cx="220" cy="90" r="44" fill="none" stroke="#F59E0B" stroke-width="1" opacity="0.4"/>
+        <!-- back city -->
+        <g fill="url(#wp-city)" opacity="0.65">
+          <rect x="0"   y="200" width="32" height="120"/>
+          <rect x="32"  y="180" width="22" height="140"/>
+          <rect x="54"  y="220" width="28" height="100"/>
+          <rect x="82"  y="160" width="36" height="160"/>
+          <rect x="118" y="200" width="22" height="120"/>
+          <rect x="180" y="190" width="28" height="130"/>
+          <rect x="208" y="160" width="32" height="160"/>
+          <rect x="240" y="200" width="24" height="120"/>
+          <rect x="264" y="170" width="36" height="150"/>
+        </g>
+        <!-- city window lights -->
+        <g fill="#FBBF24" opacity="0.7">
+          <rect x="90"  y="180" width="2.5" height="2.5"/><rect x="98"  y="180" width="2.5" height="2.5"/><rect x="106" y="180" width="2.5" height="2.5"/>
+          <rect x="90"  y="190" width="2.5" height="2.5"/><rect x="106" y="190" width="2.5" height="2.5"/>
+          <rect x="216" y="180" width="2.5" height="2.5"/><rect x="224" y="180" width="2.5" height="2.5"/><rect x="232" y="180" width="2.5" height="2.5"/>
+          <rect x="272" y="190" width="2.5" height="2.5"/><rect x="280" y="190" width="2.5" height="2.5"/><rect x="288" y="190" width="2.5" height="2.5"/>
+        </g>
+        <!-- data network overlay -->
+        <g stroke="#6366F1" stroke-width="0.8" fill="none" opacity="0.45">
+          <line x1="40"  y1="60" x2="100" y2="100"/>
+          <line x1="100" y1="100" x2="170" y2="70"/>
+          <line x1="170" y1="70" x2="240" y2="120"/>
+          <line x1="100" y1="100" x2="80" y2="160"/>
+        </g>
+        <g fill="#6366F1" opacity="0.7">
+          <circle cx="40"  cy="60"  r="2.5"/>
+          <circle cx="100" cy="100" r="3"/>
+          <circle cx="170" cy="70"  r="2.5"/>
+          <circle cx="240" cy="120" r="2.5"/>
+          <circle cx="80"  cy="160" r="2.5"/>
+        </g>
+        <!-- female figure -->
+        <g fill="url(#wp-figure)">
+          <ellipse cx="160" cy="250" rx="22" ry="26"/>
+          <!-- hair flowing -->
+          <path d="M 140 240 Q 130 252 130 280 Q 134 290 140 286 L 144 250 Z" opacity="0.85"/>
+          <path d="M 180 240 Q 190 252 188 282 Q 184 290 180 286 L 176 250 Z" opacity="0.85"/>
+          <!-- body / blazer -->
+          <path d="M 122 280 Q 122 276 126 274 L 194 274 Q 198 276 198 280 L 200 380 L 188 400 L 132 400 L 120 380 Z"/>
+          <!-- blazer lapel highlights -->
+          <path d="M 156 274 L 152 320 L 160 332 L 168 320 L 164 274 Z" fill="#FFFFFF" opacity="0.15"/>
+        </g>
+        <!-- floating UI card -->
+        <g>
+          <rect x="38"  y="260" width="60" height="44" rx="8" fill="#FFFFFF" opacity="0.95" stroke="#E2E8F0"/>
+          <text x="68" y="282" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="800" fill="#4F46E5">25+</text>
+          <text x="68" y="294" text-anchor="middle" font-family="Inter, sans-serif" font-size="7" font-weight="600" fill="#64748B" letter-spacing="0.1em">YEARS</text>
+        </g>
+        <!-- sparkles -->
+        <g fill="#F59E0B" opacity="0.85">
+          <path d="M 40 30 L 42 34 L 46 36 L 42 38 L 40 42 L 38 38 L 34 36 L 38 34 Z"/>
+          <path d="M 268 50 L 270 54 L 274 56 L 270 58 L 268 62 L 266 58 L 262 56 L 266 54 Z" opacity="0.7"/>
+        </g>
+      </svg>
     </div>
   </div>
 
@@ -2005,7 +2256,89 @@ a { color: inherit; text-decoration: none; }
   </div>
 
   <div class="cat-hero-image">
-    <image-slot id="ai-portrait" placeholder="פני AI · AI Portrait" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_150523_85c4bf84-5b73-4db3-858d-26bbc55a3583_min.webp"></image-slot>
+    <svg class="ai-portrait-svg" viewBox="0 0 320 400" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="ap-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1E1B4B"/>
+          <stop offset="50%" stop-color="#312E81"/>
+          <stop offset="100%" stop-color="#0F172A"/>
+        </linearGradient>
+        <linearGradient id="ap-face" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#FBBF24"/>
+          <stop offset="50%" stop-color="#EC4899"/>
+          <stop offset="100%" stop-color="#8B5CF6"/>
+        </linearGradient>
+        <radialGradient id="ap-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#A78BFA" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="320" height="400" fill="url(#ap-bg)"/>
+      <ellipse cx="160" cy="200" rx="180" ry="180" fill="url(#ap-glow)"/>
+      <!-- face outline -->
+      <g transform="translate(160 200)">
+        <!-- head silhouette -->
+        <ellipse cx="0" cy="-10" rx="78" ry="92" fill="none" stroke="url(#ap-face)" stroke-width="2.2" opacity="0.95"/>
+        <ellipse cx="0" cy="-10" rx="68" ry="82" fill="none" stroke="#A78BFA" stroke-width="0.8" opacity="0.5"/>
+        <!-- eye sockets (closed eyes - serene) -->
+        <path d="M -30 -22 Q -22 -16 -14 -22" stroke="#FBBF24" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path d="M 14 -22 Q 22 -16 30 -22" stroke="#FBBF24" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- nose hint -->
+        <path d="M 0 -10 L -3 10 L 3 10 Z" fill="none" stroke="#EC4899" stroke-width="1" opacity="0.6"/>
+        <!-- mouth -->
+        <path d="M -10 30 Q 0 34 10 30" stroke="#F59E0B" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <!-- neural circuit patterns inside the face -->
+        <g stroke="#A78BFA" stroke-width="0.6" fill="none" opacity="0.55">
+          <path d="M -50 -55 L -30 -45 L -10 -55 L 10 -50 L 30 -55 L 50 -45"/>
+          <path d="M -55 -30 L -40 -28 L -25 -32"/>
+          <path d="M 25 -32 L 40 -28 L 55 -30"/>
+          <path d="M -40 50 L -20 55 L 0 50 L 20 55 L 40 50"/>
+          <path d="M -55 0 L -38 -5 M 38 -5 L 55 0"/>
+        </g>
+        <g fill="#FBBF24" opacity="0.8">
+          <circle cx="-50" cy="-55" r="1.5"/>
+          <circle cx="-30" cy="-45" r="1.5"/>
+          <circle cx="-10" cy="-55" r="1.5"/>
+          <circle cx="10" cy="-50" r="1.5"/>
+          <circle cx="30" cy="-55" r="1.5"/>
+          <circle cx="50" cy="-45" r="1.5"/>
+          <circle cx="-55" cy="-30" r="1.5"/>
+          <circle cx="55" cy="-30" r="1.5"/>
+          <circle cx="-40" cy="50" r="1.5"/>
+          <circle cx="-20" cy="55" r="1.5"/>
+          <circle cx="0" cy="50" r="1.5"/>
+          <circle cx="20" cy="55" r="1.5"/>
+          <circle cx="40" cy="50" r="1.5"/>
+        </g>
+        <g fill="#EC4899" opacity="0.75">
+          <circle cx="-30" cy="-45" r="3.5" opacity="0.4"/>
+          <circle cx="30" cy="-55" r="3.5" opacity="0.4"/>
+          <circle cx="0" cy="50" r="3.5" opacity="0.4"/>
+        </g>
+      </g>
+      <!-- floating data particles around -->
+      <g fill="#A78BFA" opacity="0.7">
+        <circle cx="40"  cy="80"  r="1.5"/>
+        <circle cx="280" cy="100" r="1.5"/>
+        <circle cx="50"  cy="320" r="1.5"/>
+        <circle cx="270" cy="340" r="1.5"/>
+        <circle cx="160" cy="50"  r="1.5"/>
+        <circle cx="160" cy="370" r="1.5"/>
+        <circle cx="30"  cy="200" r="2"/>
+        <circle cx="290" cy="200" r="2"/>
+      </g>
+      <g stroke="#A78BFA" stroke-width="0.5" fill="none" opacity="0.35">
+        <path d="M 40 80 Q 100 60 160 80"/>
+        <path d="M 280 100 Q 230 70 180 95"/>
+        <path d="M 50 320 Q 110 350 160 330"/>
+        <path d="M 270 340 Q 220 360 180 340"/>
+      </g>
+      <!-- sparkles -->
+      <g fill="#FBBF24" opacity="0.85">
+        <path d="M 40 60 L 42 64 L 46 66 L 42 68 L 40 72 L 38 68 L 34 66 L 38 64 Z"/>
+        <path d="M 280 350 L 282 354 L 286 356 L 282 358 L 280 362 L 278 358 L 274 356 L 278 354 Z"/>
+      </g>
+    </svg>
   </div>
 
   <div class="cat-features-row">
@@ -2433,9 +2766,9 @@ a { color: inherit; text-decoration: none; }
 
     <div class="quotes-list">
       <div class="quote-card" data-tone="orange">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="musk">
           <div class="monogram">EM</div>
-          <image-slot id="photo-musk" placeholder="Elon Musk" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144503_afc0e21c-3398-44d0-ba5a-d97a2e989a19_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">AI is the most powerful technology of our time, and it will transform every industry.</span>
@@ -2446,9 +2779,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="blue">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="nadella">
           <div class="monogram">SN</div>
-          <image-slot id="photo-nadella" placeholder="Satya Nadella" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144506_17840883-3671-4cde-ad88-c248093a3436_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">The world is changing, and AI is at the heart of it all.</span>
@@ -2459,9 +2792,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="orange">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="huang">
           <div class="monogram">JH</div>
-          <image-slot id="photo-huang" placeholder="Jensen Huang" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144508_d4845f8a-fc39-4014-af19-da0c23611bd1_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">The new industrial revolution is being driven by AI.</span>
@@ -2472,9 +2805,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="blue">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="pichai">
           <div class="monogram">SP</div>
-          <image-slot id="photo-pichai" placeholder="Sundar Pichai" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144511_6a57fe5e-26fb-4c09-a157-774099378073_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">AI is one of the most profound things we're working on as humanity.</span>
@@ -2523,9 +2856,9 @@ a { color: inherit; text-decoration: none; }
 
     <div class="quotes-list">
       <div class="quote-card" data-tone="orange">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="franklin">
           <div class="monogram">BF</div>
-          <image-slot id="photo-franklin" placeholder="Benjamin Franklin" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144514_4a804b85-db27-42d9-846c-02310d4bd48d_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">An investment in knowledge pays the best interest.</span>
@@ -2536,9 +2869,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="blue">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="kennedy">
           <div class="monogram">JK</div>
-          <image-slot id="photo-kennedy" placeholder="John F. Kennedy" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144517_36215bc1-c8bd-4041-9679-7a1d7d184434_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">Leadership and learning are indispensable to each other.</span>
@@ -2549,9 +2882,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="orange">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="drucker">
           <div class="monogram">PD</div>
-          <image-slot id="photo-drucker" placeholder="Peter Drucker" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144520_2743c1cf-198b-455b-81a4-15f98bf3f9c9_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">A knowledge organization has to be both a learning organization and a teaching organization.</span>
@@ -2562,9 +2895,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="blue">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="ziglar">
           <div class="monogram">ZZ</div>
-          <image-slot id="photo-ziglar" placeholder="Zig Ziglar" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144523_608ff3c5-2489-4b69-862f-cc9da5972c08_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">The only thing worse than training employees and losing them is to not train them and keeping them.</span>
@@ -2605,9 +2938,9 @@ a { color: inherit; text-decoration: none; }
 
     <div class="quotes-list">
       <div class="quote-card" data-tone="orange">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="branson">
           <div class="monogram">RB</div>
-          <image-slot id="photo-branson" placeholder="Richard Branson" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144525_90c9ab31-80f6-4dd5-b4cd-0c24a117103a_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">Train people well enough so they can leave, treat them well enough so they don't want to.</span>
@@ -2618,9 +2951,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="blue">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="welch">
           <div class="monogram">JW</div>
-          <image-slot id="photo-welch" placeholder="Jack Welch" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144528_d2fc96d4-fa52-4d40-a6a2-58d60cbed81b_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">Before you are a leader, success is all about growing yourself. When you become a leader, success is all about growing others.</span>
@@ -2631,9 +2964,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="orange">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="gates">
           <div class="monogram">BG</div>
-          <image-slot id="photo-gates" placeholder="Bill Gates" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144531_7d4545ee-80b6-42a3-94c1-2bf9555e89bc_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">You don't really start getting old until you stop learning.</span>
@@ -2644,9 +2977,9 @@ a { color: inherit; text-decoration: none; }
       </div>
 
       <div class="quote-card" data-tone="blue">
-        <div class="quote-photo">
+        <div class="quote-photo" data-p="conant">
           <div class="monogram">DC</div>
-          <image-slot id="photo-conant" placeholder="Doug Conant" fit="cover" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144534_ce3e8580-9067-4f3f-9abe-0bdf08bc6787_min.webp"></image-slot>
+          <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">To win in the marketplace you must first win in the workplace.</span>

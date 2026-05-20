@@ -269,27 +269,32 @@ a { color: inherit; text-decoration: none; }
 
 .cover-grid {
   position: absolute;
-  top: 200px;
+  top: 196px;
   right: var(--pad);
   left: var(--pad);
+  height: 632px;
   display: grid;
-  grid-template-columns: 1fr 1.1fr;
-  gap: 28px;
-  align-items: start;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 34px;
+  align-items: stretch;
 }
 
-.cover-left { padding-top: 16px; }
+.cover-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .cover-year {
   font-family: var(--font-en);
   font-weight: 900;
-  font-size: 156px;
-  line-height: 0.85;
-  letter-spacing: -0.04em;
+  font-size: 186px;
+  line-height: 0.8;
+  letter-spacing: -0.05em;
   background: var(--grad-2026);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin: 0 0 12px;
+  margin: 0 0 18px;
 }
 .cover-eyebrow-en {
   font-family: var(--font-mono);
@@ -302,7 +307,7 @@ a { color: inherit; text-decoration: none; }
 .cover-headline {
   font-family: var(--font-en);
   font-weight: 700;
-  font-size: 44px;
+  font-size: 50px;
   line-height: 1;
   letter-spacing: -0.02em;
   color: var(--ink-1);
@@ -334,16 +339,25 @@ a { color: inherit; text-decoration: none; }
 .cover-hero {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;
-  border-radius: 16px;
+  height: 100%;
+  border-radius: 18px;
   overflow: hidden;
   background: linear-gradient(180deg, #DBEAFE 0%, #F1F5F9 100%);
   border: 1px solid var(--line);
+  box-shadow: 0 24px 48px -20px rgba(15,23,42,0.30);
 }
 .cover-hero image-slot {
   display: block;
   width: 100%;
   height: 100%;
+}
+.hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
 }
 .cover-hero-svg,
 .why-portrait-svg,
@@ -359,10 +373,12 @@ a { color: inherit; text-decoration: none; }
     radial-gradient(circle at 50% 60%, rgba(99,102,241,0.18), transparent 50%),
     radial-gradient(circle at 80% 30%, rgba(6,182,212,0.12), transparent 50%);
   pointer-events: none;
+  z-index: 2;
 }
 
 .cover-floating-tag {
   position: absolute;
+  z-index: 3;
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(8px);
   border: 1px solid var(--line);
@@ -1264,6 +1280,16 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 2px 4px rgba(15,23,42,0.20);
 }
 .quote-photo .role-badge svg { width: 11px; height: 11px; color: var(--p-from, #6366F1); }
+.quote-photo .portrait-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+}
+.quote-photo.has-photo .monogram { display: none; }
+.quote-photo.has-photo::after { opacity: 0; }
 
 /* Per-person color gradients */
 .quote-photo[data-p="musk"]     { --p-from: #0F172A; --p-to: #475569; }
@@ -1801,6 +1827,7 @@ a { color: inherit; text-decoration: none; }
           <path d="M 180 30 L 182 34 L 186 36 L 182 38 L 180 42 L 178 38 L 174 36 L 178 34 Z" opacity="0.7"/>
         </g>
       </svg>
+      <img class="hero-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_150511_0ac30315-91ab-4a57-9311-1d793eb6e78c_min.webp" alt="" loading="lazy" onerror="this.remove()" />
       <div class="cover-hero-overlay"></div>
       <span class="cover-floating-tag t1">AI</span>
       <span class="cover-floating-tag t2">AI AGENTS</span>
@@ -2138,6 +2165,7 @@ a { color: inherit; text-decoration: none; }
           <path d="M 268 50 L 270 54 L 274 56 L 270 58 L 268 62 L 266 58 L 262 56 L 266 54 Z" opacity="0.7"/>
         </g>
       </svg>
+      <img class="hero-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_150517_2fb098ad-43ac-486d-b713-626ccda8341d_min.webp" alt="" loading="lazy" onerror="this.remove()" />
     </div>
   </div>
 
@@ -2664,6 +2692,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="musk">
           <div class="monogram">EM</div>
           <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144503_afc0e21c-3398-44d0-ba5a-d97a2e989a19_min.webp" alt="Elon Musk" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">AI is the most powerful technology of our time, and it will transform every industry.</span>
@@ -2677,6 +2706,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="nadella">
           <div class="monogram">SN</div>
           <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144506_17840883-3671-4cde-ad88-c248093a3436_min.webp" alt="Satya Nadella" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">The world is changing, and AI is at the heart of it all.</span>
@@ -2690,6 +2720,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="huang">
           <div class="monogram">JH</div>
           <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144508_d4845f8a-fc39-4014-af19-da0c23611bd1_min.webp" alt="Jensen Huang" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">The new industrial revolution is being driven by AI.</span>
@@ -2703,6 +2734,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="pichai">
           <div class="monogram">SP</div>
           <div class="role-badge"><svg><use href="#i-bolt"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144511_6a57fe5e-26fb-4c09-a157-774099378073_min.webp" alt="Sundar Pichai" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">AI is one of the most profound things we're working on as humanity.</span>
@@ -2754,6 +2786,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="franklin">
           <div class="monogram">BF</div>
           <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144514_4a804b85-db27-42d9-846c-02310d4bd48d_min.webp" alt="Benjamin Franklin" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">An investment in knowledge pays the best interest.</span>
@@ -2767,6 +2800,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="kennedy">
           <div class="monogram">JK</div>
           <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144517_36215bc1-c8bd-4041-9679-7a1d7d184434_min.webp" alt="John F. Kennedy" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">Leadership and learning are indispensable to each other.</span>
@@ -2780,6 +2814,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="drucker">
           <div class="monogram">PD</div>
           <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144520_2743c1cf-198b-455b-81a4-15f98bf3f9c9_min.webp" alt="Peter Drucker" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">A knowledge organization has to be both a learning organization and a teaching organization.</span>
@@ -2793,6 +2828,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="ziglar">
           <div class="monogram">ZZ</div>
           <div class="role-badge"><svg><use href="#i-cert"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144523_608ff3c5-2489-4b69-862f-cc9da5972c08_min.webp" alt="Zig Ziglar" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">The only thing worse than training employees and losing them is to not train them and keeping them.</span>
@@ -2836,6 +2872,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="branson">
           <div class="monogram">RB</div>
           <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144525_90c9ab31-80f6-4dd5-b4cd-0c24a117103a_min.webp" alt="Richard Branson" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">Train people well enough so they can leave, treat them well enough so they don't want to.</span>
@@ -2849,6 +2886,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="welch">
           <div class="monogram">JW</div>
           <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144528_d2fc96d4-fa52-4d40-a6a2-58d60cbed81b_min.webp" alt="Jack Welch" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">Before you are a leader, success is all about growing yourself. When you become a leader, success is all about growing others.</span>
@@ -2862,6 +2900,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="gates">
           <div class="monogram">BG</div>
           <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144531_7d4545ee-80b6-42a3-94c1-2bf9555e89bc_min.webp" alt="Bill Gates" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">You don't really start getting old until you stop learning.</span>
@@ -2875,6 +2914,7 @@ a { color: inherit; text-decoration: none; }
         <div class="quote-photo" data-p="conant">
           <div class="monogram">DC</div>
           <div class="role-badge"><svg><use href="#i-briefcase"/></svg></div>
+          <img class="portrait-img" src="https://d8j0ntlcm91z4.cloudfront.net/user_3CXkMvQYD6UJmnBIXDcObKys6dv/hf_20260519_144534_ce3e8580-9067-4f3f-9abe-0bdf08bc6787_min.webp" alt="Doug Conant" loading="lazy" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
         </div>
         <div class="quote-body">
           <span class="quote-mark">"</span><span class="quote-text">To win in the marketplace you must first win in the workplace.</span>

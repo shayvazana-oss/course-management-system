@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PDF Form Studio · עורך וממלא טפסים</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%97%82%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">ﬡ</div>
+      <div>
+        <div class="title">PDF Form Studio</div>
+        <div class="sub">מילוי טפסים · חתימה · חותמת — הכול במחשב שלך</div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="toolbar" id="toolbar">
+      <button class="btn" id="openBtn"><span class="ic">📄</span> פתח PDF</button>
+      <div class="sep"></div>
+      <button class="btn tool" data-tool="text" title="הוסף טקסט"><span class="ic">🅣</span> טקסט</button>
+      <button class="btn tool sm" data-tool="check" title="סימן וי">✓</button>
+      <button class="btn tool sm" data-tool="cross" title="איקס">✗</button>
+      <button class="btn tool sm" data-tool="date" title="תאריך של היום">📅</button>
+      <div class="sep"></div>
+      <button class="btn tool" data-tool="signature" title="חתימה"><span class="ic">✍️</span> חתימה</button>
+      <button class="btn tool" data-tool="stamp" title="חותמת"><span class="ic">🔖</span> חותמת</button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="zoomctl" id="zoomctl">
+      <button data-z="out" title="הקטן">−</button>
+      <span class="lvl" id="zoomLvl">100%</span>
+      <button data-z="in" title="הגדל">+</button>
+      <button data-z="fit" title="התאם לרוחב">⤢</button>
+    </div>
+    <div class="sep"></div>
+    <button class="btn" id="tmplBtn" disabled><span class="ic">🗂️</span> תבניות</button>
+    <button class="btn primary" id="exportBtn" disabled><span class="ic">⬇️</span> ייצוא PDF</button>
+  </header>
+
+  <!-- ===================== BODY ===================== -->
+  <div class="body">
+    <main class="viewport" id="viewport">
+      <div class="dropzone" id="dropzone">
+        <div class="big">🗂️</div>
+        <h2>גררו לכאן קובץ PDF</h2>
+        <p>או לחצו על <strong>“פתח PDF”</strong> כדי להתחיל.</p>
+        <p class="hint" style="margin-top:14px">מלאו שדות, הוסיפו חתימה וחותמת, וייצאו PDF מוכן — בלי להדפיס ובלי לסרוק.<br>
+        הקובץ נשאר במחשב שלכם ולא נשלח לשום מקום.</p>
+      </div>
+      <div class="pages" id="pages"></div>
+    </main>
+
+    <!-- ===================== SIDEBAR ===================== -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Element properties -->
+      <div class="panel" id="propsPanel" style="display:none">
+        <h3>✎ מאפייני הפריט</h3>
+        <div class="body-p" id="propsBody"></div>
+      </div>
+
+      <!-- Signatures -->
+      <div class="panel">
+        <h3>✍️ חתימות שמורות</h3>
+        <div class="body-p">
+          <div class="asset-grid" id="sigGrid"></div>
+          <div class="row">
+            <button class="btn sm" id="drawSigBtn" style="flex:1">✎ צייר חתימה</button>
+            <button class="btn sm" id="upSigBtn" style="flex:1">⬆️ העלה</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stamps -->
+      <div class="panel">
+        <h3>🔖 חותמות שמורות</h3>
+        <div class="body-p">
+          <div class="asset-grid" id="stampGrid"></div>
+          <button class="btn sm" id="upStampBtn">⬆️ העלה חותמת</button>
+          <div class="hint">רקע לבן מוסר אוטומטית כדי שהחותמת תשב נקי על הטופס.</div>
+        </div>
+      </div>
+
+      <!-- About / privacy -->
+      <div class="panel">
+        <h3>🔒 פרטיות ואחריות</h3>
+        <div class="body-p">
+          <div class="hint">כל העיבוד מתבצע בדפדפן שלך. שום קובץ, חתימה או חותמת לא נשלחים לשרת.</div>
+          <div class="hint muted">השימוש באחריותך: החתמה/חתימה רק על מסמכים שאתה מורשה לחתום עליהם, ובאחריותך לנכונות התוכן.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="privacy">
+    <span class="lock">🔒</span>
+    <span>עובד מקומית — הקבצים שלך לא עוזבים את המכשיר.</span>
+  </div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
+<input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" class="hidden" />
+
+<!-- Signature pad modal -->
+<div class="modal-back" id="sigModal">
+  <div class="modal">
+    <header>✍️ ציור חתימה</header>
+    <div class="m-body">
+      <div class="hint">צייר את החתימה עם העכבר או האצבע. הרקע יהפוך לשקוף אוטומטית.</div>
+      <div class="sigpad-wrap"><canvas id="sigCanvas"></canvas></div>
+      <div class="row">
+        <label class="hint">צבע דיו:</label>
+        <input type="color" id="sigColor" value="#1e3a8a" />
+        <label class="hint">עובי:</label>
+        <input type="range" id="sigWidth" min="1" max="6" value="2.5" step="0.5" style="flex:1" />
+        <button class="btn sm ghost" id="sigClear">נקה</button>
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="sigSave">שמור והשתמש</button>
+      <button class="btn ghost" id="sigCancel">ביטול</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Templates modal -->
+<div class="modal-back" id="tmplModal">
+  <div class="modal">
+    <header>🗂️ תבניות טופס</header>
+    <div class="m-body">
+      <div class="hint">תבנית שומרת את מיקומי כל השדות (טקסט, חתימה, חותמת) עבור הטופס הזה — כדי למלא אותו בשנייה בפעם הבאה.</div>
+      <div class="field">
+        <label>שמור פריסה נוכחית בשם</label>
+        <div class="row">
+          <input type="text" id="tmplName" placeholder="למשל: נספח ו׳ — משרד העבודה" />
+          <button class="btn primary sm" id="tmplSave">שמור</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>תבניות שמורות</label>
+        <div class="tmpl-list" id="tmplList"></div>
+      </div>
+    </div>
+    <footer>
+      <button class="btn ghost" id="tmplClose">סגור</button>
+      <span class="spacer"></span>
+      <button class="btn sm ghost" id="tmplImport">⬆️ ייבא</button>
+      <button class="btn sm ghost" id="tmplExport">⬇️ ייצא הכול</button>
+    </footer>
+  </div>
+</div>
+<input type="file" id="tmplFile" accept="application/json" class="hidden" />
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<!-- pdf-lib is UMD → window.PDFLib (classic script, loaded first) -->
+<script src="./vendor/pdf-lib/pdf-lib.min.js"></script>
+<!-- IIFE modules hang on window.PFS -->
+<script src="./js/store.js"></script>
+<script src="./js/image-tools.js"></script>
+<script src="./js/drag-resize.js"></script>
+<script src="./js/element.js"></script>
+<script src="./js/overlay.js"></script>
+<script src="./js/pdf-view.js"></script>
+<script src="./js/assets-library.js"></script>
+<script src="./js/templates.js"></script>
+<script src="./js/exporter.js"></script>
+<!-- app is a module: imports pdf.js ESM, wires everything -->
+<script type="module" src="./app.js"></script>
+</body>
+</html>

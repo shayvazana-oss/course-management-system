@@ -111,7 +111,7 @@
           type: m.type, kind: m.kind, page: m.page,
           fx: round(m.fx), fy: round(m.fy), fw: round(m.fw), fh: round(m.fh),
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
-          text: m.text, imgUrl: m.imgUrl, aspect: m.aspect
+          text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || ''
         };
       });
     }
@@ -124,11 +124,36 @@
     }
     const round = (n) => Math.round(n * 1e5) / 1e5;
 
+    // ---- field keys (for data profiles & mail-merge) ----
+    function fieldKeys() {
+      const set = new Set();
+      elements.forEach((c) => { if (c.model.type === 'text' && c.model.fieldKey) set.add(c.model.fieldKey); });
+      return [...set];
+    }
+    function currentValues() {
+      const map = {};
+      elements.forEach((c) => { if (c.model.type === 'text' && c.model.fieldKey) map[c.model.fieldKey] = c.model.text || ''; });
+      return map;
+    }
+    function fillByKeys(map) {
+      let n = 0;
+      elements.forEach((c) => {
+        const k = c.model.fieldKey;
+        if (c.model.type === 'text' && k && Object.prototype.hasOwnProperty.call(map, k)) {
+          c.model.text = String(map[k] ?? '');
+          const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = c.model.text;
+          c.layout(); n++;
+        }
+      });
+      if (n) opts.onChange && opts.onChange();
+      return n;
+    }
+
     return {
       registerPage, addElementAt, instantiate, setPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
-      overlaySizeFor, pageCount
+      overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys
     };
   }
 

@@ -8,6 +8,7 @@ and fonts so the app runs fully offline with no CDN. Each retains its own licens
 | pdf-lib | 1.17.1 | MIT | `pdf-lib/pdf-lib.min.js` |
 | pdf.js (pdfjs-dist) | 4.6.82 | Apache-2.0 | `pdfjs/pdf.min.mjs`, `pdfjs/pdf.worker.min.mjs` |
 | pdf.js standard fonts | 4.6.82 | Foxit / Liberation (see `pdfjs/standard_fonts/LICENSE_*`) | `pdfjs/standard_fonts/*` |
+| fflate | 0.8.2 | MIT | `fflate/fflate.min.js` |
 | Heebo (via @fontsource/heebo) | — | SIL OFL 1.1 | `fonts/Heebo-*.woff2` |
 
 - pdf-lib — https://github.com/Hopding/pdf-lib (MIT)

@@ -24,7 +24,7 @@
       kind: type, page,
       fx: 0.4, fy: 0.4, fw: 0.16, fh: 0.05,
       fontFrac: 0.018, color: '#111111', bold: false, align: 'right',
-      text: '', imgUrl: null, aspect: 1
+      text: '', imgUrl: null, aspect: 1, fieldKey: ''
     };
     if (DEFAULTS[type]) Object.assign(base, DEFAULTS[type]);
     return Object.assign(base, partial || {});

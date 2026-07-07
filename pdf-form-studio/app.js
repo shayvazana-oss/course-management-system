@@ -52,6 +52,15 @@ const templates = PFS.createTemplates({
   applyModels: (models) => overlay.applyModels(models),
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
+const profiles = PFS.createDataProfiles();
+
+// populate the suggested-keys datalist
+(function fillDatalist() {
+  const dl = $('fieldKeyList');
+  PFS.SUGGESTED_FIELDS.forEach((s) => {
+    const o = document.createElement('option'); o.value = s.key; o.label = s.label; dl.appendChild(o);
+  });
+})();
 
 // =====================================================================
 //  Loading a PDF
@@ -65,6 +74,7 @@ async function openPdfFile(file) {
     dirty = false;
     $('exportBtn').disabled = false;
     $('tmplBtn').disabled = false;
+    $('mergeBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
   } catch (e) {
@@ -181,6 +191,14 @@ function renderProps(ctrl) {
     const input = document.createElement('input'); input.type = 'text'; input.value = m.text || '';
     input.addEventListener('input', () => { m.text = input.value; ctrl.layout(); markDirty(); });
     f1.appendChild(input); body.appendChild(f1);
+
+    // field name (for auto-fill from profiles & mail-merge)
+    const fKey = field('שם שדה (למילוי אוטומטי)');
+    const keyIn = document.createElement('input'); keyIn.type = 'text'; keyIn.value = m.fieldKey || '';
+    keyIn.placeholder = 'למשל: full_name, id, amount';
+    keyIn.setAttribute('list', 'fieldKeyList');
+    keyIn.addEventListener('input', () => { m.fieldKey = keyIn.value.trim(); markDirty(); });
+    fKey.appendChild(keyIn); body.appendChild(fKey);
 
     // size + color row
     const rowSC = document.createElement('div'); rowSC.className = 'row';
@@ -340,5 +358,122 @@ window.addEventListener('beforeunload', (e) => {
   if (dirty) { e.preventDefault(); e.returnValue = ''; }
 });
 
+// =====================================================================
+//  Data profiles ("My details")
+// =====================================================================
+function renderProfileSelect() {
+  const sel = $('profileSel'); sel.innerHTML = '';
+  const arr = profiles.all();
+  if (!arr.length) { const o = document.createElement('option'); o.value=''; o.textContent='(אין פרופיל — צור חדש)'; sel.appendChild(o); }
+  arr.forEach((p) => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
+  if (profiles.activeId()) sel.value = profiles.activeId();
+  renderProfileRows();
+}
+function renderProfileRows() {
+  const wrap = $('profileRows'); wrap.innerHTML = '';
+  const p = profiles.all().find((x) => x.id === $('profileSel').value);
+  if (!p) return;
+  const vals = p.values || {};
+  Object.keys(vals).forEach((k) => wrap.appendChild(profileRow(p.id, k, vals[k])));
+}
+function profileRow(pid, key, val) {
+  const row = document.createElement('div'); row.className = 'row';
+  const k = document.createElement('input'); k.type='text'; k.value=key; k.placeholder='שם שדה'; k.style.flex='0 0 40%'; k.setAttribute('list','fieldKeyList');
+  const v = document.createElement('input'); v.type='text'; v.value=val; v.placeholder='ערך'; v.style.flex='1';
+  const del = document.createElement('button'); del.className='btn sm ghost'; del.textContent='✕';
+  const commit = () => {
+    const p = profiles.all().find((x) => x.id === pid); if (!p) return;
+    p.values = {}; [...$('profileRows').children].forEach((r) => {
+      const ins = r.querySelectorAll('input'); const kk = ins[0].value.trim(); if (kk) p.values[kk] = ins[1].value;
+    });
+    profiles.saveProfile(p.name, p.values);
+  };
+  k.addEventListener('change', commit); v.addEventListener('change', commit);
+  del.addEventListener('click', () => { row.remove(); commit(); });
+  row.append(k, v, del); return row;
+}
+$('profileSel').addEventListener('change', (e) => { profiles.setActive(e.target.value); renderProfileRows(); });
+$('profileNew').addEventListener('click', () => {
+  const name = prompt('שם הפרופיל (למשל: אישי / העסק):', 'פרופיל חדש'); if (name == null) return;
+  profiles.saveProfile(name, {}); renderProfileSelect();
+});
+$('profileAddRow').addEventListener('click', () => {
+  let p = profiles.all().find((x) => x.id === $('profileSel').value);
+  if (!p) { profiles.saveProfile('פרופיל חדש', {}); renderProfileSelect(); p = profiles.active(); }
+  $('profileRows').appendChild(profileRow(p.id, '', ''));
+});
+$('profileFill').addEventListener('click', () => {
+  const p = profiles.all().find((x) => x.id === $('profileSel').value);
+  if (!p || !p.values) { PFS.toast('אין נתונים בפרופיל', 'err'); return; }
+  const n = overlay.fillByKeys(p.values);
+  PFS.toast(n ? `מולאו ${n} שדות` : 'לא נמצאו שדות מתויגים תואמים', n ? 'ok' : 'err');
+});
+$('profileGrab').addEventListener('click', () => {
+  const vals = overlay.currentValues();
+  if (!Object.keys(vals).length) { PFS.toast('אין שדות מתויגים בטופס', 'err'); return; }
+  let p = profiles.all().find((x) => x.id === $('profileSel').value);
+  const name = p ? p.name : (prompt('שם הפרופיל:', 'פרופיל חדש') || 'פרופיל חדש');
+  const merged = Object.assign({}, p?.values || {}, vals);
+  profiles.saveProfile(name, merged); renderProfileSelect();
+  PFS.toast('הפרטים נשמרו לפרופיל', 'ok');
+});
+renderProfileSelect();
+
+// =====================================================================
+//  Mail-merge (batch)
+// =====================================================================
+let mergeParsed = null; // { headers, records }
+function openMerge() {
+  const keys = overlay.fieldKeys();
+  $('mergeKeys').innerHTML = keys.length
+    ? keys.map((k) => `<span class="pill" style="margin:2px">${k}</span>`).join('')
+    : '<span class="muted">אין שדות מתויגים — הוסיפו “שם שדה” לשדות טקסט תחילה.</span>';
+  // seed CSV textarea with a header row of the field keys if empty
+  if (keys.length && !$('mergeCsv').value.trim()) $('mergeCsv').value = keys.join(',') + '\n';
+  mergeParsed = null; $('mergeRun').disabled = true; $('mergeStatus').textContent = ''; $('mergeProg').textContent = '';
+  openModal('mergeModal');
+}
+function doParseMerge() {
+  const txt = $('mergeCsv').value;
+  const parsed = PFS.merge.parseCSV(txt);
+  if (!parsed.records.length) { $('mergeStatus').textContent = 'לא נמצאו רשומות'; $('mergeRun').disabled = true; mergeParsed = null; return; }
+  mergeParsed = parsed;
+  const keys = overlay.fieldKeys();
+  const matched = parsed.headers.filter((h) => keys.includes(h));
+  $('mergeStatus').textContent = `${parsed.records.length} רשומות · ${matched.length}/${keys.length} שדות תואמים`;
+  const nf = $('mergeNameField'); nf.innerHTML = '<option value="">(מספר רץ)</option>';
+  parsed.headers.forEach((h) => { const o = document.createElement('option'); o.value=h; o.textContent=h; nf.appendChild(o); });
+  $('mergeRun').disabled = false;
+}
+$('mergeParse').addEventListener('click', doParseMerge);
+$('mergeCsv').addEventListener('input', () => { $('mergeRun').disabled = true; });
+$('mergeLoadFile').addEventListener('click', () => $('mergeFile').click());
+$('mergeFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return; e.target.value='';
+  $('mergeCsv').value = await f.text(); doParseMerge();
+});
+$('mergeClose').addEventListener('click', () => closeModal('mergeModal'));
+$('mergeRun').addEventListener('click', async () => {
+  if (!mergeParsed) doParseMerge();
+  if (!mergeParsed) return;
+  const baseModels = overlay.getElements().map((c) => c.model);
+  if (!baseModels.length) { PFS.toast('הטופס ריק', 'err'); return; }
+  const btn = $('mergeRun'); btn.disabled = true; const prev = btn.textContent;
+  try {
+    const { zip, count } = await PFS.merge.runBatch({
+      originalBytes: pdfView.getBytes(),
+      baseModels,
+      records: mergeParsed.records,
+      nameField: $('mergeNameField').value,
+      onProgress: (d, t) => { $('mergeProg').textContent = `מפיק ${d}/${t}…`; }
+    });
+    PFS.merge.downloadZip(zip, currentFileName + '-batch.zip');
+    PFS.toast(`הופקו ${count} קבצים ל-ZIP`, 'ok');
+  } catch (e) {
+    console.error(e); PFS.toast('המיזוג נכשל: ' + (e.message || e), 'err');
+  } finally { btn.disabled = false; btn.textContent = prev; $('mergeProg').textContent=''; }
+});
+$('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
+
 // sanity log
-console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib);
+console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);

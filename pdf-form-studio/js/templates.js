@@ -15,8 +15,8 @@
     let SEQ = 1;
     const uid = () => 'tpl' + (SEQ++) + '_' + Math.floor(performance.now());
 
-    const all = () => store.get(KEY, []);
-    const persist = (arr) => store.set(KEY, arr);
+    const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
+    const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
 
     function save(name) {
       const els = opts.getElements();
@@ -24,7 +24,7 @@
       const arr = all();
       const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els };
       arr.unshift(tpl);
-      persist(arr);
+      if (!persist(arr)) return; // store.set already toasted the quota error
       render();
       PFS.toast('התבנית נשמרה', 'ok');
     }

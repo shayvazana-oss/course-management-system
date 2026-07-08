@@ -55,7 +55,8 @@ const assets = PFS.createAssetsLibrary({
 });
 const templates = PFS.createTemplates({
   getElements: () => overlay.serialize(),
-  applyModels: (models) => overlay.applyModels(models),
+  // applying a template replaces the current layout (avoids stacking duplicates)
+  applyModels: (models) => { overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(models); },
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();
@@ -63,10 +64,12 @@ const fieldsPanel = PFS.createFieldsPanel({ overlay });
 
 async function runDetection() {
   if (!pdfView.hasDoc()) return;
+  const gen = loadGen;
   const btn = $('detectBtn'); const prev = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מזהה…';
   try {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
+    if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     fieldsPanel.show(det);
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
     else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
@@ -87,10 +90,16 @@ async function runDetection() {
 // =====================================================================
 //  Loading a PDF
 // =====================================================================
+let loadGen = 0; // bumped on every load so in-flight detection can bail
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   const buf = await file.arrayBuffer();
   try {
+    // start fresh: drop any elements/fields/merge state from a previous document
+    loadGen++;
+    overlay.clearElements();
+    fieldsPanel.clear();
+    mergeParsed = null;
     $('dropzone').style.display = 'none';
     await pdfView.load(buf);
     dirty = false;

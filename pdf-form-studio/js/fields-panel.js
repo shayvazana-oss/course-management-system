@@ -21,6 +21,8 @@
 
     function ensureCtrl(field, value) {
       let ctrl = ctrlByKey[field.fieldKey];
+      // drop a cached controller that was deleted elsewhere (mini-✕, Delete key, empty-blur…)
+      if (ctrl && overlay.getElements().indexOf(ctrl) === -1) { ctrl = null; delete ctrlByKey[field.fieldKey]; }
       value = value || '';
       if (!value.trim()) {
         if (ctrl) { overlay.deleteCtrl(ctrl); delete ctrlByKey[field.fieldKey]; }

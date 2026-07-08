@@ -997,7 +997,11 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     function select() { node.classList.add('selected'); }
     function deselect() {
       node.classList.remove('selected');
-      if (!isImage) { inner.contentEditable = 'false'; node.dataset.editing = '0'; }
+      if (!isImage) {
+        // blur first so the empty-text auto-remove handler can fire
+        if (node.dataset.editing === '1' && document.activeElement === inner) inner.blur();
+        inner.contentEditable = 'false'; node.dataset.editing = '0';
+      }
     }
     function remove() { node.remove(); }
 
@@ -1173,7 +1177,7 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     function applyModels(models, { keepImages = true } = {}) {
       (models || []).forEach((m) => {
         if (m.type === 'image' && !m.imgUrl && !keepImages) return;
-        if (pages[m.page]) instantiate(Object.assign(PFS.element.makeModel(m.kind || m.type, m.page), m, { id: undefined }));
+        if (pages[m.page]) instantiate(Object.assign(PFS.element.makeModel(m.kind || m.type, m.page), m));
       });
       deselectAll();
     }
@@ -1406,8 +1410,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     let SEQ = 1;
     const uid = () => 'tpl' + (SEQ++) + '_' + Math.floor(performance.now());
 
-    const all = () => store.get(KEY, []);
-    const persist = (arr) => store.set(KEY, arr);
+    const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
+    const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
 
     function save(name) {
       const els = opts.getElements();
@@ -1415,7 +1419,7 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
       const arr = all();
       const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els };
       arr.unshift(tpl);
-      persist(arr);
+      if (!persist(arr)) return; // store.set already toasted the quota error
       render();
       PFS.toast('התבנית נשמרה', 'ok');
     }
@@ -1666,7 +1670,7 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     let SEQ = 1;
     const uid = () => 'pf' + (SEQ++) + '_' + Math.floor(performance.now());
 
-    const all = () => store.get(KEY, []);
+    const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
     const persist = (arr) => store.set(KEY, arr);
     const activeId = () => store.get(ACTIVE, null);
     const setActive = (id) => store.set(ACTIVE, id);
@@ -1856,6 +1860,17 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     return out;
   }
 
+  // ensure every field has a distinct fieldKey (repeated labels like "תאריך:")
+  function uniqueKeys(fields) {
+    const seen = Object.create(null);
+    fields.forEach((f) => {
+      let k = f.fieldKey || 'field';
+      if (seen[k]) { seen[k]++; f.fieldKey = k + '_' + seen[k]; }
+      else seen[k] = 1;
+    });
+    return fields;
+  }
+
   async function detectFields(pdfDoc) {
     const num = pdfDoc.numPages;
     let anyWidget = false, anyText = false;
@@ -1892,13 +1907,13 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
       textPages.push({ items: tc.items, W, H, vp, index: i - 1 });
     }
 
-    if (anyWidget) return { tier: 'acroform', fields: widgetFields };
+    if (anyWidget) return { tier: 'acroform', fields: uniqueKeys(widgetFields) };
     if (anyText) {
       let fields = [];
       textPages.forEach((p) => { fields = fields.concat(heuristicForPage(p.items, p.W, p.H, p.vp, p.index)); });
       const seen = new Set(); const uniq = [];
       fields.forEach((f) => { const k = f.page + '|' + f.fieldKey + '|' + Math.round(f.fy * 100); if (!seen.has(k)) { seen.add(k); uniq.push(f); } });
-      return { tier: 'text', fields: uniq.slice(0, 60) };
+      return { tier: 'text', fields: uniqueKeys(uniq.slice(0, 60)) };
     }
     return { tier: 'scanned', fields: [] };
   }
@@ -1931,6 +1946,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
 
     function ensureCtrl(field, value) {
       let ctrl = ctrlByKey[field.fieldKey];
+      // drop a cached controller that was deleted elsewhere (mini-✕, Delete key, empty-blur…)
+      if (ctrl && overlay.getElements().indexOf(ctrl) === -1) { ctrl = null; delete ctrlByKey[field.fieldKey]; }
       value = value || '';
       if (!value.trim()) {
         if (ctrl) { overlay.deleteCtrl(ctrl); delete ctrlByKey[field.fieldKey]; }
@@ -2058,7 +2075,8 @@ const assets = PFS.createAssetsLibrary({
 });
 const templates = PFS.createTemplates({
   getElements: () => overlay.serialize(),
-  applyModels: (models) => overlay.applyModels(models),
+  // applying a template replaces the current layout (avoids stacking duplicates)
+  applyModels: (models) => { overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(models); },
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();
@@ -2066,10 +2084,12 @@ const fieldsPanel = PFS.createFieldsPanel({ overlay });
 
 async function runDetection() {
   if (!pdfView.hasDoc()) return;
+  const gen = loadGen;
   const btn = $('detectBtn'); const prev = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מזהה…';
   try {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
+    if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     fieldsPanel.show(det);
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
     else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
@@ -2090,10 +2110,16 @@ async function runDetection() {
 // =====================================================================
 //  Loading a PDF
 // =====================================================================
+let loadGen = 0; // bumped on every load so in-flight detection can bail
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   const buf = await file.arrayBuffer();
   try {
+    // start fresh: drop any elements/fields/merge state from a previous document
+    loadGen++;
+    overlay.clearElements();
+    fieldsPanel.clear();
+    mergeParsed = null;
     $('dropzone').style.display = 'none';
     await pdfView.load(buf);
     dirty = false;

@@ -29,7 +29,7 @@
     let SEQ = 1;
     const uid = () => 'pf' + (SEQ++) + '_' + Math.floor(performance.now());
 
-    const all = () => store.get(KEY, []);
+    const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
     const persist = (arr) => store.set(KEY, arr);
     const activeId = () => store.get(ACTIVE, null);
     const setActive = (id) => store.set(ACTIVE, id);

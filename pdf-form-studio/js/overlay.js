@@ -118,7 +118,7 @@
     function applyModels(models, { keepImages = true } = {}) {
       (models || []).forEach((m) => {
         if (m.type === 'image' && !m.imgUrl && !keepImages) return;
-        if (pages[m.page]) instantiate(Object.assign(PFS.element.makeModel(m.kind || m.type, m.page), m, { id: undefined }));
+        if (pages[m.page]) instantiate(Object.assign(PFS.element.makeModel(m.kind || m.type, m.page), m));
       });
       deselectAll();
     }

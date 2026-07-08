@@ -69,6 +69,17 @@
     return out;
   }
 
+  // ensure every field has a distinct fieldKey (repeated labels like "תאריך:")
+  function uniqueKeys(fields) {
+    const seen = Object.create(null);
+    fields.forEach((f) => {
+      let k = f.fieldKey || 'field';
+      if (seen[k]) { seen[k]++; f.fieldKey = k + '_' + seen[k]; }
+      else seen[k] = 1;
+    });
+    return fields;
+  }
+
   async function detectFields(pdfDoc) {
     const num = pdfDoc.numPages;
     let anyWidget = false, anyText = false;
@@ -105,13 +116,13 @@
       textPages.push({ items: tc.items, W, H, vp, index: i - 1 });
     }
 
-    if (anyWidget) return { tier: 'acroform', fields: widgetFields };
+    if (anyWidget) return { tier: 'acroform', fields: uniqueKeys(widgetFields) };
     if (anyText) {
       let fields = [];
       textPages.forEach((p) => { fields = fields.concat(heuristicForPage(p.items, p.W, p.H, p.vp, p.index)); });
       const seen = new Set(); const uniq = [];
       fields.forEach((f) => { const k = f.page + '|' + f.fieldKey + '|' + Math.round(f.fy * 100); if (!seen.has(k)) { seen.add(k); uniq.push(f); } });
-      return { tier: 'text', fields: uniq.slice(0, 60) };
+      return { tier: 'text', fields: uniqueKeys(uniq.slice(0, 60)) };
     }
     return { tier: 'scanned', fields: [] };
   }

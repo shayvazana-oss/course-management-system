@@ -85,7 +85,11 @@
     function select() { node.classList.add('selected'); }
     function deselect() {
       node.classList.remove('selected');
-      if (!isImage) { inner.contentEditable = 'false'; node.dataset.editing = '0'; }
+      if (!isImage) {
+        // blur first so the empty-text auto-remove handler can fire
+        if (node.dataset.editing === '1' && document.activeElement === inner) inner.blur();
+        inner.contentEditable = 'false'; node.dataset.editing = '0';
+      }
     }
     function remove() { node.remove(); }
 

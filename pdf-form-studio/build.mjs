@@ -46,6 +46,12 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (_m, src) => {
   return out;
 });
 
+// pdf-lib's minified source embeds literal U+FFFD chars (a replacement-char
+// constant + encoding tables), all inside string literals. Some hosts reject
+// U+FFFD as corruption, so rewrite each to the equivalent ASCII escape — the
+// runtime string is byte-for-byte identical, the file is now pure ASCII there.
+html = html.replace(/�/g, '\\uFFFD');
+
 // sanity: no leftover external refs
 const leftover = [...html.matchAll(/(src|href)="(\.\/|vendor\/|js\/)[^"]+"/g)].map((m) => m[0]);
 if (leftover.length) console.warn('WARNING leftover external refs:', leftover.slice(0, 8));

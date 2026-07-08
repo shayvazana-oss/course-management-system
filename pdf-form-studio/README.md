@@ -31,9 +31,23 @@ bash start.sh 9000
 פייתון). אין שלב בנייה ואין התקנת תלויות בזמן ריצה — כל הספריות כבר בתיקיית
 `vendor/`.
 
-Because the tool uses the pdf.js worker, serve it over a local server (don't
-open `index.html` from `file://`). One command: `bash start.sh`, then open the
-printed URL.
+Because the served app uses a pdf.js Web Worker, serve it over a local server
+(don't open `index.html` from `file://`). One command: `bash start.sh`, then
+open the printed URL.
+
+### גרסת קובץ יחיד (בלי שרת) / Single-file build
+
+רוצים לפתוח בלי שרת? יש גרסה של **קובץ HTML יחיד** שמכילה הכול (כולל הגופנים
+והספריות) ורצה בלחיצה כפולה או מכל אירוח:
+
+```bash
+node build.mjs      # יוצר dist/pdf-form-studio.html
+```
+
+פותחים את `dist/pdf-form-studio.html` בדפדפן — עובד גם מ-`file://`, בלי שרת ובלי
+אינטרנט. (בגרסה הזו pdf.js רץ על ה-thread הראשי כדי להיות תואם CSP, מעט איטי יותר
+מהגרסה עם ה-worker.) `dist/pdf-form-studio.artifact.html` הוא אותו דבר בפורמט
+מתאים לפרסום כ-Artifact.
 
 ## שימוש / How to use
 
@@ -47,6 +61,20 @@ printed URL.
 7. **תבניות** — שמרו את פריסת השדות של הטופס, והחילו אותה שוב בפעם הבאה.
 8. **ייצוא PDF** — מוריד קובץ PDF ממולא. הטקסט המקורי של הטופס נשאר מתחת (וניתן
    לבחירה); רק מה שהוספתם מוטבע מעליו.
+
+### 🔎 זיהוי שדות אוטומטי / Auto-detect fields
+
+כשטוענים טופס, הכלי מנסה לזהות לבד איפה צריך למלא, ומציג **פאנל “שדות שזוהו”**
+עם שורות קלט — מקלידים בשורה, וזה נכתב במקום הנכון על הטופס. שלוש רמות, בכנות:
+
+- **טופס PDF עם שדות אמיתיים (AcroForm):** זיהוי מלא ומדויק של כל השדות.
+- **PDF דיגיטלי עם שכבת טקסט:** זיהוי חכם לפי תוויות וקווים ריקים (מיטבי — ייתכנו
+  אי-דיוקים; אפשר לגרור לתיקון).
+- **טופס סרוק (תמונה בלי טקסט):** אי-אפשר לקרוא אוטומטית בלי OCR — הכלי אומר זאת
+  בבירור ומפנה למילוי ידני + שמירת **תבנית** (שממלאת בשנייה בפעם הבאה).
+
+השדות שזוהו מקבלים “שם שדה”, כך שהם עובדים מיד גם עם **הפרטים שלי** ועם **המיזוג
+המרובה**.
 
 ### חוסכי-זמן מתקדמים / Power features
 
@@ -100,9 +128,13 @@ pdf-form-studio/
     templates.js        שמירה/החלה של פריסת שדות
     data.js             פרופילי דאטה (“הפרטים שלי”)
     merge.js            מיזוג CSV מרובה → ZIP של PDF-ים
+    detect.js           זיהוי שדות (AcroForm / טקסט / סרוק)
+    fields-panel.js     שורות הקלט של השדות שזוהו
     exporter.js         הטבעה ל-PDF עם pdf-lib (מודע לסיבוב)
     store.js            עטיפת localStorage
-  vendor/               pdf-lib, pdf.js, fflate, גופן Heebo — הכול מקומי
+  vendor/               pdf-lib, pdf.js (v3 UMD), fflate, גופן Heebo — הכול מקומי
+  build.mjs             בונה גרסת קובץ-יחיד → dist/
+  dist/                 קובץ HTML יחיד ומוטמע (נוצר ע"י build.mjs)
   assets/sample-form.pdf  טופס לדוגמה לבדיקה
   start.sh              שרת מקומי
 ```
@@ -116,5 +148,5 @@ pdf-form-studio/
 ## מגבלות ותוכניות עתידיות / Limitations & roadmap
 
 - אחסון נכסים, תבניות ופרופילים מוגבל ל-~5MB (מגבלת `localStorage`). בהמשך: IndexedDB.
-- בהמשך: סיבוב/סידור עמודים בתוך האפליקציה; התקנה כ-PWA לעבודה לא-מקוונת;
-  וגרסת “עמוד אינטרנט מיידי” (Artifact) לפתיחה בלינק בלי התקנה.
+- זיהוי שדות בטפסים סרוקים דורש OCR (לא נתמך כרגע) — משתמשים בתבניות במקום.
+- בהמשך: OCR עברי לסריקות; סיבוב/סידור עמודים בתוך האפליקציה; התקנה כ-PWA.

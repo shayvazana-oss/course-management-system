@@ -57,12 +57,22 @@
           ? '📷 נראה שזה טופס <b>סרוק</b> (תמונה בלי טקסט), ולכן אי-אפשר לזהות שדות אוטומטית. הוסיפו שדות עם כלי הטקסט, ושמרו כ<b>תבנית</b> — בפעם הבאה הטופס יתמלא בשנייה.'
           : 'לא זוהו שדות אוטומטית בטופס הזה. הוסיפו שדות ידנית, ושמרו כתבנית לשימוש חוזר.';
         body.appendChild(msg);
+        if (det && det.tier === 'scanned' && opts.ocrAvailable && opts.ocrAvailable()) {
+          const btn = document.createElement('button');
+          btn.className = 'btn sm primary'; btn.style.marginTop = '8px';
+          btn.innerHTML = '\ud83d\udd24 \u05e7\u05e8\u05d0 \u05e2\u05dd OCR (\u05e2\u05d1\u05e8\u05d9\u05ea)';
+          btn.title = '\u05e7\u05e8\u05d9\u05d0\u05d4 \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea \u05e9\u05dc \u05d8\u05d5\u05e4\u05e1 \u05e1\u05e8\u05d5\u05e7 (\u05d0\u05d9\u05d8\u05d9 \u05d5\u05de\u05d9\u05d8\u05d1\u05d9)';
+          btn.addEventListener('click', () => opts.onOcr && opts.onOcr());
+          body.appendChild(btn);
+        }
         return;
       }
       const head = document.createElement('div'); head.className = 'hint muted';
       head.style.marginBottom = '4px';
       head.textContent = det.tier === 'acroform'
         ? `זוהו ${det.fields.length} שדות טופס — הקלידו כאן והם ימולאו על הטופס.`
+        : det.tier === 'ocr'
+        ? `OCR זיהה ${det.fields.length} שדות (טיוטה — בדקו ותקנו; אפשר לגרור). הקלידו למילוי.`
         : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
       body.appendChild(head);
 

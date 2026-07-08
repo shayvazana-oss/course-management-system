@@ -234,6 +234,8 @@
      (main-thread fake worker) so it needs no external file and is CSP-safe. */
   window.PFS_WORKER_SRC = './vendor/pdfjs/pdf.worker.min.js';
   window.PFS_STDFONTS = './vendor/pdfjs/standard_fonts/';
+  /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
+  window.PFS_TESS = { worker: './vendor/tesseract/worker.min.js', core: './vendor/tesseract/', lang: './vendor/tesseract/tessdata/' };
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script src="./js/store.js"></script>
@@ -249,6 +251,8 @@
 <script src="./js/data.js"></script>
 <script src="./js/merge.js"></script>
 <script src="./js/detect.js"></script>
+<script src="./vendor/tesseract/tesseract.min.js"></script>
+<script src="./js/ocr.js"></script>
 <script src="./js/fields-panel.js"></script>
 <!-- app bootstrap (classic script; uses global window.pdfjsLib) -->
 <script src="./app.js"></script>

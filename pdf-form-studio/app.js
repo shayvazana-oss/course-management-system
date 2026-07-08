@@ -60,7 +60,36 @@ const templates = PFS.createTemplates({
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();
-const fieldsPanel = PFS.createFieldsPanel({ overlay });
+const fieldsPanel = PFS.createFieldsPanel({
+  overlay,
+  ocrAvailable: () => !!(PFS.ocr && PFS.ocr.available()),
+  onOcr: () => runOcr()
+});
+
+async function runOcr() {
+  if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
+  const gen = loadGen;
+  const body = document.getElementById('fieldsBody');
+  PFS.toast('קורא את הטופס עם OCR… זה עלול לקחת כמה שניות', 'ok');
+  try {
+    const det = await PFS.ocr.runOcrDetect(pdfView.getDoc(), (done, total, stage) => {
+      if (gen !== loadGen || !body) return;
+      body.innerHTML = `<div class="hint">🔤 OCR — עמוד ${Math.min(done + 1, total)}/${total} (${stage === 'ocr' ? 'קורא' : 'מכין'})…</div>`;
+    });
+    if (gen !== loadGen) return;
+    if (!det.fields.length) {
+      fieldsPanel.show({ tier: 'scanned', fields: [] });
+      PFS.toast('OCR לא זיהה שדות ברורים — נסו מילוי ידני', 'err');
+      return;
+    }
+    fieldsPanel.show(det);
+    PFS.toast(`OCR זיהה ${det.fields.length} שדות`, 'ok');
+  } catch (e) {
+    console.error('OCR failed', e);
+    fieldsPanel.show({ tier: 'scanned', fields: [] });
+    PFS.toast('OCR נכשל: ' + (e.message || e), 'err');
+  }
+}
 
 async function runDetection() {
   if (!pdfView.hasDoc()) return;

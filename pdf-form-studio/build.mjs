@@ -35,10 +35,12 @@ html = html.replace(
   /window\.PFS_WORKER_SRC\s*=\s*'[^']*';\s*[\r\n]+\s*window\.PFS_STDFONTS\s*=\s*'[^']*';/,
   "window.PFS_WORKER_SRC = null; /* single-file: pdf.js runs main-thread */\n  window.PFS_STDFONTS = null;"
 );
+html = html.replace(/window\.PFS_TESS\s*=\s*\{[^}]*\};/, 'window.PFS_TESS = null; /* OCR omitted from single-file build */');
 
 // 3) inline every <script src="..."> ; after pdf.min.js also inline the worker
 html = html.replace(/<script src="([^"]+)"><\/script>/g, (_m, src) => {
   const rel = src.replace(/^\.\//, '');
+  if (/tesseract/.test(rel)) return '<!-- tesseract OCR omitted from single-file build (served build only) -->';
   let out = `<script>\n${escScript(rd(rel))}\n</script>`;
   if (rel.endsWith('vendor/pdfjs/pdf.min.js')) {
     out += `\n<script>/* pdf.js worker (main-thread) */\n${escScript(rd('vendor/pdfjs/pdf.worker.min.js'))}\n</script>`;

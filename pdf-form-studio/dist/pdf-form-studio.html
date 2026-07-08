@@ -594,6 +594,8 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
      (main-thread fake worker) so it needs no external file and is CSP-safe. */
   window.PFS_WORKER_SRC = null; /* single-file: pdf.js runs main-thread */
   window.PFS_STDFONTS = null;
+  /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
+  window.PFS_TESS = null; /* OCR omitted from single-file build */
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script>
@@ -1929,6 +1931,89 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
 })(window);
 
 </script>
+<!-- tesseract OCR omitted from single-file build (served build only) -->
+<script>
+/* ocr.js — read SCANNED forms with Hebrew OCR (Tesseract.js) and propose
+ * fillable fields. Best-effort: renders each page, recognizes Hebrew text with
+ * word boxes, and turns label-like words (ending in ':') into fields anchored
+ * in the blank next to them. Served-build only (needs the vendored worker +
+ * wasm + traineddata); the single-file build sets PFS_TESS = null.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+  const pdfjsLib = root.pdfjsLib;
+
+  const cfg = () => root.PFS_TESS;
+  const available = () => !!(root.Tesseract && cfg());
+  const hasHebrew = (s) => /[֐-׿]/.test(s);
+  function slug(label, i) {
+    let t = (label || '').replace(/[:：׃]\s*$/, '').trim().replace(/[^\w֐-׿]+/g, '_').replace(/^_+|_+$/g, '');
+    return t.slice(0, 40) || ('ocr_' + (i + 1));
+  }
+
+  async function renderPageCanvas(pdfDoc, n, targetW) {
+    const page = await pdfDoc.getPage(n);
+    const base = page.getViewport({ scale: 1, rotation: page.rotate });
+    const scale = Math.min(3, Math.max(1, targetW / base.width));
+    const vp = page.getViewport({ scale, rotation: page.rotate });
+    const c = document.createElement('canvas');
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    return c;
+  }
+
+  function fieldsFromWords(words, W, H, pageIndex) {
+    const out = [];
+    words.forEach((w) => {
+      const t = (w.text || '').trim();
+      if (!/[:：׃]$/.test(t) || t.length < 2) return;   // only label-like words
+      const bb = w.bbox; if (!bb) return;
+      const rtl = hasHebrew(t);
+      const defW = 0.32 * W;
+      let fx, fw;
+      if (rtl) { const lb = Math.max(0, bb.x0 - defW); fx = lb / W; fw = (bb.x0 - lb) / W; }
+      else { const rb = Math.min(W, bb.x1 + defW); fx = bb.x1 / W; fw = (rb - bb.x1) / W; }
+      const h = (bb.y1 - bb.y0);
+      out.push({
+        page: pageIndex, fieldKey: slug(t, out.length),
+        label: t.replace(/[:：׃]$/, '').trim() || 'שדה',
+        fx, fy: bb.y0 / H, fw, fh: h / H,
+        fontFrac: Math.min(0.03, (h * 0.8) / H), type: 'text', best: true, ocr: true
+      });
+    });
+    return out;
+  }
+
+  async function runOcrDetect(pdfDoc, onProgress) {
+    if (!available()) throw new Error('OCR not available in this build');
+    const c = cfg();
+    const worker = await root.Tesseract.createWorker('heb', 1, {
+      workerPath: c.worker, corePath: c.core, langPath: c.lang, gzip: false, logger: () => {}
+    });
+    let fields = [];
+    try {
+      const num = pdfDoc.numPages;
+      for (let n = 1; n <= num; n++) {
+        onProgress && onProgress(n - 1, num, 'render');
+        const canvas = await renderPageCanvas(pdfDoc, n, 1600);
+        onProgress && onProgress(n - 1, num, 'ocr');
+        const { data } = await worker.recognize(canvas);
+        const words = (data.words || []).filter((w) => w.text && w.text.trim());
+        fields = fields.concat(fieldsFromWords(words, canvas.width, canvas.height, n - 1));
+        canvas.width = 0; canvas.height = 0;
+        onProgress && onProgress(n, num, 'done');
+      }
+    } finally { try { await worker.terminate(); } catch (e) {} }
+    const seen = Object.create(null);
+    fields.forEach((f) => { let k = f.fieldKey; if (seen[k]) { seen[k]++; f.fieldKey = k + '_' + seen[k]; } else seen[k] = 1; });
+    return { tier: 'ocr', fields };
+  }
+
+  PFS.ocr = { available, runOcrDetect };
+})(window);
+
+</script>
 <script>
 /* fields-panel.js — the "detected fields" input rows.
  * Shows one labeled input per detected field; typing creates/updates a tagged
@@ -1989,12 +2074,22 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
           ? '📷 נראה שזה טופס <b>סרוק</b> (תמונה בלי טקסט), ולכן אי-אפשר לזהות שדות אוטומטית. הוסיפו שדות עם כלי הטקסט, ושמרו כ<b>תבנית</b> — בפעם הבאה הטופס יתמלא בשנייה.'
           : 'לא זוהו שדות אוטומטית בטופס הזה. הוסיפו שדות ידנית, ושמרו כתבנית לשימוש חוזר.';
         body.appendChild(msg);
+        if (det && det.tier === 'scanned' && opts.ocrAvailable && opts.ocrAvailable()) {
+          const btn = document.createElement('button');
+          btn.className = 'btn sm primary'; btn.style.marginTop = '8px';
+          btn.innerHTML = '\ud83d\udd24 \u05e7\u05e8\u05d0 \u05e2\u05dd OCR (\u05e2\u05d1\u05e8\u05d9\u05ea)';
+          btn.title = '\u05e7\u05e8\u05d9\u05d0\u05d4 \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea \u05e9\u05dc \u05d8\u05d5\u05e4\u05e1 \u05e1\u05e8\u05d5\u05e7 (\u05d0\u05d9\u05d8\u05d9 \u05d5\u05de\u05d9\u05d8\u05d1\u05d9)';
+          btn.addEventListener('click', () => opts.onOcr && opts.onOcr());
+          body.appendChild(btn);
+        }
         return;
       }
       const head = document.createElement('div'); head.className = 'hint muted';
       head.style.marginBottom = '4px';
       head.textContent = det.tier === 'acroform'
         ? `זוהו ${det.fields.length} שדות טופס — הקלידו כאן והם ימולאו על הטופס.`
+        : det.tier === 'ocr'
+        ? `OCR זיהה ${det.fields.length} שדות (טיוטה — בדקו ותקנו; אפשר לגרור). הקלידו למילוי.`
         : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
       body.appendChild(head);
 
@@ -2087,7 +2182,36 @@ const templates = PFS.createTemplates({
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();
-const fieldsPanel = PFS.createFieldsPanel({ overlay });
+const fieldsPanel = PFS.createFieldsPanel({
+  overlay,
+  ocrAvailable: () => !!(PFS.ocr && PFS.ocr.available()),
+  onOcr: () => runOcr()
+});
+
+async function runOcr() {
+  if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
+  const gen = loadGen;
+  const body = document.getElementById('fieldsBody');
+  PFS.toast('קורא את הטופס עם OCR… זה עלול לקחת כמה שניות', 'ok');
+  try {
+    const det = await PFS.ocr.runOcrDetect(pdfView.getDoc(), (done, total, stage) => {
+      if (gen !== loadGen || !body) return;
+      body.innerHTML = `<div class="hint">🔤 OCR — עמוד ${Math.min(done + 1, total)}/${total} (${stage === 'ocr' ? 'קורא' : 'מכין'})…</div>`;
+    });
+    if (gen !== loadGen) return;
+    if (!det.fields.length) {
+      fieldsPanel.show({ tier: 'scanned', fields: [] });
+      PFS.toast('OCR לא זיהה שדות ברורים — נסו מילוי ידני', 'err');
+      return;
+    }
+    fieldsPanel.show(det);
+    PFS.toast(`OCR זיהה ${det.fields.length} שדות`, 'ok');
+  } catch (e) {
+    console.error('OCR failed', e);
+    fieldsPanel.show({ tier: 'scanned', fields: [] });
+    PFS.toast('OCR נכשל: ' + (e.message || e), 'err');
+  }
+}
 
 async function runDetection() {
   if (!pdfView.hasDoc()) return;

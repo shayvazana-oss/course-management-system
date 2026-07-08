@@ -47,6 +47,7 @@
     <div class="sep"></div>
     <button class="btn" id="tmplBtn" disabled><span class="ic">🗂️</span> תבניות</button>
     <button class="btn" id="mergeBtn" disabled><span class="ic">🧬</span> מיזוג מרובה</button>
+    <button class="btn" id="fillAllBtn" disabled title="החל תבנית + מלא פרטים + חתימה/חותמת"><span class="ic">⚡</span> מלא הכל</button>
     <button class="btn primary" id="exportBtn" disabled><span class="ic">⬇️</span> ייצוא PDF</button>
   </header>
 
@@ -129,6 +130,18 @@
             <button class="btn sm ghost" id="hwWriteBtn" style="flex:1" title="כתוב טקסט בכתב ידך">כתוב על הטופס</button>
           </div>
           <div class="hint muted">מקלידים טקסט — והוא נכתב בכתב ידכם. תלוי בכמות התווים שאימנתם.</div>
+        </div>
+      </div>
+
+      <!-- Backup / restore -->
+      <div class="panel">
+        <h3>💾 גיבוי ושחזור</h3>
+        <div class="body-p">
+          <div class="hint muted">כל ההגדרות (תבניות, פרופילים, חתימות, חותמות, כתב-יד) שמורות בדפדפן. גבו לקובץ כדי לא לאבד — ושחזרו במכשיר אחר.</div>
+          <div class="row">
+            <button class="btn sm" id="backupExportBtn" style="flex:1">⬇️ גבה הכל</button>
+            <button class="btn sm" id="backupImportBtn" style="flex:1">⤴️ שחזר מקובץ</button>
+          </div>
         </div>
       </div>
 
@@ -234,6 +247,7 @@
   </div>
 </div>
 <input type="file" id="tmplFile" accept="application/json" class="hidden" />
+<input type="file" id="backupFile" accept="application/json" class="hidden" />
 
 <!-- Mail-merge modal -->
 <div class="modal-back" id="mergeModal">

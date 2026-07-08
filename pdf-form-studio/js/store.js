@@ -31,6 +31,17 @@
     },
     remove(key) {
       try { localStorage.removeItem(PREFIX + key); } catch (e) {}
+    },
+    // snapshot / restore all app data (for backup files)
+    dump() {
+      const o = {};
+      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(PREFIX) === 0) o[k] = localStorage.getItem(k); } } catch (e) {}
+      return o;
+    },
+    restore(obj) {
+      if (!obj || typeof obj !== 'object') return false;
+      try { Object.keys(obj).forEach((k) => { if (k.indexOf(PREFIX) === 0) localStorage.setItem(k, obj[k]); }); return true; }
+      catch (e) { console.warn('[store] restore failed', e); return false; }
     }
   };
 

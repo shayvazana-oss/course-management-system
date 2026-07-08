@@ -157,6 +157,7 @@ async function openPdfFile(file) {
     $('tmplBtn').disabled = false;
     $('mergeBtn').disabled = false;
     $('detectBtn').disabled = false;
+    $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     updateHwStatus();
@@ -672,6 +673,52 @@ function openHwTrainer() {
 $('hwTrainBtn').addEventListener('click', openHwTrainer);
 $('hwWriteBtn').addEventListener('click', startHandwritingFlow);
 updateHwStatus();
+
+// =====================================================================
+//  Fill-All (one click) + Backup / Restore
+// =====================================================================
+function placeDefaultAsset(kind) {
+  const item = assets.getDefault(kind);
+  if (!item) return false;
+  const aspect = item.aspect || (item.w / item.h) || 1;
+  const fw = 0.22, fh = fw / aspect;
+  const fx = kind === 'signature' ? 0.60 : 0.12, fy = 0.82;
+  overlay.instantiate(PFS.element.makeModel('image', 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind }));
+  overlay.deselectAll();
+  return true;
+}
+function fillAll() {
+  if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
+  const did = [];
+  const match = currentFp && templates.findMatch(currentFp);
+  if (match) { templates.apply(match.tpl.id); did.push('תבנית'); }
+  const ap = profiles.active();
+  if (ap && ap.values && Object.keys(ap.values).length) { const n = overlay.fillByKeys(ap.values); if (n) did.push(n + ' שדות'); }
+  const kinds = overlay.getElements().map((c) => c.model.kind);
+  if (!kinds.includes('signature') && placeDefaultAsset('signature')) did.push('חתימה');
+  if (!kinds.includes('stamp') && placeDefaultAsset('stamp')) did.push('חותמת');
+  PFS.toast(did.length ? ('מולא: ' + did.join(' + ')) : 'אין תבנית/פרופיל/חתימה תואמים', did.length ? 'ok' : 'err');
+}
+function backupExport() {
+  const data = { app: 'pdf-form-studio', type: 'backup', version: 1, ts: new Date().toISOString(), data: PFS.store.dump() };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pdf-form-studio-backup.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  PFS.toast('הגיבוי נוצר', 'ok');
+}
+async function backupImport(file) {
+  try {
+    const obj = JSON.parse(await file.text());
+    const d = obj && obj.data ? obj.data : obj;
+    if (!d || typeof d !== 'object' || !PFS.store.restore(d)) throw new Error('bad');
+    assets.renderAll(); templates.render(); renderProfileSelect(); updateHwStatus();
+    PFS.toast('השחזור הושלם', 'ok');
+  } catch (e) { PFS.toast('קובץ גיבוי לא תקין', 'err'); }
+}
+$('fillAllBtn').addEventListener('click', fillAll);
+$('backupExportBtn').addEventListener('click', backupExport);
+$('backupImportBtn').addEventListener('click', () => $('backupFile').click());
+$('backupFile').addEventListener('change', (e) => { if (e.target.files[0]) backupImport(e.target.files[0]); e.target.value = ''; });
 
 // sanity log
 console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);

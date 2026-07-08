@@ -290,3 +290,12 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
 .hw-grid .g:hover { border-color: var(--line-2); }
 .hw-grid .g.done { background: #ECFDF5; border-color: var(--ok); color: var(--ok); }
 .hw-grid .g.cur { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(79,70,229,.15); color: var(--brand); }
+
+/* default-asset star */
+.asset .star {
+  position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px;
+  border-radius: 50%; border: none; background: rgba(255,255,255,.85); color: var(--accent-warm);
+  font-size: 13px; line-height: 1; cursor: pointer; display: none; padding: 0;
+}
+.asset:hover .star, .asset.is-default .star { display: block; }
+.asset.is-default { border-color: var(--accent-warm); box-shadow: 0 0 0 2px rgba(245,158,11,.18); }

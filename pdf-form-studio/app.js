@@ -1,11 +1,17 @@
-/* app.js — bootstrap & orchestration (ES module).
- * Imports pdf.js (ESM), configures its worker, then wires the toolbar,
- * overlay manager, asset library, templates and exporter (all on window.PFS).
+/* app.js — bootstrap & orchestration (classic script).
+ * Uses global window.pdfjsLib (pdf.js v3 UMD) and configures its worker via a
+ * flag set by the host page, then wires the toolbar, overlay manager, asset
+ * library, templates, exporter, detection and fields panel (all on window.PFS).
  */
-import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
-
+(function () {
+'use strict';
+const pdfjsLib = window.pdfjsLib;
 const PFS = window.PFS;
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
+// Served build sets PFS_WORKER_SRC → real Web Worker. Single-file build omits
+// it and inlines the worker (window.pdfjsWorker) → main-thread, CSP-safe.
+if (window.PFS_WORKER_SRC && pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = window.PFS_WORKER_SRC;
+}
 
 // ---------- tiny helpers ----------
 const $ = (id) => document.getElementById(id);
@@ -39,7 +45,7 @@ const pdfView = PFS.createPdfView({
   pagesEl: $('pages'),
   viewportEl: $('viewport'),
   overlay,
-  standardFontDataUrl: new URL('./vendor/pdfjs/standard_fonts/', import.meta.url).href,
+  standardFontDataUrl: window.PFS_STDFONTS || undefined,
   onZoom: (s) => { $('zoomLvl').textContent = Math.round(s * 100) + '%'; }
 });
 
@@ -53,6 +59,22 @@ const templates = PFS.createTemplates({
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();
+const fieldsPanel = PFS.createFieldsPanel({ overlay });
+
+async function runDetection() {
+  if (!pdfView.hasDoc()) return;
+  const btn = $('detectBtn'); const prev = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מזהה…';
+  try {
+    const det = await PFS.detect.detectFields(pdfView.getDoc());
+    fieldsPanel.show(det);
+    if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
+    else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
+    else PFS.toast('לא זוהו שדות אוטומטית', 'err');
+  } catch (e) {
+    console.warn('detect failed', e); PFS.toast('זיהוי השדות נכשל', 'err');
+  } finally { btn.disabled = false; btn.innerHTML = prev; }
+}
 
 // populate the suggested-keys datalist
 (function fillDatalist() {
@@ -75,8 +97,10 @@ async function openPdfFile(file) {
     $('exportBtn').disabled = false;
     $('tmplBtn').disabled = false;
     $('mergeBtn').disabled = false;
+    $('detectBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
+    runDetection();
   } catch (e) {
     console.error(e);
     PFS.toast('טעינת ה-PDF נכשלה', 'err');
@@ -474,6 +498,8 @@ $('mergeRun').addEventListener('click', async () => {
   } finally { btn.disabled = false; btn.textContent = prev; $('mergeProg').textContent=''; }
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
+$('detectBtn').addEventListener('click', runDetection);
 
 // sanity log
 console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);
+})();

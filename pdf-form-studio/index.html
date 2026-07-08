@@ -31,6 +31,8 @@
       <div class="sep"></div>
       <button class="btn tool" data-tool="signature" title="חתימה"><span class="ic">✍️</span> חתימה</button>
       <button class="btn tool" data-tool="stamp" title="חותמת"><span class="ic">🔖</span> חותמת</button>
+      <div class="sep"></div>
+      <button class="btn" id="detectBtn" title="זהה שדות למילוי" disabled><span class="ic">🔎</span> זהה שדות</button>
     </div>
 
     <div class="spacer"></div>
@@ -62,6 +64,12 @@
 
     <!-- ===================== SIDEBAR ===================== -->
     <aside class="sidebar" id="sidebar">
+      <!-- Auto-detected fields -->
+      <div class="panel" id="fieldsPanel" style="display:none">
+        <h3>🔎 שדות שזוהו</h3>
+        <div class="body-p" id="fieldsBody"></div>
+      </div>
+
       <!-- Element properties -->
       <div class="panel" id="propsPanel" style="display:none">
         <h3>✎ מאפייני הפריט</h3>
@@ -217,8 +225,16 @@
 <div class="toast-wrap" id="toastWrap"></div>
 
 <!-- ===================== SCRIPTS ===================== -->
-<!-- pdf-lib is UMD → window.PDFLib (classic script, loaded first) -->
+<!-- pdf-lib (UMD → window.PDFLib) and pdf.js v3 (UMD → window.pdfjsLib) -->
 <script src="./vendor/pdf-lib/pdf-lib.min.js"></script>
+<script src="./vendor/pdfjs/pdf.min.js"></script>
+<script>
+  /* Served build: use a real Web Worker from the vendored file (over http).
+     The single-file Artifact build omits this and inlines pdf.worker instead
+     (main-thread fake worker) so it needs no external file and is CSP-safe. */
+  window.PFS_WORKER_SRC = './vendor/pdfjs/pdf.worker.min.js';
+  window.PFS_STDFONTS = './vendor/pdfjs/standard_fonts/';
+</script>
 <!-- IIFE modules hang on window.PFS -->
 <script src="./js/store.js"></script>
 <script src="./js/image-tools.js"></script>
@@ -232,7 +248,9 @@
 <script src="./vendor/fflate/fflate.min.js"></script>
 <script src="./js/data.js"></script>
 <script src="./js/merge.js"></script>
-<!-- app is a module: imports pdf.js ESM, wires everything -->
-<script type="module" src="./app.js"></script>
+<script src="./js/detect.js"></script>
+<script src="./js/fields-panel.js"></script>
+<!-- app bootstrap (classic script; uses global window.pdfjsLib) -->
+<script src="./app.js"></script>
 </body>
 </html>

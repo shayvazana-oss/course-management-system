@@ -76,6 +76,15 @@
 
     const imgMap = await preloadImages(models.map((m) => m.imgUrl));
     const pdfDoc = await PDFDocument.load(originalBytes);
+
+    // If the PDF is a fillable form, flatten it first: interactive field widgets
+    // otherwise render ABOVE page content and would hide our overlay text.
+    // Flattening turns them into static content so overlays sit on top.
+    try {
+      const form = pdfDoc.getForm();
+      if (form && form.getFields().length) form.flatten();
+    } catch (e) { console.warn('[export] form flatten skipped:', e && e.message); }
+
     const pages = pdfDoc.getPages();
 
     // group models by page

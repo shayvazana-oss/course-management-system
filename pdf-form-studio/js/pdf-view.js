@@ -85,10 +85,11 @@
     }
     function getScale() { return scale; }
     function getBytes() { return bytes; }
+    function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
     function numPages() { return pdfDoc ? pdfDoc.numPages : 0; }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, getBytes, hasDoc, numPages };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, getBytes, getDoc, hasDoc, numPages };
   }
 
   PFS.createPdfView = createPdfView;

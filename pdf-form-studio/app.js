@@ -120,12 +120,14 @@ async function runDetection() {
 //  Loading a PDF
 // =====================================================================
 let loadGen = 0; // bumped on every load so in-flight detection can bail
+let currentFp = null; // fingerprint of the currently-loaded form
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   const buf = await file.arrayBuffer();
   try {
     // start fresh: drop any elements/fields/merge state from a previous document
     loadGen++;
+    const myGen = loadGen;
     overlay.clearElements();
     fieldsPanel.clear();
     mergeParsed = null;
@@ -139,6 +141,19 @@ async function openPdfFile(file) {
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     updateHwStatus();
+    currentFp = null;
+    try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
+    const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp);
+    if (match) {
+      templates.apply(match.tpl.id);
+      PFS.toast('זוהה טופס מוכר — הוחלה התבנית: ' + match.tpl.name, 'ok');
+      // one-click: also fill the active profile into the (now tagged) fields
+      const ap = profiles.active();
+      if (ap && ap.values && Object.keys(ap.values).length) {
+        const n = overlay.fillByKeys(ap.values);
+        if (n) PFS.toast(`מולאו אוטומטית ${n} שדות מהפרופיל`, 'ok');
+      }
+    }
     runDetection();
   } catch (e) {
     console.error(e);
@@ -403,7 +418,7 @@ $('exportBtn').addEventListener('click', doExport);
 // templates
 $('tmplBtn').addEventListener('click', () => { templates.render(); openModal('tmplModal'); });
 $('tmplClose').addEventListener('click', () => closeModal('tmplModal'));
-$('tmplSave').addEventListener('click', () => { templates.save($('tmplName').value.trim()); $('tmplName').value = ''; });
+$('tmplSave').addEventListener('click', () => { templates.save($('tmplName').value.trim(), currentFp); $('tmplName').value = ''; });
 $('tmplExport').addEventListener('click', () => templates.exportAll());
 $('tmplImport').addEventListener('click', () => $('tmplFile').click());
 $('tmplFile').addEventListener('change', (e) => { if (e.target.files[0]) templates.importFile(e.target.files[0]); e.target.value = ''; });

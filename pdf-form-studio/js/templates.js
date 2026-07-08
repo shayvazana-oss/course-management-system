@@ -18,11 +18,11 @@
     const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
     const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
 
-    function save(name) {
+    function save(name, fp) {
       const els = opts.getElements();
       if (!els.length) { PFS.toast('אין פריטים לשמירה', 'err'); return; }
       const arr = all();
-      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els };
+      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, fp: fp || null };
       arr.unshift(tpl);
       if (!persist(arr)) return; // store.set already toasted the quota error
       render();
@@ -62,6 +62,14 @@
       }
     }
 
+    // best template whose stored fingerprint matches the given form fingerprint
+    function findMatch(fp) {
+      if (!fp || !PFS.fingerprint) return null;
+      let best = null, bestScore = 0;
+      all().forEach((t) => { if (!t.fp) return; const sc = PFS.fingerprint.score(fp, t.fp); if (sc > bestScore) { bestScore = sc; best = t; } });
+      return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
+    }
+
     function render() {
       if (!listEl) return;
       listEl.innerHTML = '';
@@ -86,7 +94,7 @@
     }
 
     render();
-    return { save, apply, remove, exportAll, importFile, render, all };
+    return { save, apply, remove, exportAll, importFile, render, all, findMatch };
   }
 
   PFS.createTemplates = createTemplates;

@@ -1656,11 +1656,11 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
     const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
 
-    function save(name) {
+    function save(name, fp) {
       const els = opts.getElements();
       if (!els.length) { PFS.toast('אין פריטים לשמירה', 'err'); return; }
       const arr = all();
-      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els };
+      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, fp: fp || null };
       arr.unshift(tpl);
       if (!persist(arr)) return; // store.set already toasted the quota error
       render();
@@ -1700,6 +1700,14 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
       }
     }
 
+    // best template whose stored fingerprint matches the given form fingerprint
+    function findMatch(fp) {
+      if (!fp || !PFS.fingerprint) return null;
+      let best = null, bestScore = 0;
+      all().forEach((t) => { if (!t.fp) return; const sc = PFS.fingerprint.score(fp, t.fp); if (sc > bestScore) { bestScore = sc; best = t; } });
+      return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
+    }
+
     function render() {
       if (!listEl) return;
       listEl.innerHTML = '';
@@ -1724,10 +1732,61 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     }
 
     render();
-    return { save, apply, remove, exportAll, importFile, render, all };
+    return { save, apply, remove, exportAll, importFile, render, all, findMatch };
   }
 
   PFS.createTemplates = createTemplates;
+})(window);
+
+</script>
+<script>
+/* fingerprint.js — recognise a form so its saved template can auto-apply.
+ * Digital PDFs: hash of page-1 text. Scanned PDFs (no text): a small average
+ * hash (aHash) of page 1. Match = same page count AND (equal text hash, or
+ * close aHash). Fully local.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  function hashStr(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h >>> 0); }
+  function hamming(a, b) { if (!a || !b || a.length !== b.length) return 999; let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d; }
+
+  async function compute(pdfDoc) {
+    const pages = pdfDoc.numPages;
+    const page = await pdfDoc.getPage(1);
+    const vp = page.getViewport({ scale: 1, rotation: page.rotate });
+    const w = Math.round(vp.width), h = Math.round(vp.height);
+    let text = '';
+    try { const tc = await page.getTextContent(); text = tc.items.map((i) => i.str).join('').replace(/\s+/g, '').slice(0, 500); } catch (e) {}
+    const textHash = text.length >= 12 ? hashStr(text) : null;
+    // aHash (8x8) of page 1
+    let ahash = '';
+    try {
+      const s = Math.min(1, 256 / vp.width);
+      const rv = page.getViewport({ scale: s, rotation: page.rotate });
+      const c = document.createElement('canvas'); c.width = Math.round(rv.width); c.height = Math.round(rv.height);
+      await page.render({ canvasContext: c.getContext('2d'), viewport: rv }).promise;
+      const N = 8; const small = document.createElement('canvas'); small.width = N; small.height = N;
+      const sctx = small.getContext('2d', { willReadFrequently: true }); sctx.drawImage(c, 0, 0, N, N);
+      const d = sctx.getImageData(0, 0, N, N).data; const g = [];
+      for (let i = 0; i < N * N; i++) g.push((d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3);
+      const avg = g.reduce((a, b) => a + b, 0) / g.length;
+      g.forEach((v) => (ahash += v > avg ? '1' : '0'));
+      c.width = 0; c.height = 0;
+    } catch (e) {}
+    return { pages, w, h, textHash, ahash };
+  }
+
+  // similarity score 0..1 (0 = no match)
+  function score(a, b) {
+    if (!a || !b || a.pages !== b.pages) return 0;
+    if (a.textHash && b.textHash) return a.textHash === b.textHash ? 1 : 0;
+    const d = hamming(a.ahash, b.ahash);
+    return d <= 10 ? 1 - d / 64 : 0;
+  }
+
+  PFS.fingerprint = { compute, score };
 })(window);
 
 </script>
@@ -2543,12 +2602,14 @@ async function runDetection() {
 //  Loading a PDF
 // =====================================================================
 let loadGen = 0; // bumped on every load so in-flight detection can bail
+let currentFp = null; // fingerprint of the currently-loaded form
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   const buf = await file.arrayBuffer();
   try {
     // start fresh: drop any elements/fields/merge state from a previous document
     loadGen++;
+    const myGen = loadGen;
     overlay.clearElements();
     fieldsPanel.clear();
     mergeParsed = null;
@@ -2562,6 +2623,19 @@ async function openPdfFile(file) {
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     updateHwStatus();
+    currentFp = null;
+    try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
+    const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp);
+    if (match) {
+      templates.apply(match.tpl.id);
+      PFS.toast('זוהה טופס מוכר — הוחלה התבנית: ' + match.tpl.name, 'ok');
+      // one-click: also fill the active profile into the (now tagged) fields
+      const ap = profiles.active();
+      if (ap && ap.values && Object.keys(ap.values).length) {
+        const n = overlay.fillByKeys(ap.values);
+        if (n) PFS.toast(`מולאו אוטומטית ${n} שדות מהפרופיל`, 'ok');
+      }
+    }
     runDetection();
   } catch (e) {
     console.error(e);
@@ -2826,7 +2900,7 @@ $('exportBtn').addEventListener('click', doExport);
 // templates
 $('tmplBtn').addEventListener('click', () => { templates.render(); openModal('tmplModal'); });
 $('tmplClose').addEventListener('click', () => closeModal('tmplModal'));
-$('tmplSave').addEventListener('click', () => { templates.save($('tmplName').value.trim()); $('tmplName').value = ''; });
+$('tmplSave').addEventListener('click', () => { templates.save($('tmplName').value.trim(), currentFp); $('tmplName').value = ''; });
 $('tmplExport').addEventListener('click', () => templates.exportAll());
 $('tmplImport').addEventListener('click', () => $('tmplFile').click());
 $('tmplFile').addEventListener('change', (e) => { if (e.target.files[0]) templates.importFile(e.target.files[0]); e.target.value = ''; });

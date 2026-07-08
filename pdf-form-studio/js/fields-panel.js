@@ -47,6 +47,20 @@
       return ctrl;
     }
 
+    function ensureCheck(field, on) {
+      let ctrl = ctrlByKey[field.fieldKey];
+      if (ctrl && overlay.getElements().indexOf(ctrl) === -1) { ctrl = null; delete ctrlByKey[field.fieldKey]; }
+      if (!on) { if (ctrl) { overlay.deleteCtrl(ctrl); delete ctrlByKey[field.fieldKey]; } return; }
+      if (!ctrl) {
+        const model = PFS.element.makeModel('check', field.page, {
+          fx: field.fx, fy: field.fy, fontFrac: Math.max(field.fontFrac || 0.02, 0.02),
+          fieldKey: field.fieldKey
+        });
+        ctrl = overlay.instantiate(model); overlay.deselectAll();
+        ctrlByKey[field.fieldKey] = ctrl;
+      }
+    }
+
     function show(det) {
       clear();
       if (!panel || !body) return;
@@ -80,16 +94,24 @@
         const row = document.createElement('div'); row.className = 'field';
         const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
         const inRow = document.createElement('div'); inRow.className = 'row';
-        const inp = document.createElement('input'); inp.type = 'text'; inp.dir = 'auto';
-        inp.placeholder = 'מלא/י…'; inp.style.flex = '1';
-        inp.addEventListener('input', () => ensureCtrl(f, inp.value));
+        let control;
+        if (f.type === 'check') {
+          control = document.createElement('input'); control.type = 'checkbox';
+          control.style.width = '20px'; control.style.height = '20px'; control.style.accentColor = 'var(--brand)';
+          control.title = 'סמן וי על הטופס';
+          control.addEventListener('change', () => ensureCheck(f, control.checked));
+        } else {
+          control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
+          control.placeholder = 'מלא/י…'; control.style.flex = '1';
+          control.addEventListener('input', () => ensureCtrl(f, control.value));
+        }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';
         go.addEventListener('click', () => {
           const c = ctrlByKey[f.fieldKey];
           if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
         });
-        inRow.append(inp, go); row.appendChild(inRow);
+        inRow.append(control, go); row.appendChild(inRow);
         body.appendChild(row);
       });
     }

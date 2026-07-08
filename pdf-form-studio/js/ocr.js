@@ -45,6 +45,27 @@
       const bb = w.bb, rtl = hasHebrew(core);
       const h = bb.y1 - bb.y0, yc = (bb.y0 + bb.y1) / 2;
       const sameLine = boxes.filter((o) => o !== w && Math.abs((o.bb.y0 + o.bb.y1) / 2 - yc) < h * 0.6);
+
+      // grow the label with tight same-line neighbours on the LABEL side
+      // (RTL: to the right of the colon word; LTR: to the left). The blank is on
+      // the opposite side, so this never eats into the fill area.
+      const labelWords = [{ x: bb.x0, t: core }];
+      const chain = rtl
+        ? sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2).sort((a, b) => a.bb.x0 - b.bb.x0)
+        : sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2).sort((a, b) => b.bb.x1 - a.bb.x1);
+      let edge = rtl ? bb.x1 : bb.x0, added = 0;
+      for (const o of chain) {
+        if (added >= 2) break;
+        const gap = rtl ? (o.bb.x0 - edge) : (edge - o.bb.x1);
+        if (gap > h * 1.6) break;                 // a big gap = the blank / next field
+        const ot = o.t.replace(/[:：׃]\s*$/, '').trim();
+        if (letters(ot) < 1) break;
+        labelWords.push({ x: o.bb.x0, t: ot });
+        edge = rtl ? o.bb.x1 : o.bb.x0; added++;
+      }
+      const label = (rtl ? labelWords.sort((a, b) => b.x - a.x) : labelWords.sort((a, b) => a.x - b.x))
+        .map((o) => o.t).join(' ');
+
       const defW = 0.30 * W;
       let fx, fw;
       if (rtl) {
@@ -57,7 +78,7 @@
         fx = bb.x1 / W; fw = Math.max(24, rb - bb.x1) / W;
       }
       out.push({
-        page: pageIndex, fieldKey: slug(core, out.length), label: core,
+        page: pageIndex, fieldKey: slug(label, out.length), label: label,
         fx, fy: bb.y0 / H, fw, fh: h / H,
         fontFrac: Math.min(0.03, (h * 0.8) / H), type: 'text', best: true, ocr: true,
         conf: w.conf, _yc: yc

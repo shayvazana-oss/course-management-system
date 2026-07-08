@@ -1956,26 +1956,50 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
     return c;
   }
 
+  const letters = (s) => (s.match(/[A-Za-z֐-׿]/g) || []).length;
+
   function fieldsFromWords(words, W, H, pageIndex) {
+    // keep reasonably confident words that have a box
+    const boxes = words
+      .filter((w) => w.bbox && (w.confidence == null || w.confidence >= 55))
+      .map((w) => ({ t: (w.text || '').trim(), bb: w.bbox, conf: w.confidence == null ? 60 : w.confidence }));
+
     const out = [];
-    words.forEach((w) => {
-      const t = (w.text || '').trim();
-      if (!/[:：׃]$/.test(t) || t.length < 2) return;   // only label-like words
-      const bb = w.bbox; if (!bb) return;
-      const rtl = hasHebrew(t);
-      const defW = 0.32 * W;
+    boxes.forEach((w) => {
+      const t = w.t;
+      if (!/[:：׃]$/.test(t)) return;                 // must look like a label "…:"
+      const core = t.replace(/[:：׃]\s*$/, '').trim();
+      if (core.length < 2 || letters(core) < 2) return; // drop punctuation/garbage tokens
+      const bb = w.bb, rtl = hasHebrew(core);
+      const h = bb.y1 - bb.y0, yc = (bb.y0 + bb.y1) / 2;
+      const sameLine = boxes.filter((o) => o !== w && Math.abs((o.bb.y0 + o.bb.y1) / 2 - yc) < h * 0.6);
+      const defW = 0.30 * W;
       let fx, fw;
-      if (rtl) { const lb = Math.max(0, bb.x0 - defW); fx = lb / W; fw = (bb.x0 - lb) / W; }
-      else { const rb = Math.min(W, bb.x1 + defW); fx = bb.x1 / W; fw = (rb - bb.x1) / W; }
-      const h = (bb.y1 - bb.y0);
+      if (rtl) {
+        const left = sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2);
+        const lb = left.length ? Math.max(...left.map((o) => o.bb.x1)) : Math.max(0, bb.x0 - defW);
+        fx = lb / W; fw = Math.max(24, bb.x0 - lb) / W;
+      } else {
+        const right = sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2);
+        const rb = right.length ? Math.min(...right.map((o) => o.bb.x0)) : Math.min(W, bb.x1 + defW);
+        fx = bb.x1 / W; fw = Math.max(24, rb - bb.x1) / W;
+      }
       out.push({
-        page: pageIndex, fieldKey: slug(t, out.length),
-        label: t.replace(/[:：׃]$/, '').trim() || 'שדה',
+        page: pageIndex, fieldKey: slug(core, out.length), label: core,
         fx, fy: bb.y0 / H, fw, fh: h / H,
-        fontFrac: Math.min(0.03, (h * 0.8) / H), type: 'text', best: true, ocr: true
+        fontFrac: Math.min(0.03, (h * 0.8) / H), type: 'text', best: true, ocr: true,
+        conf: w.conf, _yc: yc
       });
     });
-    return out;
+
+    // drop near-duplicate labels (same text, close vertically) keeping higher confidence
+    out.sort((a, b) => b.conf - a.conf);
+    const kept = [];
+    out.forEach((f) => {
+      const dup = kept.find((k) => k.label === f.label && k.page === f.page && Math.abs(k._yc - f._yc) < (f.fh * H) * 1.5);
+      if (!dup) kept.push(f);
+    });
+    return kept;
   }
 
   async function runOcrDetect(pdfDoc, onProgress) {

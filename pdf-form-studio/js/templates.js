@@ -70,19 +70,33 @@
       return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
     }
 
+    function rename(id) {
+      const t = all().find((x) => x.id === id); if (!t) return;
+      const nm = prompt('שם חדש לתבנית:', t.name); if (nm == null) return;
+      const arr = all(); const item = arr.find((x) => x.id === id);
+      if (item) { item.name = nm.trim() || item.name; persist(arr); render(); }
+    }
+
+    let filterText = '';
+    function setFilter(q) { filterText = (q || '').trim().toLowerCase(); render(); }
     function render() {
       if (!listEl) return;
       listEl.innerHTML = '';
-      const arr = all();
+      let arr = all();
+      if (filterText) arr = arr.filter((t) => (t.name || '').toLowerCase().indexOf(filterText) !== -1);
       if (!arr.length) {
         const em = document.createElement('div');
-        em.className = 'hint muted'; em.textContent = 'אין תבניות שמורות עדיין.';
+        em.className = 'hint muted'; em.textContent = filterText ? 'אין תבניות תואמות.' : 'אין תבניות שמורות עדיין.';
         listEl.appendChild(em);
         return;
       }
       arr.forEach((t) => {
         const row = document.createElement('div'); row.className = 'tmpl-item';
-        const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = t.name;
+        const nm = document.createElement('div'); nm.className = 'nm';
+        nm.textContent = (t.fp ? '🔗 ' : '') + t.name;
+        nm.title = (t.fp ? 'מקושר לטופס — יוחל אוטומטית כשתפתחו אותו\n' : '') + 'לחצו לשינוי שם';
+        nm.style.cursor = 'pointer';
+        nm.addEventListener('click', () => rename(t.id));
         const cnt = document.createElement('span'); cnt.className = 'pill'; cnt.textContent = (t.elements || []).length + ' שדות';
         const applyBtn = document.createElement('button'); applyBtn.className = 'btn sm primary'; applyBtn.textContent = 'החל';
         applyBtn.addEventListener('click', () => apply(t.id));
@@ -94,7 +108,7 @@
     }
 
     render();
-    return { save, apply, remove, exportAll, importFile, render, all, findMatch };
+    return { save, apply, remove, exportAll, importFile, render, all, findMatch, rename, setFilter };
   }
 
   PFS.createTemplates = createTemplates;

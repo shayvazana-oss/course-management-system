@@ -438,6 +438,7 @@ $('exportBtn').addEventListener('click', doExport);
 // templates
 $('tmplBtn').addEventListener('click', () => { templates.render(); openModal('tmplModal'); });
 $('tmplClose').addEventListener('click', () => closeModal('tmplModal'));
+$('tmplSearch').addEventListener('input', (e) => templates.setFilter(e.target.value));
 $('tmplSave').addEventListener('click', () => { templates.save($('tmplName').value.trim(), currentFp); $('tmplName').value = ''; });
 $('tmplExport').addEventListener('click', () => templates.exportAll());
 $('tmplImport').addEventListener('click', () => $('tmplFile').click());

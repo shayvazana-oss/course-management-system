@@ -9,156 +9,156 @@
 </head>
 <body>
 <div class="app">
-  <!-- ===================== TOP BAR ===================== -->
   <header class="topbar">
-    <div class="brand">
-      <div class="logo">ﬡ</div>
-      <div>
-        <div class="title">PDF Form Studio</div>
-        <div class="sub">מילוי טפסים · חתימה · חותמת — הכול במחשב שלך</div>
+    <div class="tb-right">
+      <div class="brand">
+        <div class="logo">ﬡ</div>
+        <div>
+          <div class="title">PDF Form Studio</div>
+          <div class="sub">מילוי טפסים · בלי הדפסה וסריקה</div>
+        </div>
       </div>
     </div>
-
-    <div class="sep"></div>
-
-    <div class="toolbar" id="toolbar">
-      <button class="btn" id="openBtn"><span class="ic">📄</span> פתח PDF</button>
-      <div class="sep"></div>
-      <button class="btn tool" data-tool="text" title="הוסף טקסט"><span class="ic">🅣</span> טקסט</button>
-      <button class="btn tool sm" data-tool="check" title="סימן וי">✓</button>
-      <button class="btn tool sm" data-tool="cross" title="איקס">✗</button>
-      <button class="btn tool sm" data-tool="date" title="תאריך של היום">📅</button>
-      <div class="sep"></div>
-      <button class="btn tool" data-tool="signature" title="חתימה"><span class="ic">✍️</span> חתימה</button>
-      <button class="btn tool" data-tool="stamp" title="חותמת"><span class="ic">🔖</span> חותמת</button>
-      <button class="btn tool" data-tool="handwriting" title="כתב יד אישי"><span class="ic">🖊️</span> כתב יד</button>
-      <div class="sep"></div>
-      <button class="btn" id="detectBtn" title="זהה שדות למילוי" disabled><span class="ic">🔎</span> זהה שדות</button>
+    <div class="tb-center">
+      <div class="docbar hidden" id="docbar">
+        <span class="fname" id="fname">—</span>
+        <div class="zoomctl" id="zoomctl">
+          <button data-z="out" title="הקטן">−</button>
+          <span class="lvl" id="zoomLvl">100%</span>
+          <button data-z="in" title="הגדל">+</button>
+          <button data-z="fit" title="התאם לרוחב">⤢</button>
+        </div>
+      </div>
     </div>
-
-    <div class="spacer"></div>
-
-    <div class="zoomctl" id="zoomctl">
-      <button data-z="out" title="הקטן">−</button>
-      <span class="lvl" id="zoomLvl">100%</span>
-      <button data-z="in" title="הגדל">+</button>
-      <button data-z="fit" title="התאם לרוחב">⤢</button>
+    <div class="tb-left">
+      <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל">☰</button>
+      <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic">📄</span><span class="txt">פתח</span></button>
+      <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic">🗂️</span><span class="txt">תבניות</span></button>
+      <button class="btn ghost" id="mergeBtn" disabled title="מיזוג מרובה"><span class="ic">🧬</span><span class="txt">מיזוג</span></button>
+      <button class="btn accent" id="fillAllBtn" disabled title="מלא הכל בקליק"><span class="ic">⚡</span><span class="txt">מלא הכל</span></button>
+      <button class="btn primary" id="exportBtn" disabled title="ייצוא PDF"><span class="ic">⬇️</span><span class="txt">ייצוא PDF</span></button>
     </div>
-    <div class="sep"></div>
-    <button class="btn" id="tmplBtn" disabled><span class="ic">🗂️</span> תבניות</button>
-    <button class="btn" id="mergeBtn" disabled><span class="ic">🧬</span> מיזוג מרובה</button>
-    <button class="btn" id="fillAllBtn" disabled title="החל תבנית + מלא פרטים + חתימה/חותמת"><span class="ic">⚡</span> מלא הכל</button>
-    <button class="btn primary" id="exportBtn" disabled><span class="ic">⬇️</span> ייצוא PDF</button>
   </header>
 
-  <!-- ===================== BODY ===================== -->
-  <div class="body">
+  <div class="workspace">
+    <nav class="rail" id="rail">
+      <button class="rail-btn tool" data-tool="text" title="טקסט">🅣<span class="lbl">טקסט</span></button>
+      <button class="rail-btn tool" data-tool="check" title="וי">✓<span class="lbl">סימן וי</span></button>
+      <button class="rail-btn tool" data-tool="cross" title="איקס">✗<span class="lbl">איקס</span></button>
+      <button class="rail-btn tool" data-tool="date" title="תאריך">📅<span class="lbl">תאריך היום</span></button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn tool" data-tool="signature" title="חתימה">✍️<span class="lbl">חתימה</span></button>
+      <button class="rail-btn tool" data-tool="stamp" title="חותמת">🔖<span class="lbl">חותמת</span></button>
+      <button class="rail-btn tool" data-tool="handwriting" title="כתב יד">🖊️<span class="lbl">כתב יד אישי</span></button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn" id="detectBtn" disabled title="זהה שדות">🔎<span class="lbl">זהה שדות</span></button>
+      <div class="spacer"></div>
+    </nav>
+
     <main class="viewport" id="viewport">
       <div class="dropzone" id="dropzone">
         <div class="big">🗂️</div>
-        <h2>גררו לכאן קובץ PDF</h2>
-        <p>או לחצו על <strong>“פתח PDF”</strong> כדי להתחיל.</p>
-        <p class="hint" style="margin-top:14px">מלאו שדות, הוסיפו חתימה וחותמת, וייצאו PDF מוכן — בלי להדפיס ובלי לסרוק.<br>
-        הקובץ נשאר במחשב שלכם ולא נשלח לשום מקום.</p>
+        <h2>ממלאים טפסים — בלי הדפסה ובלי סריקה</h2>
+        <p>גררו לכאן קובץ PDF, או פתחו קובץ כדי להתחיל.</p>
+        <div class="dz-steps">
+          <div class="dz-step"><div class="n">1</div><div class="t">פתחו PDF</div><div class="d">גררו או בחרו קובץ</div></div>
+          <div class="dz-step"><div class="n">2</div><div class="t">מלאו וחתמו</div><div class="d">טקסט · חתימה · חותמת</div></div>
+          <div class="dz-step"><div class="n">3</div><div class="t">ייצאו PDF</div><div class="d">מוכן לשליחה</div></div>
+        </div>
+        <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
+        <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
       </div>
       <div class="pages" id="pages"></div>
     </main>
 
-    <!-- ===================== SIDEBAR ===================== -->
-    <aside class="sidebar" id="sidebar">
-      <!-- Auto-detected fields -->
-      <div class="panel" id="fieldsPanel" style="display:none">
-        <h3>🔎 שדות שזוהו</h3>
-        <div class="body-p" id="fieldsBody"></div>
+    <aside class="rightpanel" id="rightpanel">
+      <div class="tabs">
+        <button class="tab active" data-tab="fill">📝 מילוי</button>
+        <button class="tab" data-tab="assets">🖋️ נכסים</button>
+        <button class="tab" data-tab="settings">⚙️ הגדרות</button>
       </div>
-
-      <!-- Element properties -->
-      <div class="panel" id="propsPanel" style="display:none">
-        <h3>✎ מאפייני הפריט</h3>
-        <div class="body-p" id="propsBody"></div>
-      </div>
-
-      <!-- My details (data profiles) -->
-      <div class="panel">
-        <h3>👤 הפרטים שלי</h3>
-        <div class="body-p">
-          <div class="row">
-            <select id="profileSel" style="flex:1"></select>
-            <button class="btn sm" id="profileNew" title="פרופיל חדש">＋</button>
+      <div class="tab-body">
+        <section class="tab-panel active" data-panel="fill">
+          <div class="card" id="propsPanel" style="display:none">
+            <h3>✎ מאפייני הפריט</h3>
+            <div class="body-p" id="propsBody"></div>
           </div>
-          <div id="profileRows" class="tmpl-list"></div>
-          <button class="btn sm ghost" id="profileAddRow">＋ הוסף שדה</button>
-          <div class="row">
-            <button class="btn sm primary" id="profileFill" style="flex:1" title="ממלא שדות מתויגים בטופס">מלא בטופס</button>
-            <button class="btn sm" id="profileGrab" style="flex:1" title="שומר את ערכי השדות שבטופס לפרופיל">שמור מהטופס</button>
+          <div class="card" id="fieldsPanel" style="display:none">
+            <h3>🔎 שדות שזוהו</h3>
+            <div class="body-p" id="fieldsBody"></div>
           </div>
-          <div class="hint muted">תייגו שדה טקסט ב“שם שדה” (בפאנל מאפייני הפריט) כדי שהמילוי האוטומטי יזהה אותו.</div>
-        </div>
-      </div>
-
-      <!-- Signatures -->
-      <div class="panel">
-        <h3>✍️ חתימות שמורות</h3>
-        <div class="body-p">
-          <div class="asset-grid" id="sigGrid"></div>
-          <div class="row">
-            <button class="btn sm" id="drawSigBtn" style="flex:1">✎ צייר חתימה</button>
-            <button class="btn sm" id="upSigBtn" style="flex:1">⬆️ העלה</button>
+          <div class="card">
+            <h3>👤 הפרטים שלי</h3>
+            <div class="body-p">
+              <div class="row">
+                <select id="profileSel" style="flex:1"></select>
+                <button class="btn sm" id="profileNew" title="פרופיל חדש">＋</button>
+              </div>
+              <div id="profileRows" class="tmpl-list"></div>
+              <button class="btn sm ghost" id="profileAddRow">＋ הוסף שדה</button>
+              <div class="row">
+                <button class="btn sm primary" id="profileFill" style="flex:1" title="ממלא שדות מתויגים">מלא בטופס</button>
+                <button class="btn sm" id="profileGrab" style="flex:1" title="שומר את ערכי השדות לפרופיל">שמור מהטופס</button>
+              </div>
+              <div class="hint muted">תייגו שדה טקסט ב“שם שדה” (במאפייני הפריט) כדי שהמילוי האוטומטי יזהה אותו.</div>
+            </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <!-- Stamps -->
-      <div class="panel">
-        <h3>🔖 חותמות שמורות</h3>
-        <div class="body-p">
-          <div class="asset-grid" id="stampGrid"></div>
-          <button class="btn sm" id="upStampBtn">⬆️ העלה חותמת</button>
-          <div class="hint">רקע לבן מוסר אוטומטית כדי שהחותמת תשב נקי על הטופס.</div>
-        </div>
-      </div>
-
-      <!-- My handwriting -->
-      <div class="panel">
-        <h3>🖊️ כתב היד שלי</h3>
-        <div class="body-p">
-          <div class="hint muted" id="hwStatus">עדיין לא אימנת כתב יד.</div>
-          <button class="btn sm primary" id="hwTrainBtn">✍️ אמן / עדכן כתב יד</button>
-          <div class="row">
-            <label class="hint">צבע דיו:</label>
-            <input type="color" id="hwInk" value="#1a237e" />
-            <button class="btn sm ghost" id="hwWriteBtn" style="flex:1" title="כתוב טקסט בכתב ידך">כתוב על הטופס</button>
+        <section class="tab-panel" data-panel="assets">
+          <div class="card">
+            <h3>✍️ חתימות שמורות</h3>
+            <div class="body-p">
+              <div class="asset-grid" id="sigGrid"></div>
+              <div class="row">
+                <button class="btn sm" id="drawSigBtn" style="flex:1">✎ צייר</button>
+                <button class="btn sm" id="upSigBtn" style="flex:1">⬆️ העלה</button>
+              </div>
+            </div>
           </div>
-          <div class="hint muted">מקלידים טקסט — והוא נכתב בכתב ידכם. תלוי בכמות התווים שאימנתם.</div>
-        </div>
-      </div>
-
-      <!-- Backup / restore -->
-      <div class="panel">
-        <h3>💾 גיבוי ושחזור</h3>
-        <div class="body-p">
-          <div class="hint muted">כל ההגדרות (תבניות, פרופילים, חתימות, חותמות, כתב-יד) שמורות בדפדפן. גבו לקובץ כדי לא לאבד — ושחזרו במכשיר אחר.</div>
-          <div class="row">
-            <button class="btn sm" id="backupExportBtn" style="flex:1">⬇️ גבה הכל</button>
-            <button class="btn sm" id="backupImportBtn" style="flex:1">⤴️ שחזר מקובץ</button>
+          <div class="card">
+            <h3>🔖 חותמות שמורות</h3>
+            <div class="body-p">
+              <div class="asset-grid" id="stampGrid"></div>
+              <button class="btn sm" id="upStampBtn">⬆️ העלה חותמת</button>
+              <div class="hint muted">רקע לבן מוסר אוטומטית כדי שהחותמת תשב נקי.</div>
+            </div>
           </div>
-        </div>
-      </div>
+          <div class="card">
+            <h3>🖊️ כתב היד שלי</h3>
+            <div class="body-p">
+              <div class="hint muted" id="hwStatus">עדיין לא אימנת כתב יד.</div>
+              <button class="btn sm primary" id="hwTrainBtn">✍️ אמן / עדכן כתב יד</button>
+              <div class="row">
+                <label class="hint">צבע:</label>
+                <input type="color" id="hwInk" value="#1a237e" />
+                <button class="btn sm ghost" id="hwWriteBtn" style="flex:1" title="כתוב בכתב ידך">כתוב על הטופס</button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <!-- About / privacy -->
-      <div class="panel">
-        <h3>🔒 פרטיות ואחריות</h3>
-        <div class="body-p">
-          <div class="hint">כל העיבוד מתבצע בדפדפן שלך. שום קובץ, חתימה או חותמת לא נשלחים לשרת.</div>
-          <div class="hint muted">השימוש באחריותך: החתמה/חתימה רק על מסמכים שאתה מורשה לחתום עליהם, ובאחריותך לנכונות התוכן.</div>
-        </div>
+        <section class="tab-panel" data-panel="settings">
+          <div class="card">
+            <h3>💾 גיבוי ושחזור</h3>
+            <div class="body-p">
+              <div class="hint muted">כל ההגדרות (תבניות, פרופילים, חתימות, חותמות, כתב-יד) שמורות בדפדפן. גבו לקובץ, ושחזרו בכל מכשיר.</div>
+              <div class="row">
+                <button class="btn sm" id="backupExportBtn" style="flex:1">⬇️ גבה הכל</button>
+                <button class="btn sm" id="backupImportBtn" style="flex:1">⤴️ שחזר מקובץ</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔒 פרטיות ואחריות</h3>
+            <div class="body-p">
+              <div class="hint">כל העיבוד מתבצע בדפדפן שלך. שום קובץ לא נשלח לשרת.</div>
+              <div class="hint muted">השימוש באחריותך: חתמו/החתימו רק על מסמכים שאתם מורשים לחתום עליהם.</div>
+            </div>
+          </div>
+        </section>
       </div>
     </aside>
-  </div>
-
-  <div class="privacy">
-    <span class="lock">🔒</span>
-    <span>עובד מקומית — הקבצים שלך לא עוזבים את המכשיר.</span>
   </div>
 </div>
 

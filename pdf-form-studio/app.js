@@ -53,7 +53,7 @@ const overlay = PFS.createOverlayManager({
   onSelect: (ctrl) => renderProps(ctrl),
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
-    if (!on) document.querySelectorAll('.btn.tool.active').forEach((b) => b.classList.remove('active'));
+    if (!on) document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active'));
   }
 });
 
@@ -153,6 +153,8 @@ async function openPdfFile(file) {
     $('dropzone').style.display = 'none';
     await pdfView.load(buf);
     dirty = false;
+    $('docbar').classList.remove('hidden');
+    $('fname').textContent = file.name;
     $('exportBtn').disabled = false;
     $('tmplBtn').disabled = false;
     $('mergeBtn').disabled = false;
@@ -178,7 +180,7 @@ async function openPdfFile(file) {
   } catch (e) {
     console.error(e);
     PFS.toast('טעינת ה-PDF נכשלה', 'err');
-    if (!pdfView.hasDoc()) $('dropzone').style.display = '';
+    if (!pdfView.hasDoc()) { $('dropzone').style.display = ''; $('docbar').classList.add('hidden'); }
   }
 }
 let currentFileName = 'filled';
@@ -189,7 +191,7 @@ let currentFileName = 'filled';
 const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date' };
 
 function activateTool(btn, tool) {
-  document.querySelectorAll('.btn.tool').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   if (tool === 'handwriting') { btn.classList.remove('active'); startHandwritingFlow(); return; }
   if (tool === 'signature' || tool === 'stamp') {
@@ -281,6 +283,9 @@ function renderProps(ctrl) {
   const panel = $('propsPanel'), body = $('propsBody');
   if (!ctrl) { panel.style.display = 'none'; return; }
   panel.style.display = '';
+  // reveal the selected element's editor: the fill tab holds the props card
+  activateTab('fill');
+  if (isNarrow()) openPanel();
   const m = ctrl.model;
   body.innerHTML = '';
 
@@ -410,12 +415,27 @@ document.querySelectorAll('.modal-back').forEach((mb) => {
 // =====================================================================
 // open buttons
 $('openBtn').addEventListener('click', () => $('pdfInput').click());
+$('openBtn2').addEventListener('click', () => $('pdfInput').click());
 $('pdfInput').addEventListener('change', (e) => { if (e.target.files[0]) openPdfFile(e.target.files[0]); e.target.value = ''; });
 
-// toolbar tools
-document.querySelectorAll('.btn.tool').forEach((btn) => {
+// right-panel tabs
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === name));
+}
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)));
+
+// mobile: right panel is a slide-in drawer
+const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
+function openPanel() { $('rightpanel').classList.add('open'); }
+function closePanel() { $('rightpanel').classList.remove('open'); }
+$('panelToggle').addEventListener('click', () => $('rightpanel').classList.toggle('open'));
+
+// tool rail
+document.querySelectorAll('.rail-btn.tool').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
+    if (isNarrow()) closePanel(); // reveal the page so the placement click lands on it
     activateTool(btn, btn.dataset.tool);
   });
 });

@@ -280,3 +280,13 @@ kbd { font-family: var(--font-mono); font-size: 11px; background: var(--bg-cream
   .btn .ic { font-size: 14px; }
   .viewport { padding: 10px; }
 }
+
+/* ===================== HANDWRITING TRAINER ===================== */
+.hw-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-top: 4px; max-height: 132px; overflow-y: auto; }
+.hw-grid .g {
+  aspect-ratio: 1; display: grid; place-items: center; font-size: 15px; font-weight: 600;
+  border: 1px solid var(--line); border-radius: 6px; cursor: pointer; background: var(--bg-base); color: var(--ink-4);
+}
+.hw-grid .g:hover { border-color: var(--line-2); }
+.hw-grid .g.done { background: #ECFDF5; border-color: var(--ok); color: var(--ok); }
+.hw-grid .g.cur { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(79,70,229,.15); color: var(--brand); }

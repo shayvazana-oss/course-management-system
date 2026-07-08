@@ -31,6 +31,7 @@
       <div class="sep"></div>
       <button class="btn tool" data-tool="signature" title="חתימה"><span class="ic">✍️</span> חתימה</button>
       <button class="btn tool" data-tool="stamp" title="חותמת"><span class="ic">🔖</span> חותמת</button>
+      <button class="btn tool" data-tool="handwriting" title="כתב יד אישי"><span class="ic">🖊️</span> כתב יד</button>
       <div class="sep"></div>
       <button class="btn" id="detectBtn" title="זהה שדות למילוי" disabled><span class="ic">🔎</span> זהה שדות</button>
     </div>
@@ -116,6 +117,21 @@
         </div>
       </div>
 
+      <!-- My handwriting -->
+      <div class="panel">
+        <h3>🖊️ כתב היד שלי</h3>
+        <div class="body-p">
+          <div class="hint muted" id="hwStatus">עדיין לא אימנת כתב יד.</div>
+          <button class="btn sm primary" id="hwTrainBtn">✍️ אמן / עדכן כתב יד</button>
+          <div class="row">
+            <label class="hint">צבע דיו:</label>
+            <input type="color" id="hwInk" value="#1a237e" />
+            <button class="btn sm ghost" id="hwWriteBtn" style="flex:1" title="כתוב טקסט בכתב ידך">כתוב על הטופס</button>
+          </div>
+          <div class="hint muted">מקלידים טקסט — והוא נכתב בכתב ידכם. תלוי בכמות התווים שאימנתם.</div>
+        </div>
+      </div>
+
       <!-- About / privacy -->
       <div class="panel">
         <h3>🔒 פרטיות ואחריות</h3>
@@ -155,6 +171,38 @@
     <footer>
       <button class="btn primary" id="sigSave">שמור והשתמש</button>
       <button class="btn ghost" id="sigCancel">ביטול</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Handwriting training modal -->
+<div class="modal-back" id="hwModal">
+  <div class="modal" style="max-width:540px">
+    <header>🖊️ אימון כתב היד שלי</header>
+    <div class="m-body">
+      <div class="hint">ציירו כל תו פעם אחת בכתב ידכם. ככל שתשלימו יותר — הכתב ייראה טבעי יותר. אפשר לדלג על תווים שלא צריך.</div>
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <button class="btn sm ghost" id="hwPrev" title="הקודם">→</button>
+        <div style="text-align:center; flex:1">
+          <div id="hwGlyph" style="font-size:46px; font-weight:700; line-height:1.1"></div>
+          <div class="hint muted" id="hwProg"></div>
+        </div>
+        <button class="btn sm ghost" id="hwNext" title="הבא">←</button>
+      </div>
+      <div class="sigpad-wrap"><canvas id="hwCanvas"></canvas></div>
+      <div class="row">
+        <button class="btn sm ghost" id="hwClear">נקה</button>
+        <span class="spacer"></span>
+        <button class="btn sm" id="hwSkip">דלג</button>
+        <button class="btn sm primary" id="hwSave">שמור והמשך</button>
+      </div>
+      <div class="hw-grid" id="hwGrid"></div>
+    </div>
+    <footer>
+      <button class="btn ghost" id="hwClose">סיום</button>
+      <span class="spacer"></span>
+      <span class="hint muted" id="hwCount"></span>
+      <button class="btn sm ghost" id="hwReset" title="מחק את כל התווים">אפס</button>
     </footer>
   </div>
 </div>
@@ -240,6 +288,7 @@
 <!-- IIFE modules hang on window.PFS -->
 <script src="./js/store.js"></script>
 <script src="./js/image-tools.js"></script>
+<script src="./js/handwriting.js"></script>
 <script src="./js/drag-resize.js"></script>
 <script src="./js/element.js"></script>
 <script src="./js/overlay.js"></script>

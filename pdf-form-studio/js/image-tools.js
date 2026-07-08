@@ -157,8 +157,54 @@
     };
   }
 
+  /* strokePad — like signaturePad but records raw polyline strokes (in CSS px),
+   * used to capture individual handwriting glyphs for later synthesis. */
+  function strokePad(canvas) {
+    const ctx = canvas.getContext('2d');
+    let drawing = false, strokes = [], cur = null, color = '#111827', width = 3;
+
+    function resize() {
+      const r = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(r.width * dpr);
+      canvas.height = Math.round(r.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      redraw();
+    }
+    function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    function redraw() {
+      const r = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, r.width, r.height);
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      strokes.forEach((st) => { ctx.beginPath(); st.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke(); });
+    }
+    function down(e) { drawing = true; cur = [pos(e)]; strokes.push(cur); canvas.setPointerCapture(e.pointerId); }
+    function move(e) {
+      if (!drawing) return;
+      const q = pos(e); const a = cur[cur.length - 1]; cur.push(q);
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+    }
+    function up() { drawing = false; }
+    canvas.addEventListener('pointerdown', down);
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerup', up);
+    canvas.addEventListener('pointercancel', up);
+
+    return {
+      resize,
+      clear() { strokes = []; cur = null; redraw(); },
+      isEmpty() { return !strokes.some((s) => s.length >= 2); },
+      getStrokes() { return strokes.map((s) => s.map((q) => ({ x: q.x, y: q.y }))); },
+      setStrokes(s) { strokes = s ? s.map((x) => x.map((q) => ({ x: q.x, y: q.y }))) : []; redraw(); },
+      setColor(c) { color = c; redraw(); },
+      setWidth(w) { width = w; }
+    };
+  }
+
   PFS.imageTools = {
     ACCEPT, loadImage, fileToImage, toCanvas,
-    whiteToTransparent, autoTrim, canvasToPngUrl, processUpload, signaturePad
+    whiteToTransparent, autoTrim, canvasToPngUrl, processUpload, signaturePad, strokePad
   };
 })(window);

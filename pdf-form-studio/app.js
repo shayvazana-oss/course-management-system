@@ -138,6 +138,7 @@ async function openPdfFile(file) {
     $('detectBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
+    updateHwStatus();
     runDetection();
   } catch (e) {
     console.error(e);
@@ -155,6 +156,7 @@ const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date' 
 function activateTool(btn, tool) {
   document.querySelectorAll('.btn.tool').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
+  if (tool === 'handwriting') { btn.classList.remove('active'); startHandwritingFlow(); return; }
   if (tool === 'signature' || tool === 'stamp') {
     // handled by their own flows below
     btn.classList.remove('active');
@@ -288,6 +290,25 @@ function renderProps(ctrl) {
       seg.appendChild(b);
     });
     rowBA.append(bold, seg); body.appendChild(rowBA);
+  } else if (m.kind === 'handwriting') {
+    const regen = () => {
+      const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#1a237e' });
+      m.imgUrl = r.url; m.aspect = r.w / r.h; m.fh = m.fw / m.aspect;
+      const img = ctrl.node.querySelector('img'); if (img) img.src = r.url;
+      ctrl.layout(); markDirty();
+    };
+    const f1 = field('טקסט (כתב יד)');
+    const inp = document.createElement('input'); inp.type = 'text'; inp.dir = 'auto'; inp.value = m.text || '';
+    inp.addEventListener('change', () => { m.text = inp.value; regen(); });
+    f1.appendChild(inp); body.appendChild(f1);
+    const rowSC = document.createElement('div'); rowSC.className = 'row';
+    const fSize = field('גודל'); fSize.style.flex = '1'; const size = document.createElement('input');
+    size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1'; size.value = Math.round(m.fw * 100);
+    size.addEventListener('input', () => { m.fw = parseInt(size.value, 10) / 100; m.fh = m.fw / (m.aspect || 1); ctrl.layout(); markDirty(); });
+    fSize.appendChild(size);
+    const fCol = field('צבע'); const col = document.createElement('input'); col.type = 'color'; col.value = toHex(m.color || '#1a237e');
+    col.addEventListener('input', () => { m.color = col.value; regen(); }); fCol.appendChild(col);
+    rowSC.append(fSize, fCol); body.appendChild(rowSC);
   } else {
     const f = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';
@@ -537,6 +558,81 @@ $('mergeRun').addEventListener('click', async () => {
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
 $('detectBtn').addEventListener('click', runDetection);
+
+// =====================================================================
+//  Handwriting ("כתב היד שלי")
+// =====================================================================
+const HW = () => PFS.handwriting;
+let hwPad = null, hwIndex = 0;
+function hwInk() { return ($('hwInk') && $('hwInk').value) || '#1a237e'; }
+function updateHwStatus() {
+  const n = HW().count(), total = HW().GLYPHS.length;
+  if ($('hwStatus')) $('hwStatus').textContent = n ? `אומנו ${n}/${total} תווים — מוכן לכתיבה.` : 'עדיין לא אימנת כתב יד.';
+}
+function startHandwritingFlow() {
+  if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
+  if (!HW().hasGlyphs()) { PFS.toast('קודם אמן/י כתב יד', 'ok'); openHwTrainer(); return; }
+  writeHandwriting();
+}
+function writeHandwriting() {
+  const text = prompt('מה לכתוב בכתב ידך?');
+  if (text == null || !text.trim()) return;
+  const res = HW().renderText(text, { fontPx: 72, color: hwInk() });
+  const aspect = res.w / res.h;
+  const fw = Math.max(0.08, Math.min(0.6, 0.028 * text.length + 0.08));
+  overlay.setPlacing({
+    sticky: false,
+    create: (page, fx, fy) => {
+      overlay.addElementAt('image', page, fx, fy, {
+        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color: hwInk()
+      });
+      return null;
+    }
+  });
+  PFS.toast('לחץ על הטופס כדי למקם', 'ok');
+}
+function hwCurrent() { return HW().GLYPHS[hwIndex]; }
+function hwRenderTrainer() {
+  const ch = hwCurrent();
+  $('hwGlyph').textContent = ch;
+  $('hwProg').textContent = `תו ${hwIndex + 1} מתוך ${HW().GLYPHS.length}`;
+  $('hwCount').textContent = `${HW().count()}/${HW().GLYPHS.length} אומנו`;
+  if (hwPad) hwPad.clear();
+  const grid = $('hwGrid'); grid.innerHTML = '';
+  HW().GLYPHS.forEach((c, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'g' + (HW().hasGlyph(c) ? ' done' : '') + (i === hwIndex ? ' cur' : '');
+    cell.textContent = c;
+    cell.addEventListener('click', () => { hwIndex = i; hwRenderTrainer(); });
+    grid.appendChild(cell);
+  });
+}
+function hwGo(d) { const n = HW().GLYPHS.length; hwIndex = (hwIndex + d + n) % n; hwRenderTrainer(); }
+function hwSaveNext() {
+  if (!hwPad || hwPad.isEmpty()) { PFS.toast('צייר את התו קודם', 'err'); return; }
+  HW().setGlyph(hwCurrent(), hwPad.getStrokes());
+  updateHwStatus(); hwGo(1);
+}
+function openHwTrainer() {
+  openModal('hwModal');
+  if (!hwPad) {
+    hwPad = PFS.imageTools.strokePad($('hwCanvas'));
+    hwPad.setColor('#111827'); hwPad.setWidth(3);
+    $('hwClear').addEventListener('click', () => hwPad.clear());
+    $('hwSave').addEventListener('click', hwSaveNext);
+    $('hwSkip').addEventListener('click', () => hwGo(1));
+    $('hwPrev').addEventListener('click', () => hwGo(-1));
+    $('hwNext').addEventListener('click', () => hwGo(1));
+    $('hwClose').addEventListener('click', () => { closeModal('hwModal'); updateHwStatus(); });
+    $('hwReset').addEventListener('click', () => { if (confirm('למחוק את כל כתב היד שאימנת?')) { HW().clearAll(); updateHwStatus(); hwRenderTrainer(); } });
+  }
+  const g = HW().GLYPHS; let idx = g.findIndex((ch) => !HW().hasGlyph(ch));
+  hwIndex = idx < 0 ? 0 : idx;
+  requestAnimationFrame(() => { hwPad.resize(); hwRenderTrainer(); });
+}
+$('hwTrainBtn').addEventListener('click', openHwTrainer);
+$('hwWriteBtn').addEventListener('click', startHandwritingFlow);
+updateHwStatus();
 
 // sanity log
 console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);

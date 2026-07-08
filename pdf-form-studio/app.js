@@ -29,9 +29,27 @@ PFS.toast = function (msg, kind) {
 let dirty = false;
 const markDirty = () => { dirty = true; };
 
+// ---------- undo / redo (snapshots of the overlay) ----------
+let history = [], redo = [], restoring = false, snapT = null;
+function resetHistory() { history = [JSON.stringify([])]; redo = []; }
+function scheduleSnap() { if (restoring) return; clearTimeout(snapT); snapT = setTimeout(snapshot, 300); }
+function snapshot() {
+  if (restoring) return;
+  const s = JSON.stringify(overlay.serialize());
+  if (history.length && history[history.length - 1] === s) return;
+  history.push(s); if (history.length > 40) history.shift(); redo = [];
+}
+function restoreState(json) {
+  restoring = true; clearTimeout(snapT);
+  overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(JSON.parse(json));
+  restoring = false; markDirty();
+}
+function undo() { if (history.length < 2) return; redo.push(history.pop()); restoreState(history[history.length - 1]); }
+function redoAction() { if (!redo.length) return; const s = redo.pop(); history.push(s); restoreState(s); }
+
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
-  onChange: markDirty,
+  onChange: () => { markDirty(); scheduleSnap(); },
   onSelect: (ctrl) => renderProps(ctrl),
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
@@ -130,6 +148,7 @@ async function openPdfFile(file) {
     const myGen = loadGen;
     overlay.clearElements();
     fieldsPanel.clear();
+    resetHistory();
     mergeParsed = null;
     $('dropzone').style.display = 'none';
     await pdfView.load(buf);
@@ -448,6 +467,11 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
     e.preventDefault(); overlay.deleteCtrl(sel);
+  }
+  if ((e.ctrlKey || e.metaKey) && !editing && !inField) {
+    const k = (e.key || '').toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoAction(); }
   }
 });
 

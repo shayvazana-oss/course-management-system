@@ -758,9 +758,7 @@ function fillAll() {
 }
 function backupExport() {
   const data = { app: 'pdf-form-studio', type: 'backup', version: 1, ts: new Date().toISOString(), data: PFS.store.dump() };
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pdf-form-studio-backup.json'; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  PFS.deliver.file(JSON.stringify(data), 'pdf-form-studio-backup.json', 'application/json');
   PFS.toast('הגיבוי נוצר', 'ok');
 }
 async function backupImport(file) {

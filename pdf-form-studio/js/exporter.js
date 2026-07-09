@@ -132,12 +132,7 @@
   }
 
   function downloadBytes(bytes, filename) {
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || 'filled.pdf';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
   PFS.exporter = { exportPdf, downloadBytes };

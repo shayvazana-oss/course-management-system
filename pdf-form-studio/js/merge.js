@@ -72,12 +72,7 @@
   }
 
   function downloadZip(zipBytes, filename) {
-    const blob = new Blob([zipBytes], { type: 'application/zip' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || 'filled-forms.zip';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
   PFS.merge = { parseCSV, applyRecord, runBatch, downloadZip };

@@ -834,6 +834,84 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 </script>
 <script>
+/* deliver.js — hand a generated file to the user, everywhere.
+ * Normally a programmatic <a download> click just works. Inside a sandboxed
+ * iframe (the hosted artifact) downloads can be silently blocked, so there we
+ * also show a "הקובץ מוכן" dialog with manual fallbacks: a direct download
+ * link (works when the host allows downloads) and open-in-new-tab (works when
+ * the host allows popups — the new tab can then save/print the file).
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  // sandboxed iframes without allow-same-origin get an opaque ("null") origin
+  const SANDBOXED = (function () { try { return window.origin === 'null'; } catch (e) { return true; } })();
+
+  let back = null, els = null, curUrl = null;
+  function build() {
+    if (back) return;
+    back = document.createElement('div');
+    back.className = 'modal-back';
+    back.id = 'dlvModal';
+    back.innerHTML =
+      '<div class="modal" style="max-width:420px">' +
+      '  <header>📄 הקובץ מוכן</header>' +
+      '  <div class="m-body">' +
+      '    <div class="row" style="justify-content:space-between">' +
+      '      <b id="dlvName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr"></b>' +
+      '      <span class="hint muted" id="dlvSize"></span>' +
+      '    </div>' +
+      '    <a class="btn primary block" id="dlvGo" style="text-decoration:none">⬇️ הורדה</a>' +
+      '    <a class="btn block" id="dlvOpen" target="_blank" rel="noopener" style="text-decoration:none">🔗 פתח בכרטיסייה חדשה</a>' +
+      '    <div class="hint muted">אם ההורדה לא מתחילה — לחצו "פתח בכרטיסייה חדשה" ושמרו משם (סמל ההורדה/שיתוף של הדפדפן).</div>' +
+      '  </div>' +
+      '  <footer><button class="btn ghost" id="dlvClose">סגור</button></footer>' +
+      '</div>';
+    document.body.appendChild(back);
+    els = {
+      name: back.querySelector('#dlvName'),
+      size: back.querySelector('#dlvSize'),
+      go: back.querySelector('#dlvGo'),
+      open: back.querySelector('#dlvOpen')
+    };
+    const close = () => {
+      back.classList.remove('show');
+      if (curUrl) { const u = curUrl; curUrl = null; setTimeout(() => URL.revokeObjectURL(u), 4000); }
+    };
+    back.querySelector('#dlvClose').addEventListener('click', close);
+    back.addEventListener('pointerdown', (e) => { if (e.target === back) close(); });
+  }
+
+  function human(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+
+  /* file(data: Uint8Array|ArrayBuffer|string|Blob, filename, mime) */
+  function file(data, filename, mime) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: mime || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    // the normal path — succeeds anywhere downloads are permitted
+    try {
+      const a = document.createElement('a');
+      a.href = url; a.download = filename || 'file';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { /* fall through to the dialog */ }
+    if (!SANDBOXED) { setTimeout(() => URL.revokeObjectURL(url), 8000); return; }
+    // sandboxed host: keep the URL alive and give manual fallbacks
+    build();
+    if (curUrl) URL.revokeObjectURL(curUrl);
+    curUrl = url;
+    els.name.textContent = filename || 'file';
+    els.size.textContent = human(blob.size);
+    els.go.href = url; els.go.setAttribute('download', filename || 'file');
+    els.open.href = url;
+    back.classList.add('show');
+  }
+
+  PFS.deliver = { file, SANDBOXED };
+})(window);
+
+</script>
+<script>
 /* image-tools.js — client-side image processing for signatures & stamps.
  * Adapted from the canvas downscale idea in image-slot.js, plus
  * white-background removal, auto-trim, and a signature drawing pad.
@@ -1816,12 +1894,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
     function exportAll() {
       const data = JSON.stringify({ app: 'pdf-form-studio', version: 1, templates: all() }, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'pdf-form-studio-templates.json';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+      PFS.deliver.file(data, 'pdf-form-studio-templates.json', 'application/json');
     }
     async function importFile(file) {
       try {
@@ -2079,12 +2152,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   }
 
   function downloadBytes(bytes, filename) {
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || 'filled.pdf';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
   PFS.exporter = { exportPdf, downloadBytes };
@@ -2232,12 +2300,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   }
 
   function downloadZip(zipBytes, filename) {
-    const blob = new Blob([zipBytes], { type: 'application/zip' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || 'filled-forms.zip';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
   PFS.merge = { parseCSV, applyRecord, runBatch, downloadZip };
@@ -3394,9 +3457,7 @@ function fillAll() {
 }
 function backupExport() {
   const data = { app: 'pdf-form-studio', type: 'backup', version: 1, ts: new Date().toISOString(), data: PFS.store.dump() };
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pdf-form-studio-backup.json'; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  PFS.deliver.file(JSON.stringify(data), 'pdf-form-studio-backup.json', 'application/json');
   PFS.toast('הגיבוי נוצר', 'ok');
 }
 async function backupImport(file) {

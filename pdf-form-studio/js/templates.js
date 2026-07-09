@@ -39,12 +39,7 @@
 
     function exportAll() {
       const data = JSON.stringify({ app: 'pdf-form-studio', version: 1, templates: all() }, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'pdf-form-studio-templates.json';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+      PFS.deliver.file(data, 'pdf-form-studio-templates.json', 'application/json');
     }
     async function importFile(file) {
       try {

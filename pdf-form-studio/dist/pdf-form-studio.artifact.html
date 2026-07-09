@@ -241,6 +241,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .modal footer { padding: 13px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-start; }
 .sigpad-wrap { border: 1px solid var(--line-2); border-radius: var(--r-sm); background: repeating-conic-gradient(#f4f6f9 0% 25%, #fff 0% 50%) 0/16px 16px; touch-action: none; }
 .sigpad-wrap canvas { display: block; width: 100%; height: 190px; cursor: crosshair; border-radius: var(--r-sm); }
+.hw-preview { min-height: 72px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line-2); border-radius: var(--r-sm); background: var(--surface-2); padding: 10px; }
+.hw-preview img { max-width: 100%; max-height: 84px; }
 
 /* ===== RESPONSIVE ===== */
 .panel-toggle { display: none; }
@@ -482,6 +484,33 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   </div>
 </div>
 
+<!-- Handwriting write modal (in-app; prompt() is blocked in sandboxed hosts) -->
+<div class="modal-back" id="hwWriteModal">
+  <div class="modal" style="max-width:460px">
+    <header>🖊️ כתיבה בכתב היד שלך</header>
+    <div class="m-body">
+      <div class="field">
+        <label>מה לכתוב?</label>
+        <input type="text" id="hwWriteText" dir="auto" placeholder="הקלידו כאן — והטקסט יופיע בכתב ידכם" />
+      </div>
+      <div class="field">
+        <label>תצוגה מקדימה</label>
+        <div class="hw-preview" id="hwWritePreview"><span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span></div>
+      </div>
+      <div class="row">
+        <label class="hint">צבע דיו:</label>
+        <input type="color" id="hwWriteInk" value="#1a237e" />
+        <span class="spacer"></span>
+        <button class="btn sm ghost" id="hwWriteTrain">✍️ אמן / עדכן אותיות</button>
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="hwWritePlace" disabled>מקם על הטופס</button>
+      <button class="btn ghost" id="hwWriteCancel">ביטול</button>
+    </footer>
+  </div>
+</div>
+
 <!-- Templates modal -->
 <div class="modal-back" id="tmplModal">
   <div class="modal">
@@ -629,20 +658,48 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script>
-/* store.js — tiny namespaced localStorage wrapper.
- * All persisted data (saved signatures, stamps, templates) lives here.
- * Kept behind a small API so it can be swapped for IndexedDB later (v2)
- * without touching callers. Everything is local to this browser.
+/* store.js — tiny namespaced storage wrapper.
+ * All persisted data (saved signatures, stamps, templates, handwriting) lives
+ * here. Uses localStorage when the browser allows it; inside a sandboxed
+ * iframe (e.g. a hosted artifact) localStorage access throws SecurityError,
+ * so we fall back to an in-memory map — everything works for the session and
+ * `persistent` is false so the app can tell the user to use backup/restore.
  */
 (function (root) {
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
   const PREFIX = 'pfs:';
 
+  // pick a backend: real localStorage if usable, else in-memory Map
+  let backend, persistent;
+  try {
+    const probe = PREFIX + '__probe__';
+    localStorage.setItem(probe, '1');
+    localStorage.removeItem(probe);
+    backend = {
+      get: (k) => localStorage.getItem(k),
+      set: (k, v) => localStorage.setItem(k, v),
+      remove: (k) => localStorage.removeItem(k),
+      keys: () => { const a = []; for (let i = 0; i < localStorage.length; i++) a.push(localStorage.key(i)); return a; }
+    };
+    persistent = true;
+  } catch (e) {
+    const mem = new Map();
+    backend = {
+      get: (k) => (mem.has(k) ? mem.get(k) : null),
+      set: (k, v) => { mem.set(k, String(v)); },
+      remove: (k) => { mem.delete(k); },
+      keys: () => [...mem.keys()]
+    };
+    persistent = false;
+    console.warn('[store] localStorage unavailable (sandboxed?) — using in-memory storage for this session');
+  }
+
   const store = {
+    persistent,
     get(key, fallback) {
       try {
-        const raw = localStorage.getItem(PREFIX + key);
+        const raw = backend.get(PREFIX + key);
         return raw == null ? fallback : JSON.parse(raw);
       } catch (e) {
         console.warn('[store] read failed', key, e);
@@ -651,7 +708,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     },
     set(key, value) {
       try {
-        localStorage.setItem(PREFIX + key, JSON.stringify(value));
+        backend.set(PREFIX + key, JSON.stringify(value));
         return true;
       } catch (e) {
         // Most likely QuotaExceededError.
@@ -661,22 +718,111 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       }
     },
     remove(key) {
-      try { localStorage.removeItem(PREFIX + key); } catch (e) {}
+      try { backend.remove(PREFIX + key); } catch (e) {}
     },
     // snapshot / restore all app data (for backup files)
     dump() {
       const o = {};
-      try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(PREFIX) === 0) o[k] = localStorage.getItem(k); } } catch (e) {}
+      try { backend.keys().forEach((k) => { if (k && k.indexOf(PREFIX) === 0) o[k] = backend.get(k); }); } catch (e) {}
       return o;
     },
     restore(obj) {
       if (!obj || typeof obj !== 'object') return false;
-      try { Object.keys(obj).forEach((k) => { if (k.indexOf(PREFIX) === 0) localStorage.setItem(k, obj[k]); }); return true; }
+      try { Object.keys(obj).forEach((k) => { if (k.indexOf(PREFIX) === 0) backend.set(k, obj[k]); }); return true; }
       catch (e) { console.warn('[store] restore failed', e); return false; }
     }
   };
 
   PFS.store = store;
+})(window);
+
+</script>
+<script>
+/* ui.js — in-app replacements for window.prompt / window.confirm.
+ * Browser-native dialogs are blocked inside sandboxed iframes (hosted
+ * artifact), so every "ask the user" flow goes through this promise-based
+ * modal instead. Reuses the app's .modal styles.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  let back = null, els = null, resolveFn = null;
+
+  function build() {
+    if (back) return;
+    back = document.createElement('div');
+    back.className = 'modal-back';
+    back.id = 'uiDialog';
+    back.innerHTML =
+      '<div class="modal" style="max-width:400px">' +
+      '  <header id="uiDlgTitle"></header>' +
+      '  <div class="m-body">' +
+      '    <div class="hint" id="uiDlgMsg" style="display:none"></div>' +
+      '    <input type="text" id="uiDlgInput" style="display:none" />' +
+      '  </div>' +
+      '  <footer>' +
+      '    <button class="btn primary" id="uiDlgOk">אישור</button>' +
+      '    <button class="btn ghost" id="uiDlgCancel">ביטול</button>' +
+      '  </footer>' +
+      '</div>';
+    document.body.appendChild(back);
+    els = {
+      title: back.querySelector('#uiDlgTitle'),
+      msg: back.querySelector('#uiDlgMsg'),
+      input: back.querySelector('#uiDlgInput'),
+      ok: back.querySelector('#uiDlgOk'),
+      cancel: back.querySelector('#uiDlgCancel')
+    };
+    els.ok.addEventListener('click', () => finish(true));
+    els.cancel.addEventListener('click', () => finish(false));
+    back.addEventListener('pointerdown', (e) => { if (e.target === back) finish(false); });
+    els.input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+  }
+
+  function finish(ok) {
+    if (!resolveFn) return;
+    const r = resolveFn; resolveFn = null;
+    back.classList.remove('show');
+    const isPrompt = els.input.style.display !== 'none';
+    r(ok ? (isPrompt ? els.input.value : true) : (isPrompt ? null : false));
+  }
+
+  /* prompt(title, {value, placeholder, message, okText}) → Promise<string|null> */
+  function promptDialog(title, opts) {
+    opts = opts || {};
+    build();
+    if (resolveFn) finish(false); // close a stale dialog
+    els.title.textContent = title || '';
+    els.msg.textContent = opts.message || '';
+    els.msg.style.display = opts.message ? '' : 'none';
+    els.input.style.display = '';
+    els.input.value = opts.value || '';
+    els.input.placeholder = opts.placeholder || '';
+    els.ok.textContent = opts.okText || 'אישור';
+    back.classList.add('show');
+    setTimeout(() => { els.input.focus(); els.input.select(); }, 30);
+    return new Promise((res) => { resolveFn = res; });
+  }
+
+  /* confirm(title, message?) → Promise<boolean> */
+  function confirmDialog(title, message) {
+    build();
+    if (resolveFn) finish(false);
+    els.title.textContent = title || '';
+    els.msg.textContent = message || '';
+    els.msg.style.display = message ? '' : 'none';
+    els.input.style.display = 'none';
+    els.ok.textContent = 'אישור';
+    back.classList.add('show');
+    setTimeout(() => els.ok.focus(), 30);
+    return new Promise((res) => { resolveFn = res; });
+  }
+
+  PFS.ui = { prompt: promptDialog, confirm: confirmDialog };
 })(window);
 
 </script>
@@ -1694,9 +1840,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
     }
 
-    function rename(id) {
+    async function rename(id) {
       const t = all().find((x) => x.id === id); if (!t) return;
-      const nm = prompt('שם חדש לתבנית:', t.name); if (nm == null) return;
+      const nm = await PFS.ui.prompt('שם חדש לתבנית', { value: t.name });
+      if (nm == null) return;
       const arr = all(); const item = arr.find((x) => x.id === id);
       if (item) { item.name = nm.trim() || item.name; persist(arr); render(); }
     }
@@ -2504,7 +2651,8 @@ PFS.toast = function (msg, kind) {
   t.textContent = msg;
   wrap.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, 2200);
+  const ms = arguments.length > 2 && arguments[2] ? arguments[2] : 2200;
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, ms);
 };
 
 // ---------- state ----------
@@ -3019,9 +3167,10 @@ function profileRow(pid, key, val) {
   row.append(k, v, del); return row;
 }
 $('profileSel').addEventListener('change', (e) => { profiles.setActive(e.target.value); renderProfileRows(); });
-$('profileNew').addEventListener('click', () => {
-  const name = prompt('שם הפרופיל (למשל: אישי / העסק):', 'פרופיל חדש'); if (name == null) return;
-  profiles.saveProfile(name, {}); renderProfileSelect();
+$('profileNew').addEventListener('click', async () => {
+  const name = await PFS.ui.prompt('שם הפרופיל', { value: 'פרופיל חדש', placeholder: 'למשל: אישי / העסק' });
+  if (name == null) return;
+  profiles.saveProfile(name.trim() || 'פרופיל חדש', {}); renderProfileSelect();
 });
 $('profileAddRow').addEventListener('click', () => {
   let p = profiles.all().find((x) => x.id === $('profileSel').value);
@@ -3034,11 +3183,13 @@ $('profileFill').addEventListener('click', () => {
   const n = overlay.fillByKeys(p.values);
   PFS.toast(n ? `מולאו ${n} שדות` : 'לא נמצאו שדות מתויגים תואמים', n ? 'ok' : 'err');
 });
-$('profileGrab').addEventListener('click', () => {
+$('profileGrab').addEventListener('click', async () => {
   const vals = overlay.currentValues();
   if (!Object.keys(vals).length) { PFS.toast('אין שדות מתויגים בטופס', 'err'); return; }
   let p = profiles.all().find((x) => x.id === $('profileSel').value);
-  const name = p ? p.name : (prompt('שם הפרופיל:', 'פרופיל חדש') || 'פרופיל חדש');
+  let name = p ? p.name : await PFS.ui.prompt('שם הפרופיל', { value: 'פרופיל חדש' });
+  if (name == null) return;
+  name = name.trim() || 'פרופיל חדש';
   const merged = Object.assign({}, p?.values || {}, vals);
   profiles.saveProfile(name, merged); renderProfileSelect();
   PFS.toast('הפרטים נשמרו לפרופיל', 'ok');
@@ -3117,17 +3268,47 @@ function startHandwritingFlow() {
   if (!HW().hasGlyphs()) { PFS.toast('קודם אמן/י כתב יד', 'ok'); openHwTrainer(); return; }
   writeHandwriting();
 }
+/* In-app write modal with live preview (window.prompt is blocked in
+   sandboxed hosts like the published artifact). */
+let hwWriteWired = false;
 function writeHandwriting() {
-  const text = prompt('מה לכתוב בכתב ידך?');
-  if (text == null || !text.trim()) return;
-  const res = HW().renderText(text, { fontPx: 72, color: hwInk() });
+  openModal('hwWriteModal');
+  if (!hwWriteWired) {
+    hwWriteWired = true;
+    const inp = $('hwWriteText'), prev = $('hwWritePreview'), place = $('hwWritePlace');
+    const upd = () => {
+      const t = inp.value.trim();
+      place.disabled = !t;
+      if (!t) { prev.innerHTML = '<span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span>'; return; }
+      const r = HW().renderText(t, { fontPx: 56, color: $('hwWriteInk').value });
+      prev.innerHTML = '';
+      const img = new Image(); img.src = r.url; img.alt = t;
+      prev.appendChild(img);
+    };
+    inp.addEventListener('input', upd);
+    $('hwWriteInk').addEventListener('input', upd);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !place.disabled) { e.preventDefault(); place.click(); } });
+    $('hwWriteCancel').addEventListener('click', () => closeModal('hwWriteModal'));
+    $('hwWriteTrain').addEventListener('click', () => { closeModal('hwWriteModal'); openHwTrainer(); });
+    place.addEventListener('click', () => {
+      const text = inp.value.trim(); if (!text) return;
+      closeModal('hwWriteModal');
+      placeHandwriting(text, $('hwWriteInk').value);
+    });
+  }
+  $('hwWriteInk').value = hwInk();
+  const inp = $('hwWriteText');
+  requestAnimationFrame(() => { inp.focus(); inp.select(); inp.dispatchEvent(new Event('input')); });
+}
+function placeHandwriting(text, color) {
+  const res = HW().renderText(text, { fontPx: 72, color });
   const aspect = res.w / res.h;
   const fw = Math.max(0.08, Math.min(0.6, 0.028 * text.length + 0.08));
   overlay.setPlacing({
     sticky: false,
     create: (page, fx, fy) => {
       overlay.addElementAt('image', page, fx, fy, {
-        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color: hwInk()
+        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color
       });
       return null;
     }
@@ -3167,7 +3348,9 @@ function openHwTrainer() {
     $('hwPrev').addEventListener('click', () => hwGo(-1));
     $('hwNext').addEventListener('click', () => hwGo(1));
     $('hwClose').addEventListener('click', () => { closeModal('hwModal'); updateHwStatus(); });
-    $('hwReset').addEventListener('click', () => { if (confirm('למחוק את כל כתב היד שאימנת?')) { HW().clearAll(); updateHwStatus(); hwRenderTrainer(); } });
+    $('hwReset').addEventListener('click', async () => {
+      if (await PFS.ui.confirm('מחיקת כתב היד', 'למחוק את כל התווים שאימנת?')) { HW().clearAll(); updateHwStatus(); hwRenderTrainer(); }
+    });
   }
   const g = HW().GLYPHS; let idx = g.findIndex((ch) => !HW().hasGlyph(ch));
   hwIndex = idx < 0 ? 0 : idx;
@@ -3222,6 +3405,19 @@ $('fillAllBtn').addEventListener('click', fillAll);
 $('backupExportBtn').addEventListener('click', backupExport);
 $('backupImportBtn').addEventListener('click', () => $('backupFile').click());
 $('backupFile').addEventListener('change', (e) => { if (e.target.files[0]) backupImport(e.target.files[0]); e.target.value = ''; });
+
+// Sandboxed host (e.g. the published artifact) blocks persistent storage —
+// everything still works, but only for this window. Tell the user clearly
+// and point them at backup/restore, which covers moving between sessions.
+if (!PFS.store.persistent) {
+  const note = document.createElement('div');
+  note.className = 'hint';
+  note.style.color = 'var(--warn)';
+  note.textContent = '⚠️ בסביבה זו הדפדפן חוסם אחסון קבוע: חתימות, תבניות וכתב־יד נשמרים רק לחלון הנוכחי. לחצו "גבה הכל" לקובץ — ו"שחזר מקובץ" בפעם הבאה.';
+  const backupCard = $('backupExportBtn') && $('backupExportBtn').closest('.body-p');
+  if (backupCard) backupCard.prepend(note);
+  PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
+}
 
 // sanity log
 console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);

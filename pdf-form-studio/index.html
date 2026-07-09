@@ -220,6 +220,33 @@
   </div>
 </div>
 
+<!-- Handwriting write modal (in-app; prompt() is blocked in sandboxed hosts) -->
+<div class="modal-back" id="hwWriteModal">
+  <div class="modal" style="max-width:460px">
+    <header>🖊️ כתיבה בכתב היד שלך</header>
+    <div class="m-body">
+      <div class="field">
+        <label>מה לכתוב?</label>
+        <input type="text" id="hwWriteText" dir="auto" placeholder="הקלידו כאן — והטקסט יופיע בכתב ידכם" />
+      </div>
+      <div class="field">
+        <label>תצוגה מקדימה</label>
+        <div class="hw-preview" id="hwWritePreview"><span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span></div>
+      </div>
+      <div class="row">
+        <label class="hint">צבע דיו:</label>
+        <input type="color" id="hwWriteInk" value="#1a237e" />
+        <span class="spacer"></span>
+        <button class="btn sm ghost" id="hwWriteTrain">✍️ אמן / עדכן אותיות</button>
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="hwWritePlace" disabled>מקם על הטופס</button>
+      <button class="btn ghost" id="hwWriteCancel">ביטול</button>
+    </footer>
+  </div>
+</div>
+
 <!-- Templates modal -->
 <div class="modal-back" id="tmplModal">
   <div class="modal">
@@ -302,6 +329,7 @@
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script src="./js/store.js"></script>
+<script src="./js/ui.js"></script>
 <script src="./js/image-tools.js"></script>
 <script src="./js/handwriting.js"></script>
 <script src="./js/drag-resize.js"></script>

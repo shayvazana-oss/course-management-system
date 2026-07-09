@@ -70,9 +70,10 @@
       return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
     }
 
-    function rename(id) {
+    async function rename(id) {
       const t = all().find((x) => x.id === id); if (!t) return;
-      const nm = prompt('שם חדש לתבנית:', t.name); if (nm == null) return;
+      const nm = await PFS.ui.prompt('שם חדש לתבנית', { value: t.name });
+      if (nm == null) return;
       const arr = all(); const item = arr.find((x) => x.id === id);
       if (item) { item.name = nm.trim() || item.name; persist(arr); render(); }
     }

@@ -22,7 +22,8 @@ PFS.toast = function (msg, kind) {
   t.textContent = msg;
   wrap.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, 2200);
+  const ms = arguments.length > 2 && arguments[2] ? arguments[2] : 2200;
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, ms);
 };
 
 // ---------- state ----------
@@ -537,9 +538,10 @@ function profileRow(pid, key, val) {
   row.append(k, v, del); return row;
 }
 $('profileSel').addEventListener('change', (e) => { profiles.setActive(e.target.value); renderProfileRows(); });
-$('profileNew').addEventListener('click', () => {
-  const name = prompt('שם הפרופיל (למשל: אישי / העסק):', 'פרופיל חדש'); if (name == null) return;
-  profiles.saveProfile(name, {}); renderProfileSelect();
+$('profileNew').addEventListener('click', async () => {
+  const name = await PFS.ui.prompt('שם הפרופיל', { value: 'פרופיל חדש', placeholder: 'למשל: אישי / העסק' });
+  if (name == null) return;
+  profiles.saveProfile(name.trim() || 'פרופיל חדש', {}); renderProfileSelect();
 });
 $('profileAddRow').addEventListener('click', () => {
   let p = profiles.all().find((x) => x.id === $('profileSel').value);
@@ -552,11 +554,13 @@ $('profileFill').addEventListener('click', () => {
   const n = overlay.fillByKeys(p.values);
   PFS.toast(n ? `מולאו ${n} שדות` : 'לא נמצאו שדות מתויגים תואמים', n ? 'ok' : 'err');
 });
-$('profileGrab').addEventListener('click', () => {
+$('profileGrab').addEventListener('click', async () => {
   const vals = overlay.currentValues();
   if (!Object.keys(vals).length) { PFS.toast('אין שדות מתויגים בטופס', 'err'); return; }
   let p = profiles.all().find((x) => x.id === $('profileSel').value);
-  const name = p ? p.name : (prompt('שם הפרופיל:', 'פרופיל חדש') || 'פרופיל חדש');
+  let name = p ? p.name : await PFS.ui.prompt('שם הפרופיל', { value: 'פרופיל חדש' });
+  if (name == null) return;
+  name = name.trim() || 'פרופיל חדש';
   const merged = Object.assign({}, p?.values || {}, vals);
   profiles.saveProfile(name, merged); renderProfileSelect();
   PFS.toast('הפרטים נשמרו לפרופיל', 'ok');
@@ -635,17 +639,47 @@ function startHandwritingFlow() {
   if (!HW().hasGlyphs()) { PFS.toast('קודם אמן/י כתב יד', 'ok'); openHwTrainer(); return; }
   writeHandwriting();
 }
+/* In-app write modal with live preview (window.prompt is blocked in
+   sandboxed hosts like the published artifact). */
+let hwWriteWired = false;
 function writeHandwriting() {
-  const text = prompt('מה לכתוב בכתב ידך?');
-  if (text == null || !text.trim()) return;
-  const res = HW().renderText(text, { fontPx: 72, color: hwInk() });
+  openModal('hwWriteModal');
+  if (!hwWriteWired) {
+    hwWriteWired = true;
+    const inp = $('hwWriteText'), prev = $('hwWritePreview'), place = $('hwWritePlace');
+    const upd = () => {
+      const t = inp.value.trim();
+      place.disabled = !t;
+      if (!t) { prev.innerHTML = '<span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span>'; return; }
+      const r = HW().renderText(t, { fontPx: 56, color: $('hwWriteInk').value });
+      prev.innerHTML = '';
+      const img = new Image(); img.src = r.url; img.alt = t;
+      prev.appendChild(img);
+    };
+    inp.addEventListener('input', upd);
+    $('hwWriteInk').addEventListener('input', upd);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !place.disabled) { e.preventDefault(); place.click(); } });
+    $('hwWriteCancel').addEventListener('click', () => closeModal('hwWriteModal'));
+    $('hwWriteTrain').addEventListener('click', () => { closeModal('hwWriteModal'); openHwTrainer(); });
+    place.addEventListener('click', () => {
+      const text = inp.value.trim(); if (!text) return;
+      closeModal('hwWriteModal');
+      placeHandwriting(text, $('hwWriteInk').value);
+    });
+  }
+  $('hwWriteInk').value = hwInk();
+  const inp = $('hwWriteText');
+  requestAnimationFrame(() => { inp.focus(); inp.select(); inp.dispatchEvent(new Event('input')); });
+}
+function placeHandwriting(text, color) {
+  const res = HW().renderText(text, { fontPx: 72, color });
   const aspect = res.w / res.h;
   const fw = Math.max(0.08, Math.min(0.6, 0.028 * text.length + 0.08));
   overlay.setPlacing({
     sticky: false,
     create: (page, fx, fy) => {
       overlay.addElementAt('image', page, fx, fy, {
-        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color: hwInk()
+        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color
       });
       return null;
     }
@@ -685,7 +719,9 @@ function openHwTrainer() {
     $('hwPrev').addEventListener('click', () => hwGo(-1));
     $('hwNext').addEventListener('click', () => hwGo(1));
     $('hwClose').addEventListener('click', () => { closeModal('hwModal'); updateHwStatus(); });
-    $('hwReset').addEventListener('click', () => { if (confirm('למחוק את כל כתב היד שאימנת?')) { HW().clearAll(); updateHwStatus(); hwRenderTrainer(); } });
+    $('hwReset').addEventListener('click', async () => {
+      if (await PFS.ui.confirm('מחיקת כתב היד', 'למחוק את כל התווים שאימנת?')) { HW().clearAll(); updateHwStatus(); hwRenderTrainer(); }
+    });
   }
   const g = HW().GLYPHS; let idx = g.findIndex((ch) => !HW().hasGlyph(ch));
   hwIndex = idx < 0 ? 0 : idx;
@@ -740,6 +776,19 @@ $('fillAllBtn').addEventListener('click', fillAll);
 $('backupExportBtn').addEventListener('click', backupExport);
 $('backupImportBtn').addEventListener('click', () => $('backupFile').click());
 $('backupFile').addEventListener('change', (e) => { if (e.target.files[0]) backupImport(e.target.files[0]); e.target.value = ''; });
+
+// Sandboxed host (e.g. the published artifact) blocks persistent storage —
+// everything still works, but only for this window. Tell the user clearly
+// and point them at backup/restore, which covers moving between sessions.
+if (!PFS.store.persistent) {
+  const note = document.createElement('div');
+  note.className = 'hint';
+  note.style.color = 'var(--warn)';
+  note.textContent = '⚠️ בסביבה זו הדפדפן חוסם אחסון קבוע: חתימות, תבניות וכתב־יד נשמרים רק לחלון הנוכחי. לחצו "גבה הכל" לקובץ — ו"שחזר מקובץ" בפעם הבאה.';
+  const backupCard = $('backupExportBtn') && $('backupExportBtn').closest('.body-p');
+  if (backupCard) backupCard.prepend(note);
+  PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
+}
 
 // sanity log
 console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);

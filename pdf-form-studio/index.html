@@ -131,7 +131,7 @@
               <button class="btn sm primary" id="hwTrainBtn">✍️ אמן / עדכן כתב יד</button>
               <div class="row">
                 <label class="hint">צבע:</label>
-                <input type="color" id="hwInk" value="#1a237e" />
+                <input type="color" id="hwInk" value="#000000" />
                 <button class="btn sm ghost" id="hwWriteBtn" style="flex:1" title="כתוב בכתב ידך">כתוב על הטופס</button>
               </div>
             </div>
@@ -175,7 +175,7 @@
       <div class="sigpad-wrap"><canvas id="sigCanvas"></canvas></div>
       <div class="row">
         <label class="hint">צבע דיו:</label>
-        <input type="color" id="sigColor" value="#1e3a8a" />
+        <input type="color" id="sigColor" value="#000000" />
         <label class="hint">עובי:</label>
         <input type="range" id="sigWidth" min="1" max="6" value="2.5" step="0.5" style="flex:1" />
         <button class="btn sm ghost" id="sigClear">נקה</button>
@@ -193,7 +193,7 @@
   <div class="modal" style="max-width:540px">
     <header>🖊️ אימון כתב היד שלי</header>
     <div class="m-body">
-      <div class="hint">ציירו כל תו פעם אחת בכתב ידכם. ככל שתשלימו יותר — הכתב ייראה טבעי יותר. אפשר לדלג על תווים שלא צריך.</div>
+      <div class="hint">ציירו כל תו פעם אחת בכתב ידכם, <b>בין הקווים כמו במחברת</b>: אות רגילה נשענת על הקו התחתון ומגיעה עד העליון · <b>י</b> קטנה וגבוהה · <b>ל</b> עולה מעל הקו העליון · <b>ך ן ף ץ ק</b> יורדות מתחת לקו התחתון. כך כל אות תשמור על הגודל והמיקום האמיתיים שלה.</div>
       <div class="row" style="justify-content:space-between; align-items:center">
         <button class="btn sm ghost" id="hwPrev" title="הקודם">→</button>
         <div style="text-align:center; flex:1">
@@ -235,7 +235,10 @@
       </div>
       <div class="row">
         <label class="hint">צבע דיו:</label>
-        <input type="color" id="hwWriteInk" value="#1a237e" />
+        <input type="color" id="hwWriteInk" value="#000000" />
+        <label class="hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="hwBeautify" checked /> ✨ שיפור אסתטי
+        </label>
         <span class="spacer"></span>
         <button class="btn sm ghost" id="hwWriteTrain">✍️ אמן / עדכן אותיות</button>
       </div>

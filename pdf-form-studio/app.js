@@ -333,7 +333,7 @@ function renderProps(ctrl) {
     rowBA.append(bold, seg); body.appendChild(rowBA);
   } else if (m.kind === 'handwriting') {
     const regen = () => {
-      const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#1a237e' });
+      const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#000000' });
       m.imgUrl = r.url; m.aspect = r.w / r.h; m.fh = m.fw / m.aspect;
       const img = ctrl.node.querySelector('img'); if (img) img.src = r.url;
       ctrl.layout(); markDirty();
@@ -347,7 +347,7 @@ function renderProps(ctrl) {
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1'; size.value = Math.round(m.fw * 100);
     size.addEventListener('input', () => { m.fw = parseInt(size.value, 10) / 100; m.fh = m.fw / (m.aspect || 1); ctrl.layout(); markDirty(); });
     fSize.appendChild(size);
-    const fCol = field('צבע'); const col = document.createElement('input'); col.type = 'color'; col.value = toHex(m.color || '#1a237e');
+    const fCol = field('צבע'); const col = document.createElement('input'); col.type = 'color'; col.value = toHex(m.color || '#000000');
     col.addEventListener('input', () => { m.color = col.value; regen(); }); fCol.appendChild(col);
     rowSC.append(fSize, fCol); body.appendChild(rowSC);
   } else {
@@ -629,7 +629,7 @@ $('detectBtn').addEventListener('click', runDetection);
 // =====================================================================
 const HW = () => PFS.handwriting;
 let hwPad = null, hwIndex = 0;
-function hwInk() { return ($('hwInk') && $('hwInk').value) || '#1a237e'; }
+function hwInk() { return ($('hwInk') && $('hwInk').value) || '#000000'; }
 function updateHwStatus() {
   const n = HW().count(), total = HW().GLYPHS.length;
   if ($('hwStatus')) $('hwStatus').textContent = n ? `אומנו ${n}/${total} תווים — מוכן לכתיבה.` : 'עדיין לא אימנת כתב יד.';
@@ -658,6 +658,8 @@ function writeHandwriting() {
     };
     inp.addEventListener('input', upd);
     $('hwWriteInk').addEventListener('input', upd);
+    $('hwBeautify').checked = HW().getBeautify();
+    $('hwBeautify').addEventListener('change', () => { HW().setBeautify($('hwBeautify').checked); upd(); });
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !place.disabled) { e.preventDefault(); place.click(); } });
     $('hwWriteCancel').addEventListener('click', () => closeModal('hwWriteModal'));
     $('hwWriteTrain').addEventListener('click', () => { closeModal('hwWriteModal'); openHwTrainer(); });
@@ -705,7 +707,10 @@ function hwRenderTrainer() {
 function hwGo(d) { const n = HW().GLYPHS.length; hwIndex = (hwIndex + d + n) % n; hwRenderTrainer(); }
 function hwSaveNext() {
   if (!hwPad || hwPad.isEmpty()) { PFS.toast('צייר את התו קודם', 'err'); return; }
-  HW().setGlyph(hwCurrent(), hwPad.getStrokes());
+  // the CSS guidelines sit at 20% / 80% of the pad height — pass them as the
+  // measurement reference so the glyph's true size & position are captured
+  const r = $('hwCanvas').getBoundingClientRect();
+  HW().setGlyph(hwCurrent(), hwPad.getStrokes(), { top: r.height * 0.20, base: r.height * 0.80 });
   updateHwStatus(); hwGo(1);
 }
 function openHwTrainer() {

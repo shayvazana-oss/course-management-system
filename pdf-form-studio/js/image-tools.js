@@ -111,7 +111,7 @@
   function signaturePad(canvas) {
     const ctx = canvas.getContext('2d');
     let drawing = false, last = null, dirty = false;
-    let color = '#1e3a8a', width = 2.5;
+    let color = '#000000', width = 2.5;
 
     function resize() {
       const rect = canvas.getBoundingClientRect();

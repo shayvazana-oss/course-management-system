@@ -333,14 +333,16 @@ function renderProps(ctrl) {
     rowBA.append(bold, seg); body.appendChild(rowBA);
   } else if (m.kind === 'handwriting') {
     const regen = () => {
-      const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#000000' });
+      const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#000000', tracking: m.tracking });
       m.imgUrl = r.url; m.aspect = r.w / r.h; m.fh = m.fw / m.aspect;
       const img = ctrl.node.querySelector('img'); if (img) img.src = r.url;
       ctrl.layout(); markDirty();
     };
-    const f1 = field('טקסט (כתב יד)');
+    // edit / delete / replace letters live — typing here rewrites the text
+    const f1 = field('טקסט (כתב יד) — ערכו, מחקו או החליפו אותיות/מספרים');
     const inp = document.createElement('input'); inp.type = 'text'; inp.dir = 'auto'; inp.value = m.text || '';
-    inp.addEventListener('change', () => { m.text = inp.value; regen(); });
+    let t = null;
+    inp.addEventListener('input', () => { m.text = inp.value; clearTimeout(t); t = setTimeout(regen, 120); });
     f1.appendChild(inp); body.appendChild(f1);
     const rowSC = document.createElement('div'); rowSC.className = 'row';
     const fSize = field('גודל'); fSize.style.flex = '1'; const size = document.createElement('input');
@@ -350,6 +352,11 @@ function renderProps(ctrl) {
     const fCol = field('צבע'); const col = document.createElement('input'); col.type = 'color'; col.value = toHex(m.color || '#000000');
     col.addEventListener('input', () => { m.color = col.value; regen(); }); fCol.appendChild(col);
     rowSC.append(fSize, fCol); body.appendChild(rowSC);
+    const fTr = field('מרווח בין אותיות'); const tr = document.createElement('input');
+    tr.type = 'range'; tr.min = '0.5'; tr.max = '1.8'; tr.step = '0.05';
+    tr.value = m.tracking != null ? m.tracking : PFS.handwriting.getTracking();
+    tr.addEventListener('input', () => { m.tracking = parseFloat(tr.value); regen(); });
+    fTr.appendChild(tr); body.appendChild(fTr);
   } else {
     const f = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';
@@ -660,6 +667,7 @@ function writeHandwriting() {
     $('hwWriteInk').addEventListener('input', upd);
     $('hwBeautify').checked = HW().getBeautify();
     $('hwBeautify').addEventListener('change', () => { HW().setBeautify($('hwBeautify').checked); upd(); });
+    $('hwTracking').addEventListener('input', () => { HW().setTracking(parseFloat($('hwTracking').value)); upd(); });
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !place.disabled) { e.preventDefault(); place.click(); } });
     $('hwWriteCancel').addEventListener('click', () => closeModal('hwWriteModal'));
     $('hwWriteTrain').addEventListener('click', () => { closeModal('hwWriteModal'); openHwTrainer(); });
@@ -670,18 +678,21 @@ function writeHandwriting() {
     });
   }
   $('hwWriteInk').value = hwInk();
+  $('hwBeautify').checked = HW().getBeautify();
+  $('hwTracking').value = HW().getTracking();
   const inp = $('hwWriteText');
   requestAnimationFrame(() => { inp.focus(); inp.select(); inp.dispatchEvent(new Event('input')); });
 }
 function placeHandwriting(text, color) {
-  const res = HW().renderText(text, { fontPx: 72, color });
+  const tracking = HW().getTracking();
+  const res = HW().renderText(text, { fontPx: 72, color, tracking });
   const aspect = res.w / res.h;
   const fw = Math.max(0.08, Math.min(0.6, 0.028 * text.length + 0.08));
   overlay.setPlacing({
     sticky: false,
     create: (page, fx, fy) => {
       overlay.addElementAt('image', page, fx, fy, {
-        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color
+        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color, tracking
       });
       return null;
     }

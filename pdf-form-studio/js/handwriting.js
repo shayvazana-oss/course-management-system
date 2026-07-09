@@ -43,8 +43,9 @@
 
   function getProfile() {
     const p = store.get(KEY, null);
-    if (!p || typeof p !== 'object' || !p.glyphs) return { glyphs: {}, space: 0.35, beautify: true };
+    if (!p || typeof p !== 'object' || !p.glyphs) return { glyphs: {}, space: 0.32, beautify: true, tracking: 1 };
     if (p.beautify === undefined) p.beautify = true;
+    if (p.tracking === undefined) p.tracking = 1;
     return p;
   }
   function saveProfile(p) { return store.set(KEY, p); }
@@ -54,6 +55,8 @@
   function clearAll() { store.remove(KEY); }
   function getBeautify() { return getProfile().beautify !== false; }
   function setBeautify(on) { const p = getProfile(); p.beautify = !!on; saveProfile(p); }
+  function getTracking() { const t = getProfile().tracking; return t == null ? 1 : t; }
+  function setTracking(t) { const p = getProfile(); p.tracking = Math.max(0.4, Math.min(2, +t || 1)); saveProfile(p); }
 
   /* store a glyph from raw strokes (canvas px). Normalizes to its bbox.
    * ref (optional) = {top, base} — the trainer guideline lines in the same px
@@ -122,8 +125,12 @@
     const color = opts.color || '#111111';
     const beautify = opts.beautify !== undefined ? !!opts.beautify : (p.beautify !== false);
     const lw = Math.max(1.4, fontPx * 0.05);
-    const gap = fontPx * 0.06;
-    const spaceW = fontPx * (p.space || 0.35);
+    // Consistent side-bearing spacing. `tracking` (0.5 tight … 1.8 loose) is a
+    // user control; the base gap is measured relative to the x-height so small
+    // and tall letters sit evenly, not relative to each glyph's own height.
+    const tracking = opts.tracking != null ? opts.tracking : (p.tracking != null ? p.tracking : 1);
+    const gap = fontPx * (0.012 + 0.055 * tracking);   // floor + scale → slider has real reach
+    const spaceW = fontPx * (p.space || 0.32);
     const chars = String(text || '').split('');
 
     // layout: every glyph at its TRUE size — advance width follows the metrics
@@ -147,10 +154,11 @@
     ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
     const topY = pad + fontPx * 0.25;        // em-box top (leaves room for ל)
-    // beautify → gentler, more regular variation; raw → looser, more casual
-    const jRot = beautify ? 0.02 : 0.07;     // ±~0.6° vs ±2°
-    const jY = beautify ? 0.03 : 0.07;
-    const jW = beautify ? 0.04 : 0.08;
+    // Only rotation + baseline jitter — NO horizontal scaling. Scaling a glyph
+    // sideways after its advance width was fixed is what made gaps look uneven;
+    // dropping it keeps letter-to-letter spacing consistent.
+    const jRot = beautify ? 0.018 : 0.06;    // ±~0.5° vs ±1.7°
+    const jY = beautify ? 0.025 : 0.06;
     let x = Wc - pad;                        // RTL: start at the right
     items.forEach((it) => {
       x -= it.w;
@@ -158,14 +166,13 @@
         const gTop = topY + fontPx * it.m.y;
         const jr = (Math.random() - 0.5) * jRot;
         const jy = (Math.random() - 0.5) * fontPx * jY;
-        const sw = 1 + (Math.random() - 0.5) * jW;
         const cx = x + it.w / 2, cy = gTop + it.h / 2;
         ctx.save();
-        ctx.translate(cx, cy + jy); ctx.rotate(jr); ctx.scale(sw, 1); ctx.translate(-cx, -cy);
+        ctx.translate(cx, cy + jy); ctx.rotate(jr); ctx.translate(-cx, -cy);
         it.g.s.forEach((st) => {
           let pts = st.map((q) => ({ x: x + q.x * it.w, y: gTop + q.y * it.h }));
           if (beautify) pts = smoothStroke(pts, 2);
-          ctx.lineWidth = lw * (0.92 + Math.random() * 0.16); // subtle ink variation
+          ctx.lineWidth = lw * (beautify ? (0.94 + Math.random() * 0.12) : 1); // subtle ink variation
           ctx.beginPath();
           pts.forEach((q, j) => (j === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)));
           ctx.stroke();
@@ -182,7 +189,7 @@
   PFS.handwriting = {
     GLYPHS, HEB, FINALS, DIGITS, PUNCT, METRICS, metricsOf,
     getProfile, saveProfile, count, hasGlyphs, hasGlyph, clearAll,
-    getBeautify, setBeautify,
+    getBeautify, setBeautify, getTracking, setTracking,
     setGlyph, removeGlyph, renderText
   };
 })(window);

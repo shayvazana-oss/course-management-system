@@ -80,9 +80,16 @@
     // If the PDF is a fillable form, flatten it first: interactive field widgets
     // otherwise render ABOVE page content and would hide our overlay text.
     // Flattening turns them into static content so overlays sit on top.
+    //
+    // CRITICAL: flatten with updateFieldAppearances=false. pdf-lib's default
+    // (true) REGENERATES every field's appearance stream using its Latin
+    // fallback font (Helvetica/WinAnsi) with no RTL/BiDi — which scrambles and
+    // spaces out all Hebrew (Israeli gov forms are AcroForms where even labels
+    // are fields), while digits survive. Keeping the ORIGINAL appearance
+    // streams bakes the Hebrew in exactly as the form authored it.
     try {
       const form = pdfDoc.getForm();
-      if (form && form.getFields().length) form.flatten();
+      if (form && form.getFields().length) form.flatten({ updateFieldAppearances: false });
     } catch (e) { console.warn('[export] form flatten skipped:', e && e.message); }
 
     const pages = pdfDoc.getPages();

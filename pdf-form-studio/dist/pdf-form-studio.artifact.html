@@ -1811,7 +1811,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       pdfDoc = await pdfjsLib.getDocument({
         data: renderCopy,
         standardFontDataUrl: opts.standardFontDataUrl,
-        useSystemFonts: false
+        // disableFontFace:true makes pdf.js draw glyph OUTLINES itself instead
+        // of routing text through browser @font-face + fillText. That browser
+        // path collides with this page's own web font (Heebo) and mis-shapes
+        // Hebrew — letters spaced out / reordered, the "uploaded doc is
+        // scrambled and unreadable" bug. Drawing outlines is immune to page
+        // fonts and renders Hebrew (and other complex scripts) correctly.
+        disableFontFace: true
       }).promise;
       pagesEl.innerHTML = '';
       views = [];

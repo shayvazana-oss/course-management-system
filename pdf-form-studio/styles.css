@@ -186,8 +186,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 /* ===== EMPTY STATE ===== */
 .dropzone { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); margin: auto; width: min(560px, 88%); text-align: center; padding: 40px 32px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-2); }
 .dropzone.hot { border: 2px dashed var(--brand); background: var(--brand-soft); }
-.dropzone .big { margin-bottom: 6px; }
-.dropzone .big svg { width: 84px; height: 84px; }
+.dropzone .big { margin-bottom: 10px; }
+.dropzone .big svg { width: 150px; height: auto; }
 .dropzone h2 { margin: 6px 0 4px; font-size: 22px; letter-spacing: -.01em; }
 .dropzone p { margin: 3px 0; font-size: 13.5px; color: var(--ink-3); }
 .dz-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0 14px; }

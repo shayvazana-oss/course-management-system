@@ -1,4 +1,4 @@
-<title>PDF Form Studio · עורך וממלא טפסים</title>
+<title>Fillo · מילוי וחתימה על טפסי PDF</title>
 <style>
 /* Heebo (inlined) */
 /* Local Heebo (Hebrew + Latin subsets) — no network, works offline. */
@@ -35,7 +35,7 @@
 
 /* app styles */
 /* ============================================================= *
- *  PDF Form Studio — "Studio" design system
+ *  Fillo — "Studio" design system
  *  Calm, professional document workspace. Navy primary, amber
  *  accent used sparingly, warm-cool neutrals, real hierarchy.
  * ============================================================= */
@@ -288,9 +288,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   <header class="topbar">
     <div class="tb-right">
       <div class="brand">
-        <div class="logo">ﬡ</div>
+        <div class="logo" aria-label="Fillo">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true">
+            <path d="M12 3.2C15 7 18 10.6 18 13.7A6 6 0 1 1 6 13.7C6 10.6 9 7 12 3.2Z" fill="#fff"/>
+            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#1E4E8C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div>
-          <div class="title">PDF Form Studio</div>
+          <div class="title">Fillo</div>
           <div class="sub">מילוי טפסים · בלי הדפסה וסריקה</div>
         </div>
       </div>
@@ -3638,7 +3643,7 @@ if (!PFS.store.persistent) {
 }
 
 // sanity log
-console.log('[PDF Form Studio] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);
+console.log('[Fillo] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);
 })();
 
 </script>

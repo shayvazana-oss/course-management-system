@@ -23,6 +23,20 @@
       keys: () => { const a = []; for (let i = 0; i < localStorage.length; i++) a.push(localStorage.key(i)); return a; }
     };
     persistent = true;
+    // Ask the browser to make this origin's storage DURABLE so it is not
+    // evicted between visits (Safari/iOS clears script-writable storage after
+    // a few idle days; Chrome may evict under pressure). Best-effort: the API
+    // may be absent or the grant denied — localStorage still works either way.
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persisted().then((already) => {
+          if (already) return;
+          navigator.storage.persist().then((granted) => {
+            console.log('[store] durable storage', granted ? 'granted' : 'not granted');
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    } catch (e2) {}
   } catch (e) {
     const mem = new Map();
     backend = {

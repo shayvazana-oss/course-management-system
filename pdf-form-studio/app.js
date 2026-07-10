@@ -638,8 +638,20 @@ const HW = () => PFS.handwriting;
 let hwPad = null, hwIndex = 0;
 function hwInk() { return ($('hwInk') && $('hwInk').value) || '#000000'; }
 function updateHwStatus() {
+  const el = $('hwStatus');
+  if (!el) return;
   const n = HW().count(), total = HW().GLYPHS.length;
-  if ($('hwStatus')) $('hwStatus').textContent = n ? `אומנו ${n}/${total} תווים — מוכן לכתיבה.` : 'עדיין לא אימנת כתב יד.';
+  const base = n ? `אומנו ${n}/${total} תווים — מוכן לכתיבה.` : 'עדיין לא אימנת כתב יד.';
+  if (n && !PFS.store.persistent) {
+    // Volatile host (sandboxed artifact): the trained glyphs live only in this
+    // window and vanish on reload. Say so plainly so the user isn't surprised
+    // when it "forgets" next login, and point at the durable options.
+    el.innerHTML = base + ' <span style="color:var(--warn)">⚠️ בסביבה זו כתב־היד לא יישמר לפעם הבאה — פתחו את האפליקציה דרך הקישור באתר (github.io), או גבו לקובץ ב⚙️ הגדרות.</span>';
+  } else if (n) {
+    el.innerHTML = base + ' <span style="color:var(--ok,#1a7f4b)">✓ נשמר במכשיר.</span>';
+  } else {
+    el.textContent = base;
+  }
 }
 function startHandwritingFlow() {
   if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }

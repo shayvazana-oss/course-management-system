@@ -741,6 +741,20 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       keys: () => { const a = []; for (let i = 0; i < localStorage.length; i++) a.push(localStorage.key(i)); return a; }
     };
     persistent = true;
+    // Ask the browser to make this origin's storage DURABLE so it is not
+    // evicted between visits (Safari/iOS clears script-writable storage after
+    // a few idle days; Chrome may evict under pressure). Best-effort: the API
+    // may be absent or the grant denied — localStorage still works either way.
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persisted().then((already) => {
+          if (already) return;
+          navigator.storage.persist().then((granted) => {
+            console.log('[store] durable storage', granted ? 'granted' : 'not granted');
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    } catch (e2) {}
   } catch (e) {
     const mem = new Map();
     backend = {
@@ -3483,8 +3497,20 @@ const HW = () => PFS.handwriting;
 let hwPad = null, hwIndex = 0;
 function hwInk() { return ($('hwInk') && $('hwInk').value) || '#000000'; }
 function updateHwStatus() {
+  const el = $('hwStatus');
+  if (!el) return;
   const n = HW().count(), total = HW().GLYPHS.length;
-  if ($('hwStatus')) $('hwStatus').textContent = n ? `אומנו ${n}/${total} תווים — מוכן לכתיבה.` : 'עדיין לא אימנת כתב יד.';
+  const base = n ? `אומנו ${n}/${total} תווים — מוכן לכתיבה.` : 'עדיין לא אימנת כתב יד.';
+  if (n && !PFS.store.persistent) {
+    // Volatile host (sandboxed artifact): the trained glyphs live only in this
+    // window and vanish on reload. Say so plainly so the user isn't surprised
+    // when it "forgets" next login, and point at the durable options.
+    el.innerHTML = base + ' <span style="color:var(--warn)">⚠️ בסביבה זו כתב־היד לא יישמר לפעם הבאה — פתחו את האפליקציה דרך הקישור באתר (github.io), או גבו לקובץ ב⚙️ הגדרות.</span>';
+  } else if (n) {
+    el.innerHTML = base + ' <span style="color:var(--ok,#1a7f4b)">✓ נשמר במכשיר.</span>';
+  } else {
+    el.textContent = base;
+  }
 }
 function startHandwritingFlow() {
   if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }

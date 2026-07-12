@@ -821,6 +821,70 @@ async function backupImport(file) {
     PFS.toast('השחזור הושלם', 'ok');
   } catch (e) { PFS.toast('קובץ גיבוי לא תקין', 'err'); }
 }
+
+// ---- cross-device sync (E2E encrypted; see js/sync.js) ------------------
+function refreshAllFromStore() { assets.renderAll(); templates.render(); renderProfileSelect(); updateHwStatus(); }
+const SYNC_ERR = {
+  NOT_CONFIGURED: 'מלאו Project ID, API Key וקוד סנכרון.',
+  WRONG_CODE: 'קוד הסנכרון שגוי — לא ניתן לפענח את הנתונים.',
+  EMPTY: 'אין עדיין נתונים בענן — העלו קודם ממכשיר אחר.',
+  TOO_BIG: 'יותר מדי נתונים לסנכרון (הקטינו חתימות/חותמות).'
+};
+function syncMsg(e) { const k = (e && e.message) || ''; return SYNC_ERR[k] || (k.indexOf('HTTP_') === 0 ? ('שגיאת שרת (' + k.slice(5) + ') — בדקו Project ID / API Key / הרשאות Firestore.') : 'הסנכרון נכשל — בדקו חיבור ופרטים.'); }
+function syncSetStatus(t, kind) { const el = $('syncStatus'); if (el) { el.textContent = t; el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--ok,#1a7f4b)' : 'var(--ink-3)'); } }
+function syncSaveCfgFromUI() {
+  return PFS.sync.setCfg({
+    projectId: $('syncProject').value.trim(), apiKey: $('syncKey').value.trim(),
+    code: $('syncCode').value.trim(), auto: $('syncAuto').checked
+  });
+}
+let syncPushTimer = null;
+function syncAutoPush() {
+  if (!PFS.sync.getCfg().auto || !PFS.sync.configured()) return;
+  clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(async () => {
+    try { await PFS.sync.push(); syncSetStatus('נשמר בענן ✓ ' + new Date().toLocaleTimeString('he-IL'), 'ok'); }
+    catch (e) { syncSetStatus(syncMsg(e), 'err'); }
+  }, 2500);
+}
+function wireSync() {
+  const c = PFS.sync.getCfg();
+  if ($('syncProject')) $('syncProject').value = c.projectId || '';
+  if ($('syncKey')) $('syncKey').value = c.apiKey || '';
+  if ($('syncCode')) $('syncCode').value = c.code || '';
+  if ($('syncAuto')) $('syncAuto').checked = !!c.auto;
+  $('syncHelp') && $('syncHelp').addEventListener('click', (e) => { e.preventDefault(); const b = $('syncHelpBox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; });
+  ['syncProject', 'syncKey', 'syncCode', 'syncAuto'].forEach((id) => $(id) && $(id).addEventListener('change', syncSaveCfgFromUI));
+  $('syncPush') && $('syncPush').addEventListener('click', async () => {
+    syncSaveCfgFromUI();
+    if (!PFS.sync.configured()) { syncSetStatus(SYNC_ERR.NOT_CONFIGURED, 'err'); return; }
+    syncSetStatus('מעלה…');
+    try { await PFS.sync.push(); syncSetStatus('הכול הועלה לענן ✓', 'ok'); }
+    catch (e) { syncSetStatus(syncMsg(e), 'err'); }
+  });
+  $('syncPull') && $('syncPull').addEventListener('click', async () => {
+    syncSaveCfgFromUI();
+    if (!PFS.sync.configured()) { syncSetStatus(SYNC_ERR.NOT_CONFIGURED, 'err'); return; }
+    if (!(await PFS.ui.confirm('משיכת נתונים', 'הנתונים מהענן יחליפו את מה שקיים במכשיר זה. להמשיך?'))) return;
+    syncSetStatus('מושך…');
+    try { await PFS.sync.pull(); refreshAllFromStore(); syncSetStatus('הנתונים נמשכו ופוענחו ✓', 'ok'); PFS.toast('הסנכרון הושלם', 'ok'); }
+    catch (e) { syncSetStatus(syncMsg(e), 'err'); }
+  });
+}
+async function syncAutoPullOnLoad() {
+  const c = PFS.sync.getCfg();
+  if (!c.auto || !PFS.sync.configured()) return;
+  try { await PFS.sync.pull(); refreshAllFromStore(); syncSetStatus('סונכרן מהענן ✓', 'ok'); }
+  catch (e) { if ((e && e.message) !== 'EMPTY') syncSetStatus(syncMsg(e), 'err'); }
+}
+wireSync();
+syncAutoPullOnLoad();
+// After any local data change, schedule an encrypted auto-push (no-op unless
+// the user enabled auto-sync). Excludes the sync config key itself.
+(function () {
+  const _set = PFS.store.set.bind(PFS.store);
+  PFS.store.set = function (k, v) { const r = _set(k, v); if (k !== 'sync:cfg') { try { syncAutoPush(); } catch (e) {} } return r; };
+})();
 $('fillAllBtn').addEventListener('click', fillAll);
 $('backupExportBtn').addEventListener('click', backupExport);
 $('backupImportBtn').addEventListener('click', () => $('backupFile').click());

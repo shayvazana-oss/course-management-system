@@ -458,6 +458,27 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             </div>
           </div>
           <div class="card">
+            <h3>🔄 סנכרון בין מכשירים</h3>
+            <div class="body-p">
+              <div class="hint muted">מסנכרן כתב־יד, חתימות, חותמות ותבניות בין המכשירים שלך — <b>מוצפן מקצה־לקצה</b> (רק מי שיודע את קוד הסנכרון יכול לפענח). דרוש חשבון Firebase חינמי חד־פעמי. <a href="#" id="syncHelp">איך מקימים? ⓘ</a></div>
+              <div id="syncHelpBox" class="hint" style="display:none; background:var(--brand-soft); padding:8px; border-radius:8px; line-height:1.6">
+                1. היכנסו ל־<b>console.firebase.google.com</b> → “Add project” (שם כלשהו, אפשר לדלג על Analytics).<br>
+                2. בתפריט → <b>Build → Firestore Database → Create database → Start in test mode</b>.<br>
+                3. ⚙️ (Project settings) → תחת “Your apps” לחצו על <b>&lt;/&gt;</b> (Web) → רשמו אפליקציה → העתיקו את <b>apiKey</b> ואת <b>projectId</b>.<br>
+                4. הדביקו אותם כאן למטה, בחרו קוד סנכרון סודי משלכם, ולחצו “שמור והעלה”. במכשיר השני — אותם פרטים + אותו קוד → “משוך”.
+              </div>
+              <div class="field"><label>Project ID</label><input type="text" id="syncProject" dir="ltr" placeholder="my-app-1234" /></div>
+              <div class="field"><label>Web API Key</label><input type="text" id="syncKey" dir="ltr" placeholder="AIza…" /></div>
+              <div class="field"><label>קוד סנכרון סודי (זכרו אותו — הוא המפתח!)</label><input type="text" id="syncCode" dir="ltr" placeholder="בחרו ביטוי סודי חזק" /></div>
+              <label class="hint" style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="syncAuto" /> סנכרן אוטומטית (משוך בפתיחה, העלה אחרי שינוי)</label>
+              <div class="row" style="margin-top:8px">
+                <button class="btn sm primary" id="syncPush" style="flex:1">⬆️ שמור והעלה</button>
+                <button class="btn sm" id="syncPull" style="flex:1">⬇️ משוך למכשיר זה</button>
+              </div>
+              <div class="hint" id="syncStatus" style="margin-top:6px"></div>
+            </div>
+          </div>
+          <div class="card">
             <h3>🔒 פרטיות ואחריות</h3>
             <div class="body-p">
               <div class="hint">כל העיבוד מתבצע בדפדפן שלך. שום קובץ לא נשלח לשרת.</div>
@@ -799,6 +820,112 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   };
 
   PFS.store = store;
+})(window);
+
+</script>
+<script>
+/* sync.js — optional end-to-end-encrypted cross-device sync.
+ *
+ * The app is normally 100% local. This module lets a user mirror their data
+ * (handwriting, signatures, stamps, templates, profiles) between their own
+ * devices through a cloud key/value doc — WITHOUT trusting the cloud: every
+ * byte is encrypted in the browser with a key derived from the user's private
+ * "sync code", so the server only ever stores ciphertext.
+ *
+ * Backend: Firestore via its REST API (no SDK to vendor, no build step). The
+ * user supplies just their own Firebase projectId + Web API key; we read/write
+ * a single document whose id is a hash of the sync code. Data is E2E encrypted,
+ * so even fully-open security rules expose nothing but random-looking bytes.
+ *
+ * The base URL is overridable (PFS.SYNC_BASE) so tests can point it at a local
+ * mock of the two REST endpoints.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+  const store = PFS.store;
+  const enc = new TextEncoder(), dec = new TextDecoder();
+
+  // ---- config (persisted locally; never uploaded) ------------------------
+  const CFG = 'sync:cfg';
+  function getCfg() { return store.get(CFG, { projectId: '', apiKey: '', code: '', auto: false }); }
+  function setCfg(patch) { const c = Object.assign(getCfg(), patch); store.set(CFG, c); return c; }
+  function configured() { const c = getCfg(); return !!(c.projectId && c.apiKey && c.code); }
+
+  // ---- base64 helpers ----------------------------------------------------
+  function bufToB64(buf) { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); }
+  function b64ToBuf(b64) { const s = atob(b64); const b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; }
+
+  // ---- crypto: PBKDF2 → AES-GCM -----------------------------------------
+  async function deriveKey(code, salt) {
+    const base = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+    );
+  }
+  async function encryptObj(code, obj) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(code, salt);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+    return 'v1.' + bufToB64(salt) + '.' + bufToB64(iv) + '.' + bufToB64(ct);
+  }
+  async function decryptStr(code, blob) {
+    const parts = String(blob || '').split('.');
+    if (parts[0] !== 'v1' || parts.length !== 4) throw new Error('bad payload');
+    const salt = b64ToBuf(parts[1]), iv = b64ToBuf(parts[2]), ct = b64ToBuf(parts[3]);
+    const key = await deriveKey(code, salt);
+    let pt;
+    try { pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct); }
+    catch (e) { throw new Error('WRONG_CODE'); }   // GCM auth fail = wrong sync code
+    return JSON.parse(dec.decode(pt));
+  }
+
+  // Fixed vault id: each user has their OWN Firebase project, so one document
+  // per project is the natural model. Keeping the id independent of the sync
+  // code means a wrong code still finds the doc and fails to DECRYPT — a clear
+  // "wrong code" error — instead of silently looking like "no data yet". The
+  // doc holds only ciphertext, so a predictable id leaks nothing.
+  async function docId(/* code */) { return 'fillo_vault'; }
+
+  // ---- Firestore REST ----------------------------------------------------
+  function base() { return root.PFS.SYNC_BASE || 'https://firestore.googleapis.com/v1'; }
+  function docUrl(c, id) {
+    return base() + '/projects/' + encodeURIComponent(c.projectId) +
+      '/databases/(default)/documents/fillo/' + id + '?key=' + encodeURIComponent(c.apiKey);
+  }
+
+  async function push() {
+    const c = getCfg();
+    if (!configured()) throw new Error('NOT_CONFIGURED');
+    const payload = await encryptObj(c.code, store.dump());
+    if (payload.length > 900 * 1024) throw new Error('TOO_BIG');
+    const id = await docId(c.code);
+    const body = { fields: { blob: { stringValue: payload }, ts: { integerValue: String(Date.now()) } } };
+    const res = await fetch(docUrl(c, id), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('HTTP_' + res.status);
+    return true;
+  }
+
+  async function pull() {
+    const c = getCfg();
+    if (!configured()) throw new Error('NOT_CONFIGURED');
+    const id = await docId(c.code);
+    const res = await fetch(docUrl(c, id));
+    if (res.status === 404) throw new Error('EMPTY');       // nothing pushed yet
+    if (!res.ok) throw new Error('HTTP_' + res.status);
+    const doc = await res.json();
+    const blob = doc && doc.fields && doc.fields.blob && doc.fields.blob.stringValue;
+    if (!blob) throw new Error('EMPTY');
+    const data = await decryptStr(c.code, blob);           // throws WRONG_CODE on mismatch
+    store.restore(data);
+    return true;
+  }
+
+  PFS.sync = { getCfg, setCfg, configured, push, pull, docId, _enc: encryptObj, _dec: decryptStr };
 })(window);
 
 </script>
@@ -3682,6 +3809,70 @@ async function backupImport(file) {
     PFS.toast('השחזור הושלם', 'ok');
   } catch (e) { PFS.toast('קובץ גיבוי לא תקין', 'err'); }
 }
+
+// ---- cross-device sync (E2E encrypted; see js/sync.js) ------------------
+function refreshAllFromStore() { assets.renderAll(); templates.render(); renderProfileSelect(); updateHwStatus(); }
+const SYNC_ERR = {
+  NOT_CONFIGURED: 'מלאו Project ID, API Key וקוד סנכרון.',
+  WRONG_CODE: 'קוד הסנכרון שגוי — לא ניתן לפענח את הנתונים.',
+  EMPTY: 'אין עדיין נתונים בענן — העלו קודם ממכשיר אחר.',
+  TOO_BIG: 'יותר מדי נתונים לסנכרון (הקטינו חתימות/חותמות).'
+};
+function syncMsg(e) { const k = (e && e.message) || ''; return SYNC_ERR[k] || (k.indexOf('HTTP_') === 0 ? ('שגיאת שרת (' + k.slice(5) + ') — בדקו Project ID / API Key / הרשאות Firestore.') : 'הסנכרון נכשל — בדקו חיבור ופרטים.'); }
+function syncSetStatus(t, kind) { const el = $('syncStatus'); if (el) { el.textContent = t; el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--ok,#1a7f4b)' : 'var(--ink-3)'); } }
+function syncSaveCfgFromUI() {
+  return PFS.sync.setCfg({
+    projectId: $('syncProject').value.trim(), apiKey: $('syncKey').value.trim(),
+    code: $('syncCode').value.trim(), auto: $('syncAuto').checked
+  });
+}
+let syncPushTimer = null;
+function syncAutoPush() {
+  if (!PFS.sync.getCfg().auto || !PFS.sync.configured()) return;
+  clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(async () => {
+    try { await PFS.sync.push(); syncSetStatus('נשמר בענן ✓ ' + new Date().toLocaleTimeString('he-IL'), 'ok'); }
+    catch (e) { syncSetStatus(syncMsg(e), 'err'); }
+  }, 2500);
+}
+function wireSync() {
+  const c = PFS.sync.getCfg();
+  if ($('syncProject')) $('syncProject').value = c.projectId || '';
+  if ($('syncKey')) $('syncKey').value = c.apiKey || '';
+  if ($('syncCode')) $('syncCode').value = c.code || '';
+  if ($('syncAuto')) $('syncAuto').checked = !!c.auto;
+  $('syncHelp') && $('syncHelp').addEventListener('click', (e) => { e.preventDefault(); const b = $('syncHelpBox'); b.style.display = b.style.display === 'none' ? 'block' : 'none'; });
+  ['syncProject', 'syncKey', 'syncCode', 'syncAuto'].forEach((id) => $(id) && $(id).addEventListener('change', syncSaveCfgFromUI));
+  $('syncPush') && $('syncPush').addEventListener('click', async () => {
+    syncSaveCfgFromUI();
+    if (!PFS.sync.configured()) { syncSetStatus(SYNC_ERR.NOT_CONFIGURED, 'err'); return; }
+    syncSetStatus('מעלה…');
+    try { await PFS.sync.push(); syncSetStatus('הכול הועלה לענן ✓', 'ok'); }
+    catch (e) { syncSetStatus(syncMsg(e), 'err'); }
+  });
+  $('syncPull') && $('syncPull').addEventListener('click', async () => {
+    syncSaveCfgFromUI();
+    if (!PFS.sync.configured()) { syncSetStatus(SYNC_ERR.NOT_CONFIGURED, 'err'); return; }
+    if (!(await PFS.ui.confirm('משיכת נתונים', 'הנתונים מהענן יחליפו את מה שקיים במכשיר זה. להמשיך?'))) return;
+    syncSetStatus('מושך…');
+    try { await PFS.sync.pull(); refreshAllFromStore(); syncSetStatus('הנתונים נמשכו ופוענחו ✓', 'ok'); PFS.toast('הסנכרון הושלם', 'ok'); }
+    catch (e) { syncSetStatus(syncMsg(e), 'err'); }
+  });
+}
+async function syncAutoPullOnLoad() {
+  const c = PFS.sync.getCfg();
+  if (!c.auto || !PFS.sync.configured()) return;
+  try { await PFS.sync.pull(); refreshAllFromStore(); syncSetStatus('סונכרן מהענן ✓', 'ok'); }
+  catch (e) { if ((e && e.message) !== 'EMPTY') syncSetStatus(syncMsg(e), 'err'); }
+}
+wireSync();
+syncAutoPullOnLoad();
+// After any local data change, schedule an encrypted auto-push (no-op unless
+// the user enabled auto-sync). Excludes the sync config key itself.
+(function () {
+  const _set = PFS.store.set.bind(PFS.store);
+  PFS.store.set = function (k, v) { const r = _set(k, v); if (k !== 'sync:cfg') { try { syncAutoPush(); } catch (e) {} } return r; };
+})();
 $('fillAllBtn').addEventListener('click', fillAll);
 $('backupExportBtn').addEventListener('click', backupExport);
 $('backupImportBtn').addEventListener('click', () => $('backupFile').click());

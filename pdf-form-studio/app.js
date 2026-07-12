@@ -668,12 +668,26 @@ function writeHandwriting() {
     const inp = $('hwWriteText'), prev = $('hwWritePreview'), place = $('hwWritePlace');
     const upd = () => {
       const t = inp.value.trim();
-      place.disabled = !t;
-      if (!t) { prev.innerHTML = '<span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span>'; return; }
+      if (!t) { place.disabled = true; prev.innerHTML = '<span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span>'; return; }
       const r = HW().renderText(t, { fontPx: 56, color: $('hwWriteInk').value });
+      // Nothing was inked → every character is untrained. Don't show an empty
+      // frame (looks broken) and don't let the user place an invisible box.
+      if (!r.drawn) {
+        place.disabled = true;
+        const miss = (r.missing || []).join(' ');
+        prev.innerHTML = '<span class="hint" style="color:var(--warn)">⚠️ אין אותיות מאומנות לטקסט הזה' + (miss ? ' (חסרות: ' + miss + ')' : '') + '. לחצו “✍️ אמן / עדכן אותיות”.</span>';
+        return;
+      }
+      place.disabled = false;
       prev.innerHTML = '';
       const img = new Image(); img.src = r.url; img.alt = t;
       prev.appendChild(img);
+      if (r.missing && r.missing.length) {
+        const note = document.createElement('div');
+        note.className = 'hint'; note.style.color = 'var(--warn)'; note.style.marginTop = '4px';
+        note.textContent = 'שים לב: אותיות שלא אומנו יופיעו כרווח ריק (' + r.missing.join(' ') + ').';
+        prev.appendChild(note);
+      }
     };
     inp.addEventListener('input', upd);
     $('hwWriteInk').addEventListener('input', upd);
@@ -698,6 +712,15 @@ function writeHandwriting() {
 function placeHandwriting(text, color) {
   const tracking = HW().getTracking();
   const res = HW().renderText(text, { fontPx: 72, color, tracking });
+  // Guard: if none of the typed characters are trained, the image is blank —
+  // placing it would drop an invisible empty box on the form (the bug users
+  // hit after their handwriting model was wiped). Refuse and say what's missing.
+  if (!res.drawn) {
+    const miss = (res.missing || []).join(' ');
+    PFS.toast(miss ? `אין אותיות מאומנות לטקסט הזה (חסרות: ${miss}). אמן/י אותן קודם ב✍️.` : 'אין כתב יד מאומן — אמן/י אותיות קודם.', 'err', 6000);
+    openHwTrainer();
+    return;
+  }
   const aspect = res.w / res.h;
   const fw = Math.max(0.08, Math.min(0.6, 0.028 * text.length + 0.08));
   overlay.setPlacing({

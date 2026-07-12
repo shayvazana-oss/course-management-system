@@ -135,9 +135,15 @@
 
     // layout: every glyph at its TRUE size — advance width follows the metrics
     const items = []; let totalW = 0;
+    let drawn = 0; const missingSet = {};
     chars.forEach((ch) => {
+      const isWs = (ch === ' ' || ch === '\t' || ch === '\n');
       const g = p.glyphs[ch];
-      if (ch === ' ' || ch === '\t' || ch === '\n' || !g) { items.push({ space: true, w: spaceW }); totalW += spaceW + gap; return; }
+      if (isWs || !g) {
+        if (!isWs && !g) missingSet[ch] = 1;         // an untrained glyph — renders blank
+        items.push({ space: true, w: spaceW }); totalW += spaceW + gap; return;
+      }
+      drawn++;
       const m = blendMetrics(ch, g);
       const gh = fontPx * m.h;
       const gw = Math.max(fontPx * 0.06, gh * g.a);
@@ -183,7 +189,10 @@
     });
 
     const trimmed = PFS.imageTools.autoTrim(c, 6);
-    return { url: trimmed.toDataURL('image/png'), w: trimmed.width, h: trimmed.height };
+    // `drawn` = how many real (trained) glyphs actually got inked; `missing` =
+    // the untrained characters that came out blank. Callers use these to refuse
+    // placing an empty image instead of dropping an invisible box on the form.
+    return { url: trimmed.toDataURL('image/png'), w: trimmed.width, h: trimmed.height, drawn, missing: Object.keys(missingSet) };
   }
 
   PFS.handwriting = {

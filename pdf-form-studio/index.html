@@ -171,6 +171,12 @@
         </section>
 
         <section class="tab-panel" data-panel="settings">
+          <div class="card" id="acctCard">
+            <h3>👤 חשבון · סנכרון אוטומטי</h3>
+            <div class="body-p" id="acctBody">
+              <div class="hint muted">טוען…</div>
+            </div>
+          </div>
           <div class="card">
             <h3>💾 גיבוי ושחזור</h3>
             <div class="body-p">
@@ -384,11 +390,16 @@
      (main-thread fake worker) so it needs no external file and is CSP-safe. */
   window.PFS_WORKER_SRC = './vendor/pdfjs/pdf.worker.min.js';
   window.PFS_STDFONTS = './vendor/pdfjs/standard_fonts/';
+  /* Cloud accounts (Supabase). Operator sets these ONCE for the whole product;
+     then every user just signs up / logs in. Empty = accounts UI stays in
+     "not configured" mode (backup/restore + optional sync.js still work). */
+  window.PFS_SUPABASE = { url: '', anonKey: '' };
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = { worker: './vendor/tesseract/worker.min.js', core: './vendor/tesseract/', lang: './vendor/tesseract/tessdata/' };
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script src="./js/store.js"></script>
+<script src="./js/account.js"></script>
 <script src="./js/sync.js"></script>
 <script src="./js/ui.js"></script>
 <script src="./js/deliver.js"></script>

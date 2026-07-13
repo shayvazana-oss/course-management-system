@@ -891,11 +891,85 @@ async function syncAutoPullOnLoad() {
 }
 wireSync();
 syncAutoPullOnLoad();
-// After any local data change, schedule an encrypted auto-push (no-op unless
-// the user enabled auto-sync). Excludes the sync config key itself.
+
+// ---- accounts + automatic cloud save (js/account.js) -------------------
+const ACCT = () => PFS.account;
+let acctSaveTimer = null, acctBusy = false;
+function acctStatus(t, kind) { const el = $('acctStatus'); if (el) { el.textContent = t || ''; el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--ok,#1a7f4b)' : 'var(--ink-3)'); } }
+function scheduleAccountSave() {
+  if (!ACCT().authed()) return;
+  clearTimeout(acctSaveTimer);
+  acctSaveTimer = setTimeout(async () => {
+    try { await ACCT().saveVault(); acctStatus('נשמר בענן ✓ ' + new Date().toLocaleTimeString('he-IL'), 'ok'); }
+    catch (e) { acctStatus('שמירה בענן נכשלה — בדקו חיבור', 'err'); }
+  }, 2000);
+}
+function renderAccount() {
+  const body = $('acctBody'); if (!body) return;
+  if (!ACCT().configured()) {
+    body.innerHTML = '<div class="hint muted">סנכרון חשבונות בענן עדיין לא הופעל למוצר. כשתחברו Supabase — כל משתמש יתחבר עם אימייל וסיסמה, והכול יישמר וייטען אוטומטית בכל מכשיר.</div>' +
+      '<details style="margin-top:6px"><summary class="hint" style="cursor:pointer">הפעלה (למפעיל) ⓘ</summary>' +
+      '<div class="field" style="margin-top:6px"><label>Supabase URL</label><input id="acctCfgUrl" dir="ltr" placeholder="https://xxxx.supabase.co" /></div>' +
+      '<div class="field"><label>anon key</label><input id="acctCfgKey" dir="ltr" placeholder="eyJ…" /></div>' +
+      '<button class="btn sm" id="acctCfgSave">שמור פרטי חיבור</button></details>';
+    $('acctCfgSave') && $('acctCfgSave').addEventListener('click', () => {
+      ACCT()._saveSessionCfg({ url: $('acctCfgUrl').value.trim(), anonKey: $('acctCfgKey').value.trim() });
+      renderAccount();
+    });
+    return;
+  }
+  if (ACCT().authed()) {
+    const u = ACCT().user() || {};
+    body.innerHTML = '<div class="hint">מחובר/ת כ־<b dir="ltr">' + (u.email || '—') + '</b></div>' +
+      '<div class="hint muted">הכול נשמר בענן אוטומטית וייטען בכל מכשיר שתתחברו בו.</div>' +
+      '<div class="row" style="margin-top:6px"><button class="btn sm" id="acctSaveNow" style="flex:1">שמור עכשיו</button><button class="btn sm ghost" id="acctOut" style="flex:1">התנתק</button></div>' +
+      '<div class="hint" id="acctStatus" style="margin-top:6px"></div>';
+    $('acctSaveNow').addEventListener('click', async () => { acctStatus('שומר…'); try { await ACCT().saveVault(); acctStatus('נשמר בענן ✓', 'ok'); } catch (e) { acctStatus('השמירה נכשלה', 'err'); } });
+    $('acctOut').addEventListener('click', () => { ACCT().signOut(); renderAccount(); PFS.toast('התנתקת', 'ok'); });
+    return;
+  }
+  body.innerHTML = '<div class="field"><label>אימייל</label><input id="acctEmail" type="email" dir="ltr" placeholder="you@email.com" /></div>' +
+    '<div class="field"><label>סיסמה</label><input id="acctPass" type="password" dir="ltr" placeholder="לפחות 6 תווים" /></div>' +
+    '<div class="row"><button class="btn sm primary" id="acctIn" style="flex:1">התחבר</button><button class="btn sm" id="acctUp" style="flex:1">הרשמה</button></div>' +
+    '<div class="hint" id="acctStatus" style="margin-top:6px"></div>';
+  const email = () => $('acctEmail').value.trim(), pass = () => $('acctPass').value;
+  async function afterAuth() {
+    acctStatus('טוען את הנתונים שלך…');
+    try { const had = await ACCT().loadVault(); if (had) { refreshAllFromStore(); } else { await ACCT().saveVault(); } }
+    catch (e) { /* keep local data; will auto-save */ }
+    renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הנתונים שלך מסונכרנים', 'ok');
+  }
+  $('acctIn').addEventListener('click', async () => {
+    if (acctBusy) return; acctBusy = true; acctStatus('מתחבר…');
+    try { await ACCT().signIn(email(), pass()); await afterAuth(); }
+    catch (e) { acctStatus((e.message === 'BAD_CREDENTIALS') ? 'אימייל או סיסמה שגויים' : 'ההתחברות נכשלה', 'err'); }
+    finally { acctBusy = false; }
+  });
+  $('acctUp').addEventListener('click', async () => {
+    if (acctBusy) return; acctBusy = true; acctStatus('יוצר חשבון…');
+    try { const r = await ACCT().signUp(email(), pass()); if (r.needsConfirm) { acctStatus('נשלח אליך מייל אימות — אשרו ואז התחברו.', 'ok'); } else { await afterAuth(); } }
+    catch (e) { acctStatus(/already/i.test(e.message) ? 'האימייל כבר רשום — התחברו' : ('ההרשמה נכשלה: ' + e.message), 'err'); }
+    finally { acctBusy = false; }
+  });
+}
+async function acctAutoLoadOnStart() {
+  if (!ACCT().configured() || !ACCT().authed()) { renderAccount(); return; }
+  try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {}
+  renderAccount();
+}
+acctAutoLoadOnStart();
+
+// After any local data change: encrypted auto-push for the personal sync path,
+// and an automatic cloud save for logged-in accounts. Excludes config/session
+// keys to avoid save loops.
 (function () {
   const _set = PFS.store.set.bind(PFS.store);
-  PFS.store.set = function (k, v) { const r = _set(k, v); if (k !== 'sync:cfg') { try { syncAutoPush(); } catch (e) {} } return r; };
+  PFS.store.set = function (k, v) {
+    const r = _set(k, v);
+    if (k !== 'sync:cfg') { try { syncAutoPush(); } catch (e) {} }
+    if (k.indexOf('acct:') !== 0) { try { scheduleAccountSave(); } catch (e) {} }
+    return r;
+  };
 })();
 $('fillAllBtn').addEventListener('click', fillAll);
 $('backupExportBtn').addEventListener('click', backupExport);

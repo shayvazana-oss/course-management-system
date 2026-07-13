@@ -28,6 +28,21 @@
       render();
       PFS.toast('התבנית נשמרה', 'ok');
     }
+    // Automatic memory: silently remember the current layout, keyed to the
+    // form's fingerprint, so opening the same form again auto-applies it with
+    // zero manual "save template". Upserts the single auto-entry per form
+    // instead of piling up duplicates.
+    function autoSave(fp, name) {
+      if (!fp || !PFS.fingerprint) return;
+      const els = opts.getElements();
+      if (!els.length) return;
+      const arr = all();
+      let tpl = arr.find((t) => t.auto && t.fp && PFS.fingerprint.score(fp, t.fp) >= 0.9);
+      if (tpl) { tpl.elements = els; tpl.ts = Date.now(); tpl.fp = fp; if (name) tpl.name = name; }
+      else { arr.unshift({ id: uid(), name: name || 'זיכרון אוטומטי', ts: Date.now(), elements: els, fp: fp, auto: true }); }
+      if (!persist(arr)) return;
+      render();
+    }
     function apply(id) {
       const tpl = all().find((t) => t.id === id);
       if (!tpl) return;
@@ -104,7 +119,7 @@
     }
 
     render();
-    return { save, apply, remove, exportAll, importFile, render, all, findMatch, rename, setFilter };
+    return { save, autoSave, apply, remove, exportAll, importFile, render, all, findMatch, rename, setFilter };
   }
 
   PFS.createTemplates = createTemplates;

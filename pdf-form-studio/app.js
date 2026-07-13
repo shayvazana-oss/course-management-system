@@ -28,7 +28,17 @@ PFS.toast = function (msg, kind) {
 
 // ---------- state ----------
 let dirty = false;
-const markDirty = () => { dirty = true; };
+const markDirty = () => { dirty = true; scheduleAutoMemory(); };
+
+// Automatic per-form memory: a short while after any edit, silently remember
+// the current layout linked to this form's fingerprint. Next time the same
+// form is opened it auto-applies (see openPdfFile) — no manual "save template".
+let autoMemTimer = null;
+function scheduleAutoMemory() {
+  if (!currentFp || !templates) return;
+  clearTimeout(autoMemTimer);
+  autoMemTimer = setTimeout(() => { try { templates.autoSave(currentFp, currentFileName); } catch (e) {} }, 1500);
+}
 
 // ---------- undo / redo (snapshots of the overlay) ----------
 let history = [], redo = [], restoring = false, snapT = null;
@@ -169,7 +179,7 @@ async function openPdfFile(file) {
     const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp);
     if (match) {
       templates.apply(match.tpl.id);
-      PFS.toast('זוהה טופס מוכר — הוחלה התבנית: ' + match.tpl.name, 'ok');
+      PFS.toast('כבר מילאת את הטופס הזה — שחזרתי את מה שמילאת ✓', 'ok');
       // one-click: also fill the active profile into the (now tagged) fields
       const ap = profiles.active();
       if (ap && ap.values && Object.keys(ap.values).length) {
@@ -401,6 +411,8 @@ async function doExport() {
     PFS.exporter.downloadBytes(bytes, currentFileName + '-filled.pdf');
     PFS.toast('ה-PDF יוצא בהצלחה', 'ok');
     dirty = false;
+    // Commit this layout to memory now, so re-opening the same form restores it.
+    try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
   } catch (e) {
     console.error(e);
     PFS.toast('הייצוא נכשל: ' + (e.message || e), 'err');

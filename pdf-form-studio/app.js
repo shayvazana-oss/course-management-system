@@ -569,6 +569,18 @@ document.addEventListener('keydown', (e) => {
     const k = (e.key || '').toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoAction(); }
+    else if (k === 'd') {
+      // duplicate the selected element slightly offset — great for repeated
+      // checks/labels down a table
+      if (sel) {
+        e.preventDefault();
+        const m = JSON.parse(JSON.stringify(sel.model)); delete m.id;
+        m.fx = Math.min(0.95, m.fx + 0.02); m.fy = Math.min(0.95, m.fy + 0.02);
+        const model = PFS.element.makeModel(m.kind || m.type, m.page, m);
+        const c = overlay.instantiate(model); if (c) overlay.selectCtrl(c);
+        markDirty();
+      }
+    }
     else if (k === 's') { e.preventDefault(); if (!$('exportBtn').disabled) doExport(); }
     else if (k === 'o') { e.preventDefault(); $('pdfInput').click(); }
   }

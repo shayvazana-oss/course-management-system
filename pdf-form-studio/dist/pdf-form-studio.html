@@ -343,6 +343,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     <div class="tb-center">
       <div class="docbar hidden" id="docbar">
         <span class="fname" id="fname">—</span>
+        <span id="savedInd" style="font-size:11px;font-weight:700;color:#9FE3BF;opacity:0;transition:opacity .4s">✓ נשמר</span>
         <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:700"></select>
         <div class="zoomctl" id="zoomctl">
           <button data-z="out" title="הקטן">−</button>
@@ -374,6 +375,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn tool" data-tool="stamp" title="חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
       <button class="rail-btn tool" data-tool="handwriting" title="כתב יד"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
       <div class="rail-sep"></div>
+      <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
       <button class="rail-btn" id="detectBtn" disabled title="זהה שדות"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
       <div class="spacer"></div>
     </nav>
@@ -3572,7 +3574,13 @@ let autoMemTimer = null;
 function scheduleAutoMemory() {
   if (!currentFp || !templates) return;
   clearTimeout(autoMemTimer);
-  autoMemTimer = setTimeout(() => { try { templates.autoSave(currentFp, currentFileName); } catch (e) {} }, 1500);
+  autoMemTimer = setTimeout(() => {
+    try {
+      templates.autoSave(currentFp, currentFileName);
+      const si = $('savedInd');
+      if (si) { si.style.opacity = '1'; clearTimeout(si._t); si._t = setTimeout(() => { si.style.opacity = '0'; }, 1800); }
+    } catch (e) {}
+  }, 1500);
 }
 
 // ---------- undo / redo (snapshots of the overlay) ----------
@@ -3658,8 +3666,10 @@ async function runOcr() {
 // Smart-vault prefill: values for detected fields taken from the active
 // profile, matched by meaning (vault.matchKey), skipping fieldKeys that
 // already have elements on the form (e.g. restored by auto-memory).
+let skipPrefillOnce = false;   // set by "clear form" — the user asked for empty
 function vaultPrefill(det) {
   try {
+    if (skipPrefillOnce) { skipPrefillOnce = false; return null; }
     const ap = profiles.active();
     if (!ap || !ap.values || !det || !det.fields) return null;
     return PFS.vault.matchValues(det.fields, ap.values, overlay.fieldKeys());
@@ -3717,6 +3727,7 @@ async function openPdfFile(file) {
     $('tmplBtn').disabled = false;
     $('mergeBtn').disabled = false;
     $('detectBtn').disabled = false;
+    $('clearBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -4286,6 +4297,14 @@ $('mergeRun').addEventListener('click', async () => {
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
 $('detectBtn').addEventListener('click', runDetection);
+$('clearBtn').addEventListener('click', async () => {
+  if (!overlay.getElements().length) { PFS.toast('הטופס כבר ריק', 'ok'); return; }
+  if (!(await PFS.ui.confirm('ניקוי הטופס', 'למחוק את כל מה שמולא על הטופס?'))) return;
+  overlay.clearElements(); fieldsPanel.clear(); markDirty();
+  skipPrefillOnce = true;
+  runDetection();
+  PFS.toast('הטופס נוקה', 'ok');
+});
 
 // =====================================================================
 //  Handwriting ("כתב היד שלי")

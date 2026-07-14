@@ -37,7 +37,13 @@ let autoMemTimer = null;
 function scheduleAutoMemory() {
   if (!currentFp || !templates) return;
   clearTimeout(autoMemTimer);
-  autoMemTimer = setTimeout(() => { try { templates.autoSave(currentFp, currentFileName); } catch (e) {} }, 1500);
+  autoMemTimer = setTimeout(() => {
+    try {
+      templates.autoSave(currentFp, currentFileName);
+      const si = $('savedInd');
+      if (si) { si.style.opacity = '1'; clearTimeout(si._t); si._t = setTimeout(() => { si.style.opacity = '0'; }, 1800); }
+    } catch (e) {}
+  }, 1500);
 }
 
 // ---------- undo / redo (snapshots of the overlay) ----------
@@ -123,8 +129,10 @@ async function runOcr() {
 // Smart-vault prefill: values for detected fields taken from the active
 // profile, matched by meaning (vault.matchKey), skipping fieldKeys that
 // already have elements on the form (e.g. restored by auto-memory).
+let skipPrefillOnce = false;   // set by "clear form" — the user asked for empty
 function vaultPrefill(det) {
   try {
+    if (skipPrefillOnce) { skipPrefillOnce = false; return null; }
     const ap = profiles.active();
     if (!ap || !ap.values || !det || !det.fields) return null;
     return PFS.vault.matchValues(det.fields, ap.values, overlay.fieldKeys());
@@ -182,6 +190,7 @@ async function openPdfFile(file) {
     $('tmplBtn').disabled = false;
     $('mergeBtn').disabled = false;
     $('detectBtn').disabled = false;
+    $('clearBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -751,6 +760,14 @@ $('mergeRun').addEventListener('click', async () => {
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
 $('detectBtn').addEventListener('click', runDetection);
+$('clearBtn').addEventListener('click', async () => {
+  if (!overlay.getElements().length) { PFS.toast('הטופס כבר ריק', 'ok'); return; }
+  if (!(await PFS.ui.confirm('ניקוי הטופס', 'למחוק את כל מה שמולא על הטופס?'))) return;
+  overlay.clearElements(); fieldsPanel.clear(); markDirty();
+  skipPrefillOnce = true;
+  runDetection();
+  PFS.toast('הטופס נוקה', 'ok');
+});
 
 // =====================================================================
 //  Handwriting ("כתב היד שלי")

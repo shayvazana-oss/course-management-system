@@ -12,6 +12,7 @@
     const panel = document.getElementById('fieldsPanel');
     const body = document.getElementById('fieldsBody');
     const ctrlByKey = {};
+    let emptyCount = () => 0;   // rebound by show(); how many text fields are still blank
 
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
@@ -93,6 +94,20 @@
         : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
       body.appendChild(head);
 
+      // completeness meter: "מולאו X/Y" + bar, live-updated on every input
+      const meter = document.createElement('div');
+      meter.style.cssText = 'margin:2px 0 8px';
+      meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
+      body.appendChild(meter);
+      const controls = [];
+      function recount() {
+        const total = controls.length;
+        const done = controls.filter((c) => c.type === 'checkbox' ? c.checked : c.value.trim()).length;
+        const t = meter.querySelector('#fpMeterTxt'), bar = meter.querySelector('#fpMeterBar');
+        if (t) t.textContent = 'מולאו ' + done + ' מתוך ' + total + ' שדות';
+        if (bar) bar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
+      }
+
       let autoFilled = 0;
       det.fields.forEach((f) => {
         const row = document.createElement('div'); row.className = 'field';
@@ -103,7 +118,7 @@
           control = document.createElement('input'); control.type = 'checkbox';
           control.style.width = '20px'; control.style.height = '20px'; control.style.accentColor = 'var(--brand)';
           control.title = 'סמן וי על הטופס';
-          control.addEventListener('change', () => ensureCheck(f, control.checked));
+          control.addEventListener('change', () => { ensureCheck(f, control.checked); recount(); });
         } else {
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
@@ -116,7 +131,7 @@
             control.style.borderColor = bad ? 'var(--danger)' : '';
             control.title = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
           };
-          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); });
+          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); });
           const pv = prefill && prefill[f.fieldKey];
           if (pv != null && String(pv).trim()) {
             control.value = pv;
@@ -149,11 +164,14 @@
         }
         row.appendChild(inRow);
         body.appendChild(row);
+        controls.push(control);
       });
+      recount();
+      emptyCount = () => controls.filter((c) => c.type !== 'checkbox' && !c.value.trim()).length;
       return autoFilled;
     }
 
-    return { show, clear };
+    return { show, clear, emptyCount: () => emptyCount() };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;

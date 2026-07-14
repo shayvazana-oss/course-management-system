@@ -61,9 +61,12 @@
       }
     }
 
-    function show(det) {
+    // show(det, prefill): prefill is an optional {fieldKey: value} map — those
+    // text fields are filled ON THE FORM immediately (the smart-vault path).
+    // Returns how many fields were auto-filled.
+    function show(det, prefill) {
       clear();
-      if (!panel || !body) return;
+      if (!panel || !body) return 0;
       panel.style.display = '';
       if (!det || det.tier === 'scanned' || !det.fields || !det.fields.length) {
         const msg = document.createElement('div'); msg.className = 'hint';
@@ -79,7 +82,7 @@
           btn.addEventListener('click', () => opts.onOcr && opts.onOcr());
           body.appendChild(btn);
         }
-        return;
+        return 0;
       }
       const head = document.createElement('div'); head.className = 'hint muted';
       head.style.marginBottom = '4px';
@@ -90,6 +93,7 @@
         : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
       body.appendChild(head);
 
+      let autoFilled = 0;
       det.fields.forEach((f) => {
         const row = document.createElement('div'); row.className = 'field';
         const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
@@ -104,6 +108,11 @@
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
           control.addEventListener('input', () => ensureCtrl(f, control.value));
+          const pv = prefill && prefill[f.fieldKey];
+          if (pv != null && String(pv).trim()) {
+            control.value = pv;
+            if (ensureCtrl(f, String(pv))) autoFilled++;
+          }
         }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';
@@ -114,6 +123,7 @@
         inRow.append(control, go); row.appendChild(inRow);
         body.appendChild(row);
       });
+      return autoFilled;
     }
 
     return { show, clear };

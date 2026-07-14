@@ -111,13 +111,24 @@ async function runOcr() {
       PFS.toast('OCR לא זיהה שדות ברורים — נסו מילוי ידני', 'err');
       return;
     }
-    fieldsPanel.show(det);
-    PFS.toast(`OCR זיהה ${det.fields.length} שדות`, 'ok');
+    const nOcr = fieldsPanel.show(det, vaultPrefill(det));
+    PFS.toast(nOcr ? `OCR זיהה ${det.fields.length} שדות — ${nOcr} מולאו אוטומטית מהפרטים שלך 🪄` : `OCR זיהה ${det.fields.length} שדות`, 'ok');
   } catch (e) {
     console.error('OCR failed', e);
     fieldsPanel.show({ tier: 'scanned', fields: [] });
     PFS.toast('OCR נכשל: ' + (e.message || e), 'err');
   }
+}
+
+// Smart-vault prefill: values for detected fields taken from the active
+// profile, matched by meaning (vault.matchKey), skipping fieldKeys that
+// already have elements on the form (e.g. restored by auto-memory).
+function vaultPrefill(det) {
+  try {
+    const ap = profiles.active();
+    if (!ap || !ap.values || !det || !det.fields) return null;
+    return PFS.vault.matchValues(det.fields, ap.values, overlay.fieldKeys());
+  } catch (e) { return null; }
 }
 
 async function runDetection() {
@@ -128,8 +139,9 @@ async function runDetection() {
   try {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
-    fieldsPanel.show(det);
+    const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
+    else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');
     else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
     else PFS.toast('לא זוהו שדות אוטומטית', 'err');
   } catch (e) {
@@ -585,6 +597,46 @@ $('profileGrab').addEventListener('click', async () => {
   PFS.toast('הפרטים נשמרו לפרופיל', 'ok');
 });
 renderProfileSelect();
+
+// ---- smart vault: build the profile from a photo of an ID / license ----
+const HEB_KEY_LABEL = { last_name: 'שם משפחה', first_name: 'שם פרטי', full_name: 'שם מלא', id: 'תעודת זהות', birth_date: 'תאריך לידה', phone: 'טלפון' };
+function vaultScanStatus(t) { const el = $('vaultScanStatus'); if (el) { el.style.display = t ? '' : 'none'; el.textContent = t || ''; } }
+$('vaultScanBtn').addEventListener('click', () => {
+  if (!(window.Tesseract && window.PFS_TESS)) { PFS.toast('קריאת תעודות אינה זמינה בגרסה זו (אין OCR)', 'err'); return; }
+  $('vaultInput').click();
+});
+$('vaultInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const btn = $('vaultScanBtn'); btn.disabled = true;
+  vaultScanStatus('קורא את התעודה… זה לוקח עד חצי דקה, הכול מקומי במכשיר 🔒');
+  try {
+    // downscale big photos for OCR speed
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+    const maxW = 1600, sc = Math.min(1, maxW / img.naturalWidth);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(img.src);
+    const text = await PFS.vault.recognizeImage(c, (p) => vaultScanStatus(`קורא את התעודה… ${Math.round(p * 100)}%`));
+    const vals = PFS.vault.extractFromText(text);
+    const found = Object.keys(vals);
+    if (!found.length) { vaultScanStatus(''); PFS.toast('לא הצלחתי לחלץ פרטים מהתמונה — נסו צילום ישר, מואר וחד', 'err'); return; }
+    // merge into the active profile (create one on first use), Hebrew keys so
+    // they match form labels naturally
+    let p = profiles.active();
+    const merged = Object.assign({}, p ? p.values : {});
+    found.forEach((k) => { merged[HEB_KEY_LABEL[k] || k] = vals[k]; });
+    profiles.saveProfile(p ? p.name : 'אני', merged);
+    renderProfileSelect();
+    vaultScanStatus('');
+    PFS.toast(`✓ חולצו ${found.length} פרטים (${found.map((k) => HEB_KEY_LABEL[k] || k).join(', ')}) — בדקו ותקנו למטה`, 'ok', 6000);
+  } catch (err) {
+    console.error(err);
+    vaultScanStatus('');
+    PFS.toast('קריאת התעודה נכשלה — נסו תמונה אחרת', 'err');
+  } finally { btn.disabled = false; }
+});
 
 // =====================================================================
 //  Mail-merge (batch)

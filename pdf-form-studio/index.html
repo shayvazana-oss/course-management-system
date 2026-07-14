@@ -128,6 +128,8 @@
               </div>
               <div id="profileRows" class="tmpl-list"></div>
               <button class="btn sm ghost" id="profileAddRow">＋ הוסף שדה</button>
+              <button class="btn sm primary" id="vaultScanBtn" title="צלמו/העלו תעודת זהות או רישיון — הפרטים יחולצו אוטומטית">📷 מלא מצילום ת״ז / רישיון</button>
+              <div class="hint muted" id="vaultScanStatus" style="display:none"></div>
               <div class="row">
                 <button class="btn sm primary" id="profileFill" style="flex:1" title="ממלא שדות מתויגים">מלא בטופס</button>
                 <button class="btn sm" id="profileGrab" style="flex:1" title="שומר את ערכי השדות לפרופיל">שמור מהטופס</button>
@@ -224,6 +226,7 @@
 <!-- Hidden file inputs -->
 <input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
 <input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" class="hidden" />
+<input type="file" id="vaultInput" accept="image/*" capture="environment" class="hidden" />
 
 <!-- Signature pad modal -->
 <div class="modal-back" id="sigModal">
@@ -401,6 +404,7 @@
 <script src="./js/store.js"></script>
 <script src="./js/account.js"></script>
 <script src="./js/sync.js"></script>
+<script src="./js/vault.js"></script>
 <script src="./js/ui.js"></script>
 <script src="./js/deliver.js"></script>
 <script src="./js/image-tools.js"></script>

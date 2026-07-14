@@ -404,6 +404,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
               </div>
               <div id="profileRows" class="tmpl-list"></div>
               <button class="btn sm ghost" id="profileAddRow">＋ הוסף שדה</button>
+              <button class="btn sm primary" id="vaultScanBtn" title="צלמו/העלו תעודת זהות או רישיון — הפרטים יחולצו אוטומטית">📷 מלא מצילום ת״ז / רישיון</button>
+              <div class="hint muted" id="vaultScanStatus" style="display:none"></div>
               <div class="row">
                 <button class="btn sm primary" id="profileFill" style="flex:1" title="ממלא שדות מתויגים">מלא בטופס</button>
                 <button class="btn sm" id="profileGrab" style="flex:1" title="שומר את ערכי השדות לפרופיל">שמור מהטופס</button>
@@ -500,6 +502,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 <!-- Hidden file inputs -->
 <input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
 <input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" class="hidden" />
+<input type="file" id="vaultInput" accept="image/*" capture="environment" class="hidden" />
 
 <!-- Signature pad modal -->
 <div class="modal-back" id="sigModal">
@@ -1056,6 +1059,169 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   }
 
   PFS.sync = { getCfg, setCfg, configured, push, pull, docId, _enc: encryptObj, _dec: decryptStr };
+})(window);
+
+</script>
+<script>
+/* vault.js — the "smart personal vault": understand what a form field MEANS
+ * and fill it from the user's saved details automatically.
+ *
+ * Two capabilities:
+ *  1. matchKey(label) — map any Hebrew/English field label ("שם משפחה",
+ *     "ת.ז.", "טלפון נייד", "last name"…) to a canonical key, so profile
+ *     values fill detected fields even when the wording differs.
+ *  2. extractFromText(ocrText) — best-effort pull of personal details from an
+ *     OCR'd photo of an Israeli ID / license (ID number with checksum, names,
+ *     birth date, phone), used to build the profile from a single photo.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  // strip punctuation/quotes/niqqud; keep Hebrew, Latin, digits
+  function norm(s) {
+    return String(s || '')
+      .replace(/[֑-ׇ]/g, '')            // niqqud
+      .replace(/["'`״׳:：׃.\-_/\\()\[\]]+/g, ' ')  // punctuation incl. gershayim
+      .replace(/\s+/g, ' ')
+      .trim().toLowerCase();
+  }
+
+  // canonical key → phrases that mean it (normalized "includes" match, longest wins)
+  const SYN = {
+    last_name:  ['שם משפחה', 'משפחה', 'last name', 'surname', 'family name'],
+    first_name: ['שם פרטי', 'פרטי', 'first name', 'given name'],
+    full_name:  ['שם מלא', 'שם משפחה ושם פרטי', 'שם פרטי ומשפחה', 'שם המבקש', 'שם העובד', 'שם הלקוח', 'full name', 'name', 'שם'],
+    id:         ['תעודת זהות', 'מספר תעודת זהות', 'מספר זהות', 'ת ז', 'תז', 'מס זהות', 'id number', 'id'],
+    birth_date: ['תאריך לידה', 'ת לידה', 'שנת לידה', 'date of birth', 'birth date'],
+    phone:      ['טלפון נייד', 'מספר טלפון', 'טלפון', 'נייד', 'סלולרי', 'פלאפון', 'phone', 'mobile', 'cell'],
+    email:      ['דואר אלקטרוני', 'דוא ל', 'אימייל', 'מייל', 'email', 'e mail'],
+    address:    ['כתובת מגורים', 'כתובת מלאה', 'כתובת', 'רחוב', 'address', 'street'],
+    city:       ['עיר', 'יישוב', 'ישוב', 'מקום מגורים', 'city', 'town'],
+    zip:        ['מיקוד', 'zip', 'postal code'],
+    date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך', 'date']
+  };
+  // precomputed [key, normalizedPhrase] sorted longest-first so "שם משפחה"
+  // beats the generic "שם"
+  const PAIRS = [];
+  Object.keys(SYN).forEach((k) => SYN[k].forEach((p) => PAIRS.push([k, norm(p)])));
+  PAIRS.sort((a, b) => b[1].length - a[1].length);
+
+  function matchKey(label) {
+    const n = norm(label);
+    if (!n) return null;
+    for (let i = 0; i < PAIRS.length; i++) {
+      const [key, phrase] = PAIRS[i];
+      if (n === phrase || n.indexOf(phrase) !== -1) return key;
+    }
+    return null;
+  }
+
+  // Israeli ID checksum (9 digits, Luhn-like)
+  function checkIsraeliId(id) {
+    const s = String(id || '').replace(/\D/g, '');
+    if (s.length < 5 || s.length > 9) return false;
+    const p = s.padStart(9, '0');
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      let d = +p[i] * ((i % 2) + 1);
+      if (d > 9) d -= 9;
+      sum += d;
+    }
+    return sum % 10 === 0;
+  }
+
+  /* Build {fieldKey: value} for detected fields from a profile's values.
+   * Matching order: exact fieldKey === profile key, then canonical-key match
+   * (both sides run through matchKey). `skipKeys` avoids refilling elements
+   * that already exist (e.g. restored from the form's auto-memory).
+   */
+  function matchValues(fields, values, skipKeys) {
+    const out = {};
+    if (!fields || !fields.length || !values) return out;
+    const skip = new Set(skipKeys || []);
+    // canonical → value (first profile entry that maps to that canon wins)
+    const canonVal = {};
+    Object.keys(values).forEach((k) => {
+      const c = matchKey(k);
+      if (c && canonVal[c] === undefined && String(values[k]).trim()) canonVal[c] = values[k];
+    });
+    // derive full_name / first+last from each other when only one form exists
+    if (canonVal.full_name === undefined && (canonVal.first_name || canonVal.last_name)) {
+      canonVal.full_name = [canonVal.first_name, canonVal.last_name].filter(Boolean).join(' ');
+    }
+    fields.forEach((f) => {
+      if (f.type === 'check' || skip.has(f.fieldKey)) return;
+      if (values[f.fieldKey] !== undefined && String(values[f.fieldKey]).trim()) { out[f.fieldKey] = values[f.fieldKey]; return; }
+      const c = matchKey(f.label) || matchKey(f.fieldKey);
+      if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
+    });
+    return out;
+  }
+
+  /* Best-effort extraction from OCR text of an Israeli ID / license photo. */
+  function extractFromText(text) {
+    const values = {};
+    const lines = String(text || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    const whole = lines.join('\n');
+
+    // ID number: any digit run of 7-9 that passes the checksum
+    const digitRuns = whole.replace(/[^\d\n]/g, ' ').match(/\d{7,9}/g) || [];
+    for (const d of digitRuns) { if (checkIsraeliId(d)) { values.id = d.padStart(9, '0'); break; } }
+
+    // dates: earliest plausible year = birth date
+    const dates = [];
+    const dre = /(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/g;
+    let m;
+    while ((m = dre.exec(whole))) {
+      let y = +m[3]; if (y < 100) y += y > 30 ? 1900 : 2000;
+      if (y >= 1900 && y <= 2026) dates.push({ str: m[1] + '.' + m[2] + '.' + y, y });
+    }
+    if (dates.length) { dates.sort((a, b) => a.y - b.y); values.birth_date = dates[0].str; }
+
+    // phone
+    const ph = whole.replace(/[^\d\n+]/g, ' ').match(/05\d[ ]?\d{7}/);
+    if (ph) values.phone = ph[0].replace(/\s+/g, '');
+
+    // names: value on the label's line (after it) or on the following line
+    function grab(labelRe) {
+      for (let i = 0; i < lines.length; i++) {
+        if (!labelRe.test(norm(lines[i]))) continue;
+        // same line: text after the label words
+        const after = lines[i].split(/[:：׃]/)[1];
+        const clean = (s) => String(s || '').replace(/[^֐-׿a-zA-Z' -]/g, '').replace(/\s+/g, ' ').trim();
+        const same = clean(after);
+        if (same && same.length >= 2) return same;
+        const next = clean(lines[i + 1]);
+        if (next && next.length >= 2 && !matchKey(next)) return next;
+      }
+      return null;
+    }
+    const last = grab(/משפחה|surname|last name/);
+    const first = grab(/פרטי|given|first name/);
+    if (last) values.last_name = last;
+    if (first) values.first_name = first;
+    if (first || last) values.full_name = [first, last].filter(Boolean).join(' ');
+
+    return values;
+  }
+
+  /* OCR a user-supplied image (File / canvas / dataURL) with the vendored
+   * Tesseract (Hebrew). Returns raw text. */
+  async function recognizeImage(src, onProgress) {
+    const c = root.PFS_TESS;
+    if (!root.Tesseract || !c) throw new Error('OCR_UNAVAILABLE');
+    const worker = await root.Tesseract.createWorker('heb', 1, {
+      workerPath: c.worker, corePath: c.core, langPath: c.lang, gzip: false,
+      logger: (s) => { if (onProgress && s.progress != null) onProgress(s.progress); }
+    });
+    try {
+      const { data } = await worker.recognize(src);
+      return data && data.text || '';
+    } finally { try { await worker.terminate(); } catch (e) {} }
+  }
+
+  PFS.vault = { matchKey, matchValues, extractFromText, recognizeImage, checkIsraeliId, norm };
 })(window);
 
 </script>
@@ -3067,9 +3233,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       }
     }
 
-    function show(det) {
+    // show(det, prefill): prefill is an optional {fieldKey: value} map — those
+    // text fields are filled ON THE FORM immediately (the smart-vault path).
+    // Returns how many fields were auto-filled.
+    function show(det, prefill) {
       clear();
-      if (!panel || !body) return;
+      if (!panel || !body) return 0;
       panel.style.display = '';
       if (!det || det.tier === 'scanned' || !det.fields || !det.fields.length) {
         const msg = document.createElement('div'); msg.className = 'hint';
@@ -3085,7 +3254,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           btn.addEventListener('click', () => opts.onOcr && opts.onOcr());
           body.appendChild(btn);
         }
-        return;
+        return 0;
       }
       const head = document.createElement('div'); head.className = 'hint muted';
       head.style.marginBottom = '4px';
@@ -3096,6 +3265,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
       body.appendChild(head);
 
+      let autoFilled = 0;
       det.fields.forEach((f) => {
         const row = document.createElement('div'); row.className = 'field';
         const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
@@ -3110,6 +3280,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
           control.addEventListener('input', () => ensureCtrl(f, control.value));
+          const pv = prefill && prefill[f.fieldKey];
+          if (pv != null && String(pv).trim()) {
+            control.value = pv;
+            if (ensureCtrl(f, String(pv))) autoFilled++;
+          }
         }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';
@@ -3120,6 +3295,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         inRow.append(control, go); row.appendChild(inRow);
         body.appendChild(row);
       });
+      return autoFilled;
     }
 
     return { show, clear };
@@ -3244,13 +3420,24 @@ async function runOcr() {
       PFS.toast('OCR לא זיהה שדות ברורים — נסו מילוי ידני', 'err');
       return;
     }
-    fieldsPanel.show(det);
-    PFS.toast(`OCR זיהה ${det.fields.length} שדות`, 'ok');
+    const nOcr = fieldsPanel.show(det, vaultPrefill(det));
+    PFS.toast(nOcr ? `OCR זיהה ${det.fields.length} שדות — ${nOcr} מולאו אוטומטית מהפרטים שלך 🪄` : `OCR זיהה ${det.fields.length} שדות`, 'ok');
   } catch (e) {
     console.error('OCR failed', e);
     fieldsPanel.show({ tier: 'scanned', fields: [] });
     PFS.toast('OCR נכשל: ' + (e.message || e), 'err');
   }
+}
+
+// Smart-vault prefill: values for detected fields taken from the active
+// profile, matched by meaning (vault.matchKey), skipping fieldKeys that
+// already have elements on the form (e.g. restored by auto-memory).
+function vaultPrefill(det) {
+  try {
+    const ap = profiles.active();
+    if (!ap || !ap.values || !det || !det.fields) return null;
+    return PFS.vault.matchValues(det.fields, ap.values, overlay.fieldKeys());
+  } catch (e) { return null; }
 }
 
 async function runDetection() {
@@ -3261,8 +3448,9 @@ async function runDetection() {
   try {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
-    fieldsPanel.show(det);
+    const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
+    else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');
     else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
     else PFS.toast('לא זוהו שדות אוטומטית', 'err');
   } catch (e) {
@@ -3718,6 +3906,46 @@ $('profileGrab').addEventListener('click', async () => {
   PFS.toast('הפרטים נשמרו לפרופיל', 'ok');
 });
 renderProfileSelect();
+
+// ---- smart vault: build the profile from a photo of an ID / license ----
+const HEB_KEY_LABEL = { last_name: 'שם משפחה', first_name: 'שם פרטי', full_name: 'שם מלא', id: 'תעודת זהות', birth_date: 'תאריך לידה', phone: 'טלפון' };
+function vaultScanStatus(t) { const el = $('vaultScanStatus'); if (el) { el.style.display = t ? '' : 'none'; el.textContent = t || ''; } }
+$('vaultScanBtn').addEventListener('click', () => {
+  if (!(window.Tesseract && window.PFS_TESS)) { PFS.toast('קריאת תעודות אינה זמינה בגרסה זו (אין OCR)', 'err'); return; }
+  $('vaultInput').click();
+});
+$('vaultInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const btn = $('vaultScanBtn'); btn.disabled = true;
+  vaultScanStatus('קורא את התעודה… זה לוקח עד חצי דקה, הכול מקומי במכשיר 🔒');
+  try {
+    // downscale big photos for OCR speed
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+    const maxW = 1600, sc = Math.min(1, maxW / img.naturalWidth);
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(img.src);
+    const text = await PFS.vault.recognizeImage(c, (p) => vaultScanStatus(`קורא את התעודה… ${Math.round(p * 100)}%`));
+    const vals = PFS.vault.extractFromText(text);
+    const found = Object.keys(vals);
+    if (!found.length) { vaultScanStatus(''); PFS.toast('לא הצלחתי לחלץ פרטים מהתמונה — נסו צילום ישר, מואר וחד', 'err'); return; }
+    // merge into the active profile (create one on first use), Hebrew keys so
+    // they match form labels naturally
+    let p = profiles.active();
+    const merged = Object.assign({}, p ? p.values : {});
+    found.forEach((k) => { merged[HEB_KEY_LABEL[k] || k] = vals[k]; });
+    profiles.saveProfile(p ? p.name : 'אני', merged);
+    renderProfileSelect();
+    vaultScanStatus('');
+    PFS.toast(`✓ חולצו ${found.length} פרטים (${found.map((k) => HEB_KEY_LABEL[k] || k).join(', ')}) — בדקו ותקנו למטה`, 'ok', 6000);
+  } catch (err) {
+    console.error(err);
+    vaultScanStatus('');
+    PFS.toast('קריאת התעודה נכשלה — נסו תמונה אחרת', 'err');
+  } finally { btn.disabled = false; }
+});
 
 // =====================================================================
 //  Mail-merge (batch)

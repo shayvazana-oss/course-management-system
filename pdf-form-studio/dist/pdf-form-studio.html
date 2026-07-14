@@ -413,6 +413,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           <div class="dz-step"><div class="n">2</div><div class="t">מלאו וחתמו</div><div class="d">טקסט · חתימה · חותמת</div></div>
           <div class="dz-step"><div class="n">3</div><div class="t">ייצאו PDF</div><div class="d">מוכן לשליחה</div></div>
         </div>
+        <div id="recentWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">⏱️ נפתחו לאחרונה — קליק ונפתח כבר ממולא:</div><div id="recentList" class="tmpl-list"></div></div>
         <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
         <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
       </div>
@@ -874,6 +875,67 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   };
 
   PFS.store = store;
+})(window);
+
+</script>
+<script>
+/* recent.js — "המסמכים האחרונים": keep the last opened PDFs (bytes included)
+ * in IndexedDB so a form can be reopened with one click — no re-hunting for
+ * the file. Combined with per-form auto-memory it reopens already filled.
+ * Cap 10 docs, oldest evicted. All local, like everything else.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+  const DB = 'fillo-docs', STORE = 'docs', CAP = 10;
+
+  function open() {
+    return new Promise((res, rej) => {
+      const rq = indexedDB.open(DB, 1);
+      rq.onupgradeneeded = () => { rq.result.createObjectStore(STORE, { keyPath: 'id' }); };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    });
+  }
+  function tx(db, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = db.transaction(STORE, mode); const s = t.objectStore(STORE);
+      const out = fn(s);
+      t.oncomplete = () => res(out && out.result !== undefined ? out.result : undefined);
+      t.onerror = () => rej(t.error);
+    });
+  }
+
+  async function save(name, bytes) {
+    try {
+      const db = await open();
+      const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
+      // same name → replace (refresh ts); else insert
+      const dup = all.find((d) => d.name === name);
+      const id = dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6);
+      await tx(db, 'readwrite', (s) => s.put({ id, name, ts: Date.now(), bytes }));
+      const rest = all.filter((d) => d.id !== id).sort((a, b) => b.ts - a.ts);
+      for (const d of rest.slice(CAP - 1)) await tx(db, 'readwrite', (s) => s.delete(d.id));
+      db.close();
+    } catch (e) { /* private-mode / quota — recents are a bonus, never block */ }
+  }
+  async function list() {
+    try {
+      const db = await open();
+      const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
+      db.close();
+      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts }) => ({ id, name, ts }));
+    } catch (e) { return []; }
+  }
+  async function get(id) {
+    try {
+      const db = await open();
+      const doc = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+      db.close(); return doc || null;
+    } catch (e) { return null; }
+  }
+
+  PFS.recent = { save, list, get };
 })(window);
 
 </script>
@@ -3600,6 +3662,7 @@ async function openPdfFile(file) {
     $('detectBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
+    PFS.recent && PFS.recent.save(file.name, buf.slice(0));
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     updateHwStatus();
     currentFp = null;
@@ -4490,6 +4553,28 @@ function showOnboarding() {
   back.querySelector('#obSkip').addEventListener('click', done);
 }
 showOnboarding();
+
+// recent-documents strip on the empty state: one click reopens (auto-memory
+// then restores everything that was filled)
+async function renderRecent() {
+  if (!PFS.recent) return;
+  const wrap = $('recentWrap'), list = $('recentList');
+  if (!wrap || !list) return;
+  const docs = await PFS.recent.list();
+  if (!docs.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  list.innerHTML = '';
+  docs.slice(0, 5).forEach((d) => {
+    const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
+    row.innerHTML = '<div class="nm">📄 ' + d.name + '</div><span class="pill">' + new Date(d.ts).toLocaleDateString('he-IL') + '</span>';
+    row.addEventListener('click', async () => {
+      const doc = await PFS.recent.get(d.id);
+      if (doc && doc.bytes) openPdfFile(new File([doc.bytes], doc.name, { type: 'application/pdf' }));
+    });
+    list.appendChild(row);
+  });
+}
+renderRecent();
 
 // A PDF shared into the app (WhatsApp → share → Fillo): sw.js stashed it,
 // pick it up and open like a normal file — the whole smart pipeline

@@ -184,6 +184,7 @@ async function openPdfFile(file) {
     $('detectBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
+    PFS.recent && PFS.recent.save(file.name, buf.slice(0));
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     updateHwStatus();
     currentFp = null;
@@ -1074,6 +1075,28 @@ function showOnboarding() {
   back.querySelector('#obSkip').addEventListener('click', done);
 }
 showOnboarding();
+
+// recent-documents strip on the empty state: one click reopens (auto-memory
+// then restores everything that was filled)
+async function renderRecent() {
+  if (!PFS.recent) return;
+  const wrap = $('recentWrap'), list = $('recentList');
+  if (!wrap || !list) return;
+  const docs = await PFS.recent.list();
+  if (!docs.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  list.innerHTML = '';
+  docs.slice(0, 5).forEach((d) => {
+    const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
+    row.innerHTML = '<div class="nm">📄 ' + d.name + '</div><span class="pill">' + new Date(d.ts).toLocaleDateString('he-IL') + '</span>';
+    row.addEventListener('click', async () => {
+      const doc = await PFS.recent.get(d.id);
+      if (doc && doc.bytes) openPdfFile(new File([doc.bytes], doc.name, { type: 'application/pdf' }));
+    });
+    list.appendChild(row);
+  });
+}
+renderRecent();
 
 // A PDF shared into the app (WhatsApp → share → Fillo): sw.js stashed it,
 // pick it up and open like a normal file — the whole smart pipeline

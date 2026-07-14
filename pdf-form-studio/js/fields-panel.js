@@ -99,7 +99,7 @@
       meter.style.cssText = 'margin:2px 0 8px';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
-      const controls = [];
+      const controls = []; const fieldMeta = [];
       function recount() {
         const total = controls.length;
         const done = controls.filter((c) => c.type === 'checkbox' ? c.checked : c.value.trim()).length;
@@ -164,11 +164,48 @@
         }
         row.appendChild(inRow);
         body.appendChild(row);
-        controls.push(control);
+        controls.push(control); fieldMeta.push(f);
       });
+      // interview mode: one question at a time, Enter advances — fastest way
+      // to sweep a long form, especially on a phone
+      const ivBtn = document.createElement('button');
+      ivBtn.className = 'btn sm primary block'; ivBtn.style.marginTop = '8px';
+      ivBtn.textContent = '🎯 מלאו בראיון — שדה אחרי שדה';
+      ivBtn.addEventListener('click', () => startInterview(fieldMeta, controls));
+      body.appendChild(ivBtn);
       recount();
       emptyCount = () => controls.filter((c) => c.type !== 'checkbox' && !c.value.trim()).length;
       return autoFilled;
+    }
+
+    let ivBar = null;
+    function startInterview(fields, controls) {
+      let i = 0;
+      if (!ivBar) {
+        ivBar = document.createElement('div');
+        ivBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:80;background:var(--surface);border-top:2px solid var(--brand);box-shadow:0 -6px 24px rgba(19,28,43,.18);padding:12px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+        ivBar.innerHTML = '<div style="flex:1;min-width:180px"><div id="ivLbl" style="font-weight:800;font-size:14px"></div><div class="hint muted" id="ivProg"></div></div><input id="ivIn" type="text" dir="auto" style="flex:2;min-width:160px;padding:10px;font-size:15px" placeholder="הקלידו ו-Enter…"/><button class="btn sm" id="ivSkip">דלג</button><button class="btn sm primary" id="ivNext">הבא ⏎</button><button class="btn sm ghost" id="ivEnd">סיום</button>';
+        document.body.appendChild(ivBar);
+      }
+      ivBar.style.display = 'flex';
+      const lbl = ivBar.querySelector('#ivLbl'), prog = ivBar.querySelector('#ivProg'), inp = ivBar.querySelector('#ivIn');
+      const textIdx = fields.map((f, j) => f.type !== 'check' ? j : -1).filter((j) => j >= 0);
+      let pos = 0;
+      function showCur() {
+        if (pos >= textIdx.length) { end(); PFS.toast('🎉 סיימתם את כל השדות!', 'ok'); return; }
+        const j = textIdx[pos]; const f = fields[j];
+        lbl.textContent = f.label; prog.textContent = 'שדה ' + (pos + 1) + ' מתוך ' + textIdx.length;
+        inp.value = controls[j].value || '';
+        const c = ctrlByKey[f.fieldKey]; if (c) c.node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        inp.focus();
+      }
+      function commit() { const j = textIdx[pos]; controls[j].value = inp.value; controls[j].dispatchEvent(new Event('input')); }
+      function end() { ivBar.style.display = 'none'; }
+      ivBar.querySelector('#ivNext').onclick = () => { commit(); pos++; showCur(); };
+      ivBar.querySelector('#ivSkip').onclick = () => { pos++; showCur(); };
+      ivBar.querySelector('#ivEnd').onclick = () => { commit(); end(); };
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); pos++; showCur(); } if (e.key === 'Escape') end(); };
+      showCur();
     }
 
     return { show, clear, emptyCount: () => emptyCount() };

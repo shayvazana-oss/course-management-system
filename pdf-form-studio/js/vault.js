@@ -85,6 +85,9 @@
     if (canonVal.full_name === undefined && (canonVal.first_name || canonVal.last_name)) {
       canonVal.full_name = [canonVal.first_name, canonVal.last_name].filter(Boolean).join(' ');
     }
+    // a plain "תאריך:" field means "today" unless the profile says otherwise
+    // (birth-date fields map to birth_date, a different canon — never touched)
+    if (canonVal.date === undefined) canonVal.date = new Date().toLocaleDateString('he-IL');
     fields.forEach((f) => {
       if (f.type === 'check' || skip.has(f.fieldKey)) return;
       if (values[f.fieldKey] !== undefined && String(values[f.fieldKey]).trim()) { out[f.fieldKey] = values[f.fieldKey]; return; }

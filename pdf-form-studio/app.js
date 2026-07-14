@@ -1041,6 +1041,19 @@ if (!PFS.store.persistent) {
   PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
 }
 
+// A PDF shared into the app (WhatsApp → share → Fillo): sw.js stashed it,
+// pick it up and open like a normal file — the whole smart pipeline
+// (detection, vault fill, per-form memory) runs on it.
+(async () => {
+  try {
+    const shared = PFS.pwa && await PFS.pwa.takeSharedPdf();
+    if (shared) {
+      PFS.toast('📥 התקבל טופס משיתוף — פותח…', 'ok');
+      await openPdfFile(new File([shared.bytes], shared.name, { type: 'application/pdf' }));
+    }
+  } catch (e) { console.warn('shared pdf pickup failed', e); }
+})();
+
 // sanity log
 console.log('[Fillo] ready. pdf.js', pdfjsLib.version, '· pdf-lib', !!window.PDFLib, '· fflate', !!window.fflate);
 })();

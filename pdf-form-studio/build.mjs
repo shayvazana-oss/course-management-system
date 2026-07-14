@@ -35,7 +35,9 @@ html = html.replace(
   /window\.PFS_WORKER_SRC\s*=\s*'[^']*';\s*[\r\n]+\s*window\.PFS_STDFONTS\s*=\s*'[^']*';/,
   "window.PFS_WORKER_SRC = null; /* single-file: pdf.js runs main-thread */\n  window.PFS_STDFONTS = null;"
 );
-html = html.replace(/window\.PFS_TESS\s*=\s*\{[^}]*\};/, 'window.PFS_TESS = null; /* OCR omitted from single-file build */');
+html = html.replace(/window\.PFS_TESS\s*=\s*\{[^}]*\};/, 'window.PFS_TESS = null; /* OCR omitted from single-file build */\n  window.PFS_SINGLE_FILE = true; /* no service worker / manifest here */');
+// strip PWA manifest link from the single-file build (no external files there)
+html = html.replace(/<link rel="manifest"[^>]*>\s*/, '');
 
 // 3) inline every <script src="..."> ; after pdf.min.js also inline the worker
 html = html.replace(/<script src="([^"]+)"><\/script>/g, (_m, src) => {

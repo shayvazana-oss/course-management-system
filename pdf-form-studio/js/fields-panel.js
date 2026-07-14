@@ -107,11 +107,21 @@
         } else {
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
-          control.addEventListener('input', () => ensureCtrl(f, control.value));
+          const canon = PFS.vault && (PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey));
+          const validate = () => {
+            // live Israeli-ID checksum: catch typos before they land on paper
+            if (canon !== 'id') return;
+            const digits = control.value.replace(/\D/g, '');
+            const bad = digits.length >= 5 && !PFS.vault.checkIsraeliId(digits);
+            control.style.borderColor = bad ? 'var(--danger)' : '';
+            control.title = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
+          };
+          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); });
           const pv = prefill && prefill[f.fieldKey];
           if (pv != null && String(pv).trim()) {
             control.value = pv;
             if (ensureCtrl(f, String(pv))) autoFilled++;
+            validate();
           }
         }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
@@ -120,7 +130,24 @@
           const c = ctrlByKey[f.fieldKey];
           if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
         });
-        inRow.append(control, go); row.appendChild(inRow);
+        // voice fill (Chrome/Edge; he-IL). Feature-detected — absent elsewhere.
+        const SR = root.SpeechRecognition || root.webkitSpeechRecognition;
+        if (SR && f.type !== 'check') {
+          const mic = document.createElement('button'); mic.className = 'btn sm ghost'; mic.textContent = '🎤';
+          mic.title = 'מלא/י בדיבור';
+          mic.addEventListener('click', () => {
+            const rec = new SR(); rec.lang = 'he-IL'; rec.interimResults = false; rec.maxAlternatives = 1;
+            mic.textContent = '🔴';
+            rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); control.value = t; ensureCtrl(f, t); };
+            rec.onend = () => { mic.textContent = '🎤'; };
+            rec.onerror = () => { mic.textContent = '🎤'; };
+            try { rec.start(); } catch (e) { mic.textContent = '🎤'; }
+          });
+          inRow.append(control, mic, go);
+        } else {
+          inRow.append(control, go);
+        }
+        row.appendChild(inRow);
         body.appendChild(row);
       });
       return autoFilled;

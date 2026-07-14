@@ -420,8 +420,20 @@ async function doExport() {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
-    PFS.exporter.downloadBytes(bytes, currentFileName + '-filled.pdf');
-    PFS.toast('ה-PDF יוצא בהצלחה', 'ok');
+    const outName = currentFileName + '-filled.pdf';
+    // Mobile: hand the filled PDF straight back to WhatsApp/mail via the OS
+    // share sheet (still within the export click's transient activation).
+    // Desktop / unsupported → regular download, as before.
+    let sharedOut = false;
+    try {
+      const f = new File([bytes], outName, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) {
+        await navigator.share({ files: [f], title: outName });
+        sharedOut = true;
+      }
+    } catch (e) { /* user cancelled or share failed — fall back to download */ }
+    if (!sharedOut) PFS.exporter.downloadBytes(bytes, outName);
+    PFS.toast(sharedOut ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
     dirty = false;
     // Commit this layout to memory now, so re-opening the same form restores it.
     try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
@@ -1040,6 +1052,28 @@ if (!PFS.store.persistent) {
   if (backupCard) backupCard.prepend(note);
   PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
 }
+
+// ---- first-run onboarding: two taps and the magic works forever --------
+function showOnboarding() {
+  if (PFS.store.get('onboarded', false)) return;
+  const back = document.createElement('div');
+  back.className = 'modal-back show';
+  back.innerHTML = '<div class="modal" style="max-width:430px;text-align:center">' +
+    '<div class="m-body" style="gap:14px;padding:26px 22px">' +
+    '<div style="font-size:40px">👋</div>' +
+    '<h2 style="margin:0;font-size:21px;font-weight:900">ברוכים הבאים ל-Fillo</h2>' +
+    '<div class="hint" style="font-size:13px">שתי פעולות של דקה — ומעכשיו כל טופס יתמלא ויחתם כמעט לבד:</div>' +
+    '<button class="btn primary block" id="obScan" style="padding:13px">📷 סרקו תעודת זהות — הפרטים יישמרו</button>' +
+    '<button class="btn block" id="obSig" style="padding:13px">✍️ ציירו חתימה — תשב על כל טופס בקליק</button>' +
+    '<button class="btn ghost sm" id="obSkip">דלגו — אסתדר לבד</button>' +
+    '</div></div>';
+  document.body.appendChild(back);
+  const done = () => { PFS.store.set('onboarded', true); back.remove(); };
+  back.querySelector('#obScan').addEventListener('click', () => { done(); $('vaultInput').click(); });
+  back.querySelector('#obSig').addEventListener('click', () => { done(); $('drawSigBtn').click(); });
+  back.querySelector('#obSkip').addEventListener('click', done);
+}
+showOnboarding();
 
 // A PDF shared into the app (WhatsApp → share → Fillo): sw.js stashed it,
 // pick it up and open like a normal file — the whole smart pipeline

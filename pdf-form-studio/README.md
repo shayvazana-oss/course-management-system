@@ -1,12 +1,24 @@
-# Fillo · עורך וממלא טפסי PDF
+# Fillo · הטפסים ממלאים את עצמם
 > **Any form, filled in seconds.**
 
-מילוי טפסים, הוספת **חתימה** ו**חותמת**, וייצוא PDF מוכן — **בלי להדפיס ובלי לסרוק**.
-כל העיבוד קורה בדפדפן שלך; שום קובץ לא נשלח לשום שרת.
+סורקים תעודת זהות **פעם אחת** — ומכאן כל טופס שנפתח **כבר ממולא**: השדות מזוהים
+לפי משמעות (גם בסרוקים, עם OCR עברי), החתימה וכתב-היד האישי שלכם יושבים במקום,
+תאריך של היום נכנס לבד, ות"ז שגויה נתפסת עוד לפני הייצוא. עובד כאפליקציה
+מותקנת בטלפון: משתפים PDF מ-WhatsApp אל Fillo — ומחזירים אותו חתום לצ'אט.
+כל העיבוד מקומי בדפדפן; שום קובץ לא נשלח לשום שרת.
 
-Fill PDF forms, add a **signature** and a **stamp**, and export a ready PDF —
-**no printing, no scanning**. Everything runs locally in your browser; no file
-ever leaves your device.
+Scan your ID **once** — from then on every form opens **already filled**:
+fields are matched by meaning (scanned forms too, via Hebrew OCR), your
+signature and personal handwriting land in place, today's date fills itself,
+and a bad ID number is caught before export. Installable as an app: share a
+PDF from WhatsApp into Fillo and send it back signed. Everything runs locally;
+no file ever leaves your device.
+
+**היכולות:** תיק אישי חכם (ת"ז→פרופיל) · מילוי-לפי-משמעות · זיכרון אוטומטי לכל
+טופס · מסמכים אחרונים · מצב ראיון (שדה-אחרי-שדה) · מילוי בדיבור 🎤 · כתב-יד
+אישי מסונתז · חתימות וחותמות · ציור חופשי · OCR עברי · מיזוג CSV מרובה ·
+תבניות · מד השלמה + שומר ייצוא · ולידציית ת"ז · ניווט עמודים · קיצורי מקלדת ·
+PWA אופליין + Share Target · גיבוי/שחזור · סנכרון ענן מוצפן (אופציונלי).
 
 ---
 

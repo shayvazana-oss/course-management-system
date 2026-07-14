@@ -186,6 +186,14 @@ async function openPdfFile(file) {
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
+    // page navigator: only worth showing on multi-page docs
+    (function () {
+      const pj = $('pageJump'); if (!pj) return;
+      const n = pdfView.numPages();
+      pj.classList.toggle('hidden', n < 2);
+      pj.innerHTML = '';
+      for (let i = 1; i <= n; i++) { const o = document.createElement('option'); o.value = i; o.textContent = 'עמ׳ ' + i + '/' + n; pj.appendChild(o); }
+    })();
     updateHwStatus();
     currentFp = null;
     try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
@@ -540,6 +548,12 @@ vp.addEventListener('drop', (e) => {
   dragDepth = 0;
   const file = [...(e.dataTransfer?.files || [])].find((f) => f.type === 'application/pdf');
   if (file) openPdfFile(file);
+});
+
+$('pageJump') && $('pageJump').addEventListener('change', (e) => {
+  const wraps = document.querySelectorAll('.page-wrap');
+  const w = wraps[parseInt(e.target.value, 10) - 1];
+  if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 
 // keyboard: delete selected, escape cancels placement

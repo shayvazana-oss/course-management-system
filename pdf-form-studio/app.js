@@ -218,6 +218,11 @@ function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
   if (tool === 'handwriting') { btn.classList.remove('active'); startHandwritingFlow(); return; }
+  if (tool === 'draw') {
+    btn.classList.remove('active');
+    if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
+    openSignaturePad('draw'); return;
+  }
   if (tool === 'signature' || tool === 'stamp') {
     // handled by their own flows below
     btn.classList.remove('active');
@@ -278,8 +283,9 @@ async function handleImageUpload(file) {
 }
 
 // ---- signature pad modal ----
-let sigPad = null;
-function openSignaturePad() {
+let sigPad = null, sigMode = 'signature';
+function openSignaturePad(mode) {
+  sigMode = mode || 'signature';
   openModal('sigModal');
   const canvas = $('sigCanvas');
   if (!sigPad) {
@@ -293,10 +299,17 @@ function openSignaturePad() {
 $('sigSave').addEventListener('click', () => {
   if (!sigPad || sigPad.isEmpty()) { PFS.toast('צייר חתימה קודם', 'err'); return; }
   const { url, w, h } = sigPad.toDataUrl();
-  const item = assets.add('signature', { url, w, h });
   closeModal('sigModal');
-  armImagePlacement('signature', item);
-  PFS.toast('החתימה נשמרה', 'ok');
+  if (sigMode === 'draw') {
+    // freehand markup (circle/arrow/note) — placed as a one-off image,
+    // NOT saved to the signature library
+    armImagePlacement('drawing', { url, w, h });
+    PFS.toast('לחץ על הטופס כדי למקם את הסימון', 'ok');
+  } else {
+    const item = assets.add('signature', { url, w, h });
+    armImagePlacement('signature', item);
+    PFS.toast('החתימה נשמרה', 'ok');
+  }
 });
 $('sigCancel').addEventListener('click', () => closeModal('sigModal'));
 

@@ -85,7 +85,8 @@ function recomputeFormulas() {
     els.forEach((c) => {
       const m = c.model;
       if (m.type !== 'text' || !PFS.formula.isFormula(m.formula)) return;
-      const val = PFS.formula.evaluate(m.formula, vars);
+      let val = PFS.formula.evaluate(m.formula, vars);
+      if (val !== '' && m.format) val = PFS.formula.format(val, m.format);
       if (m.text !== val) {
         m.text = val;
         const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = val;
@@ -486,6 +487,14 @@ function renderProps(ctrl) {
     });
     if (PFS.formula && PFS.formula.isFormula(m.formula)) input.disabled = true;
     fForm.appendChild(fin); body.appendChild(fForm);
+    // number format for a computed value (₪ / thousands / %)
+    const fFmt = field('תבנית מספר (לשדה מחושב)');
+    const sel = document.createElement('select');
+    [['none', 'ללא'], ['number', '1,234.5'], ['currency', '₪1,234.50'], ['percent', '12.5%']].forEach(([v, lbl]) => {
+      const o = document.createElement('option'); o.value = v; o.textContent = lbl; if ((m.format || 'none') === v) o.selected = true; sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => { m.format = sel.value === 'none' ? '' : sel.value; recomputeFormulas(); markDirty(); });
+    fFmt.appendChild(sel); body.appendChild(fFmt);
   } else if (m.kind === 'handwriting') {
     const regen = () => {
       const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#000000', tracking: m.tracking });

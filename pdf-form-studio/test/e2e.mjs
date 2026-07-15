@@ -727,6 +727,24 @@ async function main() {
     return t1 === '150' && t2 === '250';
   }));
 
+  // number/currency formatting for a computed value (₪ / thousands / %)
+  check('calculated field can format as currency / number / percent', await page.evaluate(() => {
+    const F = window.PFS.formula;
+    const currencyOk = F.format('1234.5', 'currency') === '₪1,234.50';
+    const numberOk = F.format('1234.5', 'number') === '1,234.5';
+    const pctOk = F.format('12.5', 'percent') === '12.5%';
+    // end to end: a formatted computed total
+    const ov = window.PFS.__test.overlay; ov.clearElements();
+    ov.addElementAt('text', 0, 0.1, 0.1, { text: '1000', fieldKey: 'x' });
+    ov.addElementAt('text', 0, 0.2, 0.2, { text: '234.5', fieldKey: 'y' });
+    ov.addElementAt('text', 0, 0.3, 0.3, { text: '', fieldKey: 'tot', formula: '=sum([x],[y])', format: 'currency' });
+    window.PFS.__test.recomputeFormulas();
+    const tot = ov.getElements().find((e) => e.model.fieldKey === 'tot');
+    const liveOk = tot && tot.model.text === '₪1,234.50';
+    ov.clearElements();
+    return currencyOk && numberOk && pctOk && liveOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

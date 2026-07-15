@@ -51,5 +51,17 @@
     return isFinite(n) ? fmt(n) : '';
   }
 
-  PFS.formula = { isFormula, evaluate };
+  /* format(value, fmt) → display a numeric value as number / currency / percent
+   * (Israeli locale). Non-numeric input is returned unchanged. */
+  function format(value, fmt) {
+    if (!fmt || fmt === 'none') return value;
+    const n = parseFloat(String(value == null ? '' : value).replace(/[^\d.\-]/g, ''));
+    if (!isFinite(n)) return value;
+    if (fmt === 'number') return n.toLocaleString('he-IL', { maximumFractionDigits: 2 });
+    if (fmt === 'currency') return '₪' + n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (fmt === 'percent') return n.toLocaleString('he-IL', { maximumFractionDigits: 2 }) + '%';
+    return value;
+  }
+
+  PFS.formula = { isFormula, evaluate, format };
 })(window);

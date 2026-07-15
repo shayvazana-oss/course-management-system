@@ -38,8 +38,32 @@
   function heuristicForPage(items, W, H, vp, startIndex) {
     const boxes = items.filter((it) => it.str && it.str.trim()).map((it) => itemBox(it, vp));
     const out = [];
+    const CHECKBOX = /[☐☑☒□◻◼⬛⬜❏❑]/;   // ☐ ☑ ☒ □ ◻ ◼ ⬛ ⬜ ❏ …
     boxes.forEach((b) => {
       const label = b.str.trim();
+      // an empty checkbox glyph → a tickable field, labelled by the rest of
+      // its text (or the nearest word on the same line). Common on Israeli
+      // digital forms ("☐ תושב ישראל").
+      if (CHECKBOX.test(label)) {
+        const rtl = hasHebrew(label);
+        let text = label.replace(CHECKBOX, '').trim();
+        if (!text) {
+          const cy = b.top + b.fontH / 2;
+          const line = boxes.filter((o) => o !== b && !CHECKBOX.test(o.str) && /[֐-׿؀-ۿA-Za-z]/.test(o.str) && Math.abs((o.top + o.fontH / 2) - cy) < b.fontH);
+          const side = rtl ? line.filter((o) => o.x < b.x + 2) : line.filter((o) => o.x > b.x - 2);
+          const pool = side.length ? side : line;
+          const near = pool.sort((a, c) => Math.abs(a.x - b.x) - Math.abs(c.x - b.x))[0];
+          if (near) text = near.str.trim();
+        }
+        const bx = rtl ? (b.x + b.w - b.fontH) : b.x;   // box sits at the reading start
+        out.push({
+          page: startIndex, fieldKey: slug('check_' + text, out.length),
+          label: (text || 'סימון').replace(/[:：׃]\s*$/, '').trim(),
+          fx: Math.max(0, bx) / W, fy: Math.max(0, b.top) / H,
+          fw: b.fontH / W, fh: b.fontH / H, fontFrac: Math.max(0.02, b.fontH / H), type: 'check'
+        });
+        return;
+      }
       if (!isLabel(label) && !isUnderscores(label)) return;
       const sameLine = boxes.filter((o) => o !== b && Math.abs(o.yBase - b.yBase) < b.fontH * 0.7);
       // For a bare underscore-blank, borrow the real label from the nearest

@@ -5119,22 +5119,33 @@ let computingFormulas = false;
 function recomputeFormulas() {
   if (computingFormulas || !PFS.formula) return;
   const els = overlay.getElements();
-  if (!els.some((c) => PFS.formula.isFormula(c.model.formula))) return; // nothing to do
+  const formulaEls = els.filter((c) => c.model.type === 'text' && PFS.formula.isFormula(c.model.formula));
+  if (!formulaEls.length) return; // nothing to do
   computingFormulas = true;
   try {
     const vars = {};
-    els.forEach((c) => { const m = c.model; if (m.type === 'text' && m.fieldKey && !PFS.formula.isFormula(m.formula)) vars[m.fieldKey] = m.text; });
-    els.forEach((c) => {
-      const m = c.model;
-      if (m.type !== 'text' || !PFS.formula.isFormula(m.formula)) return;
-      let val = PFS.formula.evaluate(m.formula, vars);
-      if (val !== '' && m.format) val = PFS.formula.format(val, m.format);
-      if (m.text !== val) {
-        m.text = val;
-        const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = val;
-        c.layout();
-      }
-    });
+    // seed with EVERY tagged text field's current value — formula fields too, so
+    // one calculated field can reference another (e.g. total = subtotal * 1.17).
+    // evaluate() strips any currency/%/thousands formatting back to a number.
+    els.forEach((c) => { const m = c.model; if (m.type === 'text' && m.fieldKey) vars[m.fieldKey] = m.text; });
+    // iterate so dependency chains resolve regardless of element order; the pass
+    // cap guards against circular references (they simply stop, never hang).
+    const maxPasses = formulaEls.length + 1;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let changed = false;
+      formulaEls.forEach((c) => {
+        const m = c.model;
+        const val = PFS.formula.evaluate(m.formula, vars);       // raw numeric string
+        if (m.fieldKey && vars[m.fieldKey] !== val) { vars[m.fieldKey] = val; changed = true; }
+        const shown = (val !== '' && m.format) ? PFS.formula.format(val, m.format) : val;
+        if (m.text !== shown) {
+          m.text = shown;
+          const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = shown;
+          c.layout();
+        }
+      });
+      if (!changed) break;
+    }
   } finally { computingFormulas = false; }
 }
 

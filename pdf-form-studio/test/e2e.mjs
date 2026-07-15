@@ -1077,6 +1077,24 @@ async function main() {
     return rotOk && topRight && bottomLeft;
   }));
 
+  check('calculated fields resolve chained dependencies (subtotal → total), cycles stop', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay; ov.clearElements();
+    ov.addElementAt('text', 0, 0.1, 0.1, { fieldKey: 'qty', text: '10', noEdit: true });
+    ov.addElementAt('text', 0, 0.1, 0.2, { fieldKey: 'price', text: '25', noEdit: true });
+    const sub = ov.addElementAt('text', 0, 0.1, 0.3, { fieldKey: 'sub', formula: '=[qty]*[price]', noEdit: true });
+    const total = ov.addElementAt('text', 0, 0.1, 0.4, { fieldKey: 'total', formula: '=[sub]*1.17', noEdit: true });
+    window.PFS.__test.recomputeFormulas();
+    const chainOk = sub.model.text === '250' && total.model.text === '292.5';   // 250 * 1.17
+    ov.clearElements();
+    // a circular reference must terminate (not hang) and leave numeric text
+    const a = ov.addElementAt('text', 0, 0.1, 0.1, { fieldKey: 'a', formula: '=[b]+1', noEdit: true });
+    const b = ov.addElementAt('text', 0, 0.1, 0.2, { fieldKey: 'b', formula: '=[a]+1', noEdit: true });
+    window.PFS.__test.recomputeFormulas();
+    const cycleTerminates = /^\d+$/.test(a.model.text) && /^\d+$/.test(b.model.text);
+    ov.clearElements();
+    return chainOk && cycleTerminates;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

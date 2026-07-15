@@ -93,6 +93,9 @@ const templates = PFS.createTemplates({
   getElements: () => overlay.serialize(),
   // applying a template replaces the current layout (avoids stacking duplicates)
   applyModels: (models) => { overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(models); },
+  // page rotations travel with the template so a straightened form reopens straight
+  getRotations: () => pdfView.getRotations(),
+  applyRotations: (r) => { if (r && Object.keys(r).length) pdfView.setRotations(r); },
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();

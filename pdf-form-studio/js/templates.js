@@ -18,11 +18,13 @@
     const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
     const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
 
+    const grabRotations = () => { try { return (opts.getRotations && opts.getRotations()) || {}; } catch (e) { return {}; } };
+
     function save(name, fp) {
       const els = opts.getElements();
       if (!els.length) { PFS.toast('אין פריטים לשמירה', 'err'); return; }
       const arr = all();
-      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, fp: fp || null };
+      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, rotations: grabRotations(), fp: fp || null };
       arr.unshift(tpl);
       if (!persist(arr)) return; // store.set already toasted the quota error
       render();
@@ -35,11 +37,13 @@
     function autoSave(fp, name) {
       if (!fp || !PFS.fingerprint) return;
       const els = opts.getElements();
-      if (!els.length) return;
+      const rotations = grabRotations();
+      // remember the form even with no placed elements if it was rotated
+      if (!els.length && !Object.keys(rotations).length) return;
       const arr = all();
       let tpl = arr.find((t) => t.auto && t.fp && PFS.fingerprint.score(fp, t.fp) >= 0.9);
-      if (tpl) { tpl.elements = els; tpl.ts = Date.now(); tpl.fp = fp; if (name) tpl.name = name; }
-      else { arr.unshift({ id: uid(), name: name || 'זיכרון אוטומטי', ts: Date.now(), elements: els, fp: fp, auto: true }); }
+      if (tpl) { tpl.elements = els; tpl.rotations = rotations; tpl.ts = Date.now(); tpl.fp = fp; if (name) tpl.name = name; }
+      else { arr.unshift({ id: uid(), name: name || 'זיכרון אוטומטי', ts: Date.now(), elements: els, rotations, fp: fp, auto: true }); }
       if (!persist(arr)) return;
       render();
     }
@@ -47,6 +51,7 @@
       const tpl = all().find((t) => t.id === id);
       if (!tpl) return;
       opts.applyModels(tpl.elements);
+      if (opts.applyRotations) opts.applyRotations(tpl.rotations);
       PFS.toast('התבנית הוחלה', 'ok');
       opts.afterApply && opts.afterApply();
     }

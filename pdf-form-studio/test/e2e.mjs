@@ -466,6 +466,24 @@ async function main() {
     return ok && pv.visiblePageCount() === before - 1 && pv.getRemovedPages().includes(last);
   }));
 
+  // per-form memory remembers page rotation, so a straightened form reopens straight
+  check('templates remember and restore page rotations', await page.evaluate(() => {
+    let appliedRot = null;
+    const t = window.PFS.createTemplates({
+      getElements: () => [{ type: 'text', kind: 'text', page: 0, fx: 0.1, fy: 0.1, fw: 0.2, fh: 0.05, fontFrac: 0.03, text: 'x' }],
+      getRotations: () => ({ 0: 90 }),
+      applyModels: () => {},
+      applyRotations: (r) => { appliedRot = r; },
+      afterApply: () => {}
+    });
+    t.save('__rot_test__', null);
+    const saved = window.PFS.store.get('templates', []).find((x) => x.name === '__rot_test__');
+    const savedOk = saved && saved.rotations && saved.rotations[0] === 90;
+    if (savedOk) t.apply(saved.id);
+    if (saved) t.remove(saved.id); // clean up so it doesn't linger in the store
+    return savedOk && appliedRot && appliedRot[0] === 90;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

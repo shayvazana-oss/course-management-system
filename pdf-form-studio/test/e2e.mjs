@@ -1002,6 +1002,24 @@ async function main() {
     return topRight > 20 && bottomLeft === 0;   // text at top-right, nothing bottom-left
   }));
 
+  check('identity fields propagate to empty twins; no clobber; generic excluded', await page.evaluate(() => {
+    const fp = window.PFS.__test.fieldsPanel;
+    const F = (k, label, y) => ({ page: 0, fieldKey: k, label, type: 'text', fx: 0.1, fy: y, fw: 0.2, fh: 0.03, fontFrac: 0.03 });
+    fp.show({ tier: 'text', fields: [
+      F('id1', 'תעודת זהות', 0.1), F('id2', 'מספר תעודת זהות', 0.2), F('id3', 'מס זהות', 0.3),
+      F('amt1', 'סכום', 0.4), F('amt2', 'סך הכל', 0.5)
+    ] });
+    const inp = (k) => [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === k);
+    const type = (k, v) => { const e = inp(k); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); };
+    inp('id3').value = '000000000';         // pre-existing value, no event → not part of propagation
+    type('id1', '123456782');               // identity → fills empty twin id2, skips filled id3
+    const propagated = inp('id2').value === '123456782';
+    const noClobber = inp('id3').value === '000000000';
+    type('amt1', '500');                     // 'amount' is not an identity canon
+    const noGeneric = inp('amt2').value === '';
+    return propagated && noClobber && noGeneric;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

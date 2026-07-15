@@ -9,6 +9,10 @@
 
   // tick-style controls (checkbox or radio) count by .checked, not text value.
   const isTick = (c) => c.type === 'checkbox' || c.type === 'radio';
+  // identity fields a multi-page form repeats verbatim — filling one fills the
+  // rest. Deliberately NOT generic canons (amount, date, occupation…) so a value
+  // is only ever auto-copied where it's unambiguously the same datum.
+  const IDENTITY = new Set(['id', 'full_name', 'first_name', 'last_name', 'phone', 'email', 'birth_date', 'address', 'city', 'zip', 'business_id', 'business_name']);
   // a field whose label asks for a signature (not a stamp — "חותמת" excluded)
   const isSignatureLabel = (s) => /חתימ|signature|sign here|توقيع/i.test(String(s || ''));
   // a field whose label asks for a stamp / seal
@@ -153,6 +157,24 @@
         });
       }
 
+      // when an identity field is filled, copy the value into every other EMPTY
+      // field of the same meaning (ID/name/phone… repeated across pages). Never
+      // overwrites a value the user already typed, and is re-entrancy guarded.
+      let propagating = false;
+      function propagateIdentity(src) {
+        if (propagating) return;
+        const canon = src.__canon, val = (src.value || '').trim();
+        if (!IDENTITY.has(canon) || !val) return;
+        propagating = true;
+        try {
+          controls.forEach((c) => {
+            if (c === src || isTick(c) || c.__canon !== canon || (c.value || '').trim()) return;
+            c.value = src.value;
+            c.dispatchEvent(new Event('input'));   // runs its own ensureCtrl/validate/recount
+          });
+        } finally { propagating = false; }
+      }
+
       let autoFilled = 0;
       const groups = Object.create(null);   // radio group id → [{f, control}]
       det.fields.forEach((f) => {
@@ -196,7 +218,7 @@
             control.style.borderColor = r.ok ? '' : 'var(--danger)';
             control.title = r.msg;
           };
-          control.__fkey = f.fieldKey;
+          control.__fkey = f.fieldKey; control.__canon = canon || '';
           if (canon) {
             const hist = histFor(canon);
             if (hist.length) {
@@ -206,7 +228,7 @@
             }
             control.addEventListener('change', () => remember(canon, control.value));
           }
-          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); });
+          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control); });
           control.addEventListener('keydown', (e) => {
             // keyboard field-wizard: Enter / ArrowDown → next field, ArrowUp → previous
             if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;

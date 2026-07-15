@@ -487,6 +487,19 @@ async function main() {
     return savedOk && appliedRot && appliedRot[0] === 90 && appliedRemoved && appliedRemoved[0] === 2;
   }));
 
+  // impossible dates (day 32, month 13, non-leap 29 Feb) are flagged live
+  check('invalid dates are flagged, valid ones cleared', await page.evaluate(() => {
+    window.PFS.__test.fieldsPanel.show({ tier: 'text', fields: [{ fieldKey: 'bd', label: 'תאריך לידה', type: 'text' }] });
+    const inp = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === 'bd');
+    if (!inp) return false;
+    const type = (v) => { inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); };
+    type('32/01/1990'); const b1 = inp.title !== '';   // day 32
+    type('29/02/2021'); const b2 = inp.title !== '';   // 2021 not a leap year
+    type('15/13/1990'); const b3 = inp.title !== '';   // month 13
+    type('15/03/1990'); const ok = inp.title === '';   // valid
+    return b1 && b2 && b3 && ok;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

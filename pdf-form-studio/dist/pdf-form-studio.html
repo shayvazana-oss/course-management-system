@@ -4163,6 +4163,20 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
               // Israeli mobile/landline: 9–10 digits, leading 0
               bad = digits.length >= 6 && !/^0\d{8,9}$/.test(digits);
               msg = bad ? 'מספר טלפון לא תקין — בדקו הקלדה' : '';
+            } else if ((canon === 'birth_date' || canon === 'date') && v) {
+              // only judge a complete dd/mm/yyyy — don't nag mid-typing
+              const m = v.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+              if (m) {
+                const d = +m[1], mo = +m[2], y = +m[3];
+                const leap = (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
+                const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+                const valid = mo >= 1 && mo <= 12 && d >= 1 && d <= dim[mo - 1] && y >= 1900 && y <= 2100;
+                const future = canon === 'birth_date' && valid && new Date(y, mo - 1, d) > new Date();
+                bad = !valid || future;
+                msg = bad ? (future ? 'תאריך לידה עתידי — בדקו' : 'תאריך לא תקין — בדקו יום/חודש/שנה') : '';
+              } else if (v.replace(/\D/g, '').length >= 8) {
+                bad = true; msg = 'פורמט תאריך: יום/חודש/שנה (למשל 15/03/1990)';
+              } else return;
             } else return;
             control.style.borderColor = bad ? 'var(--danger)' : '';
             control.title = msg;

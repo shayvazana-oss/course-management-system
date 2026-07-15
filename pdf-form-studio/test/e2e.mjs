@@ -956,6 +956,26 @@ async function main() {
     return presetsOk && defOk && clampOk && sizeOk;
   }));
 
+  check('secure export picks PNG for text pages, JPEG for photos', await page.evaluate(() => {
+    const isDoc = window.PFS.exporter.isDocumentLikeCanvas;
+    // a form page: white background with sharp black "text" strokes
+    const form = document.createElement('canvas'); form.width = 300; form.height = 400;
+    let c = form.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, 300, 400);
+    c.fillStyle = '#000';
+    for (let y = 20; y < 380; y += 24) c.fillRect(20, y, 220, 6);   // lines of text
+    const formIsDoc = isDoc(form) === true;
+    // a photo page: many mid-tone colours across the canvas
+    const photo = document.createElement('canvas'); photo.width = 300; photo.height = 400;
+    c = photo.getContext('2d');
+    for (let x = 0; x < 300; x += 3) for (let y = 0; y < 400; y += 3) {
+      c.fillStyle = 'rgb(' + ((x * 7) % 200 + 30) + ',' + ((y * 5) % 200 + 30) + ',' + ((x + y) % 200 + 30) + ')';
+      c.fillRect(x, y, 3, 3);
+    }
+    const photoIsPhoto = isDoc(photo) === false;
+    return formIsDoc && photoIsPhoto;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

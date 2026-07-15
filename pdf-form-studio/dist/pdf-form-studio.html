@@ -3756,6 +3756,32 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return Math.max(1.5, Math.min(4, v));
   }
 
+  // Is this page "document-like" (mostly flat white with sharp black text/lines)
+  // rather than photographic? Such pages get PNG in the secure export so Hebrew
+  // glyphs stay crisp instead of picking up JPEG ringing; photos get JPEG. We
+  // sample a sparse pixel grid and measure the fraction that are near-neutral
+  // extremes (near-white or near-black, low chroma) — high on forms, low on
+  // photos. Returns true → prefer PNG.
+  function isDocumentLikeCanvas(canvas) {
+    try {
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      if (!W || !H) return true;
+      const data = ctx.getImageData(0, 0, W, H).data;
+      const stride = Math.max(1, Math.floor((W * H) / 40000)); // ~40k samples max
+      let mono = 0, total = 0;
+      for (let p = 0; p < W * H; p += stride) {
+        const i = p * 4;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        total++;
+        if ((mx - mn) < 24 && (mx > 230 || mx < 70)) mono++;   // neutral extreme
+      }
+      return total ? (mono / total) > 0.9 : true;
+    } catch (e) { return false; }   // tainted/large → play safe with JPEG
+  }
+  const JPEG_Q = { draft: 0.82, standard: 0.9, high: 0.95 };
+
   function preloadImages(urls) {
     const uniq = [...new Set(urls.filter(Boolean))];
     return Promise.all(uniq.map((u) =>
@@ -3979,7 +4005,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
    *   renderBase(pageIndex) → { canvas, wPt, hPt } — base page drawn at high DPI
    *                           (already rotated), plus its size in points.
    */
-  async function exportFlattenedPdf({ order, models, attachments, renderBase, onProgress }) {
+  async function exportFlattenedPdf({ order, models, attachments, renderBase, onProgress, quality }) {
     const { PDFDocument } = root.PDFLib;
     await ensureFonts();
     const imgMap = await preloadImages((models || []).map((m) => m.imgUrl));
@@ -3987,14 +4013,22 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     (models || []).forEach((m) => { if (!byPage.has(m.page)) byPage.set(m.page, []); byPage.get(m.page).push(m); });
     const out = await PDFDocument.create();
     const idxs = (order && order.length) ? order : [...new Set((models || []).map((m) => m.page))].sort((a, b) => a - b);
+    const jq = JPEG_Q[quality] || JPEG_Q.standard;
+    // draft keeps everything JPEG for the smallest file; otherwise text-heavy
+    // pages go lossless PNG (no ringing around Hebrew glyphs), photos stay JPEG
+    const forceJpeg = (quality === 'draft');
     let done = 0;
     for (const idx of idxs) {
       const { canvas, wPt, hPt } = await renderBase(idx);
       const ctx = canvas.getContext('2d');
       (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap));
-      // JPEG on the white-backed canvas → far smaller than PNG, still shareable
-      const jpg = await out.embedJpg(canvas.toDataURL('image/jpeg', 0.85));
-      out.addPage([wPt, hPt]).drawImage(jpg, { x: 0, y: 0, width: wPt, height: hPt });
+      let img;
+      if (!forceJpeg && isDocumentLikeCanvas(canvas)) {
+        img = await out.embedPng(canvas.toDataURL('image/png'));           // crisp text
+      } else {
+        img = await out.embedJpg(canvas.toDataURL('image/jpeg', jq));      // small photo
+      }
+      out.addPage([wPt, hPt]).drawImage(img, { x: 0, y: 0, width: wPt, height: hPt });
       canvas.width = 0; canvas.height = 0;
       done++; onProgress && onProgress(done, idxs.length);
     }
@@ -4006,7 +4040,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
-  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale };
+  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale, isDocumentLikeCanvas };
 })(window);
 
 </script>
@@ -5637,6 +5671,7 @@ async function buildFlattenedBytes(onProgress) {
     order: (order && order.length) ? order : undefined,
     models, attachments,
     renderBase: (idx) => renderBaseForFlatten(idx),
+    quality: exportQuality(),
     onProgress
   });
 }

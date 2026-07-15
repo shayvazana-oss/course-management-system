@@ -687,6 +687,7 @@ async function buildFlattenedBytes(onProgress) {
     order: (order && order.length) ? order : undefined,
     models, attachments,
     renderBase: (idx) => renderBaseForFlatten(idx),
+    quality: exportQuality(),
     onProgress
   });
 }

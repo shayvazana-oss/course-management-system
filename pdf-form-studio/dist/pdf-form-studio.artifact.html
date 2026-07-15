@@ -5082,8 +5082,13 @@ $('qsSave').addEventListener('click', () => {
   profiles.saveProfile(ap ? ap.name : 'אני', merged);
   renderProfileSelect();
   closeModal('quickModal');
-  // re-apply to the open form so the effect is immediate
-  const n = pdfView.hasDoc() ? overlay.fillByKeys(merged) : 0;
+  // re-apply to the open form so the effect is immediate: fill tagged elements
+  // AND re-prefill the detected-fields panel (text + gender/marital/health tick)
+  let n = 0;
+  if (pdfView.hasDoc()) {
+    n += overlay.fillByKeys(merged);
+    if (lastDet && lastDet.fields && lastDet.fields.length) n += fieldsPanel.show(lastDet, vaultPrefill(lastDet));
+  }
   PFS.toast(n ? `נשמר ✓ — ${n} שדות מולאו בטופס` : 'הפרטים נשמרו ✓', 'ok');
 });
 

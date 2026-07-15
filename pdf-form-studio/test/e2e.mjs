@@ -406,6 +406,25 @@ async function main() {
       && cls && cls.canon === 'health_fund' && window.PFS.vault.matchKey('קופת חולים') === 'health_fund';
   }));
 
+  // saving quick-setup re-applies to the OPEN form's detected fields at once
+  check('quick-setup save instantly ticks a detected gender option', await page.evaluate(() => {
+    window.PFS.store.set('remembered_choices', {}); // isolate: only the saved profile drives it
+    window.PFS.__test.setLastDet({ tier: 'text', fields: [
+      { page: 0, fieldKey: 'qg_m', label: 'זכר', fx: 0.1, fy: 0.3, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_qg' },
+      { page: 0, fieldKey: 'qg_f', label: 'נקבה', fx: 0.4, fy: 0.3, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_qg' }
+    ] });
+    document.getElementById('quickSetupBtn').click();
+    document.querySelector('input[name="qsGender"][value="זכר"]').checked = true;
+    document.getElementById('qsSave').click();
+    const byLabel = {};
+    [...document.querySelectorAll('#fieldsBody .field')].forEach((r) => {
+      const l = r.querySelector('label') && r.querySelector('label').textContent.trim();
+      const i = r.querySelector('input[type=radio]');
+      if (l && i) byLabel[l] = i.checked;
+    });
+    return byLabel['זכר'] === true && byLabel['נקבה'] === false;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

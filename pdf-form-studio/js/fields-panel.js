@@ -131,6 +131,7 @@
         const row = document.createElement('div'); row.className = 'field';
         const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
         const inRow = document.createElement('div'); inRow.className = 'row';
+        const canon = PFS.vault && (PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey));
         let control;
         if (f.type === 'check') {
           control = document.createElement('input'); control.type = 'checkbox';
@@ -140,7 +141,6 @@
         } else {
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
-          const canon = PFS.vault && (PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey));
           const validate = () => {
             // live Israeli-ID checksum: catch typos before they land on paper
             if (canon !== 'id') return;
@@ -176,6 +176,21 @@
             if (ensureCtrl(f, String(pv))) autoFilled++;
             validate();
           }
+        }
+        // date picker for date-type fields — no fumbling with formats
+        if (f.type !== 'check' && (canon === 'date' || canon === 'birth_date')) {
+          const dbtn = document.createElement('button'); dbtn.className = 'btn sm ghost'; dbtn.textContent = '📅';
+          dbtn.title = 'בחירת תאריך מלוח שנה';
+          const dp = document.createElement('input'); dp.type = 'date';
+          dp.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none';
+          dbtn.addEventListener('click', () => { dp.showPicker ? dp.showPicker() : dp.click(); });
+          dp.addEventListener('change', () => {
+            if (!dp.value) return;
+            const [y, m, d] = dp.value.split('-');
+            control.value = d + '/' + m + '/' + y;   // Israeli dd/mm/yyyy
+            control.dispatchEvent(new Event('input')); control.dispatchEvent(new Event('change'));
+          });
+          inRow.appendChild(dp); inRow.appendChild(dbtn);
         }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';

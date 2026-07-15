@@ -4073,7 +4073,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel };
+PFS.__test = { overlay, fieldsPanel, fillAll, setLastDet: (d) => { lastDet = d; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -4091,6 +4091,7 @@ async function runOcr() {
       PFS.toast('OCR לא זיהה שדות ברורים — נסו מילוי ידני', 'err');
       return;
     }
+    lastDet = det;
     const nOcr = fieldsPanel.show(det, vaultPrefill(det));
     PFS.toast(nOcr ? `OCR זיהה ${det.fields.length} שדות — ${nOcr} מולאו אוטומטית מהפרטים שלך 🪄` : `OCR זיהה ${det.fields.length} שדות`, 'ok');
   } catch (e) {
@@ -4130,6 +4131,7 @@ async function runDetection() {
   try {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
+    lastDet = det;
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
     else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');
@@ -4152,6 +4154,7 @@ async function runDetection() {
 //  Loading a PDF
 // =====================================================================
 let loadGen = 0; // bumped on every load so in-flight detection can bail
+let lastDet = null; // most recent detection result (for Fill-All signature/stamp lines)
 let currentFp = null; // fingerprint of the currently-loaded form
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
@@ -4160,6 +4163,7 @@ async function openPdfFile(file) {
     // start fresh: drop any elements/fields/merge state from a previous document
     loadGen++;
     const myGen = loadGen;
+    lastDet = null;
     overlay.clearElements();
     fieldsPanel.clear();
     resetHistory();
@@ -4966,12 +4970,13 @@ updateHwStatus();
 // =====================================================================
 // Place the saved signature/stamp on a detected line (fields panel ✍️ / ⬤).
 // Falls back to the draw/upload flow if nothing is saved yet.
-function placeAssetAtField(kind, f) {
+function placeAssetAtField(kind, f, { silent = false } = {}) {
   const item = assets.getDefault(kind) || assets.list(kind)[0];
   if (!item) {
+    if (silent) return false;
     PFS.toast(kind === 'stamp' ? 'אין חותמת שמורה — העלו חותמת קודם' : 'אין חתימה שמורה — ציירו חתימה קודם', 'err');
     (kind === 'stamp' ? startStampFlow : startSignatureFlow)();
-    return;
+    return false;
   }
   const aspect = item.aspect || (item.w / item.h) || (kind === 'stamp' ? 1 : 3);
   const fw = Math.min(Math.max(f.fw || 0.2, 0.14), 0.32);
@@ -4980,9 +4985,16 @@ function placeAssetAtField(kind, f) {
   const fx = Math.max(0, Math.min(1 - fw, (f.fx != null ? f.fx : 0.5) + ((f.fw || 0) - fw) / 2));
   const fy = Math.max(0, (f.fy != null ? f.fy : 0.82) - fh * 0.35);
   const c = overlay.instantiate(PFS.element.makeModel('image', f.page || 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind }));
-  if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  if (c && !silent) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   markDirty();
-  PFS.toast((kind === 'stamp' ? 'החותמת הונחה' : 'החתימה הונחה') + ' על השורה — אפשר לגרור לכוונון', 'ok');
+  if (!silent) PFS.toast((kind === 'stamp' ? 'החותמת הונחה' : 'החתימה הונחה') + ' על השורה — אפשר לגרור לכוונון', 'ok');
+  return !!c;
+}
+// A detected signature/stamp line from the last detection, if any.
+function detectedLine(kind) {
+  if (!lastDet || !lastDet.fields) return null;
+  const re = kind === 'stamp' ? /חותמת|חתמת|stamp|seal|ختم/i : /חתימ|signature|توقيع/i;
+  return lastDet.fields.find((f) => f.type !== 'check' && re.test(f.label || '')) || null;
 }
 function placeSignatureAtField(f) { return placeAssetAtField('signature', f); }
 function placeDefaultAsset(kind) {
@@ -5003,8 +5015,13 @@ function fillAll() {
   const ap = profiles.active();
   if (ap && ap.values && Object.keys(ap.values).length) { const n = overlay.fillByKeys(ap.values); if (n) did.push(n + ' שדות'); }
   const kinds = overlay.getElements().map((c) => c.model.kind);
-  if (!kinds.includes('signature') && placeDefaultAsset('signature')) did.push('חתימה');
-  if (!kinds.includes('stamp') && placeDefaultAsset('stamp')) did.push('חותמת');
+  // signature/stamp: land on a detected line when one exists, else a corner
+  ['signature', 'stamp'].forEach((kind) => {
+    if (kinds.includes(kind)) return;
+    const line = detectedLine(kind);
+    const placed = line ? placeAssetAtField(kind, line, { silent: true }) : placeDefaultAsset(kind);
+    if (placed) did.push(kind === 'stamp' ? 'חותמת' : 'חתימה');
+  });
   PFS.toast(did.length ? ('מולא: ' + did.join(' + ')) : 'אין תבנית/פרופיל/חתימה תואמים', did.length ? 'ok' : 'err');
 }
 function backupExport() {

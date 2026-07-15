@@ -194,6 +194,21 @@ async function main() {
     return after.length === before + 1 && Math.abs(after[after.length - 1].model.fy - 0.75) < 0.12;
   }));
 
+  // Fill-All lands the signature on the detected signature line (fy≈0.62),
+  // not the guessed corner (fy 0.82), when detection found one.
+  check('Fill-All places signature on the detected line, not a corner', await page.evaluate(() => {
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    window.PFS.store.set('signatures', [{ id: 's9', url: png, w: 300, h: 100, aspect: 3 }]);
+    window.PFS.__test.overlay.clearElements();
+    // seed the app's last-detection with a signature line partway up the page
+    window.PFS.__test.setLastDet({ tier: 'text', fields: [
+      { page: 0, fieldKey: 'sg', label: 'חתימת המבקש', fx: 0.5, fy: 0.62, fw: 0.3, fh: 0.04, fontFrac: 0.03, type: 'text' }
+    ] });
+    window.PFS.__test.fillAll();
+    const sig = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'signature');
+    return sig.length === 1 && Math.abs(sig[0].model.fy - 0.62) < 0.12;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -837,6 +837,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> ביטול</div>
         <div><kbd>Ctrl</kbd>+<kbd>Y</kbd> חזרה</div>
         <div><kbd>Ctrl</kbd>+<kbd>D</kbd> שכפול פריט</div>
+        <div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> הזזה מדויקת (<kbd>Shift</kbd> = צעד גדול)</div>
         <div><kbd>Delete</kbd> מחיקת פריט</div>
         <div><kbd>Enter</kbd>/<kbd>↓</kbd> שדה הבא</div>
         <div><kbd>?</kbd> פתיחת עזרה זו</div>
@@ -5617,6 +5618,18 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
     e.preventDefault(); overlay.deleteCtrl(sel);
+  }
+  // arrow-key nudging: pixel-precise placement for lining a value up on a
+  // ruled form. Shift = bigger step. Fractions, so it survives zoom + export.
+  if (sel && !editing && !inField && !e.ctrlKey && !e.metaKey && /^Arrow/.test(e.key)) {
+    e.preventDefault();
+    const step = e.shiftKey ? 0.01 : 0.002;
+    const m = sel.model;
+    if (e.key === 'ArrowLeft') m.fx = PFS.clamp(m.fx - step, 0, 1 - (m.fw || 0));
+    else if (e.key === 'ArrowRight') m.fx = PFS.clamp(m.fx + step, 0, 1 - (m.fw || 0));
+    else if (e.key === 'ArrowUp') m.fy = PFS.clamp(m.fy - step, 0, 1 - (m.fh || 0));
+    else if (e.key === 'ArrowDown') m.fy = PFS.clamp(m.fy + step, 0, 1 - (m.fh || 0));
+    sel.layout(); markDirty();
   }
   if ((e.ctrlKey || e.metaKey) && !editing && !inField) {
     const k = (e.key || '').toLowerCase();

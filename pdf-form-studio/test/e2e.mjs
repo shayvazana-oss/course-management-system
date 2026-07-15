@@ -798,6 +798,19 @@ async function main() {
     return badId && goodId && badMail && goodMail && badPhone && goodPhone && badDate && goodDate && empty && sweepOk;
   }));
 
+  check('arrow keys nudge the selected element (shift = bigger step)', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay; ov.clearElements();
+    const c = ov.addElementAt('text', 0, 0.4, 0.4, { text: 'x', fieldKey: 'nudge', noEdit: true });
+    ov.selectCtrl(c);
+    document.body.focus();
+    const fire = (key, shift) => document.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: !!shift, bubbles: true }));
+    const x0 = c.model.fx, y0 = c.model.fy;
+    fire('ArrowRight'); const dx = c.model.fx - x0;               // ~+0.002
+    fire('ArrowDown', true); const dy = c.model.fy - y0;          // ~+0.01 (shift)
+    ov.clearElements();
+    return Math.abs(dx - 0.002) < 1e-6 && Math.abs(dy - 0.01) < 1e-6;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

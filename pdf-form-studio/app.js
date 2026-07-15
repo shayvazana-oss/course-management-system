@@ -919,6 +919,18 @@ document.addEventListener('keydown', (e) => {
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
     e.preventDefault(); overlay.deleteCtrl(sel);
   }
+  // arrow-key nudging: pixel-precise placement for lining a value up on a
+  // ruled form. Shift = bigger step. Fractions, so it survives zoom + export.
+  if (sel && !editing && !inField && !e.ctrlKey && !e.metaKey && /^Arrow/.test(e.key)) {
+    e.preventDefault();
+    const step = e.shiftKey ? 0.01 : 0.002;
+    const m = sel.model;
+    if (e.key === 'ArrowLeft') m.fx = PFS.clamp(m.fx - step, 0, 1 - (m.fw || 0));
+    else if (e.key === 'ArrowRight') m.fx = PFS.clamp(m.fx + step, 0, 1 - (m.fw || 0));
+    else if (e.key === 'ArrowUp') m.fy = PFS.clamp(m.fy - step, 0, 1 - (m.fh || 0));
+    else if (e.key === 'ArrowDown') m.fy = PFS.clamp(m.fy + step, 0, 1 - (m.fh || 0));
+    sel.layout(); markDirty();
+  }
   if ((e.ctrlKey || e.metaKey) && !editing && !inField) {
     const k = (e.key || '').toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }

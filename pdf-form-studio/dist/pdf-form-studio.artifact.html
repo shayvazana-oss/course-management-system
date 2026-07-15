@@ -1483,8 +1483,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   //   1 → "שקל אחד"; 1234 → "…שקלים חדשים"; 100.5 → "מאה שקלים וחמישים אגורות"
   function shekels(n) {
     n = Math.abs(Number(n) || 0);
-    const shk = Math.floor(n);
-    const ag = Math.round((n - shk) * 100);
+    let shk = Math.floor(n);
+    let ag = Math.round((n - shk) * 100);
+    if (ag === 100) { shk += 1; ag = 0; }   // agorot rounded up to a whole shekel → carry
     if (ag > 0 && ag < 100) {
       const sw = shk === 1 ? 'שקל אחד' : shk === 2 ? 'שני שקלים' : (shk === 0 ? 'אפס שקלים' : words(shk) + ' שקלים');
       const aw = ag === 1 ? 'אגורה אחת' : ag === 2 ? 'שתי אגורות' : agorotWords(ag) + ' אגורות';

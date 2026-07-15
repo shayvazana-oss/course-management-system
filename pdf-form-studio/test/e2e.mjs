@@ -340,7 +340,11 @@ async function main() {
     const shekelsOk = sh(1) === 'שקל אחד' && sh(1234) === 'אלף מאתיים שלושים וארבעה שקלים חדשים'
       && sh(100.5) === 'מאה שקלים וחמישים אגורות' && sh(1.05) === 'שקל אחד וחמש אגורות'
       && sh(2.01) === 'שני שקלים ואגורה אחת';
-    return Object.keys(cases).every((k) => w(+k) === cases[k]) && shekelsOk;
+    // agorot that round up to a whole shekel must CARRY (not be dropped):
+    const carryOk = sh(1.999) === 'שני שקלים חדשים'        // was wrongly 'שקל אחד'
+      && sh(99.995) === 'מאה שקלים חדשים'                    // 99 + carry → 100
+      && sh(2.995) === 'שלושה שקלים חדשים';
+    return Object.keys(cases).every((k) => w(+k) === cases[k]) && shekelsOk && carryOk;
   }));
 
   // typing an amount auto-fills the "סכום במילים" field with the words

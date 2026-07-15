@@ -159,6 +159,12 @@ button, input, select, textarea { font-family: inherit; }
 .page-wrap canvas.pdf { display: block; border-radius: 3px; }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
+/* subtle amber hint over a detected-but-empty field; vanishes when filled */
+.field-marker { position: absolute; pointer-events: none; z-index: 1; border-radius: 4px;
+  background: rgba(224,147,47,.12); box-shadow: inset 0 0 0 1.5px rgba(224,147,47,.55);
+  animation: fm-pulse 1.8s ease-in-out infinite; }
+@keyframes fm-pulse { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .field-marker { animation: none; opacity: .8 } }
 
 /* ===== RIGHT PANEL ===== */
 .rightpanel { background: var(--surface); border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }

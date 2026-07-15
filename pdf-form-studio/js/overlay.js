@@ -90,7 +90,37 @@
       opts.onPlacingChange && opts.onPlacingChange(!!p);
     }
 
-    function relayoutAll() { elements.forEach((c) => c.layout()); }
+    // ---- empty-field markers: subtle amber hints over detected-but-unfilled
+    // spots, so a dense form shows at a glance what's left. Live in the page
+    // overlays, reposition with zoom, and vanish as fields get filled. ----
+    let markers = [];
+    function clearFieldMarkers() { markers.splice(0).forEach((m) => m.el.remove()); }
+    function layoutMarkers() {
+      markers.forEach((m) => {
+        const p = pages[m.field.page]; if (!p) return;
+        const { w, h } = overlaySizeFor(m.field.page); const f = m.field;
+        m.el.style.left = (f.fx * w) + 'px';
+        m.el.style.top = (f.fy * h - 2) + 'px';
+        m.el.style.width = Math.max(26, (f.fw || 0.14) * w) + 'px';
+        m.el.style.height = Math.max(15, (f.fh || 0.02) * h + 4) + 'px';
+      });
+    }
+    function setFieldMarkers(fields) {
+      clearFieldMarkers();
+      (fields || []).forEach((f) => {
+        if (f.type === 'check') return;
+        const p = pages[f.page]; if (!p) return;
+        const el = document.createElement('div');
+        el.className = 'field-marker'; el.dataset.key = f.fieldKey;
+        p.overlayEl.appendChild(el);
+        markers.push({ field: f, el });
+      });
+      layoutMarkers();
+    }
+    function setFieldFilled(key, filled) {
+      markers.forEach((m) => { if (m.field.fieldKey === key) m.el.style.display = filled ? 'none' : ''; });
+    }
+    function relayoutAll() { elements.forEach((c) => c.layout()); layoutMarkers(); }
     function getSelected() { return selected; }
     function getElements() { return elements; }
     function elementsOnPage(i) { return elements.filter((c) => c.model.page === i); }
@@ -98,6 +128,7 @@
 
     function clearElements() {
       elements.splice(0).forEach((c) => c.remove());
+      clearFieldMarkers();
       selected = null;
       opts.onSelect && opts.onSelect(null);
       opts.onChange && opts.onChange();
@@ -153,7 +184,8 @@
       registerPage, addElementAt, instantiate, setPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
-      overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys
+      overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
+      setFieldMarkers, setFieldFilled, clearFieldMarkers
     };
   }
 

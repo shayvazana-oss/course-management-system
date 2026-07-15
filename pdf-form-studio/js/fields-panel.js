@@ -16,6 +16,7 @@
 
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
+      if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
       if (body) body.innerHTML = '';
       if (panel) panel.style.display = 'none';
     }
@@ -99,6 +100,8 @@
       meter.style.cssText = 'margin:2px 0 8px';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
+      // amber hints over empty detected fields (cleared as they fill)
+      if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);
       const controls = []; const fieldMeta = [];
       function recount() {
         const total = controls.length;
@@ -106,6 +109,10 @@
         const t = meter.querySelector('#fpMeterTxt'), bar = meter.querySelector('#fpMeterBar');
         if (t) t.textContent = 'מולאו ' + done + ' מתוך ' + total + ' שדות';
         if (bar) bar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
+        // sync empty-field markers
+        if (overlay.setFieldFilled) controls.forEach((c, i) => {
+          const f = fieldMeta[i]; if (f) overlay.setFieldFilled(f.fieldKey, c.type === 'checkbox' ? c.checked : !!c.value.trim());
+        });
       }
 
       let autoFilled = 0;

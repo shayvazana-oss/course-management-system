@@ -193,6 +193,12 @@ button, input, select, textarea { font-family: inherit; }
 .page-wrap canvas.pdf { display: block; border-radius: 3px; }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
+/* subtle amber hint over a detected-but-empty field; vanishes when filled */
+.field-marker { position: absolute; pointer-events: none; z-index: 1; border-radius: 4px;
+  background: rgba(224,147,47,.12); box-shadow: inset 0 0 0 1.5px rgba(224,147,47,.55);
+  animation: fm-pulse 1.8s ease-in-out infinite; }
+@keyframes fm-pulse { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .field-marker { animation: none; opacity: .8 } }
 
 /* ===== RIGHT PANEL ===== */
 .rightpanel { background: var(--surface); border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
@@ -2337,7 +2343,37 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       opts.onPlacingChange && opts.onPlacingChange(!!p);
     }
 
-    function relayoutAll() { elements.forEach((c) => c.layout()); }
+    // ---- empty-field markers: subtle amber hints over detected-but-unfilled
+    // spots, so a dense form shows at a glance what's left. Live in the page
+    // overlays, reposition with zoom, and vanish as fields get filled. ----
+    let markers = [];
+    function clearFieldMarkers() { markers.splice(0).forEach((m) => m.el.remove()); }
+    function layoutMarkers() {
+      markers.forEach((m) => {
+        const p = pages[m.field.page]; if (!p) return;
+        const { w, h } = overlaySizeFor(m.field.page); const f = m.field;
+        m.el.style.left = (f.fx * w) + 'px';
+        m.el.style.top = (f.fy * h - 2) + 'px';
+        m.el.style.width = Math.max(26, (f.fw || 0.14) * w) + 'px';
+        m.el.style.height = Math.max(15, (f.fh || 0.02) * h + 4) + 'px';
+      });
+    }
+    function setFieldMarkers(fields) {
+      clearFieldMarkers();
+      (fields || []).forEach((f) => {
+        if (f.type === 'check') return;
+        const p = pages[f.page]; if (!p) return;
+        const el = document.createElement('div');
+        el.className = 'field-marker'; el.dataset.key = f.fieldKey;
+        p.overlayEl.appendChild(el);
+        markers.push({ field: f, el });
+      });
+      layoutMarkers();
+    }
+    function setFieldFilled(key, filled) {
+      markers.forEach((m) => { if (m.field.fieldKey === key) m.el.style.display = filled ? 'none' : ''; });
+    }
+    function relayoutAll() { elements.forEach((c) => c.layout()); layoutMarkers(); }
     function getSelected() { return selected; }
     function getElements() { return elements; }
     function elementsOnPage(i) { return elements.filter((c) => c.model.page === i); }
@@ -2345,6 +2381,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
     function clearElements() {
       elements.splice(0).forEach((c) => c.remove());
+      clearFieldMarkers();
       selected = null;
       opts.onSelect && opts.onSelect(null);
       opts.onChange && opts.onChange();
@@ -2400,7 +2437,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       registerPage, addElementAt, instantiate, setPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
-      overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys
+      overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
+      setFieldMarkers, setFieldFilled, clearFieldMarkers
     };
   }
 
@@ -3361,6 +3399,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
+      if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
       if (body) body.innerHTML = '';
       if (panel) panel.style.display = 'none';
     }
@@ -3444,6 +3483,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       meter.style.cssText = 'margin:2px 0 8px';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
+      // amber hints over empty detected fields (cleared as they fill)
+      if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);
       const controls = []; const fieldMeta = [];
       function recount() {
         const total = controls.length;
@@ -3451,6 +3492,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         const t = meter.querySelector('#fpMeterTxt'), bar = meter.querySelector('#fpMeterBar');
         if (t) t.textContent = 'מולאו ' + done + ' מתוך ' + total + ' שדות';
         if (bar) bar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
+        // sync empty-field markers
+        if (overlay.setFieldFilled) controls.forEach((c, i) => {
+          const f = fieldMeta[i]; if (f) overlay.setFieldFilled(f.fieldKey, c.type === 'checkbox' ? c.checked : !!c.value.trim());
+        });
       }
 
       let autoFilled = 0;

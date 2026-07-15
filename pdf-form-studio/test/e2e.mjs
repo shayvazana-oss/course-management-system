@@ -225,6 +225,13 @@ async function main() {
     return parseOk && fillOk;
   }));
 
+  // a saved full name fills separate first/last fields (and vice-versa)
+  check('full name splits into first / last name fields', await page.evaluate(() => {
+    const fields = [{ fieldKey: 'f', label: 'שם פרטי', type: 'text' }, { fieldKey: 'l', label: 'שם משפחה', type: 'text' }];
+    const out = window.PFS.vault.matchValues(fields, { 'שם מלא': 'משה בן ישראל' }, []);
+    return out.f === 'משה' && out.l === 'בן ישראל';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

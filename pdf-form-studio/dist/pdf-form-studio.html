@@ -1422,6 +1422,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     if (canonVal.full_name === undefined && (canonVal.first_name || canonVal.last_name)) {
       canonVal.full_name = [canonVal.first_name, canonVal.last_name].filter(Boolean).join(' ');
     }
+    // the reverse: a saved full name fills separate first/last fields
+    // (Hebrew order: first token = given name, the rest = surname)
+    if (canonVal.full_name && (canonVal.first_name === undefined || canonVal.last_name === undefined)) {
+      const toks = String(canonVal.full_name).trim().split(/\s+/);
+      if (toks.length >= 2) {
+        if (canonVal.first_name === undefined) canonVal.first_name = toks[0];
+        if (canonVal.last_name === undefined) canonVal.last_name = toks.slice(1).join(' ');
+      }
+    }
     // one combined address fills separate עיר / מספר בית / מיקוד fields too
     if (canonVal.address) {
       const pa = parseAddress(canonVal.address);

@@ -81,8 +81,39 @@
   --shadow-pop: 0 8px 28px rgba(19,28,43,.16);
   --ring: 0 0 0 3px rgba(30,78,140,.18);
 
+  --dot: rgba(20,24,31,.045);   /* viewport grid dots — theme-aware */
+
   --r: 12px; --r-sm: 8px; --r-lg: 18px;
   --rail-w: 62px; --panel-w: 340px; --topbar-h: 60px;
+}
+
+/* ===== DARK THEME =====
+ * Only the chrome goes dark — the document pages (--paper) stay white so
+ * scanned/printed forms remain legible, exactly like a desktop PDF reader.
+ * Tokens are redefined; components keep styling through the variables. */
+:root[data-theme="dark"] {
+  --canvas: #0E1621; --surface: #172230; --surface-2: #1E2A3A; --surface-3: #263447;
+  --paper: #FFFFFF;
+  --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
+  --line: #263243; --line-2: #35435A;
+  --brand-soft: #16273F; --accent-soft: #2C2213;
+  --ok-soft: #10281E; --danger-soft: #2E1714;
+  --dot: rgba(255,255,255,.05);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
+  --shadow-3: 0 18px 44px rgba(0,0,0,.6); --shadow-pop: 0 8px 30px rgba(0,0,0,.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0E1621; --surface: #172230; --surface-2: #1E2A3A; --surface-3: #263447;
+    --paper: #FFFFFF;
+    --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
+    --line: #263243; --line-2: #35435A;
+    --brand-soft: #16273F; --accent-soft: #2C2213;
+    --ok-soft: #10281E; --danger-soft: #2E1714;
+    --dot: rgba(255,255,255,.05);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
+    --shadow-3: 0 18px 44px rgba(0,0,0,.6); --shadow-pop: 0 8px 30px rgba(0,0,0,.55);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -161,7 +192,7 @@ button, input, select, textarea { font-family: inherit; }
 .rail-sep { width: 26px; height: 1px; background: var(--line); margin: 6px 0; }
 .rail .spacer { flex: 1; }
 
-.viewport { overflow: auto; padding: 30px; min-width: 0; position: relative; background: radial-gradient(circle at 1px 1px, rgba(20,24,31,.045) 1px, transparent 0) 0 0 / 24px 24px, var(--canvas); }
+.viewport { overflow: auto; padding: 30px; min-width: 0; position: relative; background: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0) 0 0 / 24px 24px, var(--canvas); }
 .pages { display: flex; flex-direction: column; align-items: center; gap: 26px; }
 .page-wrap { position: relative; background: #fff; box-shadow: var(--shadow-2); border-radius: 3px; outline: 1px solid rgba(20,24,31,.05); }
 .page-wrap .pageno { position: absolute; top: -22px; inset-inline-start: 2px; font-size: 11px; font-weight: 600; color: var(--ink-4); }
@@ -354,7 +385,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       </div>
     </div>
     <div class="tb-left">
-      <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל">☰</button>
+      <button class="btn ghost" id="themeBtn" title="מצב תצוגה (בהיר/כהה)" aria-label="החלפת מצב תצוגה בהיר או כהה"><span class="ic" id="themeIc">🌙</span></button>
+      <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל" aria-label="פתיחת פאנל הצד">☰</button>
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
       <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
       <button class="btn ghost" id="mergeBtn" disabled title="מיזוג מרובה"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">מיזוג</span></button>
@@ -4651,6 +4683,23 @@ if (!PFS.store.persistent) {
   if (backupCard) backupCard.prepend(note);
   PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
 }
+
+// ---- theme (auto / light / dark) ---------------------------------------
+const THEMES = ['auto', 'light', 'dark'];
+const THEME_IC = { auto: '🌗', light: '☀️', dark: '🌙' };
+function applyTheme(t) {
+  const root = document.documentElement;
+  if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+  const ic = $('themeIc'); if (ic) ic.textContent = THEME_IC[t] || '🌗';
+  const btn = $('themeBtn'); if (btn) btn.title = 'מצב תצוגה: ' + ({ auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' }[t]);
+}
+applyTheme(PFS.store.get('theme', 'auto'));
+$('themeBtn') && $('themeBtn').addEventListener('click', () => {
+  const cur = PFS.store.get('theme', 'auto');
+  const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+  PFS.store.set('theme', next); applyTheme(next);
+  PFS.toast('מצב תצוגה: ' + ({ auto: 'אוטומטי 🌗', light: 'בהיר ☀️', dark: 'כהה 🌙' }[next]), 'ok', 1400);
+});
 
 // ---- first-run onboarding: two taps and the magic works forever --------
 function showOnboarding() {

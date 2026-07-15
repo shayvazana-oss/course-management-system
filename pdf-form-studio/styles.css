@@ -41,8 +41,39 @@
   --shadow-pop: 0 8px 28px rgba(19,28,43,.16);
   --ring: 0 0 0 3px rgba(30,78,140,.18);
 
+  --dot: rgba(20,24,31,.045);   /* viewport grid dots — theme-aware */
+
   --r: 12px; --r-sm: 8px; --r-lg: 18px;
   --rail-w: 62px; --panel-w: 340px; --topbar-h: 60px;
+}
+
+/* ===== DARK THEME =====
+ * Only the chrome goes dark — the document pages (--paper) stay white so
+ * scanned/printed forms remain legible, exactly like a desktop PDF reader.
+ * Tokens are redefined; components keep styling through the variables. */
+:root[data-theme="dark"] {
+  --canvas: #0E1621; --surface: #172230; --surface-2: #1E2A3A; --surface-3: #263447;
+  --paper: #FFFFFF;
+  --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
+  --line: #263243; --line-2: #35435A;
+  --brand-soft: #16273F; --accent-soft: #2C2213;
+  --ok-soft: #10281E; --danger-soft: #2E1714;
+  --dot: rgba(255,255,255,.05);
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
+  --shadow-3: 0 18px 44px rgba(0,0,0,.6); --shadow-pop: 0 8px 30px rgba(0,0,0,.55);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0E1621; --surface: #172230; --surface-2: #1E2A3A; --surface-3: #263447;
+    --paper: #FFFFFF;
+    --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
+    --line: #263243; --line-2: #35435A;
+    --brand-soft: #16273F; --accent-soft: #2C2213;
+    --ok-soft: #10281E; --danger-soft: #2E1714;
+    --dot: rgba(255,255,255,.05);
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
+    --shadow-3: 0 18px 44px rgba(0,0,0,.6); --shadow-pop: 0 8px 30px rgba(0,0,0,.55);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -121,7 +152,7 @@ button, input, select, textarea { font-family: inherit; }
 .rail-sep { width: 26px; height: 1px; background: var(--line); margin: 6px 0; }
 .rail .spacer { flex: 1; }
 
-.viewport { overflow: auto; padding: 30px; min-width: 0; position: relative; background: radial-gradient(circle at 1px 1px, rgba(20,24,31,.045) 1px, transparent 0) 0 0 / 24px 24px, var(--canvas); }
+.viewport { overflow: auto; padding: 30px; min-width: 0; position: relative; background: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0) 0 0 / 24px 24px, var(--canvas); }
 .pages { display: flex; flex-direction: column; align-items: center; gap: 26px; }
 .page-wrap { position: relative; background: #fff; box-shadow: var(--shadow-2); border-radius: 3px; outline: 1px solid rgba(20,24,31,.05); }
 .page-wrap .pageno { position: absolute; top: -22px; inset-inline-start: 2px; font-size: 11px; font-weight: 600; color: var(--ink-4); }

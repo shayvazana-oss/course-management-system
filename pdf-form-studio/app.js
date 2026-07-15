@@ -1115,6 +1115,23 @@ if (!PFS.store.persistent) {
   PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
 }
 
+// ---- theme (auto / light / dark) ---------------------------------------
+const THEMES = ['auto', 'light', 'dark'];
+const THEME_IC = { auto: '🌗', light: '☀️', dark: '🌙' };
+function applyTheme(t) {
+  const root = document.documentElement;
+  if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+  const ic = $('themeIc'); if (ic) ic.textContent = THEME_IC[t] || '🌗';
+  const btn = $('themeBtn'); if (btn) btn.title = 'מצב תצוגה: ' + ({ auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' }[t]);
+}
+applyTheme(PFS.store.get('theme', 'auto'));
+$('themeBtn') && $('themeBtn').addEventListener('click', () => {
+  const cur = PFS.store.get('theme', 'auto');
+  const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+  PFS.store.set('theme', next); applyTheme(next);
+  PFS.toast('מצב תצוגה: ' + ({ auto: 'אוטומטי 🌗', light: 'בהיר ☀️', dark: 'כהה 🌙' }[next]), 'ok', 1400);
+});
+
 // ---- first-run onboarding: two taps and the magic works forever --------
 function showOnboarding() {
   if (PFS.store.get('onboarded', false)) return;

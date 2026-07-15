@@ -281,7 +281,7 @@ let currentFileName = 'filled';
 // =====================================================================
 //  Tools
 // =====================================================================
-const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date' };
+const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact' };
 
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
@@ -462,6 +462,22 @@ function renderProps(ctrl) {
     tr.value = m.tracking != null ? m.tracking : PFS.handwriting.getTracking();
     tr.addEventListener('input', () => { m.tracking = parseFloat(tr.value); regen(); });
     fTr.appendChild(tr); body.appendChild(fTr);
+  } else if (m.type === 'rect') {
+    // whiteout / redact box — independent width & height, and cover color
+    const rowWH = document.createElement('div'); rowWH.className = 'row';
+    const fW = field('רוחב'); fW.style.flex = '1'; const sw = document.createElement('input');
+    sw.type = 'range'; sw.min = '2'; sw.max = '95'; sw.step = '1'; sw.value = Math.round(m.fw * 100);
+    sw.addEventListener('input', () => { m.fw = parseInt(sw.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fW.appendChild(sw);
+    const fH = field('גובה'); fH.style.flex = '1'; const sh = document.createElement('input');
+    sh.type = 'range'; sh.min = '1'; sh.max = '40'; sh.step = '1'; sh.value = Math.round(m.fh * 100);
+    sh.addEventListener('input', () => { m.fh = parseInt(sh.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fH.appendChild(sh);
+    rowWH.append(fW, fH); body.appendChild(rowWH);
+    const fCol = field('צבע כיסוי'); const col = document.createElement('input');
+    col.type = 'color'; col.value = toHex(m.color || '#ffffff');
+    col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
+    fCol.appendChild(col); body.appendChild(fCol);
   } else {
     const f = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';

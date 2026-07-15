@@ -567,6 +567,31 @@ async function main() {
     return /תל אביב/.test(b['עיר']) && b['מיקוד'] === '6100000' && /הרצל/.test(b['כתובת']) && /אלף מאתיים/.test(b['סכום במילים']);
   }));
 
+  // whiteout/redact places a filled-rectangle element
+  check('whiteout tool places a filled rectangle element', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    const before = ov.getElements().length;
+    ov.addElementAt('whiteout', 0, 0.2, 0.2, {});
+    const rect = ov.getElements().find((e) => e.model.kind === 'whiteout');
+    return ov.getElements().length === before + 1 && rect && rect.model.type === 'rect' && rect.model.color === '#ffffff';
+  }));
+
+  // a redact rectangle is actually painted into the exported PDF (center → black)
+  check('redact rectangle is drawn into the exported PDF', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const d = await PDFDocument.create(); d.addPage([200, 200]);
+    const bytes = await d.save();
+    const models = [{ type: 'rect', kind: 'redact', page: 0, fx: 0.25, fy: 0.25, fw: 0.5, fh: 0.5, color: '#000000' }];
+    const out = await window.PFS.exporter.exportPdf(bytes, models, {});
+    const doc = await window.pdfjsLib.getDocument({ data: out }).promise;
+    const pg = await doc.getPage(1);
+    const vp = pg.getViewport({ scale: 1 });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    const px = c.getContext('2d').getImageData(Math.floor(vp.width / 2), Math.floor(vp.height / 2), 1, 1).data;
+    return px[0] < 60 && px[1] < 60 && px[2] < 60; // center pixel is black → redacted
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

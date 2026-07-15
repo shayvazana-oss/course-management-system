@@ -390,6 +390,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .thumb-move button { width: 22px; height: 20px; line-height: 1; padding: 0; font-size: 11px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .thumb-move button:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
 
+/* Whiteout / redact rectangles */
+.el.rect { box-shadow: 0 0 0 1px rgba(0,0,0,.18); }          /* faint edit border (not exported) */
+.el.rect.selected { box-shadow: 0 0 0 2px var(--brand); }
+.el.rect .fill { width: 100%; height: 100%; pointer-events: none; }
+
 </style>
 
 <div class="app">
@@ -440,6 +445,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn tool" data-tool="cross" title="איקס"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="lbl">איקס</span></button>
       <button class="rail-btn tool" data-tool="draw" title="ציור חופשי"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 2-5 5-7s6-4 8-8"/><path d="M15 4l5 5-9 9-6 1 1-6z"/></svg><span class="lbl">ציור חופשי</span></button>
       <button class="rail-btn tool" data-tool="date" title="תאריך"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
+      <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
+      <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
       <div class="rail-sep"></div>
       <button class="rail-btn tool" data-tool="signature" title="חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
       <button class="rail-btn tool" data-tool="stamp" title="חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
@@ -2497,12 +2504,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     text:  { fontFrac: 0.018, color: '#111111', bold: false, align: 'right', text: '' },
     check: { fontFrac: 0.026, color: '#0f5132', bold: true,  align: 'center', text: '✓' },
     cross: { fontFrac: 0.026, color: '#842029', bold: true,  align: 'center', text: '✗' },
-    date:  { fontFrac: 0.016, color: '#111111', bold: false, align: 'center', text: '' }
+    date:  { fontFrac: 0.016, color: '#111111', bold: false, align: 'center', text: '' },
+    // filled rectangles: cover a pre-printed error (white) / redact info (black)
+    whiteout: { color: '#ffffff', fw: 0.22, fh: 0.035 },
+    redact:   { color: '#111111', fw: 0.22, fh: 0.035 }
   };
+  // element render type from the tool kind
+  const RECT_KINDS = { whiteout: 1, redact: 1 };
+  function typeOf(kind) { return kind === 'image' ? 'image' : (RECT_KINDS[kind] ? 'rect' : 'text'); }
 
   function makeModel(type, page, partial) {
     const base = {
-      id: uid(), type: type === 'image' ? 'image' : 'text',
+      id: uid(), type: typeOf(type),
       kind: type, page,
       fx: 0.4, fy: 0.4, fw: 0.16, fh: 0.05,
       fontFrac: 0.018, color: '#111111', bold: false, align: 'right',
@@ -2518,8 +2531,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
    */
   function createElement(model, ctx) {
     const isImage = model.type === 'image';
+    const isRect = model.type === 'rect';
+    const isBox = isImage || isRect;   // box-resized (vs text auto-size)
     const node = document.createElement('div');
-    node.className = 'el ' + (isImage ? 'image' : 'text');
+    node.className = 'el ' + (isImage ? 'image' : (isRect ? 'rect' : 'text'));
     node.dataset.id = model.id;
 
     // delete button + resize handle
@@ -2532,6 +2547,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       inner = document.createElement('img');
       inner.src = model.imgUrl;
       inner.alt = model.kind || 'image';
+      node.appendChild(inner);
+    } else if (isRect) {
+      inner = document.createElement('div');
+      inner.className = 'fill';
+      inner.style.cssText = 'width:100%;height:100%;background:' + (model.color || '#fff');
       node.appendChild(inner);
     } else {
       inner = document.createElement('div');
@@ -2548,9 +2568,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const { w: W, h: H } = ctx.getOverlaySize();
       node.style.left = (model.fx * W) + 'px';
       node.style.top = (model.fy * H) + 'px';
-      if (isImage) {
+      if (isBox) {
         node.style.width = (model.fw * W) + 'px';
         node.style.height = (model.fh * H) + 'px';
+        if (isRect && inner) inner.style.background = model.color || '#fff';
       } else {
         inner.style.fontSize = (model.fontFrac * H) + 'px';
         inner.style.color = model.color;
@@ -2567,7 +2588,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     function select() { node.classList.add('selected'); }
     function deselect() {
       node.classList.remove('selected');
-      if (!isImage) {
+      if (!isBox) {
         // blur first so the empty-text auto-remove handler can fire
         if (node.dataset.editing === '1' && document.activeElement === inner) inner.blur();
         inner.contentEditable = 'false'; node.dataset.editing = '0';
@@ -2576,7 +2597,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     function remove() { node.remove(); }
 
     function focusText() {
-      if (isImage) return;
+      if (isBox) return;
       inner.contentEditable = 'true';
       node.dataset.editing = '1';
       inner.focus({ preventScroll: true });
@@ -2589,7 +2610,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     del.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); });
     del.addEventListener('click', (e) => { e.stopPropagation(); ctx.onDelete(ctrl); });
 
-    if (!isImage) {
+    if (!isBox) {
       inner.addEventListener('input', () => {
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
@@ -2611,7 +2632,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       handle,
       aspect: isImage ? (model.aspect || 1) : null,
       onSelect: () => ctx.onSelect(ctrl),
-      onResize: isImage ? null : (dx, dy, start) => {
+      onResize: isBox ? null : (dx, dy, start) => {
         // text: vertical drag scales font size (gentle; fine control in panel)
         model.fontFrac = clamp(start.fontFrac + dy * 0.35, 0.006, 0.2);
         return false; // handled → skip default box resize
@@ -3333,6 +3354,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     if (m.type === 'image') {
       const img = imgMap.get(m.imgUrl);
       if (img) ctx.drawImage(img, x, y, m.fw * cw, m.fh * ch);
+      return;
+    }
+    if (m.type === 'rect') {   // whiteout / redact — a filled box
+      ctx.fillStyle = m.color || '#ffffff';
+      ctx.fillRect(x, y, m.fw * cw, m.fh * ch);
       return;
     }
     // text
@@ -4704,7 +4730,7 @@ let currentFileName = 'filled';
 // =====================================================================
 //  Tools
 // =====================================================================
-const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date' };
+const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact' };
 
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
@@ -4885,6 +4911,22 @@ function renderProps(ctrl) {
     tr.value = m.tracking != null ? m.tracking : PFS.handwriting.getTracking();
     tr.addEventListener('input', () => { m.tracking = parseFloat(tr.value); regen(); });
     fTr.appendChild(tr); body.appendChild(fTr);
+  } else if (m.type === 'rect') {
+    // whiteout / redact box — independent width & height, and cover color
+    const rowWH = document.createElement('div'); rowWH.className = 'row';
+    const fW = field('רוחב'); fW.style.flex = '1'; const sw = document.createElement('input');
+    sw.type = 'range'; sw.min = '2'; sw.max = '95'; sw.step = '1'; sw.value = Math.round(m.fw * 100);
+    sw.addEventListener('input', () => { m.fw = parseInt(sw.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fW.appendChild(sw);
+    const fH = field('גובה'); fH.style.flex = '1'; const sh = document.createElement('input');
+    sh.type = 'range'; sh.min = '1'; sh.max = '40'; sh.step = '1'; sh.value = Math.round(m.fh * 100);
+    sh.addEventListener('input', () => { m.fh = parseInt(sh.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fH.appendChild(sh);
+    rowWH.append(fW, fH); body.appendChild(rowWH);
+    const fCol = field('צבע כיסוי'); const col = document.createElement('input');
+    col.type = 'color'; col.value = toHex(m.color || '#ffffff');
+    col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
+    fCol.appendChild(col); body.appendChild(fCol);
   } else {
     const f = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';

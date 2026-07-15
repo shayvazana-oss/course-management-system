@@ -15,12 +15,18 @@
     text:  { fontFrac: 0.018, color: '#111111', bold: false, align: 'right', text: '' },
     check: { fontFrac: 0.026, color: '#0f5132', bold: true,  align: 'center', text: '✓' },
     cross: { fontFrac: 0.026, color: '#842029', bold: true,  align: 'center', text: '✗' },
-    date:  { fontFrac: 0.016, color: '#111111', bold: false, align: 'center', text: '' }
+    date:  { fontFrac: 0.016, color: '#111111', bold: false, align: 'center', text: '' },
+    // filled rectangles: cover a pre-printed error (white) / redact info (black)
+    whiteout: { color: '#ffffff', fw: 0.22, fh: 0.035 },
+    redact:   { color: '#111111', fw: 0.22, fh: 0.035 }
   };
+  // element render type from the tool kind
+  const RECT_KINDS = { whiteout: 1, redact: 1 };
+  function typeOf(kind) { return kind === 'image' ? 'image' : (RECT_KINDS[kind] ? 'rect' : 'text'); }
 
   function makeModel(type, page, partial) {
     const base = {
-      id: uid(), type: type === 'image' ? 'image' : 'text',
+      id: uid(), type: typeOf(type),
       kind: type, page,
       fx: 0.4, fy: 0.4, fw: 0.16, fh: 0.05,
       fontFrac: 0.018, color: '#111111', bold: false, align: 'right',
@@ -36,8 +42,10 @@
    */
   function createElement(model, ctx) {
     const isImage = model.type === 'image';
+    const isRect = model.type === 'rect';
+    const isBox = isImage || isRect;   // box-resized (vs text auto-size)
     const node = document.createElement('div');
-    node.className = 'el ' + (isImage ? 'image' : 'text');
+    node.className = 'el ' + (isImage ? 'image' : (isRect ? 'rect' : 'text'));
     node.dataset.id = model.id;
 
     // delete button + resize handle
@@ -50,6 +58,11 @@
       inner = document.createElement('img');
       inner.src = model.imgUrl;
       inner.alt = model.kind || 'image';
+      node.appendChild(inner);
+    } else if (isRect) {
+      inner = document.createElement('div');
+      inner.className = 'fill';
+      inner.style.cssText = 'width:100%;height:100%;background:' + (model.color || '#fff');
       node.appendChild(inner);
     } else {
       inner = document.createElement('div');
@@ -66,9 +79,10 @@
       const { w: W, h: H } = ctx.getOverlaySize();
       node.style.left = (model.fx * W) + 'px';
       node.style.top = (model.fy * H) + 'px';
-      if (isImage) {
+      if (isBox) {
         node.style.width = (model.fw * W) + 'px';
         node.style.height = (model.fh * H) + 'px';
+        if (isRect && inner) inner.style.background = model.color || '#fff';
       } else {
         inner.style.fontSize = (model.fontFrac * H) + 'px';
         inner.style.color = model.color;
@@ -85,7 +99,7 @@
     function select() { node.classList.add('selected'); }
     function deselect() {
       node.classList.remove('selected');
-      if (!isImage) {
+      if (!isBox) {
         // blur first so the empty-text auto-remove handler can fire
         if (node.dataset.editing === '1' && document.activeElement === inner) inner.blur();
         inner.contentEditable = 'false'; node.dataset.editing = '0';
@@ -94,7 +108,7 @@
     function remove() { node.remove(); }
 
     function focusText() {
-      if (isImage) return;
+      if (isBox) return;
       inner.contentEditable = 'true';
       node.dataset.editing = '1';
       inner.focus({ preventScroll: true });
@@ -107,7 +121,7 @@
     del.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); });
     del.addEventListener('click', (e) => { e.stopPropagation(); ctx.onDelete(ctrl); });
 
-    if (!isImage) {
+    if (!isBox) {
       inner.addEventListener('input', () => {
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
@@ -129,7 +143,7 @@
       handle,
       aspect: isImage ? (model.aspect || 1) : null,
       onSelect: () => ctx.onSelect(ctrl),
-      onResize: isImage ? null : (dx, dy, start) => {
+      onResize: isBox ? null : (dx, dy, start) => {
         // text: vertical drag scales font size (gentle; fine control in panel)
         model.fontFrac = clamp(start.fontFrac + dy * 0.35, 0.006, 0.2);
         return false; // handled → skip default box resize

@@ -502,6 +502,19 @@ async function main() {
     return moved && reordered && restored;
   }));
 
+  // undo now covers page operations, not just overlay edits
+  check('undo reverts a page rotation', await page.evaluate(async () => {
+    const pv = window.PFS.__test.pdfView, T = window.PFS.__test;
+    T.snapshotNow();                                   // clean checkpoint of the current state
+    const before = JSON.stringify(pv.getPageState());
+    await pv.rotatePage(0, 90);
+    T.snapshotNow();
+    const rotated = pv.getPageState().rotations[0] === 90;
+    T.undo();                                           // back to the checkpoint
+    const undone = JSON.stringify(pv.getPageState());
+    return rotated && undone === before;
+  }));
+
   // impossible dates (day 32, month 13, non-leap 29 Feb) are flagged live
   check('invalid dates are flagged, valid ones cleared', await page.evaluate(() => {
     window.PFS.__test.fieldsPanel.show({ tier: 'text', fields: [{ fieldKey: 'bd', label: 'תאריך לידה', type: 'text' }] });

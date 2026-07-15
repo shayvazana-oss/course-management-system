@@ -123,16 +123,39 @@
       order = order.filter((i) => i !== index);
       return true;
     }
+    // re-lay the DOM: visible pages in `order`, then any deleted pages at the
+    // end (so a hidden page never strands at the front, breaking "first page")
+    function relayDom() {
+      const deleted = views.map((_, i) => i).filter((i) => order.indexOf(i) === -1);
+      order.concat(deleted).forEach((i) => pagesEl.appendChild(views[i].wrap));
+    }
     // move a page one step earlier/later in the display order (dir -1 / +1)
     function movePage(index, dir) {
       const pos = order.indexOf(index);
       const to = pos + (dir < 0 ? -1 : 1);
       if (pos < 0 || to < 0 || to >= order.length) return false;
       const tmp = order[pos]; order[pos] = order[to]; order[to] = tmp;
-      order.forEach((i) => pagesEl.appendChild(views[i].wrap)); // re-lay the DOM in order
+      relayDom();
       return true;
     }
     function getPageOrder() { return order.slice(); }
+    // full page state for undo/redo snapshots
+    function getPageState() { return { rotations: getRotations(), removed: getRemovedPages(), order: getPageOrder() }; }
+    // restore a snapshot exactly (un-deletes, resets rotations, re-lays order)
+    function setPageState(st) {
+      st = st || {};
+      const removed = new Set((st.removed || []).map(Number));
+      views.forEach((v, i) => {
+        v.deleted = removed.has(i);
+        v.wrap.style.display = v.deleted ? 'none' : '';
+        v.userRot = ((((st.rotations || {})[i] || 0) % 360) + 360) % 360;
+      });
+      order = (Array.isArray(st.order) && st.order.length)
+        ? st.order.filter((i) => views[i] && !views[i].deleted)
+        : views.map((_, i) => i).filter((i) => !views[i].deleted);
+      relayDom();
+      return rerenderAll();
+    }
     // a real reorder (order not simply ascending) vs. plain deletion (gaps only)
     function isReordered() { return order.some((v, i) => i > 0 && v < order[i - 1]); }
     function setPageOrder(arr) {
@@ -140,7 +163,7 @@
       const valid = arr.filter((i) => views[i] && !views[i].deleted);
       if (valid.length !== order.length) return; // stale/mismatched memory — ignore
       order = valid;
-      order.forEach((i) => pagesEl.appendChild(views[i].wrap));
+      relayDom();
     }
     function getRemovedPages() { return views.map((v, i) => (v.deleted ? i : -1)).filter((i) => i >= 0); }
     // restore deletions from memory — but never hide every page
@@ -160,7 +183,7 @@
     // page canvases + wraps, for building the thumbnail rail
     function viewList() { return views.map((v, i) => ({ n: i + 1, idx: i, canvas: v.canvas, wrap: v.wrap, deleted: !!v.deleted })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;

@@ -48,17 +48,23 @@ function scheduleAutoMemory() {
 
 // ---------- undo / redo (snapshots of the overlay) ----------
 let history = [], redo = [], restoring = false, snapT = null;
-function resetHistory() { history = [JSON.stringify([])]; redo = []; }
+function snapState() {
+  return JSON.stringify({ els: overlay.serialize(), pg: pdfView.getPageState ? pdfView.getPageState() : null });
+}
+function resetHistory() { history = [snapState()]; redo = []; }
 function scheduleSnap() { if (restoring) return; clearTimeout(snapT); snapT = setTimeout(snapshot, 300); }
 function snapshot() {
   if (restoring) return;
-  const s = JSON.stringify(overlay.serialize());
+  const s = snapState();
   if (history.length && history[history.length - 1] === s) return;
   history.push(s); if (history.length > 40) history.shift(); redo = [];
 }
 function restoreState(json) {
   restoring = true; clearTimeout(snapT);
-  overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(JSON.parse(json));
+  const st = JSON.parse(json);
+  overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(st.els || (Array.isArray(st) ? st : []));
+  // restore page rotation/deletion/order too, so undo covers page operations
+  if (st.pg && pdfView.setPageState) { pdfView.setPageState(st.pg); buildPageNav(); buildThumbnails(); }
   restoring = false; markDirty();
 }
 function undo() { if (history.length < 2) return; redo.push(history.pop()); restoreState(history[history.length - 1]); }
@@ -117,7 +123,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -645,8 +651,8 @@ function buildThumbnails() {
     const mv = document.createElement('div'); mv.className = 'thumb-move';
     const up = document.createElement('button'); up.type = 'button'; up.title = 'הזז מוקדם יותר'; up.textContent = '▲';
     const dn = document.createElement('button'); dn.type = 'button'; dn.title = 'הזז מאוחר יותר'; dn.textContent = '▼';
-    up.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, -1)) { buildThumbnails(); buildPageNav(); markDirty(); } });
-    dn.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, 1)) { buildThumbnails(); buildPageNav(); markDirty(); } });
+    up.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, -1)) { buildThumbnails(); buildPageNav(); markDirty(); scheduleSnap(); } });
+    dn.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, 1)) { buildThumbnails(); buildPageNav(); markDirty(); scheduleSnap(); } });
     mv.append(up, dn);
     cell.append(tc, tag, mv);
     cell.addEventListener('click', () => { v.wrap.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
@@ -691,6 +697,7 @@ $('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
   if (!pdfView.hasDoc()) return;
   const idx = currentPageIndex();
   await pdfView.rotatePage(idx, 90);
+  scheduleSnap();
   PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
 });
 $('deleteBtn') && $('deleteBtn').addEventListener('click', async () => {
@@ -699,7 +706,7 @@ $('deleteBtn') && $('deleteBtn').addEventListener('click', async () => {
   const idx = currentPageIndex();
   if (!(await PFS.ui.confirm('מחיקת עמוד', 'למחוק את עמוד ' + (idx + 1) + '? הוא לא ייכלל בקובץ המיוצא.'))) return;
   if (pdfView.deletePage(idx)) {
-    buildPageNav(); buildThumbnails(); markDirty();
+    buildPageNav(); buildThumbnails(); markDirty(); scheduleSnap();
     PFS.toast('העמוד נמחק — לא ייכלל בייצוא', 'ok', 1600);
   }
 });

@@ -697,6 +697,36 @@ async function main() {
       && Math.abs(el.model.fontFrac - 0.05) < 0.001 && el.model.bold === true && el.model.align === 'left';
   }));
 
+  // calculated fields: the safe formula evaluator over other fields' values
+  check('formula evaluator computes over field references (safe)', await page.evaluate(() => {
+    const F = window.PFS.formula;
+    const v = { qty: '3', price: '10.5', a: '100', b: '50', c: '25', amount: '1,200' };
+    return F.isFormula('=[qty]*[price]') && !F.isFormula('nope')
+      && F.evaluate('=[qty]*[price]', v) === '31.5'
+      && F.evaluate('=sum([a],[b],[c])', v) === '175'
+      && F.evaluate('=[a]-[b]', v) === '50'
+      && F.evaluate('=([a]+[b])/2', v) === '75'
+      && F.evaluate('=[amount]*2', v) === '2400'   // strips the comma
+      && F.evaluate('=alert(1)', v) === '' && F.evaluate('=[a]', {}) === '0';
+  }));
+
+  // a calculated field auto-updates from the fields it references
+  check('a calculated field auto-updates from other fields', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    ov.clearElements();
+    ov.addElementAt('text', 0, 0.1, 0.1, { text: '100', fieldKey: 'a' });
+    ov.addElementAt('text', 0, 0.2, 0.2, { text: '50', fieldKey: 'b' });
+    ov.addElementAt('text', 0, 0.3, 0.3, { text: '', fieldKey: 'total', formula: '=sum([a],[b])' });
+    const totalText = () => { const e = ov.getElements().find((x) => x.model.fieldKey === 'total'); return e ? e.model.text : null; };
+    window.PFS.__test.recomputeFormulas();
+    const t1 = totalText();                       // snapshot: 150
+    ov.getElements().find((e) => e.model.fieldKey === 'a').model.text = '200'; // change an input
+    window.PFS.__test.recomputeFormulas();
+    const t2 = totalText();                       // follows: 250
+    ov.clearElements();
+    return t1 === '150' && t2 === '250';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

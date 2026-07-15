@@ -70,9 +70,34 @@ function restoreState(json) {
 function undo() { if (history.length < 2) return; redo.push(history.pop()); restoreState(history[history.length - 1]); }
 function redoAction() { if (!redo.length) return; const s = redo.pop(); history.push(s); restoreState(s); }
 
+// ---------- calculated fields ----------
+// Recompute every formula element from the current values of keyed fields.
+// Guarded so setting a formula field's text can't re-enter and loop.
+let computingFormulas = false;
+function recomputeFormulas() {
+  if (computingFormulas || !PFS.formula) return;
+  const els = overlay.getElements();
+  if (!els.some((c) => PFS.formula.isFormula(c.model.formula))) return; // nothing to do
+  computingFormulas = true;
+  try {
+    const vars = {};
+    els.forEach((c) => { const m = c.model; if (m.type === 'text' && m.fieldKey && !PFS.formula.isFormula(m.formula)) vars[m.fieldKey] = m.text; });
+    els.forEach((c) => {
+      const m = c.model;
+      if (m.type !== 'text' || !PFS.formula.isFormula(m.formula)) return;
+      const val = PFS.formula.evaluate(m.formula, vars);
+      if (m.text !== val) {
+        m.text = val;
+        const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = val;
+        c.layout();
+      }
+    });
+  } finally { computingFormulas = false; }
+}
+
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
-  onChange: () => { markDirty(); scheduleSnap(); },
+  onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
   onSelect: (ctrl) => renderProps(ctrl),
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
@@ -123,7 +148,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -449,6 +474,18 @@ function renderProps(ctrl) {
       seg.appendChild(b);
     });
     rowBA.append(bold, seg); body.appendChild(rowBA);
+
+    // calculated field: a formula over other tagged fields (=[qty]*[price])
+    const fForm = field('נוסחה (חישוב אוטומטי) — למשל ‎=[qty]*[price]‎ או ‎=sum([a],[b])');
+    const fin = document.createElement('input'); fin.type = 'text'; fin.dir = 'ltr';
+    fin.value = m.formula || ''; fin.placeholder = '=… (רשות)';
+    fin.addEventListener('input', () => {
+      m.formula = fin.value.trim();
+      if (PFS.formula.isFormula(m.formula)) { input.disabled = true; input.value = ''; } else { input.disabled = false; }
+      recomputeFormulas(); markDirty();
+    });
+    if (PFS.formula && PFS.formula.isFormula(m.formula)) input.disabled = true;
+    fForm.appendChild(fin); body.appendChild(fForm);
   } else if (m.kind === 'handwriting') {
     const regen = () => {
       const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#000000', tracking: m.tracking });

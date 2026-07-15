@@ -111,6 +111,11 @@
     if (canonVal.full_name === undefined && (canonVal.first_name || canonVal.last_name)) {
       canonVal.full_name = [canonVal.first_name, canonVal.last_name].filter(Boolean).join(' ');
     }
+    // one combined address fills separate עיר / מספר בית / מיקוד fields too
+    if (canonVal.address) {
+      const pa = parseAddress(canonVal.address);
+      ['city', 'house_no', 'zip'].forEach((k) => { if (canonVal[k] === undefined && pa[k]) canonVal[k] = pa[k]; });
+    }
     // a plain "תאריך:" field means "today" unless the profile says otherwise
     // (birth-date fields map to birth_date, a different canon — never touched)
     if (canonVal.date === undefined) canonVal.date = new Date().toLocaleDateString('he-IL');
@@ -120,6 +125,36 @@
       const c = matchKey(f.label) || matchKey(f.fieldKey);
       if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
     });
+    return out;
+  }
+
+  /* Best-effort split of one Israeli address string into its parts, so a
+   * profile that stores only a combined "כתובת" can still fill separate
+   * עיר / מספר בית / מיקוד fields. Heuristic, tolerant of missing pieces:
+   *   "רחוב הרצל 15, תל אביב 6100000" → {street:'הרצל', house_no:'15',
+   *    city:'תל אביב', zip:'6100000', address:<original>}
+   */
+  function parseAddress(s) {
+    const out = {};
+    const str = String(s || '').trim();
+    if (!str) return out;
+    out.address = str;
+    // zip: an Israeli postcode is 5 or 7 digits; take the last such run
+    const zips = str.match(/\b(\d{7}|\d{5})\b/g);
+    if (zips) out.zip = zips[zips.length - 1];
+    // house number: first digit run (optionally a Hebrew apartment letter)
+    const hm = str.match(/\b(\d{1,4}[א-ת]?)\b/);
+    if (hm && hm[1] !== out.zip) out.house_no = hm[1];
+    const parts = str.split(/[,،]/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      // "<street + house>, <city> [zip]"
+      let cityPart = parts.slice(1).join(' ');
+      if (out.zip) cityPart = cityPart.split(out.zip).join(' ');
+      cityPart = cityPart.replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cityPart) out.city = cityPart;
+      const street = parts[0].replace(/\b\d{1,4}[א-ת]?\b/, ' ').replace(/^(רחוב|רח['׳]?|שדרות|שד['׳]?|שכ['׳]?|דרך)\s+/, '').replace(/\s+/g, ' ').trim();
+      if (street) out.street = street;
+    }
     return out;
   }
 
@@ -228,5 +263,5 @@
     } finally { try { await worker.terminate(); } catch (e) {} }
   }
 
-  PFS.vault = { matchKey, matchValues, matchChecks, classifyChoice, extractFromText, recognizeImage, checkIsraeliId, norm };
+  PFS.vault = { matchKey, matchValues, matchChecks, classifyChoice, parseAddress, extractFromText, recognizeImage, checkIsraeliId, norm };
 })(window);

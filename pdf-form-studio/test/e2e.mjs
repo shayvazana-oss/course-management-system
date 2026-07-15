@@ -209,6 +209,22 @@ async function main() {
     return sig.length === 1 && Math.abs(sig[0].model.fy - 0.62) < 0.12;
   }));
 
+  // one combined address fills separate city / house-no / zip fields
+  check('combined address auto-splits into עיר / מספר בית / מיקוד', await page.evaluate(() => {
+    const pa = window.PFS.vault.parseAddress('רחוב הרצל 15, תל אביב 6100000');
+    const parseOk = pa.house_no === '15' && pa.zip === '6100000' && /תל אביב/.test(pa.city) && /הרצל/.test(pa.street);
+    // and it flows through matchValues into the separate detected fields
+    const fields = [
+      { fieldKey: 'a', label: 'כתובת', type: 'text' },
+      { fieldKey: 'c', label: 'עיר', type: 'text' },
+      { fieldKey: 'h', label: 'מספר בית', type: 'text' },
+      { fieldKey: 'z', label: 'מיקוד', type: 'text' }
+    ];
+    const out = window.PFS.vault.matchValues(fields, { 'כתובת': 'רחוב הרצל 15, תל אביב 6100000' }, []);
+    const fillOk = /הרצל/.test(out.a) && /תל אביב/.test(out.c) && out.h === '15' && out.z === '6100000';
+    return parseOk && fillOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

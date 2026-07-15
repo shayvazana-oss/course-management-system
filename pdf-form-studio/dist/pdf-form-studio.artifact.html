@@ -1447,6 +1447,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // amount_words must out-rank amount (longer phrase wins in matchKey)
     amount_words: ['סכום במילים', 'סכום במלים', 'הסכום במילים', 'amount in words', 'sum in words'],
     amount:     ['סכום בשח', 'סכום', 'סך הכל', 'סך הכול', 'סה״כ', 'סהכ', 'amount', 'total', 'sum', 'المبلغ', 'المجموع'],
+    // Israeli business/tax forms (101, VAT): company / dealer numbers use the
+    // SAME 9-digit checksum as ת.ז, so they can be validated the same way.
+    business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
+    business_name: ['שם העסק', 'שם החברה', 'שם התאגיד', 'שם עסק', 'business name', 'company name'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
 
@@ -4020,10 +4024,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             // live format checks — catch typos before they land on paper
             const v = control.value.trim();
             let bad = false, msg = '';
-            if (canon === 'id') {
+            if (canon === 'id' || canon === 'business_id') {
               const digits = v.replace(/\D/g, '');
               bad = digits.length >= 5 && !PFS.vault.checkIsraeliId(digits);
-              msg = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
+              msg = bad ? (canon === 'business_id'
+                ? 'מספר העוסק / ח.פ לא עובר ביקורת ספרת ביקורת — בדקו הקלדה'
+                : 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה') : '';
             } else if (canon === 'email' && v) {
               bad = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
               msg = bad ? 'כתובת אימייל לא תקינה — בדקו הקלדה' : '';

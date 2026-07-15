@@ -193,10 +193,12 @@
             // live format checks — catch typos before they land on paper
             const v = control.value.trim();
             let bad = false, msg = '';
-            if (canon === 'id') {
+            if (canon === 'id' || canon === 'business_id') {
               const digits = v.replace(/\D/g, '');
               bad = digits.length >= 5 && !PFS.vault.checkIsraeliId(digits);
-              msg = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
+              msg = bad ? (canon === 'business_id'
+                ? 'מספר העוסק / ח.פ לא עובר ביקורת ספרת ביקורת — בדקו הקלדה'
+                : 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה') : '';
             } else if (canon === 'email' && v) {
               bad = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
               msg = bad ? 'כתובת אימייל לא תקינה — בדקו הקלדה' : '';

@@ -352,6 +352,19 @@ async function main() {
     return amtw.value === 'אלף מאתיים שלושים וארבעה שקלים חדשים';
   }));
 
+  // business numbers (ח.פ / עוסק) resolve and validate with the ID checksum
+  check('business number (ח.פ / עוסק) is validated like an ID', await page.evaluate(() => {
+    const mk = window.PFS.vault.matchKey;
+    const resolves = mk('עוסק מורשה') === 'business_id' && mk('ח.פ') === 'business_id' && mk('שם העסק') === 'business_name';
+    window.PFS.__test.fieldsPanel.show({ tier: 'text', fields: [{ fieldKey: 'hp', label: 'ח.פ', type: 'text' }] });
+    const inp = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === 'hp');
+    if (!inp) return false;
+    const type = (v) => { inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); };
+    type('123456789'); const bad = inp.title !== '' && inp.style.borderColor !== '';   // fails checksum
+    type('123456782'); const ok = inp.title === '' && inp.style.borderColor === '';    // valid checksum
+    return resolves && bad && ok;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

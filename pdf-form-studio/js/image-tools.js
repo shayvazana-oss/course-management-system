@@ -97,6 +97,19 @@
 
   function canvasToPngUrl(canvas) { return canvas.toDataURL('image/png'); }
 
+  /* Downscale an image/canvas and encode as JPEG on a white background — for
+   * attachments (a phone photo of an ID can be 4000px/5MB; this keeps the
+   * exported PDF small enough to share on WhatsApp/email). */
+  function downscaleToJpeg(src, maxDim = 1800, quality = 0.85) {
+    const scaled = toCanvas(src, maxDim);
+    const c = document.createElement('canvas');
+    c.width = scaled.width; c.height = scaled.height;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height); // JPEG has no alpha
+    ctx.drawImage(scaled, 0, 0);
+    return { url: c.toDataURL('image/jpeg', quality), w: c.width, h: c.height };
+  }
+
   /* Full pipeline for an uploaded stamp/signature photo:
    * downscale → optional white removal → trim → PNG data URL (keeps alpha). */
   async function processUpload(file, { removeWhite = true } = {}) {
@@ -212,6 +225,6 @@
 
   PFS.imageTools = {
     ACCEPT, loadImage, fileToImage, toCanvas,
-    whiteToTransparent, autoTrim, canvasToPngUrl, processUpload, signaturePad, strokePad
+    whiteToTransparent, autoTrim, canvasToPngUrl, downscaleToJpeg, processUpload, signaturePad, strokePad
   };
 })(window);

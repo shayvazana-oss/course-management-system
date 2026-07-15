@@ -2030,6 +2030,19 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
   function canvasToPngUrl(canvas) { return canvas.toDataURL('image/png'); }
 
+  /* Downscale an image/canvas and encode as JPEG on a white background — for
+   * attachments (a phone photo of an ID can be 4000px/5MB; this keeps the
+   * exported PDF small enough to share on WhatsApp/email). */
+  function downscaleToJpeg(src, maxDim = 1800, quality = 0.85) {
+    const scaled = toCanvas(src, maxDim);
+    const c = document.createElement('canvas');
+    c.width = scaled.width; c.height = scaled.height;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height); // JPEG has no alpha
+    ctx.drawImage(scaled, 0, 0);
+    return { url: c.toDataURL('image/jpeg', quality), w: c.width, h: c.height };
+  }
+
   /* Full pipeline for an uploaded stamp/signature photo:
    * downscale → optional white removal → trim → PNG data URL (keeps alpha). */
   async function processUpload(file, { removeWhite = true } = {}) {
@@ -2145,7 +2158,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
   PFS.imageTools = {
     ACCEPT, loadImage, fileToImage, toCanvas,
-    whiteToTransparent, autoTrim, canvasToPngUrl, processUpload, signaturePad, strokePad
+    whiteToTransparent, autoTrim, canvasToPngUrl, downscaleToJpeg, processUpload, signaturePad, strokePad
   };
 })(window);
 
@@ -3573,8 +3586,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const { canvas, wPt, hPt } = await renderBase(idx);
       const ctx = canvas.getContext('2d');
       (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap));
-      const png = await out.embedPng(canvas.toDataURL('image/png'));
-      out.addPage([wPt, hPt]).drawImage(png, { x: 0, y: 0, width: wPt, height: hPt });
+      // JPEG on the white-backed canvas → far smaller than PNG, still shareable
+      const jpg = await out.embedJpg(canvas.toDataURL('image/jpeg', 0.85));
+      out.addPage([wPt, hPt]).drawImage(jpg, { x: 0, y: 0, width: wPt, height: hPt });
       canvas.width = 0; canvas.height = 0;
       done++; onProgress && onProgress(done, idxs.length);
     }
@@ -5310,13 +5324,11 @@ $('attachInput') && $('attachInput').addEventListener('change', async (e) => {
       if (f.type === 'application/pdf') {
         const buf = await f.arrayBuffer();
         attachments.push({ kind: 'pdf', bytes: new Uint8Array(buf), name: f.name });
-      } else if (f.type === 'image/webp') {
-        // webp isn't embeddable by pdf-lib → normalize to PNG
-        const conv = await PFS.imageTools.processUpload(f, { removeWhite: false });
-        attachments.push({ url: conv.url, type: 'image/png', name: f.name });
-      } else if (/^image\/(png|jpeg)$/.test(f.type)) {
-        const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-        attachments.push({ url, type: f.type, name: f.name });
+      } else if (/^image\/(png|jpeg|webp)$/.test(f.type)) {
+        // downscale + JPEG so a big phone photo doesn't bloat the shared PDF
+        const img = await PFS.imageTools.fileToImage(f);
+        const conv = PFS.imageTools.downscaleToJpeg(img, 1800, 0.85);
+        attachments.push({ url: conv.url, type: 'image/jpeg', name: f.name });
       }
     } catch (err) { console.warn('attach failed', err); }
   }

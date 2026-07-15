@@ -242,8 +242,9 @@
       const { canvas, wPt, hPt } = await renderBase(idx);
       const ctx = canvas.getContext('2d');
       (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap));
-      const png = await out.embedPng(canvas.toDataURL('image/png'));
-      out.addPage([wPt, hPt]).drawImage(png, { x: 0, y: 0, width: wPt, height: hPt });
+      // JPEG on the white-backed canvas → far smaller than PNG, still shareable
+      const jpg = await out.embedJpg(canvas.toDataURL('image/jpeg', 0.85));
+      out.addPage([wPt, hPt]).drawImage(jpg, { x: 0, y: 0, width: wPt, height: hPt });
       canvas.width = 0; canvas.height = 0;
       done++; onProgress && onProgress(done, idxs.length);
     }

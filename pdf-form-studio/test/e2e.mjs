@@ -625,6 +625,14 @@ async function main() {
     return doc.numPages >= 1 && text.trim().length === 0;
   }));
 
+  // image attachments are downscaled + JPEG so a big photo doesn't bloat the PDF
+  check('large image attachments are downscaled to a shareable JPEG', await page.evaluate(() => {
+    const big = document.createElement('canvas'); big.width = 4000; big.height = 3000;
+    const ctx = big.getContext('2d'); ctx.fillStyle = '#3366cc'; ctx.fillRect(0, 0, 4000, 3000);
+    const out = window.PFS.imageTools.downscaleToJpeg(big, 1800, 0.85);
+    return out.w <= 1800 && out.h <= 1800 && /^data:image\/jpeg/.test(out.url) && out.url.length < big.toDataURL('image/png').length;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

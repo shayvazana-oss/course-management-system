@@ -799,13 +799,11 @@ $('attachInput') && $('attachInput').addEventListener('change', async (e) => {
       if (f.type === 'application/pdf') {
         const buf = await f.arrayBuffer();
         attachments.push({ kind: 'pdf', bytes: new Uint8Array(buf), name: f.name });
-      } else if (f.type === 'image/webp') {
-        // webp isn't embeddable by pdf-lib → normalize to PNG
-        const conv = await PFS.imageTools.processUpload(f, { removeWhite: false });
-        attachments.push({ url: conv.url, type: 'image/png', name: f.name });
-      } else if (/^image\/(png|jpeg)$/.test(f.type)) {
-        const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-        attachments.push({ url, type: f.type, name: f.name });
+      } else if (/^image\/(png|jpeg|webp)$/.test(f.type)) {
+        // downscale + JPEG so a big phone photo doesn't bloat the shared PDF
+        const img = await PFS.imageTools.fileToImage(f);
+        const conv = PFS.imageTools.downscaleToJpeg(img, 1800, 0.85);
+        attachments.push({ url: conv.url, type: 'image/jpeg', name: f.name });
       }
     } catch (err) { console.warn('attach failed', err); }
   }

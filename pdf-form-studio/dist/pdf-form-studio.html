@@ -4659,7 +4659,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -4820,6 +4820,9 @@ let currentFileName = 'filled';
 // =====================================================================
 const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
 let stickyTools = false; // "repeat mode": keep a tool armed for multiple placements
+// remember the last text style so filling a form stays visually consistent
+let lastTextStyle = null;
+function rememberTextStyle(m) { lastTextStyle = { fontFrac: m.fontFrac, color: m.color, bold: !!m.bold, align: m.align }; }
 $('stickyBtn') && $('stickyBtn').addEventListener('click', () => {
   stickyTools = !stickyTools;
   $('stickyBtn').classList.toggle('active', stickyTools);
@@ -4848,6 +4851,8 @@ function activateTool(btn, tool) {
     create: (pageIndex, fx, fy) => {
       const extra = {};
       if (tool === 'date') extra.text = new Date().toLocaleDateString('he-IL');
+      // new text/date inherits the last-used style so the form stays consistent
+      if ((tool === 'text' || tool === 'date') && lastTextStyle) Object.assign(extra, lastTextStyle);
       const ctrl = overlay.addElementAt(TEXT_TOOLS[tool], pageIndex, fx, fy, extra);
       return null; // addElementAt already instantiated
     }
@@ -4959,11 +4964,11 @@ function renderProps(ctrl) {
     const fSize = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '6'; size.max = '80'; size.step = '1';
     size.value = Math.round(m.fontFrac * 1000);
-    size.addEventListener('input', () => { m.fontFrac = parseInt(size.value, 10) / 1000; ctrl.layout(); markDirty(); });
+    size.addEventListener('input', () => { m.fontFrac = parseInt(size.value, 10) / 1000; ctrl.layout(); markDirty(); rememberTextStyle(m); });
     fSize.appendChild(size); fSize.style.flex = '1';
     const fCol = field('צבע'); const col = document.createElement('input');
     col.type = 'color'; col.value = toHex(m.color);
-    col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
+    col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); rememberTextStyle(m); });
     fCol.appendChild(col);
     rowSC.append(fSize, fCol); body.appendChild(rowSC);
 
@@ -4971,12 +4976,12 @@ function renderProps(ctrl) {
     const rowBA = document.createElement('div'); rowBA.className = 'row';
     const bold = document.createElement('button'); bold.className = 'btn sm' + (m.bold ? ' active tool' : '');
     bold.textContent = 'מודגש'; bold.style.fontWeight = '700';
-    bold.addEventListener('click', () => { m.bold = !m.bold; ctrl.layout(); markDirty(); renderProps(ctrl); });
+    bold.addEventListener('click', () => { m.bold = !m.bold; ctrl.layout(); markDirty(); rememberTextStyle(m); renderProps(ctrl); });
     const seg = document.createElement('div'); seg.className = 'seg';
     [['right', '⇥'], ['center', '≡'], ['left', '⇤']].forEach(([a, label]) => {
       const b = document.createElement('button'); b.textContent = label; b.title = a;
       if (m.align === a) b.classList.add('on');
-      b.addEventListener('click', () => { m.align = a; ctrl.layout(); markDirty(); renderProps(ctrl); });
+      b.addEventListener('click', () => { m.align = a; ctrl.layout(); markDirty(); rememberTextStyle(m); renderProps(ctrl); });
       seg.appendChild(b);
     });
     rowBA.append(bold, seg); body.appendChild(rowBA);

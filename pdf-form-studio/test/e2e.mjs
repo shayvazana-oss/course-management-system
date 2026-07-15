@@ -684,6 +684,19 @@ async function main() {
     return serOk && restoredOk;
   }));
 
+  // text style memory: styling one field is remembered and applied to the next
+  check('text style is remembered and applied to new text', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay, T = window.PFS.__test;
+    ov.clearElements();
+    T.rememberTextStyle({ fontFrac: 0.05, color: '#ff0000', bold: true, align: 'left' });
+    const ls = T.getLastTextStyle();
+    ov.addElementAt('text', 0, 0.2, 0.2, Object.assign({ text: 'x' }, ls));
+    const el = ov.getElements().find((e) => e.model.text === 'x');
+    ov.clearElements();
+    return ls && ls.color === '#ff0000' && el && el.model.color === '#ff0000'
+      && Math.abs(el.model.fontFrac - 0.05) < 0.001 && el.model.bold === true && el.model.align === 'left';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

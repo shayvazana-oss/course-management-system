@@ -446,6 +446,26 @@ async function main() {
     return (await PDFDocument.load(out)).getPageCount() === 4; // 1 base + 3 donor pages
   }));
 
+  // removePages drops pages from the export, but never leaves an empty document
+  check('removePages drops pages on export (keeps at least one)', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const d = await PDFDocument.create(); d.addPage([200, 200]); d.addPage([200, 200]); d.addPage([200, 200]);
+    const bytes = await d.save();
+    const c1 = (await PDFDocument.load(await window.PFS.exporter.exportPdf(bytes, [], { removePages: [1] }))).getPageCount();
+    const c2 = (await PDFDocument.load(await window.PFS.exporter.exportPdf(bytes, [], { removePages: [0, 1, 2] }))).getPageCount();
+    return c1 === 2 && c2 === 1; // one removed → 2; all removed → clamped to 1
+  }));
+
+  // deleting a page in the viewer hides it and records it for export exclusion
+  check('deleting a page hides it and marks it for export exclusion', await page.evaluate(() => {
+    const pv = window.PFS.__test.pdfView;
+    const before = pv.visiblePageCount();
+    if (before < 2) return true; // single-page fixture — nothing to delete
+    const last = before - 1;      // delete the LAST page so page 0 stays for later tests
+    const ok = pv.deletePage(last);
+    return ok && pv.visiblePageCount() === before - 1 && pv.getRemovedPages().includes(last);
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

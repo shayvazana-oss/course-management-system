@@ -105,9 +105,11 @@
     // /Rotate — for straightening sideways scans. Pages that were rotated but
     // carry no overlay still need their /Rotate updated, so process the union.
     const rotations = opts.rotations || {};
+    const removeSet = new Set((opts.removePages || []).map(Number));
     const userR = (idx) => (((Number(rotations[idx]) || 0) % 360) + 360) % 360;
     const pageSet = new Set([...byPage.keys(), ...Object.keys(rotations).map(Number).filter((k) => userR(k))]);
-    const pageIdxs = [...pageSet].sort((a, b) => a - b);
+    // don't draw overlays on pages that are being removed
+    const pageIdxs = [...pageSet].filter((i) => !removeSet.has(i)).sort((a, b) => a - b);
     let done = 0;
     for (const idx of pageIdxs) {
       const page = pages[idx];
@@ -142,6 +144,15 @@
       canvas.width = 0; canvas.height = 0;
       done++;
       opts.onProgress && opts.onProgress(done, pageIdxs.length);
+    }
+
+    // remove user-deleted pages (descending so indices stay valid). Never
+    // leave an empty document: keep one page if there are no attachments.
+    if (removeSet.size) {
+      let toRemove = [...removeSet].filter((i) => i >= 0 && i < pages.length).sort((a, b) => b - a);
+      const attachCount = (opts.attachments || []).length;
+      if (!attachCount && toRemove.length >= pdfDoc.getPageCount()) toRemove = toRemove.slice(0, pdfDoc.getPageCount() - 1);
+      toRemove.forEach((i) => { try { pdfDoc.removePage(i); } catch (e) {} });
     }
 
     // append supporting attachments (e.g. a photo of an ID) as their own pages,

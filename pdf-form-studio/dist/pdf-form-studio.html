@@ -454,6 +454,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
       <button class="rail-btn" id="attachBtn" disabled title="צרף עמודים (צילום ת״ז, קבלה, PDF) — יתווספו לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
       <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
+      <button class="rail-btn" id="deleteBtn" disabled title="מחק את העמוד הנוכחי (לא ייכלל בייצוא)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/></svg><span class="lbl">מחק עמוד</span></button>
       <div class="spacer"></div>
     </nav>
 
@@ -2937,15 +2938,25 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       views.forEach((v, i) => { v.userRot = (((Number(map[i]) || 0) % 360) + 360) % 360; });
       return rerenderAll();
     }
+    // mark a page removed (hidden now, dropped on export). Refuses to remove the
+    // last remaining visible page. Returns true if it removed one.
+    function deletePage(index) {
+      const v = views[index]; if (!v || v.deleted) return false;
+      if (views.filter((x) => !x.deleted).length <= 1) return false; // keep at least one
+      v.deleted = true; v.wrap.style.display = 'none';
+      return true;
+    }
+    function getRemovedPages() { return views.map((v, i) => (v.deleted ? i : -1)).filter((i) => i >= 0); }
+    function visiblePageCount() { return views.filter((v) => !v.deleted).length; }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
     function numPages() { return pdfDoc ? pdfDoc.numPages : 0; }
 
     // page canvases + wraps, for building the thumbnail rail
-    function viewList() { return views.map((v, i) => ({ n: i + 1, canvas: v.canvas, wrap: v.wrap })); }
+    function viewList() { return views.map((v, i) => ({ n: i + 1, idx: i, canvas: v.canvas, wrap: v.wrap, deleted: !!v.deleted })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, getBytes, getDoc, hasDoc, numPages, viewList };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;
@@ -3330,9 +3341,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // /Rotate — for straightening sideways scans. Pages that were rotated but
     // carry no overlay still need their /Rotate updated, so process the union.
     const rotations = opts.rotations || {};
+    const removeSet = new Set((opts.removePages || []).map(Number));
     const userR = (idx) => (((Number(rotations[idx]) || 0) % 360) + 360) % 360;
     const pageSet = new Set([...byPage.keys(), ...Object.keys(rotations).map(Number).filter((k) => userR(k))]);
-    const pageIdxs = [...pageSet].sort((a, b) => a - b);
+    // don't draw overlays on pages that are being removed
+    const pageIdxs = [...pageSet].filter((i) => !removeSet.has(i)).sort((a, b) => a - b);
     let done = 0;
     for (const idx of pageIdxs) {
       const page = pages[idx];
@@ -3367,6 +3380,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       canvas.width = 0; canvas.height = 0;
       done++;
       opts.onProgress && opts.onProgress(done, pageIdxs.length);
+    }
+
+    // remove user-deleted pages (descending so indices stay valid). Never
+    // leave an empty document: keep one page if there are no attachments.
+    if (removeSet.size) {
+      let toRemove = [...removeSet].filter((i) => i >= 0 && i < pages.length).sort((a, b) => b - a);
+      const attachCount = (opts.attachments || []).length;
+      if (!attachCount && toRemove.length >= pdfDoc.getPageCount()) toRemove = toRemove.slice(0, pdfDoc.getPageCount() - 1);
+      toRemove.forEach((i) => { try { pdfDoc.removePage(i); } catch (e) {} });
     }
 
     // append supporting attachments (e.g. a photo of an ID) as their own pages,
@@ -4512,18 +4534,13 @@ async function openPdfFile(file) {
     $('enhanceBtn').disabled = false;
     $('rotateBtn').disabled = false;
     $('attachBtn').disabled = false;
+    $('deleteBtn') && ($('deleteBtn').disabled = false);
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     // page navigator: only worth showing on multi-page docs
-    (function () {
-      const pj = $('pageJump'); if (!pj) return;
-      const n = pdfView.numPages();
-      pj.classList.toggle('hidden', n < 2);
-      pj.innerHTML = '';
-      for (let i = 1; i <= n; i++) { const o = document.createElement('option'); o.value = i; o.textContent = 'עמ׳ ' + i + '/' + n; pj.appendChild(o); }
-    })();
+    buildPageNav();
     buildThumbnails();
     updateHwStatus();
     currentFp = null;
@@ -4792,6 +4809,7 @@ async function doExport() {
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
       rotations: pdfView.getRotations(),
+      removePages: pdfView.getRemovedPages(),
       attachments,
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
@@ -4902,7 +4920,7 @@ vp.addEventListener('drop', (e) => {
 
 $('pageJump') && $('pageJump').addEventListener('change', (e) => {
   const wraps = document.querySelectorAll('.page-wrap');
-  const w = wraps[parseInt(e.target.value, 10) - 1];
+  const w = wraps[parseInt(e.target.value, 10)];   // value is the 0-based page index
   if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 
@@ -4910,7 +4928,7 @@ $('pageJump') && $('pageJump').addEventListener('change', (e) => {
 function buildThumbnails() {
   const strip = $('thumbs'), btn = $('thumbsBtn');
   if (!strip || !pdfView.viewList) return;
-  const views = pdfView.viewList();
+  const views = pdfView.viewList().filter((v) => !v.deleted);
   strip.innerHTML = '';
   const multi = views.length > 1;
   btn.hidden = !multi;
@@ -4941,22 +4959,40 @@ $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
 });
 // rotate the page currently centered in the viewport (90° CW per click)
 function currentPageIndex() {
-  const list = pdfView.viewList(); if (!list.length) return 0;
+  const list = pdfView.viewList().filter((v) => !v.deleted); if (!list.length) return 0;
   const vpRect = $('viewport').getBoundingClientRect();
   const cy = vpRect.top + vpRect.height / 2;
-  let best = 0, bestDist = Infinity;
-  list.forEach((v, i) => {
+  let best = list[0].idx, bestDist = Infinity;
+  list.forEach((v) => {
     const r = v.wrap.getBoundingClientRect();
     const d = Math.abs((r.top + r.height / 2) - cy);
-    if (d < bestDist) { bestDist = d; best = i; }
+    if (d < bestDist) { bestDist = d; best = v.idx; }
   });
   return best;
+}
+// rebuild the page-jump dropdown from the currently visible (non-deleted) pages
+function buildPageNav() {
+  const pj = $('pageJump'); if (!pj) return;
+  const vis = pdfView.viewList().filter((v) => !v.deleted);
+  pj.classList.toggle('hidden', vis.length < 2);
+  pj.innerHTML = '';
+  vis.forEach((v, i) => { const o = document.createElement('option'); o.value = v.idx; o.textContent = 'עמ׳ ' + (i + 1) + '/' + vis.length; pj.appendChild(o); });
 }
 $('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
   if (!pdfView.hasDoc()) return;
   const idx = currentPageIndex();
   await pdfView.rotatePage(idx, 90);
   PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
+});
+$('deleteBtn') && $('deleteBtn').addEventListener('click', async () => {
+  if (!pdfView.hasDoc()) return;
+  if (pdfView.visiblePageCount() <= 1) { PFS.toast('לא ניתן למחוק את העמוד היחיד', 'err'); return; }
+  const idx = currentPageIndex();
+  if (!(await PFS.ui.confirm('מחיקת עמוד', 'למחוק את עמוד ' + (idx + 1) + '? הוא לא ייכלל בקובץ המיוצא.'))) return;
+  if (pdfView.deletePage(idx)) {
+    buildPageNav(); buildThumbnails(); markDirty();
+    PFS.toast('העמוד נמחק — לא ייכלל בייצוא', 'ok', 1600);
+  }
 });
 // attach supporting pages (photo of ID etc.) — appended to the exported PDF
 function updateAttachBadge() {

@@ -220,18 +220,13 @@ async function openPdfFile(file) {
     $('enhanceBtn').disabled = false;
     $('rotateBtn').disabled = false;
     $('attachBtn').disabled = false;
+    $('deleteBtn') && ($('deleteBtn').disabled = false);
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     // page navigator: only worth showing on multi-page docs
-    (function () {
-      const pj = $('pageJump'); if (!pj) return;
-      const n = pdfView.numPages();
-      pj.classList.toggle('hidden', n < 2);
-      pj.innerHTML = '';
-      for (let i = 1; i <= n; i++) { const o = document.createElement('option'); o.value = i; o.textContent = 'עמ׳ ' + i + '/' + n; pj.appendChild(o); }
-    })();
+    buildPageNav();
     buildThumbnails();
     updateHwStatus();
     currentFp = null;
@@ -500,6 +495,7 @@ async function doExport() {
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
       rotations: pdfView.getRotations(),
+      removePages: pdfView.getRemovedPages(),
       attachments,
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
@@ -610,7 +606,7 @@ vp.addEventListener('drop', (e) => {
 
 $('pageJump') && $('pageJump').addEventListener('change', (e) => {
   const wraps = document.querySelectorAll('.page-wrap');
-  const w = wraps[parseInt(e.target.value, 10) - 1];
+  const w = wraps[parseInt(e.target.value, 10)];   // value is the 0-based page index
   if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 
@@ -618,7 +614,7 @@ $('pageJump') && $('pageJump').addEventListener('change', (e) => {
 function buildThumbnails() {
   const strip = $('thumbs'), btn = $('thumbsBtn');
   if (!strip || !pdfView.viewList) return;
-  const views = pdfView.viewList();
+  const views = pdfView.viewList().filter((v) => !v.deleted);
   strip.innerHTML = '';
   const multi = views.length > 1;
   btn.hidden = !multi;
@@ -649,22 +645,40 @@ $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
 });
 // rotate the page currently centered in the viewport (90° CW per click)
 function currentPageIndex() {
-  const list = pdfView.viewList(); if (!list.length) return 0;
+  const list = pdfView.viewList().filter((v) => !v.deleted); if (!list.length) return 0;
   const vpRect = $('viewport').getBoundingClientRect();
   const cy = vpRect.top + vpRect.height / 2;
-  let best = 0, bestDist = Infinity;
-  list.forEach((v, i) => {
+  let best = list[0].idx, bestDist = Infinity;
+  list.forEach((v) => {
     const r = v.wrap.getBoundingClientRect();
     const d = Math.abs((r.top + r.height / 2) - cy);
-    if (d < bestDist) { bestDist = d; best = i; }
+    if (d < bestDist) { bestDist = d; best = v.idx; }
   });
   return best;
+}
+// rebuild the page-jump dropdown from the currently visible (non-deleted) pages
+function buildPageNav() {
+  const pj = $('pageJump'); if (!pj) return;
+  const vis = pdfView.viewList().filter((v) => !v.deleted);
+  pj.classList.toggle('hidden', vis.length < 2);
+  pj.innerHTML = '';
+  vis.forEach((v, i) => { const o = document.createElement('option'); o.value = v.idx; o.textContent = 'עמ׳ ' + (i + 1) + '/' + vis.length; pj.appendChild(o); });
 }
 $('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
   if (!pdfView.hasDoc()) return;
   const idx = currentPageIndex();
   await pdfView.rotatePage(idx, 90);
   PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
+});
+$('deleteBtn') && $('deleteBtn').addEventListener('click', async () => {
+  if (!pdfView.hasDoc()) return;
+  if (pdfView.visiblePageCount() <= 1) { PFS.toast('לא ניתן למחוק את העמוד היחיד', 'err'); return; }
+  const idx = currentPageIndex();
+  if (!(await PFS.ui.confirm('מחיקת עמוד', 'למחוק את עמוד ' + (idx + 1) + '? הוא לא ייכלל בקובץ המיוצא.'))) return;
+  if (pdfView.deletePage(idx)) {
+    buildPageNav(); buildThumbnails(); markDirty();
+    PFS.toast('העמוד נמחק — לא ייכלל בייצוא', 'ok', 1600);
+  }
 });
 // attach supporting pages (photo of ID etc.) — appended to the exported PDF
 function updateAttachBadge() {

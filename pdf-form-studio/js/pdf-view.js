@@ -111,15 +111,25 @@
       views.forEach((v, i) => { v.userRot = (((Number(map[i]) || 0) % 360) + 360) % 360; });
       return rerenderAll();
     }
+    // mark a page removed (hidden now, dropped on export). Refuses to remove the
+    // last remaining visible page. Returns true if it removed one.
+    function deletePage(index) {
+      const v = views[index]; if (!v || v.deleted) return false;
+      if (views.filter((x) => !x.deleted).length <= 1) return false; // keep at least one
+      v.deleted = true; v.wrap.style.display = 'none';
+      return true;
+    }
+    function getRemovedPages() { return views.map((v, i) => (v.deleted ? i : -1)).filter((i) => i >= 0); }
+    function visiblePageCount() { return views.filter((v) => !v.deleted).length; }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
     function numPages() { return pdfDoc ? pdfDoc.numPages : 0; }
 
     // page canvases + wraps, for building the thumbnail rail
-    function viewList() { return views.map((v, i) => ({ n: i + 1, canvas: v.canvas, wrap: v.wrap })); }
+    function viewList() { return views.map((v, i) => ({ n: i + 1, idx: i, canvas: v.canvas, wrap: v.wrap, deleted: !!v.deleted })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, getBytes, getDoc, hasDoc, numPages, viewList };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;

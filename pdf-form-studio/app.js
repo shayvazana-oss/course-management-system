@@ -100,6 +100,8 @@ const fieldsPanel = PFS.createFieldsPanel({
   ocrAvailable: () => !!(PFS.ocr && PFS.ocr.available()),
   onOcr: () => runOcr()
 });
+// test handle: the e2e suite drives these module-scoped singletons directly.
+PFS.__test = { overlay, fieldsPanel };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;

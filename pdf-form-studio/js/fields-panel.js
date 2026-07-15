@@ -7,6 +7,9 @@
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
 
+  // tick-style controls (checkbox or radio) count by .checked, not text value.
+  const isTick = (c) => c.type === 'checkbox' || c.type === 'radio';
+
   function createFieldsPanel(opts = {}) {
     const overlay = opts.overlay;
     const panel = document.getElementById('fieldsPanel');
@@ -135,17 +138,18 @@
       const controls = []; const fieldMeta = [];
       function recount() {
         const total = controls.length;
-        const done = controls.filter((c) => c.type === 'checkbox' ? c.checked : c.value.trim()).length;
+        const done = controls.filter((c) => isTick(c) ? c.checked : c.value.trim()).length;
         const t = meter.querySelector('#fpMeterTxt'), bar = meter.querySelector('#fpMeterBar');
         if (t) t.textContent = 'מולאו ' + done + ' מתוך ' + total + ' שדות';
         if (bar) bar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
         // sync empty-field markers
         if (overlay.setFieldFilled) controls.forEach((c, i) => {
-          const f = fieldMeta[i]; if (f) overlay.setFieldFilled(f.fieldKey, c.type === 'checkbox' ? c.checked : !!c.value.trim());
+          const f = fieldMeta[i]; if (f) overlay.setFieldFilled(f.fieldKey, isTick(c) ? c.checked : !!c.value.trim());
         });
       }
 
       let autoFilled = 0;
+      const groups = Object.create(null);   // radio group id → [{f, control}]
       det.fields.forEach((f) => {
         const row = document.createElement('div'); row.className = 'field';
         const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
@@ -153,10 +157,19 @@
         const canon = PFS.vault && (PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey));
         let control;
         if (f.type === 'check') {
-          control = document.createElement('input'); control.type = 'checkbox';
+          control = document.createElement('input');
+          // round-bullet options that share a line are a single-choice group →
+          // render as radios so only one can be picked; squares stay checkboxes.
+          const grouped = f.group && det.fields.filter((o) => o.group === f.group).length >= 2;
+          control.type = grouped ? 'radio' : 'checkbox';
+          if (grouped) { control.name = 'fpg_' + f.group; (groups[f.group] = groups[f.group] || []).push({ f, control }); }
           control.style.width = '20px'; control.style.height = '20px'; control.style.accentColor = 'var(--brand)';
-          control.title = 'סמן וי על הטופס';
-          control.addEventListener('change', () => { ensureCheck(f, control.checked); recount(); });
+          control.title = grouped ? 'בחר/י אפשרות אחת' : 'סמן וי על הטופס';
+          control.addEventListener('change', () => {
+            // picking one radio clears the mark of its siblings on the form
+            if (grouped && control.checked) groups[f.group].forEach((m) => { if (m.control !== control) { m.control.checked = false; ensureCheck(m.f, false); } });
+            ensureCheck(f, control.checked); recount();
+          });
         } else {
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
@@ -182,7 +195,7 @@
           control.addEventListener('keydown', (e) => {
             // keyboard field-wizard: Enter / ArrowDown → next field, ArrowUp → previous
             if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-            const texts = controls.filter((c) => c.type !== 'checkbox');
+            const texts = controls.filter((c) => !isTick(c));
             const i = texts.indexOf(control);
             const next = (e.key === 'ArrowUp') ? texts[i - 1] : texts[i + 1];
             e.preventDefault();
@@ -246,7 +259,7 @@
       ivBtn.addEventListener('click', () => startInterview(fieldMeta, controls));
       body.appendChild(ivBtn);
       recount();
-      emptyCount = () => controls.filter((c) => c.type !== 'checkbox' && !c.value.trim()).length;
+      emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
       return autoFilled;
     }
 

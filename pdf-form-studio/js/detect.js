@@ -40,6 +40,10 @@
     const out = [];
     // empty tick targets: square checkboxes AND round radio bullets — Israeli
     // forms use both (☐ תושב / ○ זכר ○ נקבה). Filled variants (☑ ●) are skipped.
+    // Round bullets denote single-choice (radio) options; squares are often
+    // genuine multi-select, so only round ones are grouped as mutually exclusive.
+    const SQUARE = /[☐□◻◼⬜❏❑]/;
+    const ROUND = /[○◯⚪◦〇]/;
     const CHECKBOX = /[☐□◻◼⬜❏❑○◯⚪◦〇]/;
     boxes.forEach((b) => {
       const label = b.str.trim();
@@ -62,7 +66,8 @@
           page: startIndex, fieldKey: slug('check_' + text, out.length),
           label: (text || 'סימון').replace(/[:：׃]\s*$/, '').trim(),
           fx: Math.max(0, bx) / W, fy: Math.max(0, b.top) / H,
-          fw: b.fontH / W, fh: b.fontH / H, fontFrac: Math.max(0.02, b.fontH / H), type: 'check'
+          fw: b.fontH / W, fh: b.fontH / H, fontFrac: Math.max(0.02, b.fontH / H), type: 'check',
+          radio: ROUND.test(label), _cy: b.top + b.fontH / 2, _rowH: b.fontH
         });
         return;
       }
@@ -105,6 +110,18 @@
         fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true
       });
     });
+    // radio grouping: round-bullet options sharing a line belong to one
+    // question (e.g. "○ זכר   ○ נקבה") → mark them one mutually-exclusive group
+    // so ticking one clears its siblings. Squares stay independent; a lone
+    // radio gets no group (nothing to be exclusive with).
+    const radios = out.filter((f) => f.radio);
+    let gid = 0;
+    radios.forEach((f) => {
+      if (f.group) return;
+      const line = radios.filter((o) => Math.abs(o._cy - f._cy) < (f._rowH || 10) * 0.8);
+      if (line.length >= 2) { gid++; const g = startIndex + '_r' + gid; line.forEach((o) => { o.group = g; }); }
+    });
+    out.forEach((f) => { delete f._cy; delete f._rowH; });
     return out;
   }
 

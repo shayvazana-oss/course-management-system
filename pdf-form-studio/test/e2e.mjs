@@ -84,15 +84,39 @@ async function main() {
     const H = 320, W = 420, fs = 16;
     const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
     const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
-    const labels = (arr) => arr.filter((f) => f.type === 'check').map((f) => f.label);
-    const joined = labels(window.PFS.detect.heuristicForPage([
-      item('○ male', 40, 90, 60), item('○ female', 160, 90, 70), item('○ resident', 40, 140, 90)
+    const checks = (arr) => arr.filter((f) => f.type === 'check');
+    const joined = checks(window.PFS.detect.heuristicForPage([
+      item('○ male', 40, 90, 60), item('○ female', 160, 90, 70), item('☐ agree', 40, 140, 90)
     ], W, H, vp, 0));
-    const split = labels(window.PFS.detect.heuristicForPage([
+    const split = checks(window.PFS.detect.heuristicForPage([
       item('○', 40, 200, 12), item('male', 58, 200, 40), item('○', 160, 200, 12), item('female', 178, 200, 48)
     ], W, H, vp, 0));
-    return joined.length === 3 && joined.some((l) => /male/i.test(l)) && joined.some((l) => /female/i.test(l)) && joined.some((l) => /resident/i.test(l))
-      && split.length === 2 && split.some((l) => /male/i.test(l)) && split.some((l) => /female/i.test(l));
+    const L = (a) => a.map((f) => f.label);
+    const labelsOk = L(joined).length === 3 && L(joined).some((l) => /male/i.test(l)) && L(joined).some((l) => /female/i.test(l)) && L(joined).some((l) => /agree/i.test(l))
+      && split.length === 2 && L(split).some((l) => /male/i.test(l)) && L(split).some((l) => /female/i.test(l));
+    // the two same-line round bullets share one radio group; the square doesn't
+    const maleG = joined.find((f) => /male/i.test(f.label)).group;
+    const femaleG = joined.find((f) => /female/i.test(f.label)).group;
+    const squareG = joined.find((f) => /agree/i.test(f.label)).group;
+    const groupOk = maleG && maleG === femaleG && !squareG;
+    return labelsOk && groupOk;
+  }));
+
+  // radio semantics in the panel: picking one same-group option clears the other
+  check('same-line radio options are mutually exclusive on the form', await page.evaluate(() => {
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'check_male', label: 'male', fx: 0.1, fy: 0.2, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_r1' },
+      { page: 0, fieldKey: 'check_female', label: 'female', fx: 0.4, fy: 0.2, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_r1' }
+    ] };
+    window.PFS.__test.fieldsPanel.show(det);
+    const radios = [...document.querySelectorAll('#fieldsBody input[type=radio]')];
+    if (radios.length !== 2) return false;
+    radios[0].checked = true; radios[0].dispatchEvent(new Event('change', { bubbles: true }));
+    radios[1].checked = true; radios[1].dispatchEvent(new Event('change', { bubbles: true }));
+    // after picking the 2nd, the 1st must have been cleared, and exactly one
+    // check element sits on the form (not two).
+    const marks = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'check').length;
+    return radios[0].checked === false && radios[1].checked === true && marks === 1;
   }));
 
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored

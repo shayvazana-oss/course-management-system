@@ -898,6 +898,32 @@ async function main() {
     return dotOk && numOk && embOk;
   }));
 
+  check('detect: wide full-line label places its blank on the line below', await page.evaluate(() => {
+    const H = 320, W = 460, fs = 16;
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    const texts = (arr) => arr.filter((f) => f.type === 'text');
+    const labelTopFrac = 60 / H;   // 0.1875
+    // (positive) a wide colon-label filling the line → field drops below it
+    const below = texts(window.PFS.detect.heuristicForPage([
+      item('כתובת מלאה (רחוב, מספר בית, עיר ומיקוד):', 30, 60, 400)
+    ], W, H, vp, 0));
+    const posOk = below.length === 1 && below[0].fy > labelTopFrac + 0.04;
+    // (negative 1) a short label with room beside it stays on the same line
+    const beside = texts(window.PFS.detect.heuristicForPage([
+      item('שם:', 380, 140, 50)
+    ], W, H, vp, 0));
+    const neg1Ok = beside.length === 1 && Math.abs(beside[0].fy - 140 / H) < 0.02;
+    // (negative 2) wide label but the line below is occupied → NOT dropped down
+    const blocked = texts(window.PFS.detect.heuristicForPage([
+      item('כתובת מלאה (רחוב, מספר בית, עיר ומיקוד):', 30, 60, 400),
+      item('פרטים נוספים', 280, 78, 80)
+    ], W, H, vp, 0));
+    const wide = blocked.find((f) => /כתובת/.test(f.label));
+    const neg2Ok = wide && wide.fy < labelTopFrac + 0.03;
+    return posOk && neg1Ok && neg2Ok;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

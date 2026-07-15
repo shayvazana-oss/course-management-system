@@ -4194,8 +4194,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   const hasHebrew = (s) => /[֐-׿؀-ۿ]/.test(s);
   const isLabel = (s) => {
     const t = (s || '').trim();
-    // a label ends with a colon, optionally followed by a required marker ("*")
-    return t.length > 0 && t.length < 40 && /[:：׃]\s*[*＊]?\s*$/.test(t);
+    // a label ends with a colon, optionally followed by a required marker ("*").
+    // up to 64 chars so full-line labels ("כתובת מלאה (רחוב, עיר, מיקוד):") count.
+    return t.length > 0 && t.length < 64 && /[:：׃]\s*[*＊]?\s*$/.test(t);
   };
   const isUnderscores = (s) => /_{3,}/.test(s || '');
   // dot leaders ("שם מלא ........") are as common as underscores on official
@@ -4297,6 +4298,27 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
+      let fy = Math.max(0, b.top) / H;
+      // "label above, blank below": a WIDE full-line colon-label leaves no room
+      // for a same-line answer, so the value goes on the line beneath it. Gated
+      // hard to avoid false positives — a plain colon-label with a normal blank
+      // beside it keeps the same-line behaviour above.
+      //   (1) real colon-label (not a bare blank run)
+      //   (2) the computed same-line blank is tiny (< 8% width)
+      //   (3) the label itself is wide (spans > 42% of the page)
+      //   (4) the line directly below is CLEAR in the field's horizontal band
+      if (!isBlankRun(label) && fw < 0.08 && (b.w / W) > 0.42) {
+        const width = Math.min(defW, rtl ? (b.x + b.w) : (W - b.x));
+        const bxPx = rtl ? (b.x + b.w - width) : b.x;
+        const belowTop = b.top + b.fontH * 1.15;
+        const belowMid = belowTop + b.fontH / 2;
+        const conflict = boxes.some((o) => o !== b && hasLetters(o.str)
+          && Math.abs((o.top + o.fontH / 2) - belowMid) < b.fontH * 0.8
+          && o.x < bxPx + width && (o.x + o.w) > bxPx);
+        if (!conflict && (belowTop + b.fontH) / H <= 1) {
+          fx = bxPx / W; fw = width / W; fy = belowTop / H;
+        }
+      }
       // required marker: a '*' or "חובה" in/next to the label — a missing
       // required field is the usual reason a government form is bounced back
       const reqMark = /[*＊]|\(?\s*חובה\s*\)?|required/i;
@@ -4305,7 +4327,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       out.push({
         page: startIndex, fieldKey: slug(cleanLabel || displayLabel, out.length),
         label: cleanLabel || 'שדה',
-        fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
+        fx, fy, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
       });
     });
     // radio grouping: round-bullet options sharing a line belong to one

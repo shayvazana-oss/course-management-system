@@ -383,6 +383,15 @@ async function main() {
       && window.PFS.vault.matchKey('מצב משפחתי') === 'marital_status';
   }));
 
+  // load failures get specific, actionable messages (password / corrupt / other)
+  check('PDF load errors give specific, actionable messages', await page.evaluate(() => {
+    const lm = window.PFS.__test.loadErrorMessage;
+    const pw = lm({ name: 'PasswordException' });
+    const bad = lm({ name: 'InvalidPDFException' });
+    const other = lm({ message: 'boom' });
+    return /סיסמה/.test(pw) && /פגום/.test(bad) && /נכשלה/.test(other) && pw !== bad && bad !== other;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -109,7 +109,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, setLastDet: (d) => { lastDet = d; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -246,9 +246,22 @@ async function openPdfFile(file) {
     runDetection();
   } catch (e) {
     console.error(e);
-    PFS.toast('טעינת ה-PDF נכשלה', 'err');
+    PFS.toast(loadErrorMessage(e), 'err', 5000);
     if (!pdfView.hasDoc()) { $('dropzone').style.display = ''; $('docbar').classList.add('hidden'); }
   }
+}
+// Turn a pdf.js load error into an actionable Hebrew message. Password-protected
+// gov PDFs and corrupt files are common; a generic "failed" leaves users stuck.
+function loadErrorMessage(e) {
+  const name = (e && e.name) || '';
+  const m = (e && e.message) || '';
+  if (name === 'PasswordException' || /password/i.test(m)) {
+    return 'הקובץ מוגן בסיסמה. הסירו את ההגנה (למשל פִּתחו והדפיסו ל-PDF חדש) ונסו שוב 🔒';
+  }
+  if (name === 'InvalidPDFException' || /invalid pdf|corrupt|structure|xref/i.test(m)) {
+    return 'הקובץ פגום או אינו PDF תקין — נסו קובץ אחר';
+  }
+  return 'טעינת ה-PDF נכשלה — ודאו שזהו קובץ PDF תקין';
 }
 let currentFileName = 'filled';
 

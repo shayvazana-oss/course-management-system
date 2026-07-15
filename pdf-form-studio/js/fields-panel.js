@@ -11,6 +11,8 @@
   const isTick = (c) => c.type === 'checkbox' || c.type === 'radio';
   // a field whose label asks for a signature (not a stamp — "חותמת" excluded)
   const isSignatureLabel = (s) => /חתימ|signature|sign here|توقيع/i.test(String(s || ''));
+  // a field whose label asks for a stamp / seal
+  const isStampLabel = (s) => /חותמת|חתמת|stamp|seal|ختم/i.test(String(s || ''));
 
   function createFieldsPanel(opts = {}) {
     const overlay = opts.overlay;
@@ -242,6 +244,13 @@
           sbtn.title = 'הנח/י את החתימה השמורה על השורה הזו';
           sbtn.addEventListener('click', () => opts.onPlaceSignature(f));
           inRow.appendChild(sbtn);
+        }
+        // stamp / seal line → one tap drops the saved stamp on it
+        if (f.type !== 'check' && isStampLabel(f.label) && opts.onPlaceStamp) {
+          const tbtn = document.createElement('button'); tbtn.className = 'btn sm primary'; tbtn.textContent = '⬤';
+          tbtn.title = 'הנח/י את החותמת השמורה על השורה הזו';
+          tbtn.addEventListener('click', () => opts.onPlaceStamp(f));
+          inRow.appendChild(tbtn);
         }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';

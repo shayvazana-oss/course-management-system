@@ -178,6 +178,22 @@ async function main() {
     return placed && near;
   }));
 
+  // stamp / seal line → one-tap places the saved stamp on it (mirrors ✍️)
+  check('detected stamp line offers one-tap stamp placement', await page.evaluate(() => {
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    window.PFS.store.set('stamps', [{ id: 't1', url: png, w: 200, h: 200, aspect: 1 }]);
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'stamp', label: 'חותמת', fx: 0.15, fy: 0.75, fw: 0.25, fh: 0.06, fontFrac: 0.03, type: 'text' }
+    ] };
+    window.PFS.__test.fieldsPanel.show(det);
+    const btn = [...document.querySelectorAll('#fieldsBody button')].find((b) => b.textContent === '⬤');
+    if (!btn) return false;
+    const before = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'stamp').length;
+    btn.click();
+    const after = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'stamp');
+    return after.length === before + 1 && Math.abs(after[after.length - 1].model.fy - 0.75) < 0.12;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

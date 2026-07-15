@@ -3653,6 +3653,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   const isTick = (c) => c.type === 'checkbox' || c.type === 'radio';
   // a field whose label asks for a signature (not a stamp — "חותמת" excluded)
   const isSignatureLabel = (s) => /חתימ|signature|sign here|توقيع/i.test(String(s || ''));
+  // a field whose label asks for a stamp / seal
+  const isStampLabel = (s) => /חותמת|חתמת|stamp|seal|ختم/i.test(String(s || ''));
 
   function createFieldsPanel(opts = {}) {
     const overlay = opts.overlay;
@@ -3885,6 +3887,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           sbtn.addEventListener('click', () => opts.onPlaceSignature(f));
           inRow.appendChild(sbtn);
         }
+        // stamp / seal line → one tap drops the saved stamp on it
+        if (f.type !== 'check' && isStampLabel(f.label) && opts.onPlaceStamp) {
+          const tbtn = document.createElement('button'); tbtn.className = 'btn sm primary'; tbtn.textContent = '⬤';
+          tbtn.title = 'הנח/י את החותמת השמורה על השורה הזו';
+          tbtn.addEventListener('click', () => opts.onPlaceStamp(f));
+          inRow.appendChild(tbtn);
+        }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';
         go.addEventListener('click', () => {
@@ -4068,8 +4077,9 @@ const fieldsPanel = PFS.createFieldsPanel({
   rememberChoice: (canon, value) => {
     try { const rc = PFS.store.get('remembered_choices', {}) || {}; rc[canon] = value; PFS.store.set('remembered_choices', rc); } catch (e) {}
   },
-  // one-tap: drop the saved signature exactly on a detected signature line
-  onPlaceSignature: (f) => placeSignatureAtField(f)
+  // one-tap: drop the saved signature/stamp exactly on a detected line
+  onPlaceSignature: (f) => placeAssetAtField('signature', f),
+  onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
 PFS.__test = { overlay, fieldsPanel };
@@ -4963,22 +4973,27 @@ updateHwStatus();
 // =====================================================================
 //  Fill-All (one click) + Backup / Restore
 // =====================================================================
-// Place the saved signature on a detected signature line (fields panel ✍️).
-// Falls back to drawing one if nothing is saved yet.
-function placeSignatureAtField(f) {
-  const item = assets.getDefault('signature') || assets.list('signature')[0];
-  if (!item) { PFS.toast('אין חתימה שמורה — ציירו חתימה קודם', 'err'); startSignatureFlow(); return; }
-  const aspect = item.aspect || (item.w / item.h) || 3;
+// Place the saved signature/stamp on a detected line (fields panel ✍️ / ⬤).
+// Falls back to the draw/upload flow if nothing is saved yet.
+function placeAssetAtField(kind, f) {
+  const item = assets.getDefault(kind) || assets.list(kind)[0];
+  if (!item) {
+    PFS.toast(kind === 'stamp' ? 'אין חותמת שמורה — העלו חותמת קודם' : 'אין חתימה שמורה — ציירו חתימה קודם', 'err');
+    (kind === 'stamp' ? startStampFlow : startSignatureFlow)();
+    return;
+  }
+  const aspect = item.aspect || (item.w / item.h) || (kind === 'stamp' ? 1 : 3);
   const fw = Math.min(Math.max(f.fw || 0.2, 0.14), 0.32);
   const fh = fw / aspect;
-  // center the signature on the blank and sit it a touch above the baseline
+  // center on the blank and sit it a touch above the baseline
   const fx = Math.max(0, Math.min(1 - fw, (f.fx != null ? f.fx : 0.5) + ((f.fw || 0) - fw) / 2));
   const fy = Math.max(0, (f.fy != null ? f.fy : 0.82) - fh * 0.35);
-  const c = overlay.instantiate(PFS.element.makeModel('image', f.page || 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind: 'signature' }));
+  const c = overlay.instantiate(PFS.element.makeModel('image', f.page || 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind }));
   if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
   markDirty();
-  PFS.toast('החתימה הונחה על שורת החתימה — אפשר לגרור לכוונון', 'ok');
+  PFS.toast((kind === 'stamp' ? 'החותמת הונחה' : 'החתימה הונחה') + ' על השורה — אפשר לגרור לכוונון', 'ok');
 }
+function placeSignatureAtField(f) { return placeAssetAtField('signature', f); }
 function placeDefaultAsset(kind) {
   const item = assets.getDefault(kind);
   if (!item) return false;

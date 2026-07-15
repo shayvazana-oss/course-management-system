@@ -232,6 +232,15 @@ async function main() {
     return out.f === 'משה' && out.l === 'בן ישראל';
   }));
 
+  // profile field suggestions surface the new canonical keys, and each maps
+  // to a canon so it actually auto-fills once set
+  check('profile suggestions expose gender / name / address parts', await page.evaluate(() => {
+    const opts = [...document.querySelectorAll('#fieldKeyList option')].map((o) => o.value);
+    const has = ['gender', 'first_name', 'last_name', 'house_no', 'zip', 'birth_date'].every((k) => opts.includes(k));
+    const resolves = ['gender', 'first_name', 'last_name', 'house_no', 'zip', 'birth_date'].every((k) => !!window.PFS.vault.matchKey(k));
+    return has && resolves;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -745,6 +745,19 @@ async function main() {
     return currencyOk && numberOk && pctOk && liveOk;
   }));
 
+  // mail-merge computes calculated fields per record (batch invoices etc.)
+  check('mail-merge computes calculated fields per record', await page.evaluate(() => {
+    const models = [
+      { type: 'text', fieldKey: 'qty' }, { type: 'text', fieldKey: 'price' },
+      { type: 'text', fieldKey: 'total', formula: '=[qty]*[price]', format: 'currency' }
+    ];
+    const r1 = window.PFS.merge.applyRecord(models, { qty: '3', price: '10' });
+    const r2 = window.PFS.merge.applyRecord(models, { qty: '5', price: '4.5' });
+    const t1 = r1.find((m) => m.fieldKey === 'total').text;
+    const t2 = r2.find((m) => m.fieldKey === 'total').text;
+    return t1 === '₪30.00' && t2 === '₪22.50';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

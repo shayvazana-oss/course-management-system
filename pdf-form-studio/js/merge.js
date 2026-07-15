@@ -62,12 +62,25 @@
   }
   function applyRecord(models, record) {
     const rec = enrichRecord(models, record);
-    return cloneModels(models).map((m) => {
+    const out = cloneModels(models).map((m) => {
       if (m.type === 'text' && m.fieldKey && Object.prototype.hasOwnProperty.call(rec, m.fieldKey)) {
         m = Object.assign({}, m, { text: String(rec[m.fieldKey] ?? '') });
       }
       return m;
     });
+    // recompute calculated fields per record, so a batch invoice's total (etc.)
+    // works the same as interactive fill
+    if (PFS.formula) {
+      const vars = {};
+      out.forEach((m) => { if (m.type === 'text' && m.fieldKey && !PFS.formula.isFormula(m.formula)) vars[m.fieldKey] = m.text; });
+      out.forEach((m) => {
+        if (m.type !== 'text' || !PFS.formula.isFormula(m.formula)) return;
+        let v = PFS.formula.evaluate(m.formula, vars);
+        if (v !== '' && m.format) v = PFS.formula.format(v, m.format);
+        m.text = v;
+      });
+    }
+    return out;
   }
 
   const safe = (s) => String(s || '').replace(/[^\w֐-׿ .\-]+/g, '_').slice(0, 60) || 'record';

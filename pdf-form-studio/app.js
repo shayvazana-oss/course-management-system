@@ -191,6 +191,7 @@ async function openPdfFile(file) {
     $('mergeBtn').disabled = false;
     $('detectBtn').disabled = false;
     $('clearBtn').disabled = false;
+    $('enhanceBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -588,6 +589,11 @@ function buildThumbnails() {
     strip.appendChild(cell);
   });
 }
+$('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
+  const on = $('pages').classList.toggle('enhance');
+  $('enhanceBtn').classList.toggle('active', on);
+  PFS.toast(on ? 'חידוד סריקה: פעיל — קריא יותר (לא משפיע על הקובץ המיוצא)' : 'חידוד סריקה: כבוי', 'ok', 1600);
+});
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
   const strip = $('thumbs'); strip.classList.toggle('open');
   $('thumbsBtn').classList.toggle('active', strip.classList.contains('open'));

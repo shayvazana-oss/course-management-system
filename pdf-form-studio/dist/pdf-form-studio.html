@@ -212,6 +212,9 @@ button, input, select, textarea { font-family: inherit; }
 .page-wrap { position: relative; background: #fff; box-shadow: var(--shadow-2); border-radius: 3px; outline: 1px solid rgba(20,24,31,.05); }
 .page-wrap .pageno { position: absolute; top: -22px; inset-inline-start: 2px; font-size: 11px; font-weight: 600; color: var(--ink-4); }
 .page-wrap canvas.pdf { display: block; border-radius: 3px; }
+/* non-destructive readability boost for faded scans/photos (display only —
+   export always uses the untouched original bytes) */
+.pages.enhance canvas.pdf { filter: contrast(1.6) brightness(1.08) saturate(.85); }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
 /* subtle amber hint over a detected-but-empty field; vanishes when filled */
@@ -431,6 +434,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
       <button class="rail-btn" id="detectBtn" disabled title="זהה שדות"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
       <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
+      <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
       <div class="spacer"></div>
     </nav>
 
@@ -3888,6 +3892,7 @@ async function openPdfFile(file) {
     $('mergeBtn').disabled = false;
     $('detectBtn').disabled = false;
     $('clearBtn').disabled = false;
+    $('enhanceBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -4285,6 +4290,11 @@ function buildThumbnails() {
     strip.appendChild(cell);
   });
 }
+$('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
+  const on = $('pages').classList.toggle('enhance');
+  $('enhanceBtn').classList.toggle('active', on);
+  PFS.toast(on ? 'חידוד סריקה: פעיל — קריא יותר (לא משפיע על הקובץ המיוצא)' : 'חידוד סריקה: כבוי', 'ok', 1600);
+});
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
   const strip = $('thumbs'); strip.classList.toggle('open');
   $('thumbsBtn').classList.toggle('active', strip.classList.contains('open'));

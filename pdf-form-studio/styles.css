@@ -172,6 +172,9 @@ button, input, select, textarea { font-family: inherit; }
 .page-wrap { position: relative; background: #fff; box-shadow: var(--shadow-2); border-radius: 3px; outline: 1px solid rgba(20,24,31,.05); }
 .page-wrap .pageno { position: absolute; top: -22px; inset-inline-start: 2px; font-size: 11px; font-weight: 600; color: var(--ink-4); }
 .page-wrap canvas.pdf { display: block; border-radius: 3px; }
+/* non-destructive readability boost for faded scans/photos (display only —
+   export always uses the untouched original bytes) */
+.pages.enhance canvas.pdf { filter: contrast(1.6) brightness(1.08) saturate(.85); }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
 /* subtle amber hint over a detected-but-empty field; vanishes when filled */

@@ -425,6 +425,16 @@ async function main() {
     return byLabel['זכר'] === true && byLabel['נקבה'] === false;
   }));
 
+  // attachments (e.g. a photo of an ID) are appended as extra pages on export
+  check('attachments are appended as pages in the exported PDF', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const src = await PDFDocument.create(); src.addPage([300, 400]); src.addPage([300, 400]);
+    const bytes = await src.save();
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const out = await window.PFS.exporter.exportPdf(bytes, [], { attachments: [{ url: png, type: 'image/png' }, { url: png, type: 'image/png' }] });
+    return (await PDFDocument.load(out)).getPageCount() === 4; // 2 original + 2 attachments
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

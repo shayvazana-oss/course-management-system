@@ -191,6 +191,7 @@ async function runDetection() {
 // =====================================================================
 let loadGen = 0; // bumped on every load so in-flight detection can bail
 let lastDet = null; // most recent detection result (for Fill-All signature/stamp lines)
+let attachments = []; // extra pages (photos of ID etc.) appended on export
 let currentFp = null; // fingerprint of the currently-loaded form
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
@@ -200,6 +201,8 @@ async function openPdfFile(file) {
     loadGen++;
     const myGen = loadGen;
     lastDet = null;
+    attachments = [];
+    updateAttachBadge();
     overlay.clearElements();
     fieldsPanel.clear();
     resetHistory();
@@ -216,6 +219,7 @@ async function openPdfFile(file) {
     $('clearBtn').disabled = false;
     $('enhanceBtn').disabled = false;
     $('rotateBtn').disabled = false;
+    $('attachBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -483,7 +487,7 @@ function toHex(c) {
 async function doExport() {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
-  if (!models.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
+  if (!models.length && !attachments.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
   // last-mile guard: detected fields still blank? ask before baking the PDF.
   // required (*) empties are called out first — those bounce a government form.
   const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
@@ -496,6 +500,7 @@ async function doExport() {
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
       rotations: pdfView.getRotations(),
+      attachments,
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
     const outName = currentFileName + '-filled.pdf';
@@ -660,6 +665,34 @@ $('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
   const idx = currentPageIndex();
   await pdfView.rotatePage(idx, 90);
   PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
+});
+// attach supporting pages (photo of ID etc.) — appended to the exported PDF
+function updateAttachBadge() {
+  const b = $('attachBtn'); if (!b) return;
+  const lbl = b.querySelector('.lbl');
+  if (lbl) lbl.textContent = attachments.length ? `צרף עמוד (${attachments.length})` : 'צרף עמוד';
+  b.classList.toggle('active', attachments.length > 0);
+}
+$('attachBtn') && $('attachBtn').addEventListener('click', () => { if (pdfView.hasDoc()) $('attachInput').click(); });
+$('attachInput') && $('attachInput').addEventListener('change', async (e) => {
+  const files = [...(e.target.files || [])];
+  e.target.value = '';
+  for (const f of files) {
+    if (!/^image\/(png|jpeg|webp)$/.test(f.type)) continue;
+    try {
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+      // webp isn't embeddable by pdf-lib → normalize to PNG; keep jpeg/png as-is
+      if (f.type === 'image/webp') {
+        const conv = await PFS.imageTools.processUpload(f, { removeWhite: false });
+        attachments.push({ url: conv.url, type: 'image/png', name: f.name });
+      } else {
+        attachments.push({ url, type: f.type, name: f.name });
+      }
+    } catch (err) { console.warn('attach failed', err); }
+  }
+  updateAttachBadge();
+  markDirty();
+  if (attachments.length) PFS.toast(`צורפו ${attachments.length} עמודים — יתווספו לקובץ בייצוא`, 'ok');
 });
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
   const strip = $('thumbs'); strip.classList.toggle('open');

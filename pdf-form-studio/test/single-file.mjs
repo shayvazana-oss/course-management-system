@@ -45,7 +45,7 @@ async function main() {
   check('single-file: vault categories present (health_fund)', await page.evaluate(() => window.PFS.vault.matchKey('קופת חולים') === 'health_fund'));
   check('single-file: amount-in-words works', await page.evaluate(() => window.PFS.numwords.shekels(100.5) === 'מאה שקלים וחמישים אגורות'));
   check('single-file: detect + exporter present', await page.evaluate(() => !!(window.PFS.detect.heuristicForPage && window.PFS.exporter.exportPdf)));
-  check('single-file: quick-setup + rotate controls present', await page.evaluate(() => !!(document.getElementById('quickSetupBtn') && document.getElementById('rotateBtn'))));
+  check('single-file: quick-setup + rotate + attach controls present', await page.evaluate(() => !!(document.getElementById('quickSetupBtn') && document.getElementById('rotateBtn') && document.getElementById('attachBtn'))));
 
   // build a tiny PDF in-page with the inlined PDFLib and render it — exercises
   // pdf.js main-thread worker + canvas render end to end from file://

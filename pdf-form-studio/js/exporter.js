@@ -144,6 +144,22 @@
       opts.onProgress && opts.onProgress(done, pageIdxs.length);
     }
 
+    // append supporting attachments (e.g. a photo of an ID) as their own pages,
+    // each scaled to fit an A4 portrait — so form + attachments submit as one PDF
+    const attachments = opts.attachments || [];
+    for (const att of attachments) {
+      const src = att && (att.url || att);
+      if (!src) continue;
+      let emb;
+      try { emb = /jpe?g|jfif/i.test(att.type || src) ? await pdfDoc.embedJpg(src) : await pdfDoc.embedPng(src); }
+      catch (e) { console.warn('[export] attachment skipped:', e && e.message); continue; }
+      const maxW = 595, maxH = 842; // A4 in pt
+      const s = Math.min(maxW / emb.width, maxH / emb.height, 1);
+      const w = Math.max(1, emb.width * s), h = Math.max(1, emb.height * s);
+      const p = pdfDoc.addPage([w, h]);
+      p.drawImage(emb, { x: 0, y: 0, width: w, height: h });
+    }
+
     const bytes = await pdfDoc.save();
     return bytes;
   }

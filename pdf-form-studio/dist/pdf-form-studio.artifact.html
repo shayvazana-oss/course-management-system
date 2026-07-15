@@ -443,6 +443,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
       <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
       <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
+      <button class="rail-btn" id="attachBtn" disabled title="צרף עמוד (צילום ת״ז וכו׳) — יתווסף לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
+      <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
       <div class="spacer"></div>
     </nav>
 
@@ -3358,6 +3360,22 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       opts.onProgress && opts.onProgress(done, pageIdxs.length);
     }
 
+    // append supporting attachments (e.g. a photo of an ID) as their own pages,
+    // each scaled to fit an A4 portrait — so form + attachments submit as one PDF
+    const attachments = opts.attachments || [];
+    for (const att of attachments) {
+      const src = att && (att.url || att);
+      if (!src) continue;
+      let emb;
+      try { emb = /jpe?g|jfif/i.test(att.type || src) ? await pdfDoc.embedJpg(src) : await pdfDoc.embedPng(src); }
+      catch (e) { console.warn('[export] attachment skipped:', e && e.message); continue; }
+      const maxW = 595, maxH = 842; // A4 in pt
+      const s = Math.min(maxW / emb.width, maxH / emb.height, 1);
+      const w = Math.max(1, emb.width * s), h = Math.max(1, emb.height * s);
+      const p = pdfDoc.addPage([w, h]);
+      p.drawImage(emb, { x: 0, y: 0, width: w, height: h });
+    }
+
     const bytes = await pdfDoc.save();
     return bytes;
   }
@@ -4447,6 +4465,7 @@ async function runDetection() {
 // =====================================================================
 let loadGen = 0; // bumped on every load so in-flight detection can bail
 let lastDet = null; // most recent detection result (for Fill-All signature/stamp lines)
+let attachments = []; // extra pages (photos of ID etc.) appended on export
 let currentFp = null; // fingerprint of the currently-loaded form
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
@@ -4456,6 +4475,8 @@ async function openPdfFile(file) {
     loadGen++;
     const myGen = loadGen;
     lastDet = null;
+    attachments = [];
+    updateAttachBadge();
     overlay.clearElements();
     fieldsPanel.clear();
     resetHistory();
@@ -4472,6 +4493,7 @@ async function openPdfFile(file) {
     $('clearBtn').disabled = false;
     $('enhanceBtn').disabled = false;
     $('rotateBtn').disabled = false;
+    $('attachBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -4739,7 +4761,7 @@ function toHex(c) {
 async function doExport() {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
-  if (!models.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
+  if (!models.length && !attachments.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
   // last-mile guard: detected fields still blank? ask before baking the PDF.
   // required (*) empties are called out first — those bounce a government form.
   const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
@@ -4752,6 +4774,7 @@ async function doExport() {
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
       rotations: pdfView.getRotations(),
+      attachments,
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
     const outName = currentFileName + '-filled.pdf';
@@ -4916,6 +4939,34 @@ $('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
   const idx = currentPageIndex();
   await pdfView.rotatePage(idx, 90);
   PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
+});
+// attach supporting pages (photo of ID etc.) — appended to the exported PDF
+function updateAttachBadge() {
+  const b = $('attachBtn'); if (!b) return;
+  const lbl = b.querySelector('.lbl');
+  if (lbl) lbl.textContent = attachments.length ? `צרף עמוד (${attachments.length})` : 'צרף עמוד';
+  b.classList.toggle('active', attachments.length > 0);
+}
+$('attachBtn') && $('attachBtn').addEventListener('click', () => { if (pdfView.hasDoc()) $('attachInput').click(); });
+$('attachInput') && $('attachInput').addEventListener('change', async (e) => {
+  const files = [...(e.target.files || [])];
+  e.target.value = '';
+  for (const f of files) {
+    if (!/^image\/(png|jpeg|webp)$/.test(f.type)) continue;
+    try {
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+      // webp isn't embeddable by pdf-lib → normalize to PNG; keep jpeg/png as-is
+      if (f.type === 'image/webp') {
+        const conv = await PFS.imageTools.processUpload(f, { removeWhite: false });
+        attachments.push({ url: conv.url, type: 'image/png', name: f.name });
+      } else {
+        attachments.push({ url, type: f.type, name: f.name });
+      }
+    } catch (err) { console.warn('attach failed', err); }
+  }
+  updateAttachBadge();
+  markDirty();
+  if (attachments.length) PFS.toast(`צורפו ${attachments.length} עמודים — יתווספו לקובץ בייצוא`, 'ok');
 });
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
   const strip = $('thumbs'); strip.classList.toggle('open');

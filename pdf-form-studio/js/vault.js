@@ -38,8 +38,30 @@
     city:       ['עיר', 'יישוב', 'ישוב', 'עיר מגורים', 'מקום מגורים', 'שם היישוב', 'city', 'town', 'المدينة', 'البلدة', 'مكان السكن'],
     zip:        ['מיקוד', 'מיקוד דואר', 'zip', 'zip code', 'postal code', 'الرمز البريدي'],
     occupation: ['מקצוע', 'עיסוק', 'תפקיד', 'occupation', 'profession', 'المهنة', 'الوظيفة'],
+    gender:     ['מין', 'מגדר', 'sex', 'gender', 'الجنس'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
+
+  // option-value dictionaries for single-choice questions: canonical value →
+  // the words that denote it, so a stored gender ("זכר" / "ז" / "male") and a
+  // form option ("○ זכר") resolve to the same value across languages.
+  const GENDER = {
+    male:   ['זכר', 'ז', 'male', 'm', 'man', 'ذكر'],
+    female: ['נקבה', 'נ', 'female', 'f', 'woman', 'أنثى', 'انثى']
+  };
+  // which canonical value (if any) a free string denotes in a dictionary —
+  // exact or whole-word match on the normalized form (so "ז" won't hit "מזכיר")
+  function valInDict(str, dict) {
+    const n = norm(str);
+    if (!n) return null;
+    for (const key of Object.keys(dict)) {
+      for (const syn of dict[key]) {
+        const s = norm(syn);
+        if (n === s || (' ' + n + ' ').indexOf(' ' + s + ' ') !== -1) return key;
+      }
+    }
+    return null;
+  }
   // precomputed [key, normalizedPhrase] sorted longest-first so "שם משפחה"
   // beats the generic "שם"
   const PAIRS = [];
@@ -97,6 +119,41 @@
       if (values[f.fieldKey] !== undefined && String(values[f.fieldKey]).trim()) { out[f.fieldKey] = values[f.fieldKey]; return; }
       const c = matchKey(f.label) || matchKey(f.fieldKey);
       if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
+    });
+    return out;
+  }
+
+  /* Extend memory to SELECTIONS: which detected check/radio options should be
+   * auto-ticked from the saved details. Returns {fieldKey: true}.
+   *  - gender options match the saved gender across languages ("מין: זכר" →
+   *    tick "○ זכר"), never the opposite option;
+   *  - any option whose text equals a saved value is ticked (city, marital
+   *    status, etc. that the user stored verbatim).
+   * At most one option per radio group is chosen (they're mutually exclusive).
+   */
+  function matchChecks(fields, values, skipKeys) {
+    const out = {};
+    if (!fields || !fields.length || !values) return out;
+    const skip = new Set(skipKeys || []);
+    const canonVal = {};
+    Object.keys(values).forEach((k) => {
+      const c = matchKey(k);
+      if (c && canonVal[c] === undefined && String(values[k]).trim()) canonVal[c] = values[k];
+    });
+    const storedGender = canonVal.gender ? valInDict(canonVal.gender, GENDER) : null;
+    // every saved value, normalized, for a verbatim option match (min length 2
+    // so a stray letter can't tick unrelated boxes)
+    const storedNorms = new Set();
+    Object.keys(values).forEach((k) => { const v = norm(values[k]); if (v && v.length >= 2) storedNorms.add(v); });
+    const usedGroup = new Set();
+    fields.forEach((f) => {
+      if (f.type !== 'check' || skip.has(f.fieldKey)) return;
+      const nlabel = norm(f.label);
+      const og = valInDict(f.label, GENDER);
+      const hit = (og && storedGender && og === storedGender) || (nlabel.length >= 2 && storedNorms.has(nlabel));
+      if (!hit) return;
+      if (f.group) { if (usedGroup.has(f.group)) return; usedGroup.add(f.group); }
+      out[f.fieldKey] = true;
     });
     return out;
   }
@@ -163,5 +220,5 @@
     } finally { try { await worker.terminate(); } catch (e) {} }
   }
 
-  PFS.vault = { matchKey, matchValues, extractFromText, recognizeImage, checkIsraeliId, norm };
+  PFS.vault = { matchKey, matchValues, matchChecks, extractFromText, recognizeImage, checkIsraeliId, norm };
 })(window);

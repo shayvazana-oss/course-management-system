@@ -170,6 +170,9 @@
             if (grouped && control.checked) groups[f.group].forEach((m) => { if (m.control !== control) { m.control.checked = false; ensureCheck(m.f, false); } });
             ensureCheck(f, control.checked); recount();
           });
+          // selection memory: auto-tick the option the saved details point to
+          // (gender, verbatim matches). matchChecks already picks ≤1 per group.
+          if (prefill && prefill[f.fieldKey] === true) { control.checked = true; ensureCheck(f, true); autoFilled++; }
         } else {
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';

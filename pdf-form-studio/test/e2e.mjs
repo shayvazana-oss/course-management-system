@@ -119,6 +119,26 @@ async function main() {
     return radios[0].checked === false && radios[1].checked === true && marks === 1;
   }));
 
+  // selection memory: a saved gender auto-ticks the matching radio option and
+  // never the opposite one — memory extends to choices, not just text.
+  check('saved gender auto-selects the matching radio option', await page.evaluate(() => {
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'check_zachar', label: 'זכר', fx: 0.1, fy: 0.3, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_g1' },
+      { page: 0, fieldKey: 'check_nekeva', label: 'נקבה', fx: 0.4, fy: 0.3, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_g1' }
+    ] };
+    const sel = window.PFS.vault.matchChecks(det.fields, { 'מין': 'זכר' }, []);
+    window.PFS.__test.fieldsPanel.show(det, sel);
+    const byLabel = {};
+    [...document.querySelectorAll('#fieldsBody .field')].forEach((row) => {
+      const lab = row.querySelector('label')?.textContent; const inp = row.querySelector('input[type=radio]');
+      if (lab && inp) byLabel[lab] = inp.checked;
+    });
+    // a form mark exists for the chosen option, none for the rejected one
+    const keys = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'check').map((e) => e.model.fieldKey);
+    const markOk = keys.includes('check_zachar') && !keys.includes('check_nekeva');
+    return sel.check_zachar === true && !sel.check_nekeva && byLabel['זכר'] === true && byLabel['נקבה'] === false && markOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

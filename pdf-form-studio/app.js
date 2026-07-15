@@ -137,7 +137,11 @@ function vaultPrefill(det) {
     if (skipPrefillOnce) { skipPrefillOnce = false; return null; }
     const ap = profiles.active();
     if (!ap || !ap.values || !det || !det.fields) return null;
-    return PFS.vault.matchValues(det.fields, ap.values, overlay.fieldKeys());
+    const skip = overlay.fieldKeys();
+    // text values + auto-ticked selections (gender, verbatim option matches)
+    const text = PFS.vault.matchValues(det.fields, ap.values, skip);
+    const checks = PFS.vault.matchChecks(det.fields, ap.values, skip);
+    return Object.assign({}, text, checks);
   } catch (e) { return null; }
 }
 

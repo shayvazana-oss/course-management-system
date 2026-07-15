@@ -139,6 +139,25 @@ async function main() {
     return sel.check_zachar === true && !sel.check_nekeva && byLabel['זכר'] === true && byLabel['נקבה'] === false && markOk;
   }));
 
+  // learn-from-hand: manually ticking a gender option is remembered, so the
+  // NEXT form auto-selects it without any typing or profile setup.
+  check('manually picked gender is learned and reused on the next form', await page.evaluate(() => {
+    window.PFS.store.set('remembered_choices', {});   // start clean
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'g_m', label: 'זכר', fx: 0.1, fy: 0.5, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_m1' },
+      { page: 0, fieldKey: 'g_f', label: 'נקבה', fx: 0.4, fy: 0.5, fw: 0.03, fh: 0.03, fontFrac: 0.03, type: 'check', radio: true, group: '0_m1' }
+    ] };
+    window.PFS.__test.fieldsPanel.show(det);
+    const male = document.querySelectorAll('#fieldsBody input[type=radio]')[0];
+    male.checked = true; male.dispatchEvent(new Event('change', { bubbles: true }));
+    const rc = window.PFS.store.get('remembered_choices', {});
+    // a different form later — matchChecks with the learned choice ticks זכר
+    const later = [{ fieldKey: 'x_m', label: 'זכר', type: 'check', radio: true, group: 'p_1' },
+                   { fieldKey: 'x_f', label: 'נקבה', type: 'check', radio: true, group: 'p_1' }];
+    const sel = window.PFS.vault.matchChecks(later, rc, []);
+    return !!rc.gender && sel.x_m === true && !sel.x_f;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -1434,6 +1434,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return out;
   }
 
+  /* Classify a ticked option so the app can remember the choice for next time
+   * ("○ זכר" ticked → {canon:'gender', value:'זכר'}). null when the option
+   * isn't a known single-choice value. */
+  function classifyChoice(label) {
+    if (valInDict(label, GENDER)) return { canon: 'gender', value: String(label).trim() };
+    return null;
+  }
+
   /* Extend memory to SELECTIONS: which detected check/radio options should be
    * auto-ticked from the saved details. Returns {fieldKey: true}.
    *  - gender options match the saved gender across languages ("מין: זכר" →
@@ -1531,7 +1539,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     } finally { try { await worker.terminate(); } catch (e) {} }
   }
 
-  PFS.vault = { matchKey, matchValues, matchChecks, extractFromText, recognizeImage, checkIsraeliId, norm };
+  PFS.vault = { matchKey, matchValues, matchChecks, classifyChoice, extractFromText, recognizeImage, checkIsraeliId, norm };
 })(window);
 
 </script>
@@ -3803,6 +3811,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             // picking one radio clears the mark of its siblings on the form
             if (grouped && control.checked) groups[f.group].forEach((m) => { if (m.control !== control) { m.control.checked = false; ensureCheck(m.f, false); } });
             ensureCheck(f, control.checked); recount();
+            // remember a recognised choice (e.g. gender) so the next form
+            // auto-ticks it — memory that learns from what you pick by hand
+            if (control.checked && opts.rememberChoice && PFS.vault && PFS.vault.classifyChoice) {
+              const cl = PFS.vault.classifyChoice(f.label);
+              if (cl) opts.rememberChoice(cl.canon, cl.value);
+            }
           });
           // selection memory: auto-tick the option the saved details point to
           // (gender, verbatim matches). matchChecks already picks ≤1 per group.
@@ -4039,7 +4053,11 @@ const profiles = PFS.createDataProfiles();
 const fieldsPanel = PFS.createFieldsPanel({
   overlay,
   ocrAvailable: () => !!(PFS.ocr && PFS.ocr.available()),
-  onOcr: () => runOcr()
+  onOcr: () => runOcr(),
+  // learn choices the user makes by hand (gender, …) for future forms
+  rememberChoice: (canon, value) => {
+    try { const rc = PFS.store.get('remembered_choices', {}) || {}; rc[canon] = value; PFS.store.set('remembered_choices', rc); } catch (e) {}
+  }
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
 PFS.__test = { overlay, fieldsPanel };
@@ -4076,12 +4094,17 @@ let skipPrefillOnce = false;   // set by "clear form" — the user asked for emp
 function vaultPrefill(det) {
   try {
     if (skipPrefillOnce) { skipPrefillOnce = false; return null; }
+    if (!det || !det.fields) return null;
     const ap = profiles.active();
-    if (!ap || !ap.values || !det || !det.fields) return null;
+    // remembered choices (learned from manual ticks) fill gaps; an explicit
+    // profile value always wins over a remembered one.
+    const remembered = PFS.store.get('remembered_choices', {}) || {};
+    const values = Object.assign({}, remembered, ap && ap.values);
+    if (!Object.keys(values).length) return null;
     const skip = overlay.fieldKeys();
     // text values + auto-ticked selections (gender, verbatim option matches)
-    const text = PFS.vault.matchValues(det.fields, ap.values, skip);
-    const checks = PFS.vault.matchChecks(det.fields, ap.values, skip);
+    const text = PFS.vault.matchValues(det.fields, values, skip);
+    const checks = PFS.vault.matchChecks(det.fields, values, skip);
     return Object.assign({}, text, checks);
   } catch (e) { return null; }
 }

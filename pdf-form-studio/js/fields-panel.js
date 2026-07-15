@@ -169,6 +169,12 @@
             // picking one radio clears the mark of its siblings on the form
             if (grouped && control.checked) groups[f.group].forEach((m) => { if (m.control !== control) { m.control.checked = false; ensureCheck(m.f, false); } });
             ensureCheck(f, control.checked); recount();
+            // remember a recognised choice (e.g. gender) so the next form
+            // auto-ticks it — memory that learns from what you pick by hand
+            if (control.checked && opts.rememberChoice && PFS.vault && PFS.vault.classifyChoice) {
+              const cl = PFS.vault.classifyChoice(f.label);
+              if (cl) opts.rememberChoice(cl.canon, cl.value);
+            }
           });
           // selection memory: auto-tick the option the saved details point to
           // (gender, verbatim matches). matchChecks already picks ≤1 per group.

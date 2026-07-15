@@ -123,6 +123,14 @@
     return out;
   }
 
+  /* Classify a ticked option so the app can remember the choice for next time
+   * ("○ זכר" ticked → {canon:'gender', value:'זכר'}). null when the option
+   * isn't a known single-choice value. */
+  function classifyChoice(label) {
+    if (valInDict(label, GENDER)) return { canon: 'gender', value: String(label).trim() };
+    return null;
+  }
+
   /* Extend memory to SELECTIONS: which detected check/radio options should be
    * auto-ticked from the saved details. Returns {fieldKey: true}.
    *  - gender options match the saved gender across languages ("מין: זכר" →
@@ -220,5 +228,5 @@
     } finally { try { await worker.terminate(); } catch (e) {} }
   }
 
-  PFS.vault = { matchKey, matchValues, matchChecks, extractFromText, recognizeImage, checkIsraeliId, norm };
+  PFS.vault = { matchKey, matchValues, matchChecks, classifyChoice, extractFromText, recognizeImage, checkIsraeliId, norm };
 })(window);

@@ -98,7 +98,11 @@ const profiles = PFS.createDataProfiles();
 const fieldsPanel = PFS.createFieldsPanel({
   overlay,
   ocrAvailable: () => !!(PFS.ocr && PFS.ocr.available()),
-  onOcr: () => runOcr()
+  onOcr: () => runOcr(),
+  // learn choices the user makes by hand (gender, …) for future forms
+  rememberChoice: (canon, value) => {
+    try { const rc = PFS.store.get('remembered_choices', {}) || {}; rc[canon] = value; PFS.store.set('remembered_choices', rc); } catch (e) {}
+  }
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
 PFS.__test = { overlay, fieldsPanel };
@@ -135,12 +139,17 @@ let skipPrefillOnce = false;   // set by "clear form" — the user asked for emp
 function vaultPrefill(det) {
   try {
     if (skipPrefillOnce) { skipPrefillOnce = false; return null; }
+    if (!det || !det.fields) return null;
     const ap = profiles.active();
-    if (!ap || !ap.values || !det || !det.fields) return null;
+    // remembered choices (learned from manual ticks) fill gaps; an explicit
+    // profile value always wins over a remembered one.
+    const remembered = PFS.store.get('remembered_choices', {}) || {};
+    const values = Object.assign({}, remembered, ap && ap.values);
+    if (!Object.keys(values).length) return null;
     const skip = overlay.fieldKeys();
     // text values + auto-ticked selections (gender, verbatim option matches)
-    const text = PFS.vault.matchValues(det.fields, ap.values, skip);
-    const checks = PFS.vault.matchChecks(det.fields, ap.values, skip);
+    const text = PFS.vault.matchValues(det.fields, values, skip);
+    const checks = PFS.vault.matchChecks(det.fields, values, skip);
     return Object.assign({}, text, checks);
   } catch (e) { return null; }
 }

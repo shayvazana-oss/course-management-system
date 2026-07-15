@@ -69,16 +69,24 @@
       return m;
     });
     // recompute calculated fields per record, so a batch invoice's total (etc.)
-    // works the same as interactive fill
+    // works the same as interactive fill — including calc fields that reference
+    // OTHER calc fields (subtotal → total), resolved via fixed-point iteration.
     if (PFS.formula) {
-      const vars = {};
-      out.forEach((m) => { if (m.type === 'text' && m.fieldKey && !PFS.formula.isFormula(m.formula)) vars[m.fieldKey] = m.text; });
-      out.forEach((m) => {
-        if (m.type !== 'text' || !PFS.formula.isFormula(m.formula)) return;
-        let v = PFS.formula.evaluate(m.formula, vars);
-        if (v !== '' && m.format) v = PFS.formula.format(v, m.format);
-        m.text = v;
-      });
+      const formulaMs = out.filter((m) => m.type === 'text' && PFS.formula.isFormula(m.formula));
+      if (formulaMs.length) {
+        const vars = {};
+        out.forEach((m) => { if (m.type === 'text' && m.fieldKey) vars[m.fieldKey] = m.text; });
+        const maxPasses = formulaMs.length + 1;
+        for (let pass = 0; pass < maxPasses; pass++) {
+          let changed = false;
+          formulaMs.forEach((m) => {
+            const v = PFS.formula.evaluate(m.formula, vars);   // raw numeric string
+            if (m.fieldKey && vars[m.fieldKey] !== v) { vars[m.fieldKey] = v; changed = true; }
+            m.text = (v !== '' && m.format) ? PFS.formula.format(v, m.format) : v;
+          });
+          if (!changed) break;
+        }
+      }
     }
     return out;
   }

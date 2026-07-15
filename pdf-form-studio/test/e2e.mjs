@@ -1095,6 +1095,23 @@ async function main() {
     return chainOk && cycleTerminates;
   }));
 
+  check('mail-merge resolves chained calc fields per record, no cross-row leak', await page.evaluate(() => {
+    const base = [
+      { type: 'text', kind: 'text', page: 0, fieldKey: 'qty', text: '', fx: 0.1, fy: 0.1, fw: 0.2, fh: 0.04, fontFrac: 0.03 },
+      { type: 'text', kind: 'text', page: 0, fieldKey: 'price', text: '', fx: 0.1, fy: 0.2, fw: 0.2, fh: 0.04, fontFrac: 0.03 },
+      { type: 'text', kind: 'text', page: 0, fieldKey: 'sub', formula: '=[qty]*[price]', text: '', fx: 0.1, fy: 0.3, fw: 0.2, fh: 0.04, fontFrac: 0.03 },
+      { type: 'text', kind: 'text', page: 0, fieldKey: 'total', formula: '=[sub]*1.17', text: '', fx: 0.1, fy: 0.4, fw: 0.2, fh: 0.04, fontFrac: 0.03 }
+    ];
+    const get = (models, key) => models.find((m) => m.fieldKey === key).text;
+    const r1 = window.PFS.merge.applyRecord(base, { qty: '10', price: '25' });   // sub 250, total 292.5
+    const r2 = window.PFS.merge.applyRecord(base, { qty: '2', price: '100' });    // sub 200, total 234
+    const rec1 = get(r1, 'sub') === '250' && get(r1, 'total') === '292.5';
+    const rec2 = get(r2, 'sub') === '200' && get(r2, 'total') === '234';
+    // base models must be untouched (clone isolation) — no leak between rows
+    const baseClean = base[2].text === '' && base[3].text === '';
+    return rec1 && rec2 && baseClean;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

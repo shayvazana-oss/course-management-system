@@ -1032,6 +1032,51 @@ async function main() {
     return before && ov.getElements().length === 0 && !stillRotated && !t.hasPageOps();
   }));
 
+  check('crop + reorder: cropped overlay follows its page to the new position', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const src = await PDFDocument.create(); src.addPage([400, 400]); src.addPage([400, 400]);
+    const bytes = await src.save();
+    const models = [{ page: 0, type: 'text', kind: 'text', fx: 0.62, fy: 0.08, fw: 0.33, fh: 0.07, fontFrac: 0.05, text: 'TOPRIGHT', color: '#000', align: 'right' }];
+    const out = await window.PFS.exporter.exportPdf(bytes, models, { pageOrder: [1, 0] });   // swap pages
+    const doc = await window.pdfjsLib.getDocument({ data: out.slice() }).promise;
+    if (doc.numPages !== 2) return false;
+    const render = async (n) => {
+      const pg = await doc.getPage(n); const vp = pg.getViewport({ scale: 1 });
+      const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+      await pg.render({ canvasContext: x, viewport: vp }).promise; return { x, W: c.width, H: c.height };
+    };
+    const dark = (ctx, x0, y0, x1, y1) => { const d = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 120 && d[i + 1] < 120 && d[i + 2] < 120) n++; return n; };
+    const p2 = await render(2);   // reordered: output page 2 == original page 0 (has the element)
+    const p1 = await render(1);   // output page 1 == original page 1 (empty)
+    const onP2 = dark(p2.x, Math.floor(p2.W * 0.5), 0, p2.W, Math.floor(p2.H * 0.28)) > 20;
+    const p1empty = dark(p1.x, 0, 0, p1.W, p1.H) === 0;
+    return onP2 && p1empty;
+  }));
+
+  check('mixed export: cropped rot-0 page correct alongside a rotated sibling', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const src = await PDFDocument.create(); src.addPage([400, 400]); src.addPage([400, 400]);
+    const bytes = await src.save();
+    const models = [
+      { page: 0, type: 'text', kind: 'text', fx: 0.62, fy: 0.08, fw: 0.33, fh: 0.07, fontFrac: 0.05, text: 'AAA', color: '#000', align: 'right' },
+      { page: 1, type: 'text', kind: 'text', fx: 0.3, fy: 0.35, fw: 0.3, fh: 0.07, fontFrac: 0.05, text: 'BBB', color: '#000', align: 'right' }
+    ];
+    const out = await window.PFS.exporter.exportPdf(bytes, models, { rotations: { 1: 90 } });
+    const re = await PDFDocument.load(out.slice());
+    const rotOk = re.getPage(0).getRotation().angle === 0 && re.getPage(1).getRotation().angle === 90;
+    // page 0 uses the crop path — its element must still land top-right
+    const doc = await window.pdfjsLib.getDocument({ data: out.slice() }).promise;
+    const pg = await doc.getPage(1); const vp = pg.getViewport({ scale: 1 });
+    const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    await pg.render({ canvasContext: x, viewport: vp }).promise;
+    const dark = (x0, y0, x1, y1) => { const d = x.getImageData(x0, y0, x1 - x0, y1 - y0).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 120 && d[i + 1] < 120 && d[i + 2] < 120) n++; return n; };
+    const topRight = dark(Math.floor(c.width * 0.5), 0, c.width, Math.floor(c.height * 0.28)) > 20;
+    const bottomLeft = dark(0, Math.floor(c.height * 0.8), Math.floor(c.width * 0.45), c.height) === 0;
+    return rotOk && topRight && bottomLeft;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

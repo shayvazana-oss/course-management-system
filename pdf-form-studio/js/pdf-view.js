@@ -95,7 +95,10 @@
     function hasDoc() { return !!pdfDoc; }
     function numPages() { return pdfDoc ? pdfDoc.numPages : 0; }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, getBytes, getDoc, hasDoc, numPages };
+    // page canvases + wraps, for building the thumbnail rail
+    function viewList() { return views.map((v, i) => ({ n: i + 1, canvas: v.canvas, wrap: v.wrap })); }
+
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;

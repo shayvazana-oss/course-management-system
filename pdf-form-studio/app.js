@@ -203,6 +203,7 @@ async function openPdfFile(file) {
       pj.innerHTML = '';
       for (let i = 1; i <= n; i++) { const o = document.createElement('option'); o.value = i; o.textContent = 'עמ׳ ' + i + '/' + n; pj.appendChild(o); }
     })();
+    buildThumbnails();
     updateHwStatus();
     currentFp = null;
     try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
@@ -564,6 +565,48 @@ $('pageJump') && $('pageJump').addEventListener('change', (e) => {
   const w = wraps[parseInt(e.target.value, 10) - 1];
   if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
+
+// ---- page thumbnails (rail toggle → slide-in strip) --------------------
+function buildThumbnails() {
+  const strip = $('thumbs'), btn = $('thumbsBtn');
+  if (!strip || !pdfView.viewList) return;
+  const views = pdfView.viewList();
+  strip.innerHTML = '';
+  const multi = views.length > 1;
+  btn.hidden = !multi;
+  if (!multi) { strip.hidden = true; strip.classList.remove('open'); return; }
+  strip.hidden = false;
+  views.forEach((v) => {
+    const cell = document.createElement('div'); cell.className = 'thumb'; cell.dataset.n = v.n;
+    const tc = document.createElement('canvas');
+    const tw = 108, th = Math.round(tw * (v.canvas.height / v.canvas.width || 1.414));
+    tc.width = tw; tc.height = th;
+    try { tc.getContext('2d').drawImage(v.canvas, 0, 0, tw, th); } catch (e) {}
+    const tag = document.createElement('span'); tag.className = 'tn'; tag.textContent = v.n;
+    cell.append(tc, tag);
+    cell.addEventListener('click', () => { v.wrap.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    strip.appendChild(cell);
+  });
+}
+$('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
+  const strip = $('thumbs'); strip.classList.toggle('open');
+  $('thumbsBtn').classList.toggle('active', strip.classList.contains('open'));
+});
+// highlight the page currently in view
+(function () {
+  const vp = $('viewport'); if (!vp) return;
+  let raf = 0;
+  vp.addEventListener('scroll', () => {
+    if (raf) return; raf = requestAnimationFrame(() => {
+      raf = 0;
+      const strip = $('thumbs'); if (!strip || strip.hidden) return;
+      const wraps = [...document.querySelectorAll('.page-wrap')];
+      const mid = vp.scrollTop + vp.clientHeight / 2;
+      let cur = 0; wraps.forEach((w, i) => { if (w.offsetTop <= mid) cur = i; });
+      strip.querySelectorAll('.thumb').forEach((t, i) => t.classList.toggle('current', i === cur));
+    });
+  }, { passive: true });
+})();
 
 // keyboard: delete selected, escape cancels placement
 document.addEventListener('keydown', (e) => {

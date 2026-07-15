@@ -1958,6 +1958,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
   /* Chaikin corner-cutting (keeps endpoints) — removes hand/pointer jitter
    * while preserving the letterform. */
+  // Reverse maximal LTR runs (letters/digits + internal . , : / - + ( ) @ and
+  // spaces between them) so the RTL layout renders them in natural order.
+  function toVisualRTL(s) {
+    return String(s).replace(/[0-9A-Za-z](?:[0-9A-Za-z .,:/@+()\-]*[0-9A-Za-z])?/g,
+      (m) => m.split('').reverse().join(''));
+  }
+
   function smoothStroke(st, iters) {
     let p = st;
     for (let k = 0; k < iters; k++) {
@@ -1988,7 +1995,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const tracking = opts.tracking != null ? opts.tracking : (p.tracking != null ? p.tracking : 1);
     const gap = fontPx * (0.012 + 0.055 * tracking);   // floor + scale → slider has real reach
     const spaceW = fontPx * (p.space || 0.32);
-    const chars = String(text || '').split('');
+    // BiDi: glyphs are laid out right-to-left (Hebrew base), so a naive pass
+    // would mirror digit/Latin runs — "054" would come out "450". Reverse each
+    // LTR run (digits, Latin, and their internal separators like . / : -) so
+    // numbers, dates and codes read correctly while Hebrew stays RTL.
+    const chars = toVisualRTL(String(text || '')).split('');
 
     // layout: every glyph at its TRUE size — advance width follows the metrics
     const items = []; let totalW = 0;
@@ -2034,10 +2045,21 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         ctx.translate(cx, cy + jy); ctx.rotate(jr); ctx.translate(-cx, -cy);
         it.g.s.forEach((st) => {
           let pts = st.map((q) => ({ x: x + q.x * it.w, y: gTop + q.y * it.h }));
-          if (beautify) pts = smoothStroke(pts, 2);
+          if (beautify) pts = smoothStroke(pts, 3);
           ctx.lineWidth = lw * (beautify ? (0.94 + Math.random() * 0.12) : 1); // subtle ink variation
           ctx.beginPath();
-          pts.forEach((q, j) => (j === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)));
+          if (beautify && pts.length > 2) {
+            // flowing pen: quadratic curves through the midpoints of each
+            // segment, so the ink reads as one continuous stroke, not facets
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let j = 1; j < pts.length - 1; j++) {
+              const mx = (pts[j].x + pts[j + 1].x) / 2, my = (pts[j].y + pts[j + 1].y) / 2;
+              ctx.quadraticCurveTo(pts[j].x, pts[j].y, mx, my);
+            }
+            ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+          } else {
+            pts.forEach((q, j) => (j === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)));
+          }
           ctx.stroke();
         });
         ctx.restore();

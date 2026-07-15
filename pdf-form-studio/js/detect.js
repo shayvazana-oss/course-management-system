@@ -11,7 +11,8 @@
   const PFS = (root.PFS = root.PFS || {});
   const pdfjsLib = root.pdfjsLib;
 
-  const hasHebrew = (s) => /[֐-׿]/.test(s);
+  // RTL = Hebrew OR Arabic → blank sits to the LEFT of the label for both
+  const hasHebrew = (s) => /[֐-׿؀-ۿ]/.test(s);
   const isLabel = (s) => {
     const t = (s || '').trim();
     return t.length > 0 && t.length < 40 && /[:：׃]\s*$/.test(t);
@@ -40,8 +41,20 @@
     boxes.forEach((b) => {
       const label = b.str.trim();
       if (!isLabel(label) && !isUnderscores(label)) return;
-      const rtl = hasHebrew(label);
       const sameLine = boxes.filter((o) => o !== b && Math.abs(o.yBase - b.yBase) < b.fontH * 0.7);
+      // For a bare underscore-blank, borrow the real label from the nearest
+      // text on the same line (bidi sometimes splits "label: ____" into two
+      // items — happens with Arabic and some Hebrew). Prefer the label to the
+      // RIGHT (RTL) of the blank, else the nearest with letters.
+      let displayLabel = label;
+      const hasLetters = (s) => /[A-Za-z֐-׿؀-ۿ]/.test(s || '');
+      if (isUnderscores(label)) {
+        const cand = sameLine.filter((o) => hasLetters(o.str) && !isUnderscores(o.str.trim()));
+        const right = cand.filter((o) => o.x > b.x).sort((a, c) => a.x - c.x)[0];
+        const chosen = right || cand.sort((a, c) => c.x - a.x)[0];
+        if (chosen) displayLabel = chosen.str.trim();
+      }
+      const rtl = hasHebrew(displayLabel);
       let fx, fw;
       const defW = Math.min(0.34 * W, W * 0.5);
       if (isUnderscores(label)) {
@@ -61,8 +74,8 @@
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
       out.push({
-        page: startIndex, fieldKey: slug(label, out.length),
-        label: label.replace(/[:：׃]\s*$/, '').trim() || 'שדה',
+        page: startIndex, fieldKey: slug(displayLabel, out.length),
+        label: displayLabel.replace(/[:：׃]\s*$/, '').trim() || 'שדה',
         fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true
       });
     });

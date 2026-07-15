@@ -42,7 +42,7 @@
         return null;
       }
       if (!ctrl) {
-        const align = /[֐-׿]/.test(field.label) ? 'right' : 'left';
+        const align = /[֐-׿؀-ۿ]/.test(field.label) ? 'right' : 'left';   // Hebrew or Arabic → right-align
         const model = PFS.element.makeModel('text', field.page, {
           fx: field.fx, fy: field.fy, fw: field.fw || 0.2,
           fontFrac: field.fontFrac || 0.016, align,

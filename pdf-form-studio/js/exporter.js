@@ -146,9 +146,20 @@
       opts.onProgress && opts.onProgress(done, pageIdxs.length);
     }
 
-    // remove user-deleted pages (descending so indices stay valid). Never
-    // leave an empty document: keep one page if there are no attachments.
-    if (removeSet.size) {
+    // Decide the output document. Overlays/rotations were already baked onto the
+    // source pages above (copyPages/removePage preserve both).
+    //  - pageOrder present → reassemble a fresh doc with pages in that order
+    //    (this alone encodes reordering AND deletion — omitted indices drop out).
+    //  - else → the tested in-place path: drop deleted pages, keep source doc.
+    let target = pdfDoc;
+    const order = Array.isArray(opts.pageOrder) ? opts.pageOrder.filter((i) => i >= 0 && i < pages.length) : null;
+    if (order && order.length) {
+      target = await PDFDocument.create();
+      const copied = await target.copyPages(pdfDoc, order);
+      copied.forEach((p) => target.addPage(p));
+    } else if (removeSet.size) {
+      // remove user-deleted pages (descending so indices stay valid). Never
+      // leave an empty document: keep one page if there are no attachments.
       let toRemove = [...removeSet].filter((i) => i >= 0 && i < pages.length).sort((a, b) => b - a);
       const attachCount = (opts.attachments || []).length;
       if (!attachCount && toRemove.length >= pdfDoc.getPageCount()) toRemove = toRemove.slice(0, pdfDoc.getPageCount() - 1);
@@ -163,24 +174,24 @@
       if (att && att.kind === 'pdf' && att.bytes) {
         try {
           const donor = await PDFDocument.load(att.bytes);
-          const copied = await pdfDoc.copyPages(donor, donor.getPageIndices());
-          copied.forEach((p) => pdfDoc.addPage(p));
+          const copied = await target.copyPages(donor, donor.getPageIndices());
+          copied.forEach((p) => target.addPage(p));
         } catch (e) { console.warn('[export] pdf attachment skipped:', e && e.message); }
         continue;
       }
       const src = att && (att.url || att);
       if (!src) continue;
       let emb;
-      try { emb = /jpe?g|jfif/i.test(att.type || src) ? await pdfDoc.embedJpg(src) : await pdfDoc.embedPng(src); }
+      try { emb = /jpe?g|jfif/i.test(att.type || src) ? await target.embedJpg(src) : await target.embedPng(src); }
       catch (e) { console.warn('[export] attachment skipped:', e && e.message); continue; }
       const maxW = 595, maxH = 842; // A4 in pt
       const s = Math.min(maxW / emb.width, maxH / emb.height, 1);
       const w = Math.max(1, emb.width * s), h = Math.max(1, emb.height * s);
-      const p = pdfDoc.addPage([w, h]);
+      const p = target.addPage([w, h]);
       p.drawImage(emb, { x: 0, y: 0, width: w, height: h });
     }
 
-    const bytes = await pdfDoc.save();
+    const bytes = await target.save();
     return bytes;
   }
 

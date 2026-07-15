@@ -469,22 +469,37 @@ async function main() {
   // per-form memory remembers page rotation + deletion, so a straightened/
   // trimmed form reopens the same way
   check('templates remember and restore page rotation + deletion', await page.evaluate(() => {
-    let appliedRot = null, appliedRemoved = null;
+    let appliedRot = null, appliedRemoved = null, appliedOrder = null;
     const t = window.PFS.createTemplates({
       getElements: () => [{ type: 'text', kind: 'text', page: 0, fx: 0.1, fy: 0.1, fw: 0.2, fh: 0.05, fontFrac: 0.03, text: 'x' }],
       getRotations: () => ({ 0: 90 }),
       getRemovedPages: () => [2],
+      getPageOrder: () => [1, 0],
       applyModels: () => {},
       applyRotations: (r) => { appliedRot = r; },
       applyRemovedPages: (a) => { appliedRemoved = a; },
+      applyPageOrder: (o) => { appliedOrder = o; },
       afterApply: () => {}
     });
     t.save('__pageops_test__', null);
     const saved = window.PFS.store.get('templates', []).find((x) => x.name === '__pageops_test__');
-    const savedOk = saved && saved.rotations && saved.rotations[0] === 90 && Array.isArray(saved.removePages) && saved.removePages[0] === 2;
+    const savedOk = saved && saved.rotations && saved.rotations[0] === 90 && Array.isArray(saved.removePages) && saved.removePages[0] === 2
+      && Array.isArray(saved.pageOrder) && saved.pageOrder.join(',') === '1,0';
     if (savedOk) t.apply(saved.id);
     if (saved) t.remove(saved.id);
-    return savedOk && appliedRot && appliedRot[0] === 90 && appliedRemoved && appliedRemoved[0] === 2;
+    return savedOk && appliedRot && appliedRot[0] === 90 && appliedRemoved && appliedRemoved[0] === 2 && appliedOrder && appliedOrder.join(',') === '1,0';
+  }));
+
+  // reordering pages updates the display order, flags isReordered, and reverses
+  check('reordering pages updates order and is reversible', await page.evaluate(() => {
+    const pv = window.PFS.__test.pdfView;
+    if (pv.visiblePageCount() < 2) return true; // single visible page — nothing to reorder
+    const before = pv.getPageOrder().join(',');
+    const moved = pv.movePage(pv.getPageOrder()[0], 1);   // send the first page later
+    const reordered = pv.isReordered() && pv.getPageOrder().join(',') !== before;
+    pv.movePage(pv.getPageOrder()[1], -1);                // move it back to restore
+    const restored = pv.getPageOrder().join(',') === before && !pv.isReordered();
+    return moved && reordered && restored;
   }));
 
   // impossible dates (day 32, month 13, non-leap 29 Feb) are flagged live
@@ -498,6 +513,22 @@ async function main() {
     type('15/13/1990'); const b3 = inp.title !== '';   // month 13
     type('15/03/1990'); const ok = inp.title === '';   // valid
     return b1 && b2 && b3 && ok;
+  }));
+
+  // pageOrder reorders (and can drop) pages in the exported PDF — proven by the
+  // per-page widths landing in the requested order
+  check('pageOrder reorders pages in the exported PDF', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const d = await PDFDocument.create();
+    d.addPage([300, 400]); d.addPage([310, 400]); d.addPage([320, 400]);
+    const bytes = await d.save();
+    const re = await PDFDocument.load(await window.PFS.exporter.exportPdf(bytes, [], { pageOrder: [2, 0, 1] }));
+    const w = [0, 1, 2].map((i) => Math.round(re.getPage(i).getSize().width));
+    const reordered = re.getPageCount() === 3 && w[0] === 320 && w[1] === 300 && w[2] === 310;
+    // pageOrder also drops omitted pages (reorder + delete in one)
+    const re2 = await PDFDocument.load(await window.PFS.exporter.exportPdf(bytes, [], { pageOrder: [2, 0] }));
+    const dropped = re2.getPageCount() === 2 && Math.round(re2.getPage(0).getSize().width) === 320;
+    return reordered && dropped;
   }));
 
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored

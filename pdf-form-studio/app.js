@@ -99,6 +99,8 @@ const templates = PFS.createTemplates({
   applyRotations: (r) => { if (r && Object.keys(r).length) pdfView.setRotations(r); },
   getRemovedPages: () => pdfView.getRemovedPages(),
   applyRemovedPages: (a) => { if (a && a.length) { pdfView.setRemovedPages(a); buildPageNav(); buildThumbnails(); } },
+  getPageOrder: () => (pdfView.isReordered && pdfView.isReordered() ? pdfView.getPageOrder() : null),
+  applyPageOrder: (o) => { if (o && o.length && pdfView.setPageOrder) { pdfView.setPageOrder(o); buildPageNav(); buildThumbnails(); } },
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();
@@ -501,7 +503,8 @@ async function doExport() {
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
       rotations: pdfView.getRotations(),
-      removePages: pdfView.getRemovedPages(),
+      // a real reorder → pageOrder (encodes reorder AND deletion); else removePages
+      ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
       attachments,
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
@@ -611,8 +614,9 @@ vp.addEventListener('drop', (e) => {
 });
 
 $('pageJump') && $('pageJump').addEventListener('change', (e) => {
-  const wraps = document.querySelectorAll('.page-wrap');
-  const w = wraps[parseInt(e.target.value, 10)];   // value is the 0-based page index
+  // value is the stable original page index — find the wrap by data attr so it
+  // works after a reorder (DOM position no longer equals original index)
+  const w = document.querySelector('.page-wrap[data-page-idx="' + CSS.escape(e.target.value) + '"]');
   if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 
@@ -620,7 +624,11 @@ $('pageJump') && $('pageJump').addEventListener('change', (e) => {
 function buildThumbnails() {
   const strip = $('thumbs'), btn = $('thumbsBtn');
   if (!strip || !pdfView.viewList) return;
-  const views = pdfView.viewList().filter((v) => !v.deleted);
+  const byIdx = new Map(pdfView.viewList().map((v) => [v.idx, v]));
+  const orderArr = (pdfView.getPageOrder && pdfView.getPageOrder()) || [];
+  // show thumbnails in the current display order (reflects reorder + deletion)
+  const views = (orderArr.length ? orderArr.map((i) => byIdx.get(i)).filter(Boolean) : [...byIdx.values()].filter((v) => !v.deleted))
+    .map((v, i) => Object.assign({}, v, { n: i + 1 }));   // renumber to display position
   strip.innerHTML = '';
   const multi = views.length > 1;
   btn.hidden = !multi;
@@ -633,7 +641,14 @@ function buildThumbnails() {
     tc.width = tw; tc.height = th;
     try { tc.getContext('2d').drawImage(v.canvas, 0, 0, tw, th); } catch (e) {}
     const tag = document.createElement('span'); tag.className = 'tn'; tag.textContent = v.n;
-    cell.append(tc, tag);
+    // reorder controls: move this page earlier / later
+    const mv = document.createElement('div'); mv.className = 'thumb-move';
+    const up = document.createElement('button'); up.type = 'button'; up.title = 'הזז מוקדם יותר'; up.textContent = '▲';
+    const dn = document.createElement('button'); dn.type = 'button'; dn.title = 'הזז מאוחר יותר'; dn.textContent = '▼';
+    up.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, -1)) { buildThumbnails(); buildPageNav(); markDirty(); } });
+    dn.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, 1)) { buildThumbnails(); buildPageNav(); markDirty(); } });
+    mv.append(up, dn);
+    cell.append(tc, tag, mv);
     cell.addEventListener('click', () => { v.wrap.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
     strip.appendChild(cell);
   });
@@ -665,7 +680,9 @@ function currentPageIndex() {
 // rebuild the page-jump dropdown from the currently visible (non-deleted) pages
 function buildPageNav() {
   const pj = $('pageJump'); if (!pj) return;
-  const vis = pdfView.viewList().filter((v) => !v.deleted);
+  const byIdx = new Map(pdfView.viewList().map((v) => [v.idx, v]));
+  const orderArr = (pdfView.getPageOrder && pdfView.getPageOrder()) || [];
+  const vis = orderArr.length ? orderArr.map((i) => byIdx.get(i)).filter(Boolean) : [...byIdx.values()].filter((v) => !v.deleted);
   pj.classList.toggle('hidden', vis.length < 2);
   pj.innerHTML = '';
   vis.forEach((v, i) => { const o = document.createElement('option'); o.value = v.idx; o.textContent = 'עמ׳ ' + (i + 1) + '/' + vis.length; pj.appendChild(o); });

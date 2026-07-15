@@ -348,3 +348,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .qs-radio .qs-r { flex-direction: row; align-items: center; gap: 6px; font-weight: 500; font-size: 14px; }
 .qs-radio .qs-r input { width: 18px; height: 18px; accent-color: var(--brand); }
 .btn.block { display: block; width: 100%; margin-bottom: 8px; }
+
+/* Thumbnail reorder controls */
+.thumb { position: relative; }
+.thumb-move { position: absolute; top: 4px; inset-inline-end: 4px; display: flex; flex-direction: column; gap: 2px; opacity: 0; transition: opacity .15s; }
+.thumb:hover .thumb-move, .thumb:focus-within .thumb-move { opacity: 1; }
+.thumb-move button { width: 22px; height: 20px; line-height: 1; padding: 0; font-size: 11px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.thumb-move button:hover { background: var(--brand); color: #fff; border-color: var(--brand); }

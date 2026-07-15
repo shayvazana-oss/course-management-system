@@ -763,6 +763,20 @@ async function main() {
     return t1 === '₪30.00' && t2 === '₪22.50';
   }));
 
+  // letter-spacing (align typed text to per-character boxes): canvas supports it,
+  // it's applied in display, and it round-trips through serialize
+  check('letter-spacing for boxed fields — canvas + display + serialize', await page.evaluate(() => {
+    const x = document.createElement('canvas').getContext('2d');
+    const canvasSupport = ('letterSpacing' in x);        // needed for the export
+    const ov = window.PFS.__test.overlay; ov.clearElements();
+    ov.addElementAt('text', 0, 0.1, 0.1, { text: '123456789', letterSpacing: 0.8, fieldKey: 'idbox' });
+    const ser = ov.serialize().find((m) => m.fieldKey === 'idbox');
+    const el = ov.getElements().find((e) => e.model.fieldKey === 'idbox');
+    const applied = el && el.node.querySelector('.txt').style.letterSpacing;
+    ov.clearElements();
+    return canvasSupport && ser && Math.abs(ser.letterSpacing - 0.8) < 0.01 && applied && applied !== '' && applied !== '0px';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

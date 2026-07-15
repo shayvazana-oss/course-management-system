@@ -462,6 +462,13 @@ function renderProps(ctrl) {
     fCol.appendChild(col);
     rowSC.append(fSize, fCol); body.appendChild(rowSC);
 
+    // letter-spacing — spread digits/letters to line up with per-character boxes
+    const fLS = field('מרווח אותיות (ליישור לתאים)');
+    const ls = document.createElement('input'); ls.type = 'range'; ls.min = '0'; ls.max = '250'; ls.step = '5';
+    ls.value = Math.round((m.letterSpacing || 0) * 100);
+    ls.addEventListener('input', () => { m.letterSpacing = parseInt(ls.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fLS.appendChild(ls); body.appendChild(fLS);
+
     // bold + align
     const rowBA = document.createElement('div'); rowBA.className = 'row';
     const bold = document.createElement('button'); bold.className = 'btn sm' + (m.bold ? ' active tool' : '');

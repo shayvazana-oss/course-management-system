@@ -2694,10 +2694,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         node.style.height = (model.fh * H) + 'px';
         if (isRect && inner) { inner.style.background = model.color || '#fff'; inner.style.opacity = (model.opacity != null ? model.opacity : 1); }
       } else {
-        inner.style.fontSize = (model.fontFrac * H) + 'px';
+        const fontPx = model.fontFrac * H;
+        inner.style.fontSize = fontPx + 'px';
         inner.style.color = model.color;
         inner.style.fontWeight = model.bold ? '700' : '400';
         inner.style.textAlign = model.align;
+        // letter-spacing lets typed text line up with per-character boxes
+        inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';
         node.style.width = 'auto';
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)
@@ -2915,7 +2918,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           fx: round(m.fx), fy: round(m.fy), fw: round(m.fw), fh: round(m.fh),
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
-          opacity: m.opacity, formula: m.formula || '', format: m.format || ''
+          opacity: m.opacity, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0
         };
       });
     }
@@ -3495,6 +3498,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     ctx.textBaseline = 'top';
     ctx.fillStyle = m.color || '#111';
     ctx.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px Heebo, sans-serif';
+    // letter-spacing (aligns typed text to per-character boxes) — supported in
+    // modern Chromium/Safari; older engines ignore it (text still exports).
+    try { ctx.letterSpacing = m.letterSpacing ? (m.letterSpacing * fontPx) + 'px' : '0px'; } catch (e) {}
     let anchorX, align;
     if (m.align === 'center') { anchorX = x + boxW / 2; align = 'center'; }
     else if (m.align === 'left') { anchorX = x; align = 'left'; }
@@ -5098,6 +5104,13 @@ function renderProps(ctrl) {
     col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); rememberTextStyle(m); });
     fCol.appendChild(col);
     rowSC.append(fSize, fCol); body.appendChild(rowSC);
+
+    // letter-spacing — spread digits/letters to line up with per-character boxes
+    const fLS = field('מרווח אותיות (ליישור לתאים)');
+    const ls = document.createElement('input'); ls.type = 'range'; ls.min = '0'; ls.max = '250'; ls.step = '5';
+    ls.value = Math.round((m.letterSpacing || 0) * 100);
+    ls.addEventListener('input', () => { m.letterSpacing = parseInt(ls.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fLS.appendChild(ls); body.appendChild(fLS);
 
     // bold + align
     const rowBA = document.createElement('div'); rowBA.className = 'row';

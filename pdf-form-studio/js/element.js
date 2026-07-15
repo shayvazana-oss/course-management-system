@@ -86,10 +86,13 @@
         node.style.height = (model.fh * H) + 'px';
         if (isRect && inner) { inner.style.background = model.color || '#fff'; inner.style.opacity = (model.opacity != null ? model.opacity : 1); }
       } else {
-        inner.style.fontSize = (model.fontFrac * H) + 'px';
+        const fontPx = model.fontFrac * H;
+        inner.style.fontSize = fontPx + 'px';
         inner.style.color = model.color;
         inner.style.fontWeight = model.bold ? '700' : '400';
         inner.style.textAlign = model.align;
+        // letter-spacing lets typed text line up with per-character boxes
+        inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';
         node.style.width = 'auto';
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)

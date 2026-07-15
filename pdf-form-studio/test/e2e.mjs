@@ -260,6 +260,26 @@ async function main() {
     return emBad && emOk && phBad && phOk;
   }));
 
+  // quick personal-details setup writes canonical values that drive auto-fill
+  check('quick setup saves details that then auto-fill a form', await page.evaluate(() => {
+    document.getElementById('quickSetupBtn').click();     // opens + prefills
+    const set = (id, v) => { document.getElementById(id).value = v; };
+    set('qsFullName', 'משה ישראלי'); set('qsId', '123456782'); set('qsPhone', '0501234567');
+    set('qsEmail', 'me@example.com'); set('qsAddress', 'רחוב הרצל 15, תל אביב 6100000');
+    document.querySelector('input[name="qsGender"][value="זכר"]').checked = true;
+    document.getElementById('qsSave').click();
+    const profs = window.PFS.store.get('profiles', []);
+    const active = profs.find((p) => p.id === window.PFS.store.get('active_profile', null)) || profs[0];
+    const vals = (active && active.values) || {};
+    const saved = vals['שם מלא'] === 'משה ישראלי' && vals['תעודת זהות'] === '123456782'
+      && vals['מין'] === 'זכר' && vals['טלפון'] === '0501234567' && vals['דוא״ל'] === 'me@example.com';
+    // the saved details drive both text auto-fill and gender auto-tick
+    const det = { fields: [{ fieldKey: 'nm', label: 'שם מלא', type: 'text' }, { fieldKey: 'gm', label: 'זכר', type: 'check', radio: true, group: 'g' }] };
+    const text = window.PFS.vault.matchValues(det.fields, vals, []);
+    const checks = window.PFS.vault.matchChecks(det.fields, vals, []);
+    return saved && text.nm === 'משה ישראלי' && checks.gm === true;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

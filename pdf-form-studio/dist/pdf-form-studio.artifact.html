@@ -374,6 +374,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   .viewport { padding: 12px; }
 }
 
+/* Quick personal-details setup */
+.qs-grid { display: flex; flex-direction: column; gap: 11px; }
+.qs-grid > label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 700; color: var(--text); }
+.qs-grid input[type=text] { padding: 9px 10px; font-size: 15px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.qs-radio { display: flex; gap: 18px; }
+.qs-radio .qs-r { flex-direction: row; align-items: center; gap: 6px; font-weight: 500; font-size: 14px; }
+.qs-radio .qs-r input { width: 18px; height: 18px; accent-color: var(--brand); }
+.btn.block { display: block; width: 100%; margin-bottom: 8px; }
+
 </style>
 
 <div class="app">
@@ -500,6 +509,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           <div class="card">
             <h3>👤 הפרטים שלי</h3>
             <div class="body-p">
+              <button class="btn sm primary block" id="quickSetupBtn" title="הזינו את הפרטים האישיים פעם אחת — וכל טופס יתמלא לבד">⚡ מילוי מהיר של הפרטים שלי</button>
               <div class="row">
                 <select id="profileSel" style="flex:1"></select>
                 <button class="btn sm" id="profileNew" title="פרופיל חדש">＋</button>
@@ -795,6 +805,26 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       </div>
     </div>
     <footer><button class="btn primary" id="helpClose">הבנתי</button></footer>
+  </div>
+</div>
+
+<!-- Quick personal-details setup — fills the vault in one screen -->
+<div class="modal-back" id="quickModal">
+  <div class="modal" style="max-width:460px">
+    <header>⚡ הפרטים שלי — מילוי מהיר</header>
+    <div class="m-body" style="max-height:72vh;overflow:auto">
+      <div class="hint muted" style="margin-bottom:8px">הזינו פעם אחת — וכל טופס ייפתח כבר ממולא. הכול נשמר במכשיר שלכם בלבד.</div>
+      <div class="qs-grid">
+        <label>שם מלא<input type="text" id="qsFullName" dir="auto" placeholder="משה ישראלי"></label>
+        <label>תעודת זהות<input type="text" id="qsId" inputmode="numeric" placeholder="123456782"></label>
+        <label>מין<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsGender" value="זכר"> זכר</label><label class="qs-r"><input type="radio" name="qsGender" value="נקבה"> נקבה</label></span></label>
+        <label>תאריך לידה<input type="text" id="qsBirth" dir="auto" placeholder="15/03/1990"></label>
+        <label>טלפון<input type="text" id="qsPhone" inputmode="tel" placeholder="0501234567"></label>
+        <label>דוא״ל<input type="text" id="qsEmail" inputmode="email" placeholder="me@example.com"></label>
+        <label>כתובת מלאה<input type="text" id="qsAddress" dir="auto" placeholder="רחוב הרצל 15, תל אביב 6100000"></label>
+      </div>
+    </div>
+    <footer><button class="btn ghost" id="qsCancel">ביטול</button><button class="btn primary" id="qsSave">שמירה</button></footer>
   </div>
 </div>
 
@@ -4769,6 +4799,48 @@ $('profileGrab').addEventListener('click', async () => {
   PFS.toast('הפרטים נשמרו לפרופיל', 'ok');
 });
 renderProfileSelect();
+
+// ---- quick personal-details setup: fill the whole vault in one screen ----
+// canonical key → the Hebrew profile-field name it's stored under + input id
+const QUICK_FIELDS = [
+  { canon: 'full_name', key: 'שם מלא', id: 'qsFullName' },
+  { canon: 'id', key: 'תעודת זהות', id: 'qsId' },
+  { canon: 'birth_date', key: 'תאריך לידה', id: 'qsBirth' },
+  { canon: 'phone', key: 'טלפון', id: 'qsPhone' },
+  { canon: 'email', key: 'דוא״ל', id: 'qsEmail' },
+  { canon: 'address', key: 'כתובת', id: 'qsAddress' }
+];
+function quickCanonVals() {
+  // resolve the active profile's values to canonical keys for prefill
+  const ap = profiles.active(); const out = {};
+  if (ap && ap.values) Object.keys(ap.values).forEach((k) => {
+    const c = PFS.vault.matchKey(k);
+    if (c && out[c] === undefined && String(ap.values[k]).trim()) out[c] = ap.values[k];
+  });
+  return out;
+}
+function openQuickSetup() {
+  const cv = quickCanonVals();
+  QUICK_FIELDS.forEach((f) => { const el = $(f.id); if (el) el.value = cv[f.canon] || ''; });
+  const g = cv.gender || '';
+  document.querySelectorAll('input[name="qsGender"]').forEach((r) => { r.checked = (r.value === g); });
+  openModal('quickModal');
+}
+$('quickSetupBtn').addEventListener('click', openQuickSetup);
+$('qsCancel').addEventListener('click', () => closeModal('quickModal'));
+$('qsSave').addEventListener('click', () => {
+  const ap = profiles.active();
+  const merged = Object.assign({}, ap && ap.values);
+  QUICK_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
+  const gEl = document.querySelector('input[name="qsGender"]:checked');
+  if (gEl) merged['מין'] = gEl.value; else delete merged['מין'];
+  profiles.saveProfile(ap ? ap.name : 'אני', merged);
+  renderProfileSelect();
+  closeModal('quickModal');
+  // re-apply to the open form so the effect is immediate
+  const n = pdfView.hasDoc() ? overlay.fillByKeys(merged) : 0;
+  PFS.toast(n ? `נשמר ✓ — ${n} שדות מולאו בטופס` : 'הפרטים נשמרו ✓', 'ok');
+});
 
 // ---- smart vault: build the profile from a photo of an ID / license ----
 const HEB_KEY_LABEL = { last_name: 'שם משפחה', first_name: 'שם פרטי', full_name: 'שם מלא', id: 'תעודת זהות', birth_date: 'תאריך לידה', phone: 'טלפון' };

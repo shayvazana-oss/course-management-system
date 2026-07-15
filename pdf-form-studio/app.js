@@ -742,6 +742,48 @@ $('profileGrab').addEventListener('click', async () => {
 });
 renderProfileSelect();
 
+// ---- quick personal-details setup: fill the whole vault in one screen ----
+// canonical key → the Hebrew profile-field name it's stored under + input id
+const QUICK_FIELDS = [
+  { canon: 'full_name', key: 'שם מלא', id: 'qsFullName' },
+  { canon: 'id', key: 'תעודת זהות', id: 'qsId' },
+  { canon: 'birth_date', key: 'תאריך לידה', id: 'qsBirth' },
+  { canon: 'phone', key: 'טלפון', id: 'qsPhone' },
+  { canon: 'email', key: 'דוא״ל', id: 'qsEmail' },
+  { canon: 'address', key: 'כתובת', id: 'qsAddress' }
+];
+function quickCanonVals() {
+  // resolve the active profile's values to canonical keys for prefill
+  const ap = profiles.active(); const out = {};
+  if (ap && ap.values) Object.keys(ap.values).forEach((k) => {
+    const c = PFS.vault.matchKey(k);
+    if (c && out[c] === undefined && String(ap.values[k]).trim()) out[c] = ap.values[k];
+  });
+  return out;
+}
+function openQuickSetup() {
+  const cv = quickCanonVals();
+  QUICK_FIELDS.forEach((f) => { const el = $(f.id); if (el) el.value = cv[f.canon] || ''; });
+  const g = cv.gender || '';
+  document.querySelectorAll('input[name="qsGender"]').forEach((r) => { r.checked = (r.value === g); });
+  openModal('quickModal');
+}
+$('quickSetupBtn').addEventListener('click', openQuickSetup);
+$('qsCancel').addEventListener('click', () => closeModal('quickModal'));
+$('qsSave').addEventListener('click', () => {
+  const ap = profiles.active();
+  const merged = Object.assign({}, ap && ap.values);
+  QUICK_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
+  const gEl = document.querySelector('input[name="qsGender"]:checked');
+  if (gEl) merged['מין'] = gEl.value; else delete merged['מין'];
+  profiles.saveProfile(ap ? ap.name : 'אני', merged);
+  renderProfileSelect();
+  closeModal('quickModal');
+  // re-apply to the open form so the effect is immediate
+  const n = pdfView.hasDoc() ? overlay.fillByKeys(merged) : 0;
+  PFS.toast(n ? `נשמר ✓ — ${n} שדות מולאו בטופס` : 'הפרטים נשמרו ✓', 'ok');
+});
+
 // ---- smart vault: build the profile from a photo of an ID / license ----
 const HEB_KEY_LABEL = { last_name: 'שם משפחה', first_name: 'שם פרטי', full_name: 'שם מלא', id: 'תעודת זהות', birth_date: 'תאריך לידה', phone: 'טלפון' };
 function vaultScanStatus(t) { const el = $('vaultScanStatus'); if (el) { el.style.display = t ? '' : 'none'; el.textContent = t || ''; } }

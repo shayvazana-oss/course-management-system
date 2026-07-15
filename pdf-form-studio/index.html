@@ -135,6 +135,7 @@
           <div class="card">
             <h3>👤 הפרטים שלי</h3>
             <div class="body-p">
+              <button class="btn sm primary block" id="quickSetupBtn" title="הזינו את הפרטים האישיים פעם אחת — וכל טופס יתמלא לבד">⚡ מילוי מהיר של הפרטים שלי</button>
               <div class="row">
                 <select id="profileSel" style="flex:1"></select>
                 <button class="btn sm" id="profileNew" title="פרופיל חדש">＋</button>
@@ -430,6 +431,26 @@
       </div>
     </div>
     <footer><button class="btn primary" id="helpClose">הבנתי</button></footer>
+  </div>
+</div>
+
+<!-- Quick personal-details setup — fills the vault in one screen -->
+<div class="modal-back" id="quickModal">
+  <div class="modal" style="max-width:460px">
+    <header>⚡ הפרטים שלי — מילוי מהיר</header>
+    <div class="m-body" style="max-height:72vh;overflow:auto">
+      <div class="hint muted" style="margin-bottom:8px">הזינו פעם אחת — וכל טופס ייפתח כבר ממולא. הכול נשמר במכשיר שלכם בלבד.</div>
+      <div class="qs-grid">
+        <label>שם מלא<input type="text" id="qsFullName" dir="auto" placeholder="משה ישראלי"></label>
+        <label>תעודת זהות<input type="text" id="qsId" inputmode="numeric" placeholder="123456782"></label>
+        <label>מין<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsGender" value="זכר"> זכר</label><label class="qs-r"><input type="radio" name="qsGender" value="נקבה"> נקבה</label></span></label>
+        <label>תאריך לידה<input type="text" id="qsBirth" dir="auto" placeholder="15/03/1990"></label>
+        <label>טלפון<input type="text" id="qsPhone" inputmode="tel" placeholder="0501234567"></label>
+        <label>דוא״ל<input type="text" id="qsEmail" inputmode="email" placeholder="me@example.com"></label>
+        <label>כתובת מלאה<input type="text" id="qsAddress" dir="auto" placeholder="רחוב הרצל 15, תל אביב 6100000"></label>
+      </div>
+    </div>
+    <footer><button class="btn ghost" id="qsCancel">ביטול</button><button class="btn primary" id="qsSave">שמירה</button></footer>
   </div>
 </div>
 

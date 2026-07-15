@@ -339,3 +339,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   .brand .title { display: none; } /* logo-only to free width on phones */
   .viewport { padding: 12px; }
 }
+
+/* Quick personal-details setup */
+.qs-grid { display: flex; flex-direction: column; gap: 11px; }
+.qs-grid > label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 700; color: var(--text); }
+.qs-grid input[type=text] { padding: 9px 10px; font-size: 15px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.qs-radio { display: flex; gap: 18px; }
+.qs-radio .qs-r { flex-direction: row; align-items: center; gap: 6px; font-weight: 500; font-size: 14px; }
+.qs-radio .qs-r input { width: 18px; height: 18px; accent-color: var(--brand); }
+.btn.block { display: block; width: 100%; margin-bottom: 8px; }

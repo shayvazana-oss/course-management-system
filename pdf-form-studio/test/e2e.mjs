@@ -76,6 +76,25 @@ async function main() {
   check('page thumbnails available (multi-page)', await page.evaluate(() => !document.getElementById('thumbsBtn').hidden));
   check('checkbox (☐) detected as tickable field', await page.evaluate(() => document.querySelectorAll('#fieldsBody input[type=checkbox]').length > 0));
 
+  // round radio bullets (○ זכר / ○ נקבה) → one tickable field per option, each
+  // labelled by its own word — whether the bullet shares a text run with its
+  // label or the text layer splits them apart. Driven through the detection
+  // heuristic with synthetic pdf.js items (standard PDF fonts can't encode ○).
+  check('radio bullets (○) become individually labelled tickable fields', await page.evaluate(() => {
+    const H = 320, W = 420, fs = 16;
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    const labels = (arr) => arr.filter((f) => f.type === 'check').map((f) => f.label);
+    const joined = labels(window.PFS.detect.heuristicForPage([
+      item('○ male', 40, 90, 60), item('○ female', 160, 90, 70), item('○ resident', 40, 140, 90)
+    ], W, H, vp, 0));
+    const split = labels(window.PFS.detect.heuristicForPage([
+      item('○', 40, 200, 12), item('male', 58, 200, 40), item('○', 160, 200, 12), item('female', 178, 200, 48)
+    ], W, H, vp, 0));
+    return joined.length === 3 && joined.some((l) => /male/i.test(l)) && joined.some((l) => /female/i.test(l)) && joined.some((l) => /resident/i.test(l))
+      && split.length === 2 && split.some((l) => /male/i.test(l)) && split.some((l) => /female/i.test(l));
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

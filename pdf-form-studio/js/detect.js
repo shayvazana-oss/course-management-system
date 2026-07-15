@@ -38,7 +38,9 @@
   function heuristicForPage(items, W, H, vp, startIndex) {
     const boxes = items.filter((it) => it.str && it.str.trim()).map((it) => itemBox(it, vp));
     const out = [];
-    const CHECKBOX = /[☐☑☒□◻◼⬛⬜❏❑]/;   // ☐ ☑ ☒ □ ◻ ◼ ⬛ ⬜ ❏ …
+    // empty tick targets: square checkboxes AND round radio bullets — Israeli
+    // forms use both (☐ תושב / ○ זכר ○ נקבה). Filled variants (☑ ●) are skipped.
+    const CHECKBOX = /[☐□◻◼⬜❏❑○◯⚪◦〇]/;
     boxes.forEach((b) => {
       const label = b.str.trim();
       // an empty checkbox glyph → a tickable field, labelled by the rest of
@@ -164,5 +166,8 @@
     return { tier: 'scanned', fields: [] };
   }
 
-  PFS.detect = { detectFields };
+  // heuristicForPage is exposed for the e2e suite (synthetic text items →
+  // fields) so checkbox/label heuristics can be tested without a real PDF whose
+  // embedded font carries glyphs the standard PDF fonts can't encode (e.g. ○).
+  PFS.detect = { detectFields, heuristicForPage };
 })(window);

@@ -589,9 +589,15 @@ function buildThumbnails() {
     strip.appendChild(cell);
   });
 }
+function applyEnhance(on) {
+  $('pages').classList.toggle('enhance', on);
+  $('enhanceBtn') && $('enhanceBtn').classList.toggle('active', on);
+}
+applyEnhance(PFS.store.get('enhance_scan', false));   // restore preference
 $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
-  const on = $('pages').classList.toggle('enhance');
-  $('enhanceBtn').classList.toggle('active', on);
+  const on = !$('pages').classList.contains('enhance');
+  applyEnhance(on);
+  PFS.store.set('enhance_scan', on);
   PFS.toast(on ? 'חידוד סריקה: פעיל — קריא יותר (לא משפיע על הקובץ המיוצא)' : 'חידוד סריקה: כבוי', 'ok', 1600);
 });
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {

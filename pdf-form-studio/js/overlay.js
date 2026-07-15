@@ -43,7 +43,9 @@
         getOverlaySize: () => overlaySizeFor(model.page),
         onSelect: (c) => selectCtrl(c),
         onChange: () => opts.onChange && opts.onChange(),
-        onDelete: (c) => deleteCtrl(c)
+        onDelete: (c) => deleteCtrl(c),
+        // peer geometries on this page (excluding self) for drag snapping
+        getPeers: () => elements.filter((c) => c.model !== model && c.model.page === model.page).map((c) => c.model)
       });
       page.overlayEl.appendChild(ctrl.node);
       ctrl.layout();

@@ -147,6 +147,8 @@
       model,
       handle,
       aspect: isImage ? (model.aspect || 1) : null,
+      // peers on the same page → alignment snapping while dragging
+      getSnapTargets: () => (ctx.getPeers ? ctx.getPeers() : []).map((m) => ({ fx: m.fx, fy: m.fy, fw: m.fw, fh: m.fh })),
       onSelect: () => ctx.onSelect(ctrl),
       onResize: isBox ? null : (dx, dy, start) => {
         // text: vertical drag scales font size (gentle; fine control in panel)

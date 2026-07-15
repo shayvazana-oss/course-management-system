@@ -811,6 +811,21 @@ async function main() {
     return Math.abs(dx - 0.002) < 1e-6 && Math.abs(dy - 0.01) < 1e-6;
   }));
 
+  check('drag snapping aligns edges to peers and page center within threshold', await page.evaluate(() => {
+    const snap = window.PFS.computeSnap;
+    const th = 0.01;
+    // left edge just shy of a peer's left edge (0.30) → snaps to 0.30
+    const a = snap({ fx: 0.305, fy: 0.5, fw: 0.1, fh: 0.04 }, [{ fx: 0.30, fy: 0.20, fw: 0.1, fh: 0.04 }], th, th);
+    const snappedLeft = Math.abs(a.fx - 0.30) < 1e-9 && a.guideX === 0.30;
+    // horizontal center near page middle (0.5) → element centered
+    const b = snap({ fx: 0.44, fy: 0.1, fw: 0.12, fh: 0.04 }, [], th, th);
+    const centered = Math.abs((b.fx + 0.06) - 0.5) < 1e-9 && b.guideX === 0.5;
+    // far from anything → no snap, position unchanged, no guides
+    const c = snap({ fx: 0.123, fy: 0.777, fw: 0.1, fh: 0.04 }, [{ fx: 0.6, fy: 0.6, fw: 0.1, fh: 0.04 }], th, th);
+    const noSnap = c.fx === 0.123 && c.fy === 0.777 && c.guideX === null && c.guideY === null;
+    return snappedLeft && centered && noSnap;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

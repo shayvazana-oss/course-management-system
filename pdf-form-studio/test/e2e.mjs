@@ -1135,6 +1135,17 @@ async function main() {
     return c1 && c2 && c3 && c4 && c5 && c6;
   }));
 
+  check('address parser keeps the Hebrew apartment letter (7א) out of the street', await page.evaluate(() => {
+    const pa = window.PFS.vault.parseAddress;
+    const a = pa('ביאליק 7א, רמת גן');
+    const aptOk = a.house_no === '7א' && a.street === 'ביאליק' && a.city === 'רמת גן' && !a.zip;
+    const b = pa('רחוב הרצל 15, תל אביב 6100000');   // 7-digit zip must not become a house no
+    const stdOk = b.house_no === '15' && b.zip === '6100000' && b.city === 'תל אביב' && b.street === 'הרצל';
+    const c = pa('הרצל, חיפה 12345');                 // 5-digit zip, no house number
+    const noHouseOk = c.zip === '12345' && !c.house_no && c.city === 'חיפה';
+    return aptOk && stdOk && noHouseOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -1803,8 +1803,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // zip: an Israeli postcode is 5 or 7 digits; take the last such run
     const zips = str.match(/\b(\d{7}|\d{5})\b/g);
     if (zips) out.zip = zips[zips.length - 1];
-    // house number: first digit run (optionally a Hebrew apartment letter)
-    const hm = str.match(/\b(\d{1,4}[א-ת]?)\b/);
+    // house number: first digit run (optionally a Hebrew apartment letter).
+    // A trailing \b can't follow a Hebrew letter (Hebrew isn't a \w char), so a
+    // negative lookahead for digit/Hebrew is used instead — otherwise the letter
+    // in "7א" is silently dropped.
+    const hm = str.match(/\b(\d{1,4}[א-ת]?)(?![\dא-ת])/);
     if (hm && hm[1] !== out.zip) out.house_no = hm[1];
     const parts = str.split(/[,،]/).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2) {
@@ -1813,7 +1816,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (out.zip) cityPart = cityPart.split(out.zip).join(' ');
       cityPart = cityPart.replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim();
       if (cityPart) out.city = cityPart;
-      const street = parts[0].replace(/\b\d{1,4}[א-ת]?\b/, ' ').replace(/^(רחוב|רח['׳]?|שדרות|שד['׳]?|שכ['׳]?|דרך)\s+/, '').replace(/\s+/g, ' ').trim();
+      const street = parts[0].replace(/\b\d{1,4}[א-ת]?(?![\dא-ת])/, ' ').replace(/^(רחוב|רח['׳]?|שדרות|שד['׳]?|שכ['׳]?|דרך)\s+/, '').replace(/\s+/g, ' ').trim();
       if (street) out.street = street;
     }
     return out;

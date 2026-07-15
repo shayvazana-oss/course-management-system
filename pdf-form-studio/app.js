@@ -592,6 +592,19 @@ async function doExport() {
   if (reqBlanks > 0) {
     if (!(await PFS.ui.confirm('שדות חובה ריקים', 'נשארו ' + reqBlanks + ' שדות חובה (*) ריקים — טופס עם שדות חובה חסרים עלול להידחות. לייצא בכל זאת?'))) return;
   } else if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
+  // format sweep: a mistyped ID / phone / e-mail / date on an official form is
+  // the most costly error, so flag anything that looks malformed before baking.
+  if (PFS.validate && PFS.validate.scan) {
+    const suspects = PFS.validate.scan(
+      models.filter((m) => m.type === 'text' && m.fieldKey)
+            .map((m) => ({ key: m.fieldKey, value: m.text }))
+    );
+    if (suspects.length) {
+      const list = suspects.slice(0, 6).map((s) => '• ' + (s.value || '') + ' — ' + s.msg).join('\n');
+      const more = suspects.length > 6 ? '\n…ועוד ' + (suspects.length - 6) : '';
+      if (!(await PFS.ui.confirm('ערכים שכדאי לבדוק', 'נמצאו ' + suspects.length + ' ערכים שנראים שגויים:\n' + list + more + '\n\nלייצא בכל זאת?'))) return;
+    }
+  }
   const btn = $('exportBtn'); const prev = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {

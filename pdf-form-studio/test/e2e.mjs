@@ -777,6 +777,27 @@ async function main() {
     return canvasSupport && ser && Math.abs(ser.letterSpacing - 0.8) < 0.01 && applied && applied !== '' && applied !== '0px';
   }));
 
+  check('validate flags malformed id/phone/email/date, accepts valid', await page.evaluate(() => {
+    const V = window.PFS.validate;
+    const badId = !V.field('id', '123456789').ok;          // fails checksum
+    const goodId = V.field('id', '000000018').ok;           // passes checksum
+    const badMail = !V.field('email', 'foo@bar').ok;
+    const goodMail = V.field('email', 'a@b.co').ok;
+    const badPhone = !V.field('phone', '1234567').ok;   // 7 digits, no leading 0
+    const goodPhone = V.field('phone', '0501234567').ok;
+    const badDate = !V.field('birth_date', '31/02/1990').ok; // no Feb 31
+    const goodDate = V.field('date', '15/03/2020').ok;
+    const empty = V.field('id', '').ok && V.field('phone', '').ok; // never nag on empty
+    // sweep maps free fieldKeys → canon and collects only the bad ones
+    const sweep = V.scan([
+      { key: 'תעודת זהות', value: '123456789' },
+      { key: 'email', value: 'a@b.co' },
+      { key: 'טלפון', value: '999' }
+    ]);
+    const sweepOk = sweep.length === 1 && sweep[0].key === 'תעודת זהות';
+    return badId && goodId && badMail && goodMail && badPhone && goodPhone && badDate && goodDate && empty && sweepOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

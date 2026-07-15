@@ -190,40 +190,11 @@
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
           const validate = () => {
-            // live format checks — catch typos before they land on paper
-            const v = control.value.trim();
-            let bad = false, msg = '';
-            if (canon === 'id' || canon === 'business_id') {
-              const digits = v.replace(/\D/g, '');
-              bad = digits.length >= 5 && !PFS.vault.checkIsraeliId(digits);
-              msg = bad ? (canon === 'business_id'
-                ? 'מספר העוסק / ח.פ לא עובר ביקורת ספרת ביקורת — בדקו הקלדה'
-                : 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה') : '';
-            } else if (canon === 'email' && v) {
-              bad = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
-              msg = bad ? 'כתובת אימייל לא תקינה — בדקו הקלדה' : '';
-            } else if (canon === 'phone') {
-              const digits = v.replace(/\D/g, '');
-              // Israeli mobile/landline: 9–10 digits, leading 0
-              bad = digits.length >= 6 && !/^0\d{8,9}$/.test(digits);
-              msg = bad ? 'מספר טלפון לא תקין — בדקו הקלדה' : '';
-            } else if ((canon === 'birth_date' || canon === 'date') && v) {
-              // only judge a complete dd/mm/yyyy — don't nag mid-typing
-              const m = v.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-              if (m) {
-                const d = +m[1], mo = +m[2], y = +m[3];
-                const leap = (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0));
-                const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-                const valid = mo >= 1 && mo <= 12 && d >= 1 && d <= dim[mo - 1] && y >= 1900 && y <= 2100;
-                const future = canon === 'birth_date' && valid && new Date(y, mo - 1, d) > new Date();
-                bad = !valid || future;
-                msg = bad ? (future ? 'תאריך לידה עתידי — בדקו' : 'תאריך לא תקין — בדקו יום/חודש/שנה') : '';
-              } else if (v.replace(/\D/g, '').length >= 8) {
-                bad = true; msg = 'פורמט תאריך: יום/חודש/שנה (למשל 15/03/1990)';
-              } else return;
-            } else return;
-            control.style.borderColor = bad ? 'var(--danger)' : '';
-            control.title = msg;
+            // live format checks — catch typos before they land on paper.
+            // shared with the pre-export sweep so both judge values identically.
+            const r = PFS.validate.field(canon, control.value);
+            control.style.borderColor = r.ok ? '' : 'var(--danger)';
+            control.title = r.msg;
           };
           control.__fkey = f.fieldKey;
           if (canon) {

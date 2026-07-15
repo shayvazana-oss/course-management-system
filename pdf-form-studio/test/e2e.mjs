@@ -633,6 +633,24 @@ async function main() {
     return out.w <= 1800 && out.h <= 1800 && /^data:image\/jpeg/.test(out.url) && out.url.length < big.toDataURL('image/png').length;
   }));
 
+  // secure export composes with page order/deletion (via `order`) + attachments
+  check('secure export respects page order and appends attachments', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    // synthetic base renderer: page idx → a white canvas of height 100+idx*20
+    const renderBase = async (idx) => {
+      const c = document.createElement('canvas'); c.width = 100; c.height = 100 + idx * 20;
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+      return { canvas: c, wPt: 100, hPt: 100 + idx * 20 };
+    };
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const out = await window.PFS.exporter.exportFlattenedPdf({
+      order: [2, 0], models: [], attachments: [{ url: png, type: 'image/png' }], renderBase
+    });
+    const re = await PDFDocument.load(out);
+    // order [2,0] → 2 rendered pages (first is idx 2 → height 140) + 1 attachment
+    return re.getPageCount() === 3 && Math.round(re.getPage(0).getSize().height) === 140;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

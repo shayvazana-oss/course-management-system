@@ -311,9 +311,9 @@
         if (amtIdx < 0 || wordsIdx < 0) return;
         const amt = controls[amtIdx], wc = controls[wordsIdx], wf = fieldMeta[wordsIdx];
         const sync = () => {
-          const digits = (amt.value || '').replace(/[^\d]/g, '');
-          if (!digits) return;
-          wc.value = PFS.numwords.shekels(parseInt(digits, 10));
+          const num = parseFloat((amt.value || '').replace(/[^\d.]/g, ''));
+          if (!isFinite(num)) return;
+          wc.value = PFS.numwords.shekels(num);
           ensureCtrl(wf, wc.value); recount();
         };
         amt.addEventListener('input', sync);

@@ -1354,6 +1354,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   const ONES = ['', 'אחד', 'שניים', 'שלושה', 'ארבעה', 'חמישה', 'שישה', 'שבעה', 'שמונה', 'תשעה'];
   const TEENS = ['', 'אחד עשר', 'שנים עשר', 'שלושה עשר', 'ארבעה עשר', 'חמישה עשר', 'שישה עשר', 'שבעה עשר', 'שמונה עשר', 'תשעה עשר'];
   const TENS = ['', '', 'עשרים', 'שלושים', 'ארבעים', 'חמישים', 'שישים', 'שבעים', 'שמונים', 'תשעים'];
+  // feminine forms for agorot (אגורה is feminine): 1..99
+  const ONES_F = ['', 'אחת', 'שתיים', 'שלוש', 'ארבע', 'חמש', 'שש', 'שבע', 'שמונה', 'תשע'];
+  const TEENS_F = ['', 'אחת עשרה', 'שתים עשרה', 'שלוש עשרה', 'ארבע עשרה', 'חמש עשרה', 'שש עשרה', 'שבע עשרה', 'שמונה עשרה', 'תשע עשרה'];
   const HUNDREDS = ['', 'מאה', 'מאתיים', 'שלוש מאות', 'ארבע מאות', 'חמש מאות', 'שש מאות', 'שבע מאות', 'שמונה מאות', 'תשע מאות'];
   const CONSTRUCT = ['', '', '', 'שלושת', 'ארבעת', 'חמשת', 'ששת', 'שבעת', 'שמונת', 'תשעת', 'עשרת'];
 
@@ -1400,12 +1403,30 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return joinVav(comps);
   }
 
-  // amount as shekels ("שקל אחד" / "שני שקלים חדשים" / "<words> שקלים חדשים")
+  // feminine words for agorot (1..99)
+  function agorotWords(a) {
+    const parts = [];
+    if (a < 10) parts.push(ONES_F[a]);
+    else if (a === 10) parts.push('עשר');
+    else if (a < 20) parts.push(TEENS_F[a - 10]);
+    else { parts.push(TENS[Math.floor(a / 10)]); if (a % 10) parts.push(ONES_F[a % 10]); }
+    return joinVav(parts);
+  }
+
+  // amount as shekels, incl. agorot when the value has a fraction:
+  //   1 → "שקל אחד"; 1234 → "…שקלים חדשים"; 100.5 → "מאה שקלים וחמישים אגורות"
   function shekels(n) {
-    n = Math.floor(Math.abs(Number(n) || 0));
-    if (n === 1) return 'שקל אחד';
-    if (n === 2) return 'שני שקלים חדשים';
-    return words(n) + ' שקלים חדשים';
+    n = Math.abs(Number(n) || 0);
+    const shk = Math.floor(n);
+    const ag = Math.round((n - shk) * 100);
+    if (ag > 0 && ag < 100) {
+      const sw = shk === 1 ? 'שקל אחד' : shk === 2 ? 'שני שקלים' : (shk === 0 ? 'אפס שקלים' : words(shk) + ' שקלים');
+      const aw = ag === 1 ? 'אגורה אחת' : ag === 2 ? 'שתי אגורות' : agorotWords(ag) + ' אגורות';
+      return sw + ' ו' + aw;
+    }
+    if (shk === 1) return 'שקל אחד';
+    if (shk === 2) return 'שני שקלים חדשים';
+    return words(shk) + ' שקלים חדשים';
   }
 
   PFS.numwords = { words, shekels };
@@ -4172,9 +4193,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         if (amtIdx < 0 || wordsIdx < 0) return;
         const amt = controls[amtIdx], wc = controls[wordsIdx], wf = fieldMeta[wordsIdx];
         const sync = () => {
-          const digits = (amt.value || '').replace(/[^\d]/g, '');
-          if (!digits) return;
-          wc.value = PFS.numwords.shekels(parseInt(digits, 10));
+          const num = parseFloat((amt.value || '').replace(/[^\d.]/g, ''));
+          if (!isFinite(num)) return;
+          wc.value = PFS.numwords.shekels(num);
           ensureCtrl(wf, wc.value); recount();
         };
         amt.addEventListener('input', sync);

@@ -336,7 +336,11 @@ async function main() {
       1000: 'אלף', 1001: 'אלף ואחד', 2000: 'אלפיים', 3000: 'שלושת אלפים',
       1234: 'אלף מאתיים שלושים וארבעה', 10000: 'עשרת אלפים', 21000: 'עשרים ואחד אלף', 100000: 'מאה אלף'
     };
-    return Object.keys(cases).every((k) => w(+k) === cases[k]) && window.PFS.numwords.shekels(1) === 'שקל אחד';
+    const sh = window.PFS.numwords.shekels;
+    const shekelsOk = sh(1) === 'שקל אחד' && sh(1234) === 'אלף מאתיים שלושים וארבעה שקלים חדשים'
+      && sh(100.5) === 'מאה שקלים וחמישים אגורות' && sh(1.05) === 'שקל אחד וחמש אגורות'
+      && sh(2.01) === 'שני שקלים ואגורה אחת';
+    return Object.keys(cases).every((k) => w(+k) === cases[k]) && shekelsOk;
   }));
 
   // typing an amount auto-fills the "סכום במילים" field with the words

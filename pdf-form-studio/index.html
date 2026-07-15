@@ -4,10 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Fillo · מילוי וחתימה על טפסי PDF</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%231E4E8C'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%231E4E8C' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230E6E78'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%230E6E78' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="styles.css" />
 <link rel="manifest" href="manifest.webmanifest" />
-<meta name="theme-color" content="#0E2A52" />
+<meta name="theme-color" content="#FFFFFF" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 </head>
 <body>
@@ -18,7 +18,7 @@
         <div class="logo" aria-label="Fillo">
           <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true">
             <path d="M12 3.2C15 7 18 10.6 18 13.7A6 6 0 1 1 6 13.7C6 10.6 9 7 12 3.2Z" fill="#fff"/>
-            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#1E4E8C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#0E6E78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         <div>
@@ -30,8 +30,8 @@
     <div class="tb-center">
       <div class="docbar hidden" id="docbar">
         <span class="fname" id="fname">—</span>
-        <span id="savedInd" style="font-size:11px;font-weight:700;color:#9FE3BF;opacity:0;transition:opacity .4s">✓ נשמר</span>
-        <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:700"></select>
+        <span id="savedInd" style="font-size:11px;font-weight:700;color:var(--ok);opacity:0;transition:opacity .4s">✓ נשמר</span>
+        <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);font-size:12px;font-weight:700"></select>
         <div class="zoomctl" id="zoomctl">
           <button data-z="out" title="הקטן">−</button>
           <span class="lvl" id="zoomLvl">100%</span>
@@ -53,30 +53,42 @@
   </header>
 
   <div class="workspace">
-    <nav class="rail" id="rail">
-      <button class="rail-btn tool" data-tool="text" title="טקסט"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg><span class="lbl">טקסט</span></button>
-      <button class="rail-btn tool" data-tool="check" title="וי"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg><span class="lbl">סימן וי</span></button>
-      <button class="rail-btn tool" data-tool="cross" title="איקס"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="lbl">איקס</span></button>
-      <button class="rail-btn tool" data-tool="draw" title="ציור חופשי"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 2-5 5-7s6-4 8-8"/><path d="M15 4l5 5-9 9-6 1 1-6z"/></svg><span class="lbl">ציור חופשי</span></button>
-      <button class="rail-btn tool" data-tool="date" title="תאריך"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
-      <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
-      <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
-      <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
-      <button class="rail-btn" id="stickyBtn" title="מצב רצף — הכלי נשאר פעיל להנחה מרובה (Esc לעצירה)"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="lbl">מצב רצף</span></button>
-      <div class="rail-sep"></div>
-      <button class="rail-btn tool" data-tool="signature" title="חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
-      <button class="rail-btn tool" data-tool="stamp" title="חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
-      <button class="rail-btn tool" data-tool="handwriting" title="כתב יד"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
-      <div class="rail-sep"></div>
-      <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
-      <button class="rail-btn" id="detectBtn" disabled title="זהה שדות"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
-      <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
-      <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
-      <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
-      <button class="rail-btn" id="attachBtn" disabled title="צרף עמודים (צילום ת״ז, קבלה, PDF) — יתווספו לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
-      <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
-      <button class="rail-btn" id="deleteBtn" disabled title="מחק את העמוד הנוכחי (לא ייכלל בייצוא)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/></svg><span class="lbl">מחק עמוד</span></button>
-      <div class="spacer"></div>
+    <nav class="rail" id="rail" aria-label="כלים">
+      <div class="rail-group">
+        <div class="rail-head">הוספה</div>
+        <button class="rail-btn tool" data-tool="text" title="הוספת טקסט"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg><span class="lbl">טקסט</span></button>
+        <button class="rail-btn tool" data-tool="check" title="סימן וי"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg><span class="lbl">סימן וי</span></button>
+        <button class="rail-btn tool" data-tool="cross" title="איקס"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="lbl">איקס</span></button>
+        <button class="rail-btn tool" data-tool="date" title="תאריך היום"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
+        <button class="rail-btn tool" data-tool="draw" title="ציור חופשי"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 2-5 5-7s6-4 8-8"/><path d="M15 4l5 5-9 9-6 1 1-6z"/></svg><span class="lbl">ציור חופשי</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">חתימה וחותמת</div>
+        <button class="rail-btn tool" data-tool="signature" title="הוספת חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
+        <button class="rail-btn tool" data-tool="stamp" title="הוספת חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
+        <button class="rail-btn tool" data-tool="handwriting" title="טקסט בכתב היד שלך"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">הדגשה ותיקון</div>
+        <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
+        <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
+        <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">עמוד וקובץ</div>
+        <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
+        <button class="rail-btn" id="attachBtn" disabled title="צרף עמודים (צילום ת״ז, קבלה, PDF) — יתווספו לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
+        <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
+        <button class="rail-btn" id="deleteBtn" disabled title="מחק את העמוד הנוכחי (לא ייכלל בייצוא)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/></svg><span class="lbl">מחק עמוד</span></button>
+        <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
+        <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">כלים</div>
+        <button class="rail-btn" id="detectBtn" disabled title="זהה שדות אוטומטית"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
+        <button class="rail-btn" id="stickyBtn" title="מצב רצף — הכלי נשאר פעיל להנחה מרובה (Esc לעצירה)"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="lbl">מצב רצף</span></button>
+        <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
+      </div>
     </nav>
 
     <aside class="thumbs" id="thumbs" hidden aria-label="תמונות ממוזערות של עמודים"></aside>

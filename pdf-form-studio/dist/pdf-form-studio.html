@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Fillo · מילוי וחתימה על טפסי PDF</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%231E4E8C'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%231E4E8C' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230E6E78'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%230E6E78' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <style>
 /* Heebo (inlined) */
 /* Local Heebo (Hebrew + Latin subsets) — no network, works offline. */
@@ -49,27 +49,29 @@
   --font: 'Heebo', 'Segoe UI', 'Arial', sans-serif;
   --mono: ui-monospace, 'JetBrains Mono', monospace;
 
-  --canvas: #EBEDF1;
+  --canvas: #EAEDEE;
   --surface: #FFFFFF;
-  --surface-2: #F5F7FA;
-  --surface-3: #EEF1F5;
+  --surface-2: #F4F6F7;
+  --surface-3: #EBEFF0;
   --paper: #FFFFFF;
 
-  --ink-1: #14181F;
-  --ink-2: #3B444F;
-  --ink-3: #697585;
-  --ink-4: #98A2B0;
-  --line: #E3E7EC;
-  --line-2: #CDD4DD;
+  --ink-1: #15201F;
+  --ink-2: #3A4746;
+  --ink-3: #667472;
+  --ink-4: #97A4A2;
+  --line: #E2E7E6;
+  --line-2: #CBD3D2;
 
-  --brand: #1E4E8C;
-  --brand-600: #1A4680;
-  --brand-700: #143a6b;
-  --brand-800: #0E2A52;      /* topbar gradient end — the identity surface */
-  --brand-soft: #E8EFF8;
-  --accent: #E0932F;
-  --accent-600: #C97E1F;
-  --accent-soft: #FCF1DE;
+  /* petrol teal — distinctive, trustworthy, not the default SaaS navy */
+  --brand: #0E6E78;
+  --brand-600: #0B5C65;
+  --brand-700: #094C54;
+  --brand-800: #073E45;
+  --brand-soft: #E1F0F1;
+  /* amber used sparingly as the "official seal" accent */
+  --accent: #DE9327;
+  --accent-600: #C27C17;
+  --accent-soft: #FBEFD8;
 
   --ok: #10875A; --ok-soft: #E4F5EC;
   --danger: #D0453F; --danger-soft: #FBECEB;
@@ -79,12 +81,12 @@
   --shadow-2: 0 4px 14px rgba(19,28,43,.10);
   --shadow-3: 0 16px 40px rgba(19,28,43,.18);
   --shadow-pop: 0 8px 28px rgba(19,28,43,.16);
-  --ring: 0 0 0 3px rgba(30,78,140,.18);
+  --ring: 0 0 0 3px rgba(14,110,120,.20);
 
   --dot: rgba(20,24,31,.045);   /* viewport grid dots — theme-aware */
 
   --r: 12px; --r-sm: 8px; --r-lg: 18px;
-  --rail-w: 62px; --panel-w: 340px; --topbar-h: 60px;
+  --rail-w: 172px; --panel-w: 340px; --topbar-h: 60px;
 }
 
 /* ===== DARK THEME =====
@@ -96,7 +98,7 @@
   --paper: #FFFFFF;
   --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
   --line: #263243; --line-2: #35435A;
-  --brand-soft: #16273F; --accent-soft: #2C2213;
+  --brand-soft: #0E2A2D; --accent-soft: #2C2213;
   --ok-soft: #10281E; --danger-soft: #2E1714;
   --dot: rgba(255,255,255,.05);
   --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
@@ -108,7 +110,7 @@
     --paper: #FFFFFF;
     --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
     --line: #263243; --line-2: #35435A;
-    --brand-soft: #16273F; --accent-soft: #2C2213;
+    --brand-soft: #0E2A2D; --accent-soft: #2C2213;
     --ok-soft: #10281E; --danger-soft: #2E1714;
     --dot: rgba(255,255,255,.05);
     --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
@@ -127,37 +129,34 @@ button, input, select, textarea { font-family: inherit; }
 
 /* ===== SHELL ===== */
 .app { display: grid; grid-template-rows: var(--topbar-h) 1fr; height: 100vh; }
-/* The topbar IS the brand: a deep navy band, everything on it designed on-dark. */
+/* Light, quiet topbar — the document is the hero; chrome recedes to a hairline. */
 .topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 0 16px;
-  background: linear-gradient(115deg, var(--brand-800) 0%, var(--brand-700) 46%, var(--brand) 100%);
-  border-bottom: 1px solid rgba(255,255,255,.08); z-index: 50; box-shadow: 0 2px 14px rgba(14,42,82,.28); }
+  background: var(--surface); border-bottom: 1px solid var(--line); z-index: 50; box-shadow: var(--shadow-1); }
 .tb-right { justify-self: start; }
 .tb-center { justify-self: center; }
 .tb-left { justify-self: end; display: flex; align-items: center; gap: 8px; }
 
 .brand { display: flex; align-items: center; gap: 11px; }
-.brand .logo { width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 17px; box-shadow: inset 0 1px 0 rgba(255,255,255,.18); }
-.brand .title { font-weight: 900; font-size: 16.5px; letter-spacing: .01em; line-height: 1.1; color: #fff; }
-.brand .sub { font-size: 11px; color: rgba(255,255,255,.62); font-weight: 500; }
+.brand .logo { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; box-shadow: 0 2px 8px rgba(14,110,120,.30); }
+.brand .logo svg path[fill="#fff"] { fill: #fff; }
+.brand .title { font-weight: 900; font-size: 16px; letter-spacing: .01em; line-height: 1.1; color: var(--ink-1); }
+.brand .sub { font-size: 11px; color: var(--ink-3); font-weight: 500; }
 
 .docbar { display: flex; align-items: center; gap: 10px; }
-.docbar .fname { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.92); padding: 6px 11px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; }
+.docbar .fname { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--ink-2); padding: 6px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; }
 .docbar.hidden, .tb-actions.hidden { display: none; }
 
-.zoomctl { display: inline-flex; align-items: center; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16); border-radius: 999px; overflow: hidden; }
-.zoomctl button { border: none; background: transparent; width: 34px; height: 32px; cursor: pointer; font-size: 16px; color: rgba(255,255,255,.85); }
-.zoomctl button:hover { background: rgba(255,255,255,.14); }
-.zoomctl .lvl { min-width: 46px; text-align: center; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.75); font-variant-numeric: tabular-nums; }
+.zoomctl { display: inline-flex; align-items: center; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.zoomctl button { border: none; background: transparent; width: 34px; height: 32px; cursor: pointer; font-size: 16px; color: var(--ink-2); }
+.zoomctl button:hover { background: var(--surface-3); }
+.zoomctl .lvl { min-width: 46px; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
-/* on-dark button variants, scoped to the topbar */
-.topbar .btn { border-color: rgba(255,255,255,.20); background: rgba(255,255,255,.08); color: #fff; }
-.topbar .btn:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.28); }
-.topbar .btn.ghost { border-color: transparent; background: transparent; color: rgba(255,255,255,.85); }
-.topbar .btn.ghost:hover { background: rgba(255,255,255,.12); color: #fff; }
-.topbar .btn.primary { background: #fff; border-color: #fff; color: var(--brand-700); box-shadow: 0 2px 10px rgba(0,0,0,.18); }
-.topbar .btn.primary:hover { background: #F0F5FC; }
-.topbar .btn.accent { background: var(--accent); border-color: var(--accent); color: #2B1B04; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
-.topbar .btn:disabled { opacity: .38; }
+/* topbar action buttons (light chrome) */
+.topbar .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 2px 8px rgba(14,110,120,.24); }
+.topbar .btn.primary:hover { background: var(--brand-600); border-color: var(--brand-600); }
+.topbar .btn.accent { background: var(--accent); border-color: var(--accent); color: #2B1B04; box-shadow: 0 2px 8px rgba(222,147,39,.28); }
+.topbar .btn.accent:hover { background: var(--accent-600); border-color: var(--accent-600); }
+.topbar .btn:disabled { opacity: .45; }
 
 /* ===== BUTTONS ===== */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 15px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink-1); font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, transform .08s, box-shadow .15s; }
@@ -182,15 +181,19 @@ button, input, select, textarea { font-family: inherit; }
 /* ===== WORKSPACE ===== */
 .workspace { display: grid; grid-template-columns: var(--rail-w) 1fr var(--panel-w); min-height: 0; }
 
-.rail { background: var(--surface); border-inline-end: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 0; overflow-y: auto; }
-.rail-btn { width: 46px; height: 46px; border-radius: 12px; border: 1px solid transparent; background: transparent; color: var(--ink-2); font-size: 19px; cursor: pointer; position: relative; display: grid; place-items: center; transition: background .15s, color .15s, border-color .15s, transform .12s, box-shadow .15s; }
-.rail-btn:hover { background: var(--surface-3); color: var(--ink-1); transform: translateY(-1px); }
-.rail-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-600); box-shadow: 0 0 0 3px rgba(224,147,47,.16); }
+/* Labeled, grouped tool list — every tool says what it does, clustered by task. */
+.rail { background: var(--surface); border-inline-end: 1px solid var(--line); display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 10px 10px 16px; overflow-y: auto; }
+.rail-group { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.rail-group:last-child { border-bottom: none; margin-bottom: 0; }
+.rail-head { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--ink-4); padding: 5px 8px 4px; text-transform: none; }
+.rail-btn { width: 100%; height: 36px; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--ink-2); cursor: pointer; position: relative; display: flex; align-items: center; gap: 10px; padding: 0 10px; text-align: start; transition: background .14s, color .14s, border-color .14s, box-shadow .14s; }
+.rail-btn:hover { background: var(--surface-3); color: var(--ink-1); }
+.rail-btn.active { background: var(--brand-soft); border-color: transparent; color: var(--brand); box-shadow: inset 2px 0 0 var(--brand); }
 .rail-btn:disabled { opacity: .4; cursor: not-allowed; }
-.rail-btn .lbl { position: absolute; inset-inline-end: calc(100% + 8px); top: 50%; transform: translateY(-50%); background: var(--ink-1); color: #fff; font-size: 11.5px; font-weight: 600; padding: 4px 8px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 60; }
-.rail-btn:hover .lbl { opacity: 1; }
-.rail-sep { width: 26px; height: 1px; background: var(--line); margin: 6px 0; }
-.rail .spacer { flex: 1; }
+.rail-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.rail-btn .lbl { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-sep { display: none; }
+.rail .spacer { display: none; }
 
 .viewport { overflow: auto; padding: 30px; min-width: 0; position: relative; background: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0) 0 0 / 24px 24px, var(--canvas); }
 
@@ -379,6 +382,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   .tb-left .btn .txt { display: none; }
   .tb-left { gap: 6px; }
   .tb-left .btn { padding: 9px 10px; }
+  /* rail collapses to a compact icon column; labels move to tooltips (title) */
+  :root { --rail-w: 54px; }
+  .rail { padding: 8px 6px; align-items: center; }
+  .rail-head { display: none; }
+  .rail-group { align-items: center; gap: 3px; padding-bottom: 6px; margin-bottom: 4px; }
+  .rail-btn { width: 42px; height: 42px; justify-content: center; padding: 0; }
+  .rail-btn .lbl { display: none; }
 }
 @media (max-width: 900px) {
   :root { --panel-w: 300px; }
@@ -420,7 +430,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .el.rect .fill { width: 100%; height: 100%; pointer-events: none; }
 
 </style>
-<meta name="theme-color" content="#0E2A52" />
+<meta name="theme-color" content="#FFFFFF" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 </head>
 <body>
@@ -431,7 +441,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         <div class="logo" aria-label="Fillo">
           <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true">
             <path d="M12 3.2C15 7 18 10.6 18 13.7A6 6 0 1 1 6 13.7C6 10.6 9 7 12 3.2Z" fill="#fff"/>
-            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#1E4E8C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#0E6E78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         <div>
@@ -443,8 +453,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     <div class="tb-center">
       <div class="docbar hidden" id="docbar">
         <span class="fname" id="fname">—</span>
-        <span id="savedInd" style="font-size:11px;font-weight:700;color:#9FE3BF;opacity:0;transition:opacity .4s">✓ נשמר</span>
-        <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:700"></select>
+        <span id="savedInd" style="font-size:11px;font-weight:700;color:var(--ok);opacity:0;transition:opacity .4s">✓ נשמר</span>
+        <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);font-size:12px;font-weight:700"></select>
         <div class="zoomctl" id="zoomctl">
           <button data-z="out" title="הקטן">−</button>
           <span class="lvl" id="zoomLvl">100%</span>
@@ -466,30 +476,42 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   </header>
 
   <div class="workspace">
-    <nav class="rail" id="rail">
-      <button class="rail-btn tool" data-tool="text" title="טקסט"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg><span class="lbl">טקסט</span></button>
-      <button class="rail-btn tool" data-tool="check" title="וי"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg><span class="lbl">סימן וי</span></button>
-      <button class="rail-btn tool" data-tool="cross" title="איקס"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="lbl">איקס</span></button>
-      <button class="rail-btn tool" data-tool="draw" title="ציור חופשי"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 2-5 5-7s6-4 8-8"/><path d="M15 4l5 5-9 9-6 1 1-6z"/></svg><span class="lbl">ציור חופשי</span></button>
-      <button class="rail-btn tool" data-tool="date" title="תאריך"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
-      <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
-      <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
-      <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
-      <button class="rail-btn" id="stickyBtn" title="מצב רצף — הכלי נשאר פעיל להנחה מרובה (Esc לעצירה)"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="lbl">מצב רצף</span></button>
-      <div class="rail-sep"></div>
-      <button class="rail-btn tool" data-tool="signature" title="חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
-      <button class="rail-btn tool" data-tool="stamp" title="חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
-      <button class="rail-btn tool" data-tool="handwriting" title="כתב יד"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
-      <div class="rail-sep"></div>
-      <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
-      <button class="rail-btn" id="detectBtn" disabled title="זהה שדות"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
-      <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
-      <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
-      <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
-      <button class="rail-btn" id="attachBtn" disabled title="צרף עמודים (צילום ת״ז, קבלה, PDF) — יתווספו לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
-      <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
-      <button class="rail-btn" id="deleteBtn" disabled title="מחק את העמוד הנוכחי (לא ייכלל בייצוא)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/></svg><span class="lbl">מחק עמוד</span></button>
-      <div class="spacer"></div>
+    <nav class="rail" id="rail" aria-label="כלים">
+      <div class="rail-group">
+        <div class="rail-head">הוספה</div>
+        <button class="rail-btn tool" data-tool="text" title="הוספת טקסט"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg><span class="lbl">טקסט</span></button>
+        <button class="rail-btn tool" data-tool="check" title="סימן וי"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg><span class="lbl">סימן וי</span></button>
+        <button class="rail-btn tool" data-tool="cross" title="איקס"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="lbl">איקס</span></button>
+        <button class="rail-btn tool" data-tool="date" title="תאריך היום"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
+        <button class="rail-btn tool" data-tool="draw" title="ציור חופשי"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 2-5 5-7s6-4 8-8"/><path d="M15 4l5 5-9 9-6 1 1-6z"/></svg><span class="lbl">ציור חופשי</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">חתימה וחותמת</div>
+        <button class="rail-btn tool" data-tool="signature" title="הוספת חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
+        <button class="rail-btn tool" data-tool="stamp" title="הוספת חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
+        <button class="rail-btn tool" data-tool="handwriting" title="טקסט בכתב היד שלך"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">הדגשה ותיקון</div>
+        <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
+        <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
+        <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">עמוד וקובץ</div>
+        <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
+        <button class="rail-btn" id="attachBtn" disabled title="צרף עמודים (צילום ת״ז, קבלה, PDF) — יתווספו לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
+        <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
+        <button class="rail-btn" id="deleteBtn" disabled title="מחק את העמוד הנוכחי (לא ייכלל בייצוא)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/></svg><span class="lbl">מחק עמוד</span></button>
+        <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
+        <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">כלים</div>
+        <button class="rail-btn" id="detectBtn" disabled title="זהה שדות אוטומטית"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
+        <button class="rail-btn" id="stickyBtn" title="מצב רצף — הכלי נשאר פעיל להנחה מרובה (Esc לעצירה)"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="lbl">מצב רצף</span></button>
+        <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
+      </div>
     </nav>
 
     <aside class="thumbs" id="thumbs" hidden aria-label="תמונות ממוזערות של עמודים"></aside>

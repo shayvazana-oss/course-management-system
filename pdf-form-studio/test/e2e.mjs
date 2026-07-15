@@ -651,6 +651,22 @@ async function main() {
     return re.getPageCount() === 3 && Math.round(re.getPage(0).getSize().height) === 140;
   }));
 
+  // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
+  check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    const overlayEl = document.querySelector('.page-wrap .overlay');
+    if (!overlayEl || !ov.isPlacing) return false;
+    const place = () => overlayEl.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 10 }));
+    ov.setPlacing({ sticky: false, create: () => null });
+    place();
+    const disarmed = ov.isPlacing() === false;         // one shot → disarmed
+    ov.setPlacing({ sticky: true, create: () => null });
+    place(); place();
+    const stillArmed = ov.isPlacing() === true;         // stays armed
+    ov.setPlacing(null);                                // cleanup
+    return disarmed && stillArmed;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

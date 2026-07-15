@@ -84,6 +84,7 @@
       opts.onChange && opts.onChange();
     }
 
+    function isPlacing() { return !!placing; }
     function setPlacing(p) {
       placing = p;
       pages.forEach((pg) => pg && pg.overlayEl.classList.toggle('placing', !!p));
@@ -182,7 +183,7 @@
     }
 
     return {
-      registerPage, addElementAt, instantiate, setPlacing,
+      registerPage, addElementAt, instantiate, setPlacing, isPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
       overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,

@@ -283,6 +283,12 @@ let currentFileName = 'filled';
 //  Tools
 // =====================================================================
 const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
+let stickyTools = false; // "repeat mode": keep a tool armed for multiple placements
+$('stickyBtn') && $('stickyBtn').addEventListener('click', () => {
+  stickyTools = !stickyTools;
+  $('stickyBtn').classList.toggle('active', stickyTools);
+  PFS.toast(stickyTools ? 'מצב רצף פעיל — הכלי יישאר פעיל להנחה מרובה (Esc לעצירה)' : 'מצב רצף כבוי', 'ok', 1800);
+});
 
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
@@ -299,9 +305,10 @@ function activateTool(btn, tool) {
     tool === 'signature' ? startSignatureFlow() : startStampFlow();
     return;
   }
-  // text-like: arm placement — click on a page to drop it
+  // text-like: arm placement — click on a page to drop it. In "repeat mode" the
+  // tool stays armed so you can place many (checkmarks, boxes) fast; Esc stops.
   overlay.setPlacing({
-    sticky: false,
+    sticky: stickyTools,
     create: (pageIndex, fx, fy) => {
       const extra = {};
       if (tool === 'date') extra.text = new Date().toLocaleDateString('he-IL');

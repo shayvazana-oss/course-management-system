@@ -448,6 +448,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
       <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
       <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
+      <button class="rail-btn" id="stickyBtn" title="מצב רצף — הכלי נשאר פעיל להנחה מרובה (Esc לעצירה)"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="lbl">מצב רצף</span></button>
       <div class="rail-sep"></div>
       <button class="rail-btn tool" data-tool="signature" title="חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
       <button class="rail-btn tool" data-tool="stamp" title="חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
@@ -2757,6 +2758,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       opts.onChange && opts.onChange();
     }
 
+    function isPlacing() { return !!placing; }
     function setPlacing(p) {
       placing = p;
       pages.forEach((pg) => pg && pg.overlayEl.classList.toggle('placing', !!p));
@@ -2855,7 +2857,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     }
 
     return {
-      registerPage, addElementAt, instantiate, setPlacing,
+      registerPage, addElementAt, instantiate, setPlacing, isPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
       overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
@@ -4808,6 +4810,12 @@ let currentFileName = 'filled';
 //  Tools
 // =====================================================================
 const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
+let stickyTools = false; // "repeat mode": keep a tool armed for multiple placements
+$('stickyBtn') && $('stickyBtn').addEventListener('click', () => {
+  stickyTools = !stickyTools;
+  $('stickyBtn').classList.toggle('active', stickyTools);
+  PFS.toast(stickyTools ? 'מצב רצף פעיל — הכלי יישאר פעיל להנחה מרובה (Esc לעצירה)' : 'מצב רצף כבוי', 'ok', 1800);
+});
 
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
@@ -4824,9 +4832,10 @@ function activateTool(btn, tool) {
     tool === 'signature' ? startSignatureFlow() : startStampFlow();
     return;
   }
-  // text-like: arm placement — click on a page to drop it
+  // text-like: arm placement — click on a page to drop it. In "repeat mode" the
+  // tool stays armed so you can place many (checkmarks, boxes) fast; Esc stops.
   overlay.setPlacing({
-    sticky: false,
+    sticky: stickyTools,
     create: (pageIndex, fx, fy) => {
       const extra = {};
       if (tool === 'date') extra.text = new Date().toLocaleDateString('he-IL');

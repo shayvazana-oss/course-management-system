@@ -1758,7 +1758,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   /* ---- Signature drawing pad ---- */
   function signaturePad(canvas) {
     const ctx = canvas.getContext('2d');
-    let drawing = false, last = null, dirty = false;
+    let drawing = false, dirty = false, p0 = null, p1 = null;
     let color = '#000000', width = 2.5;
 
     function resize() {
@@ -1774,17 +1774,24 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
     function down(e) {
-      drawing = true; dirty = true; last = pos(e);
+      drawing = true; dirty = true; p0 = p1 = pos(e);
+      // a dot so a single tap registers
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(p0.x, p0.y, width / 2, 0, Math.PI * 2); ctx.fill();
       canvas.setPointerCapture(e.pointerId);
     }
     function move(e) {
       if (!drawing) return;
-      const p = pos(e);
+      const q = pos(e);
+      // quadratic curve from the midpoint(p0,p1) through control p1 to
+      // midpoint(p1,q) → the ink flows smoothly instead of faceting.
+      const m1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+      const m2 = { x: (p1.x + q.x) / 2, y: (p1.y + q.y) / 2 };
       ctx.strokeStyle = color; ctx.lineWidth = width;
-      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-      last = p;
+      ctx.beginPath(); ctx.moveTo(m1.x, m1.y); ctx.quadraticCurveTo(p1.x, p1.y, m2.x, m2.y); ctx.stroke();
+      p0 = p1; p1 = q;
     }
-    function up() { drawing = false; }
+    function up() { drawing = false; p0 = p1 = null; }
 
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);

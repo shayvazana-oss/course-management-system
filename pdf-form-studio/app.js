@@ -469,9 +469,13 @@ async function doExport() {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
   if (!models.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
-  // last-mile guard: detected fields still blank? ask before baking the PDF
+  // last-mile guard: detected fields still blank? ask before baking the PDF.
+  // required (*) empties are called out first — those bounce a government form.
+  const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
   const blanks = (fieldsPanel.emptyCount && fieldsPanel.emptyCount()) || 0;
-  if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
+  if (reqBlanks > 0) {
+    if (!(await PFS.ui.confirm('שדות חובה ריקים', 'נשארו ' + reqBlanks + ' שדות חובה (*) ריקים — טופס עם שדות חובה חסרים עלול להידחות. לייצא בכל זאת?'))) return;
+  } else if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
   const btn = $('exportBtn'); const prev = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {

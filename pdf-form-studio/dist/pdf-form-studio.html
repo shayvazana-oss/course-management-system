@@ -3391,7 +3391,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   const hasHebrew = (s) => /[֐-׿؀-ۿ]/.test(s);
   const isLabel = (s) => {
     const t = (s || '').trim();
-    return t.length > 0 && t.length < 40 && /[:：׃]\s*$/.test(t);
+    // a label ends with a colon, optionally followed by a required marker ("*")
+    return t.length > 0 && t.length < 40 && /[:：׃]\s*[*＊]?\s*$/.test(t);
   };
   const isUnderscores = (s) => /_{3,}/.test(s || '');
   function slug(label, i) {
@@ -3480,10 +3481,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
+      // required marker: a '*' or "חובה" in/next to the label — a missing
+      // required field is the usual reason a government form is bounced back
+      const reqMark = /[*＊]|\(?\s*חובה\s*\)?|required/i;
+      const required = reqMark.test(displayLabel) || sameLine.some((o) => /^[*＊]$/.test((o.str || '').trim()));
+      const cleanLabel = displayLabel.replace(/[*＊]/g, '').replace(/\(?\s*חובה\s*\)?/g, '').replace(/[:：׃]\s*$/, '').replace(/\s+/g, ' ').trim();
       out.push({
-        page: startIndex, fieldKey: slug(displayLabel, out.length),
-        label: displayLabel.replace(/[:：׃]\s*$/, '').trim() || 'שדה',
-        fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true
+        page: startIndex, fieldKey: slug(cleanLabel || displayLabel, out.length),
+        label: cleanLabel || 'שדה',
+        fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
       });
     });
     // radio grouping: round-bullet options sharing a line belong to one
@@ -3743,6 +3749,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const body = document.getElementById('fieldsBody');
     const ctrlByKey = {};
     let emptyCount = () => 0;   // rebound by show(); how many text fields are still blank
+    let requiredEmpty = () => 0; // rebound by show(); blank text fields marked required (*)
 
     // value history per canonical field type (address/phone/…) — powers
     // autocomplete across ALL forms, even without a saved profile.
@@ -3879,7 +3886,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const groups = Object.create(null);   // radio group id → [{f, control}]
       det.fields.forEach((f) => {
         const row = document.createElement('div'); row.className = 'field';
-        const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
+        const lab = document.createElement('label'); lab.textContent = f.label;
+        if (f.required) { const star = document.createElement('span'); star.textContent = ' *'; star.style.color = 'var(--danger)'; star.title = 'שדה חובה'; lab.appendChild(star); }
+        row.appendChild(lab);
         const inRow = document.createElement('div'); inRow.className = 'row';
         const canon = PFS.vault && (PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey));
         let control;
@@ -4023,6 +4032,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       body.appendChild(ivBtn);
       recount();
       emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
+      requiredEmpty = () => controls.filter((c, i) => !isTick(c) && !c.value.trim() && fieldMeta[i] && fieldMeta[i].required).length;
       return autoFilled;
     }
 
@@ -4056,7 +4066,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       showCur();
     }
 
-    return { show, clear, emptyCount: () => emptyCount() };
+    return { show, clear, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;
@@ -4536,9 +4546,13 @@ async function doExport() {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
   if (!models.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
-  // last-mile guard: detected fields still blank? ask before baking the PDF
+  // last-mile guard: detected fields still blank? ask before baking the PDF.
+  // required (*) empties are called out first — those bounce a government form.
+  const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
   const blanks = (fieldsPanel.emptyCount && fieldsPanel.emptyCount()) || 0;
-  if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
+  if (reqBlanks > 0) {
+    if (!(await PFS.ui.confirm('שדות חובה ריקים', 'נשארו ' + reqBlanks + ' שדות חובה (*) ריקים — טופס עם שדות חובה חסרים עלול להידחות. לייצא בכל זאת?'))) return;
+  } else if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
   const btn = $('exportBtn'); const prev = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {

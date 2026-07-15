@@ -280,6 +280,27 @@ async function main() {
     return saved && text.nm === 'משה ישראלי' && checks.gm === true;
   }));
 
+  // required-field detection: "* " / "חובה" marks a field required, the label
+  // is cleaned, a red * shows, and requiredEmpty() counts only blank requireds
+  check('required (*) fields are detected, marked and counted', await page.evaluate(() => {
+    const H = 300, W = 420, fs = 16;
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    // "שם מלא: *" on one line (label + blank), and an optional "הערות:" line
+    const fields = window.PFS.detect.heuristicForPage([
+      item('שם מלא: *', 250, 60, 90), item('הערות:', 250, 110, 70)
+    ], W, H, vp, 0);
+    const req = fields.find((f) => /שם מלא/.test(f.label));
+    const opt = fields.find((f) => /הערות/.test(f.label));
+    const detOk = req && req.required === true && !/[*＊]/.test(req.label) && opt && !opt.required;
+    if (!detOk) return false;
+    // render and check the marker + requiredEmpty count (both blank → 1 required)
+    window.PFS.__test.fieldsPanel.show({ tier: 'text', fields });
+    const hasStar = [...document.querySelectorAll('#fieldsBody label span')].some((s) => s.textContent.trim() === '*');
+    const reqEmpty = window.PFS.__test.fieldsPanel.requiredEmpty();
+    return hasStar && reqEmpty === 1;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -15,7 +15,8 @@
   const hasHebrew = (s) => /[֐-׿؀-ۿ]/.test(s);
   const isLabel = (s) => {
     const t = (s || '').trim();
-    return t.length > 0 && t.length < 40 && /[:：׃]\s*$/.test(t);
+    // a label ends with a colon, optionally followed by a required marker ("*")
+    return t.length > 0 && t.length < 40 && /[:：׃]\s*[*＊]?\s*$/.test(t);
   };
   const isUnderscores = (s) => /_{3,}/.test(s || '');
   function slug(label, i) {
@@ -104,10 +105,15 @@
         fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
+      // required marker: a '*' or "חובה" in/next to the label — a missing
+      // required field is the usual reason a government form is bounced back
+      const reqMark = /[*＊]|\(?\s*חובה\s*\)?|required/i;
+      const required = reqMark.test(displayLabel) || sameLine.some((o) => /^[*＊]$/.test((o.str || '').trim()));
+      const cleanLabel = displayLabel.replace(/[*＊]/g, '').replace(/\(?\s*חובה\s*\)?/g, '').replace(/[:：׃]\s*$/, '').replace(/\s+/g, ' ').trim();
       out.push({
-        page: startIndex, fieldKey: slug(displayLabel, out.length),
-        label: displayLabel.replace(/[:：׃]\s*$/, '').trim() || 'שדה',
-        fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true
+        page: startIndex, fieldKey: slug(cleanLabel || displayLabel, out.length),
+        label: cleanLabel || 'שדה',
+        fx, fy: Math.max(0, b.top) / H, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
       });
     });
     // radio grouping: round-bullet options sharing a line belong to one

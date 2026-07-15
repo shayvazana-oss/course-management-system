@@ -20,6 +20,7 @@
     const body = document.getElementById('fieldsBody');
     const ctrlByKey = {};
     let emptyCount = () => 0;   // rebound by show(); how many text fields are still blank
+    let requiredEmpty = () => 0; // rebound by show(); blank text fields marked required (*)
 
     // value history per canonical field type (address/phone/…) — powers
     // autocomplete across ALL forms, even without a saved profile.
@@ -156,7 +157,9 @@
       const groups = Object.create(null);   // radio group id → [{f, control}]
       det.fields.forEach((f) => {
         const row = document.createElement('div'); row.className = 'field';
-        const lab = document.createElement('label'); lab.textContent = f.label; row.appendChild(lab);
+        const lab = document.createElement('label'); lab.textContent = f.label;
+        if (f.required) { const star = document.createElement('span'); star.textContent = ' *'; star.style.color = 'var(--danger)'; star.title = 'שדה חובה'; lab.appendChild(star); }
+        row.appendChild(lab);
         const inRow = document.createElement('div'); inRow.className = 'row';
         const canon = PFS.vault && (PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey));
         let control;
@@ -300,6 +303,7 @@
       body.appendChild(ivBtn);
       recount();
       emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
+      requiredEmpty = () => controls.filter((c, i) => !isTick(c) && !c.value.trim() && fieldMeta[i] && fieldMeta[i].required).length;
       return autoFilled;
     }
 
@@ -333,7 +337,7 @@
       showCur();
     }
 
-    return { show, clear, emptyCount: () => emptyCount() };
+    return { show, clear, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;

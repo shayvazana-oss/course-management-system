@@ -57,6 +57,8 @@
   function setBeautify(on) { const p = getProfile(); p.beautify = !!on; saveProfile(p); }
   function getTracking() { const t = getProfile().tracking; return t == null ? 1 : t; }
   function setTracking(t) { const p = getProfile(); p.tracking = Math.max(0.4, Math.min(2, +t || 1)); saveProfile(p); }
+  function getWeight() { const w = getProfile().weight; return w == null ? 1 : w; }   // pen thickness ×
+  function setWeight(w) { const p = getProfile(); p.weight = Math.max(0.5, Math.min(2, +w || 1)); saveProfile(p); }
 
   /* store a glyph from raw strokes (canvas px). Normalizes to its bbox.
    * ref (optional) = {top, base} — the trainer guideline lines in the same px
@@ -131,7 +133,8 @@
     const fontPx = opts.fontPx || 64;
     const color = opts.color || '#111111';
     const beautify = opts.beautify !== undefined ? !!opts.beautify : (p.beautify !== false);
-    const lw = Math.max(1.4, fontPx * 0.05);
+    const weight = opts.weight != null ? opts.weight : (p.weight != null ? p.weight : 1);
+    const lw = Math.max(1.1, fontPx * 0.05 * weight);   // pen thickness (user control)
     // Consistent side-bearing spacing. `tracking` (0.5 tight … 1.8 loose) is a
     // user control; the base gap is measured relative to the x-height so small
     // and tall letters sit evenly, not relative to each glyph's own height.
@@ -220,7 +223,7 @@
   PFS.handwriting = {
     GLYPHS, HEB, FINALS, DIGITS, PUNCT, METRICS, metricsOf,
     getProfile, saveProfile, count, hasGlyphs, hasGlyph, clearAll,
-    getBeautify, setBeautify, getTracking, setTracking,
+    getBeautify, setBeautify, getTracking, setTracking, getWeight, setWeight,
     setGlyph, removeGlyph, renderText
   };
 })(window);

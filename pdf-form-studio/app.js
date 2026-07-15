@@ -857,7 +857,7 @@ function writeHandwriting() {
     const upd = () => {
       const t = inp.value.trim();
       if (!t) { place.disabled = true; prev.innerHTML = '<span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span>'; return; }
-      const r = HW().renderText(t, { fontPx: 56, color: $('hwWriteInk').value });
+      const r = HW().renderText(t, { fontPx: 56, color: $('hwWriteInk').value, weight: HW().getWeight() });
       // Nothing was inked → every character is untrained. Don't show an empty
       // frame (looks broken) and don't let the user place an invisible box.
       if (!r.drawn) {
@@ -882,6 +882,7 @@ function writeHandwriting() {
     $('hwBeautify').checked = HW().getBeautify();
     $('hwBeautify').addEventListener('change', () => { HW().setBeautify($('hwBeautify').checked); upd(); });
     $('hwTracking').addEventListener('input', () => { HW().setTracking(parseFloat($('hwTracking').value)); upd(); });
+    $('hwWeight').addEventListener('input', () => { HW().setWeight(parseFloat($('hwWeight').value)); upd(); });
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !place.disabled) { e.preventDefault(); place.click(); } });
     $('hwWriteCancel').addEventListener('click', () => closeModal('hwWriteModal'));
     $('hwWriteTrain').addEventListener('click', () => { closeModal('hwWriteModal'); openHwTrainer(); });
@@ -894,6 +895,7 @@ function writeHandwriting() {
   $('hwWriteInk').value = hwInk();
   $('hwBeautify').checked = HW().getBeautify();
   $('hwTracking').value = HW().getTracking();
+  $('hwWeight').value = HW().getWeight();
   const inp = $('hwWriteText');
   requestAnimationFrame(() => { inp.focus(); inp.select(); inp.dispatchEvent(new Event('input')); });
 }

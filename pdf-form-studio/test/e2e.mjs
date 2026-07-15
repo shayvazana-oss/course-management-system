@@ -1020,6 +1020,18 @@ async function main() {
     return propagated && noClobber && noGeneric;
   }));
 
+  check('clear form resets both fills and page operations', await page.evaluate(async () => {
+    const t = window.PFS.__test, ov = t.overlay, pv = t.pdfView;
+    ov.clearElements();
+    pv.setRotations({ 0: 90 });                       // a page operation…
+    ov.addElementAt('text', 0, 0.3, 0.3, { text: 'x', noEdit: true });  // …and a fill
+    const before = t.hasPageOps() && ov.getElements().length >= 1;
+    await t.resetForm();
+    const rot = pv.getRotations();
+    const stillRotated = Object.values(rot).some((v) => ((((v || 0) % 360) + 360) % 360) !== 0);
+    return before && ov.getElements().length === 0 && !stillRotated && !t.hasPageOps();
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -5207,7 +5207,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -6258,12 +6258,29 @@ $('mergeRun').addEventListener('click', async () => {
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
 $('detectBtn').addEventListener('click', runDetection);
-$('clearBtn').addEventListener('click', async () => {
-  if (!overlay.getElements().length) { PFS.toast('הטופס כבר ריק', 'ok'); return; }
-  if (!(await PFS.ui.confirm('ניקוי הטופס', 'למחוק את כל מה שמולא על הטופס?'))) return;
-  overlay.clearElements(); fieldsPanel.clear(); markDirty();
+// is any page rotated / deleted / reordered away from the loaded original?
+function hasPageOps() {
+  try {
+    const rot = pdfView.getRotations ? pdfView.getRotations() : {};
+    const rotated = Object.values(rot).some((v) => ((((v || 0) % 360) + 360) % 360) !== 0);
+    const deleted = pdfView.getRemovedPages ? pdfView.getRemovedPages().length > 0 : false;
+    const reordered = pdfView.isReordered ? pdfView.isReordered() : false;
+    return rotated || deleted || reordered;
+  } catch (e) { return false; }
+}
+// return the form to its just-loaded state: remove every placed field AND undo
+// page rotations/deletions/reordering (undo still offers finer-grained steps).
+async function resetForm() {
+  overlay.clearElements(); fieldsPanel.clear();
+  try { if (pdfView.setPageState) await pdfView.setPageState({ rotations: {}, removed: [], order: null }); } catch (e) {}
+  markDirty();
   skipPrefillOnce = true;
-  runDetection();
+  try { await runDetection(); } catch (e) {}
+}
+$('clearBtn').addEventListener('click', async () => {
+  if (!overlay.getElements().length && !hasPageOps()) { PFS.toast('הטופס כבר ריק', 'ok'); return; }
+  if (!(await PFS.ui.confirm('ניקוי הטופס', 'למחוק את כל מה שמולא ולבטל שינויי עמודים (סיבוב/מחיקה/סדר)? הטופס יחזור למצבו המקורי.'))) return;
+  await resetForm();
   PFS.toast('הטופס נוקה', 'ok');
 });
 

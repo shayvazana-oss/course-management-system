@@ -99,11 +99,27 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
-  onSelect: (ctrl) => renderProps(ctrl),
+  onSelect: (ctrl, count) => { renderProps(ctrl); updateAlignBar(count); },
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
     if (!on) document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active'));
   }
+});
+
+// ---------- align / distribute bar (multi-select) ----------
+function updateAlignBar(count) {
+  const bar = $('alignBar'); if (!bar) return;
+  const distributeReady = (overlay.getMulti && overlay.getMulti().length >= 3);
+  bar.classList.toggle('hidden', !(count >= 2));
+  if (count >= 2) $('alignCount').textContent = count + ' פריטים';
+  bar.querySelectorAll('[data-align^="distribute"]').forEach((b) => { b.disabled = !distributeReady; b.style.opacity = distributeReady ? '' : '.4'; });
+}
+document.querySelectorAll('#alignBar .align-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const op = btn.dataset.align;
+    const n = overlay.alignSelection(op);
+    if (n) { markDirty(); updateAlignBar(overlay.getMulti().length); }
+  });
 });
 
 // ---------- pdf view ----------

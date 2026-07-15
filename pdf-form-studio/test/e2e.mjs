@@ -841,6 +841,40 @@ async function main() {
     return equalW && alignBottom && noSnap;
   }));
 
+  check('align engine: edges align and centers distribute evenly', await page.evaluate(() => {
+    const A = window.PFS.align;
+    const rs = [
+      { id: 'a', fx: 0.20, fy: 0.10, fw: 0.10, fh: 0.04 },
+      { id: 'b', fx: 0.50, fy: 0.30, fw: 0.10, fh: 0.04 },
+      { id: 'c', fx: 0.35, fy: 0.70, fw: 0.10, fh: 0.04 }
+    ];
+    const L = A.left(rs);
+    const leftOk = L.a.fx === 0.20 && L.b.fx === 0.20 && L.c.fx === 0.20;   // min fx
+    // distribute vertically: centers of a(0.12),c(0.72),b(0.32→) become evenly spaced
+    const D = A.distributeV(rs);
+    // after distribute, the three centers must be equally spaced regardless of id
+    const centers = [D.a.fy + 0.02, D.b.fy + 0.02, D.c.fy + 0.02].sort((x, y) => x - y);
+    const evenY = Math.abs((centers[1] - centers[0]) - (centers[2] - centers[1])) < 1e-9;
+    // right align: right edges (fx+fw) all equal the max (0.60)
+    const R = A.right(rs);
+    const rightOk = Math.abs((R.a.fx + 0.10) - 0.60) < 1e-9 && Math.abs((R.b.fx + 0.10) - 0.60) < 1e-9;
+    return leftOk && evenY && rightOk;
+  }));
+
+  check('multi-select + alignSelection lines up placed elements', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay; ov.clearElements();
+    const a = ov.addElementAt('text', 0, 0.2, 0.2, { text: 'a', noEdit: true });
+    const b = ov.addElementAt('text', 0, 0.5, 0.4, { text: 'b', noEdit: true });
+    const c = ov.addElementAt('text', 0, 0.35, 0.6, { text: 'c', noEdit: true });
+    ov.selectCtrl(a, false); ov.selectCtrl(b, true); ov.selectCtrl(c, true);
+    const selCount = ov.getMulti().length;
+    const applied = ov.alignSelection('top');
+    const ys = ov.getMulti().map((x) => x.model.fy);
+    const allSameTop = ys.every((y) => Math.abs(y - ys[0]) < 1e-9);
+    ov.clearElements();
+    return selCount === 3 && applied === 3 && allSameTop;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

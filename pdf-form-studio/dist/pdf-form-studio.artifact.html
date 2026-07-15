@@ -283,6 +283,24 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 @media (max-width: 560px) { .help-grid, .help-keys { grid-template-columns: 1fr; } }
 .hidden { display: none !important; }
 
+/* ===== ALIGN / DISTRIBUTE BAR (multi-select) ===== */
+.align-bar {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 3px; z-index: 40;
+  padding: 5px 8px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-3);
+}
+.align-count { font-size: 11.5px; color: var(--ink-3); margin-inline-end: 4px; white-space: nowrap; }
+.align-sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 3px; }
+.align-btn {
+  width: 30px; height: 30px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--ink-2); font-size: 16px; line-height: 1;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.align-btn:hover { background: var(--brand-soft); color: var(--brand); border-color: var(--line); }
+.align-btn:active { transform: translateY(1px); }
+
 /* ===== ELEMENTS ===== */
 .el { position: absolute; box-sizing: border-box; cursor: move; border: 1px dashed transparent; border-radius: 3px; user-select: none; touch-action: none; }
 .el:hover { border-color: rgba(30,78,140,.4); }
@@ -508,6 +526,20 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
       </div>
       <div class="pages" id="pages"></div>
+      <!-- floating align/distribute bar — shown when 2+ elements are selected -->
+      <div class="align-bar hidden" id="alignBar" role="toolbar" aria-label="יישור וסידור">
+        <span class="align-count" id="alignCount"></span>
+        <button class="align-btn" data-align="left"        title="יישור לשמאל">⇤</button>
+        <button class="align-btn" data-align="centerX"     title="מרכוז אופקי">⇋</button>
+        <button class="align-btn" data-align="right"       title="יישור לימין">⇥</button>
+        <span class="align-sep"></span>
+        <button class="align-btn" data-align="top"         title="יישור למעלה">⤒</button>
+        <button class="align-btn" data-align="centerY"     title="מרכוז אנכי">⇳</button>
+        <button class="align-btn" data-align="bottom"      title="יישור למטה">⤓</button>
+        <span class="align-sep"></span>
+        <button class="align-btn" data-align="distributeH" title="פיזור אופקי אחיד">↔</button>
+        <button class="align-btn" data-align="distributeV" title="פיזור אנכי אחיד">↕</button>
+      </div>
     </main>
 
     <aside class="rightpanel" id="rightpanel">
@@ -830,6 +862,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         <div><kbd>Ctrl</kbd>+<kbd>D</kbd> שכפול פריט</div>
         <div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> הזזה מדויקת (<kbd>Shift</kbd> = צעד גדול)</div>
         <div><kbd>Alt</kbd> בגרירה — ביטול הצמדה לקווי היישור</div>
+        <div><kbd>Shift</kbd>+קליק — בחירת כמה פריטים ליישור/פיזור</div>
         <div><kbd>Delete</kbd> מחיקת פריט</div>
         <div><kbd>Enter</kbd>/<kbd>↓</kbd> שדה הבא</div>
         <div><kbd>?</kbd> פתיחת עזרה זו</div>
@@ -1940,6 +1973,55 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 </script>
 <script>
+/* align.js — pure alignment + distribution math for a set of overlay elements.
+ * Every function takes an array of rects { id, fx, fy, fw, fh } (page fractions)
+ * and returns a map id → { fx, fy } with the new top-left for each rect. Only
+ * positions change (never sizes), so callers just assign fx/fy and re-layout.
+ * No DOM, no state — trivially testable and reused by the overlay's toolbar.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  const move = (rects, fn) => {
+    const out = {};
+    rects.forEach((r) => { out[r.id] = fn(r); });
+    return out;
+  };
+
+  function left(rects)   { const v = Math.min(...rects.map((r) => r.fx));                 return move(rects, (r) => ({ fx: v, fy: r.fy })); }
+  function right(rects)  { const v = Math.max(...rects.map((r) => r.fx + r.fw));           return move(rects, (r) => ({ fx: v - r.fw, fy: r.fy })); }
+  function top(rects)    { const v = Math.min(...rects.map((r) => r.fy));                 return move(rects, (r) => ({ fx: r.fx, fy: v })); }
+  function bottom(rects) { const v = Math.max(...rects.map((r) => r.fy + r.fh));           return move(rects, (r) => ({ fx: r.fx, fy: v - r.fh })); }
+  // center on the average center, so the group stays put overall
+  function centerX(rects) { const c = avg(rects.map((r) => r.fx + r.fw / 2)); return move(rects, (r) => ({ fx: c - r.fw / 2, fy: r.fy })); }
+  function centerY(rects) { const c = avg(rects.map((r) => r.fy + r.fh / 2)); return move(rects, (r) => ({ fx: r.fx, fy: c - r.fh / 2 })); }
+  const avg = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+
+  // distribute: keep the two extreme elements, space the rest so centers are
+  // evenly spread. <3 elements → nothing to distribute (returns them unchanged).
+  function distributeH(rects) { return distribute(rects, 'fx', 'fw'); }
+  function distributeV(rects) { return distribute(rects, 'fy', 'fh'); }
+  function distribute(rects, p, s) {
+    const out = {}; rects.forEach((r) => { out[r.id] = { fx: r.fx, fy: r.fy }; });
+    if (rects.length < 3) return out;
+    const sorted = [...rects].sort((a, b) => (a[p] + a[s] / 2) - (b[p] + b[s] / 2));
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    const c0 = first[p] + first[s] / 2, c1 = last[p] + last[s] / 2;
+    const step = (c1 - c0) / (sorted.length - 1);
+    sorted.forEach((r, i) => {
+      const center = c0 + step * i;
+      const np = center - r[s] / 2;
+      out[r.id] = p === 'fx' ? { fx: np, fy: r.fy } : { fx: r.fx, fy: np };
+    });
+    return out;
+  }
+
+  PFS.align = { left, right, top, bottom, centerX, centerY, distributeH, distributeV };
+})(window);
+
+</script>
+<script>
 /* ui.js — in-app replacements for window.prompt / window.confirm.
  * Browser-native dialogs are blocked inside sandboxed iframes (hosted
  * artifact), so every "ask the user" flow goes through this promise-based
@@ -2667,7 +2749,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (opts.handle && e.target === opts.handle) return; // handled by resize
       if (node.dataset.editing === '1') return;            // let text caret work
       e.preventDefault();
-      opts.onSelect && opts.onSelect();
+      // Shift-click toggles multi-selection and does NOT start a drag
+      if (e.shiftKey) { opts.onSelect && opts.onSelect(true); return; }
+      opts.onSelect && opts.onSelect(false);
       const size = overlaySize();
       const start = { px: e.clientX, py: e.clientY, fx: model.fx, fy: model.fy };
       node.setPointerCapture(e.pointerId);
@@ -2908,7 +2992,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       aspect: isImage ? (model.aspect || 1) : null,
       // peers on the same page → alignment snapping while dragging
       getSnapTargets: () => (ctx.getPeers ? ctx.getPeers() : []).map((m) => ({ fx: m.fx, fy: m.fy, fw: m.fw, fh: m.fh })),
-      onSelect: () => ctx.onSelect(ctrl),
+      onSelect: (additive) => ctx.onSelect(ctrl, additive),
       onResize: isBox ? null : (dx, dy, start) => {
         // text: vertical drag scales font size (gentle; fine control in panel)
         model.fontFrac = clamp(start.fontFrac + dy * 0.35, 0.006, 0.2);
@@ -2937,6 +3021,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const pages = [];        // { index, wrapEl, overlayEl }
     const elements = [];     // element controllers
     let selected = null;
+    const multi = new Set(); // multi-selection for align/distribute commands
     let placing = null;      // { create: (pageIndex, fx, fy) => model|null }
 
     function registerPage(index, wrapEl, overlayEl) {
@@ -2968,7 +3053,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const ctrl = PFS.element.createElement(model, {
         overlayEl: page.overlayEl,
         getOverlaySize: () => overlaySizeFor(model.page),
-        onSelect: (c) => selectCtrl(c),
+        onSelect: (c, additive) => selectCtrl(c, additive),
         onChange: () => opts.onChange && opts.onChange(),
         onDelete: (c) => deleteCtrl(c),
         // peer geometries on this page (excluding self) for drag snapping
@@ -2995,22 +3080,47 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return ctrl;
     }
 
-    function selectCtrl(ctrl) {
-      if (selected && selected !== ctrl) selected.deselect();
-      selected = ctrl;
-      ctrl.select();
-      opts.onSelect && opts.onSelect(ctrl);
+    // additive (Shift-click) toggles membership for align/distribute; a plain
+    // click resets to a single selection. `selected` stays the primary member.
+    function selectCtrl(ctrl, additive) {
+      if (additive) {
+        if (multi.has(ctrl)) {
+          multi.delete(ctrl); ctrl.deselect();
+          if (selected === ctrl) selected = [...multi][multi.size - 1] || null;
+        } else {
+          multi.add(ctrl); ctrl.select(); selected = ctrl;
+        }
+      } else {
+        multi.forEach((c) => { if (c !== ctrl) c.deselect(); });
+        multi.clear();
+        if (selected && selected !== ctrl) selected.deselect();
+        selected = ctrl; multi.add(ctrl); ctrl.select();
+      }
+      opts.onSelect && opts.onSelect(selected, multi.size);
     }
     function deselectAll() {
+      multi.forEach((c) => c.deselect()); multi.clear();
       if (selected) { selected.deselect(); selected = null; }
-      opts.onSelect && opts.onSelect(null);
+      opts.onSelect && opts.onSelect(null, 0);
     }
     function deleteCtrl(ctrl) {
       const i = elements.indexOf(ctrl);
       if (i >= 0) elements.splice(i, 1);
+      multi.delete(ctrl);
       ctrl.remove();
-      if (selected === ctrl) { selected = null; opts.onSelect && opts.onSelect(null); }
+      if (selected === ctrl) { selected = [...multi][0] || null; opts.onSelect && opts.onSelect(selected, multi.size); }
       opts.onChange && opts.onChange();
+    }
+    function getMulti() { return [...multi]; }
+    // apply a pure PFS.align op to the multi-selection (positions only)
+    function alignSelection(op) {
+      const ctrls = [...multi];
+      if (ctrls.length < 2 || !PFS.align || !PFS.align[op]) return 0;
+      const rects = ctrls.map((c) => ({ id: c.model.id, fx: c.model.fx, fy: c.model.fy, fw: c.model.fw, fh: c.model.fh }));
+      const res = PFS.align[op](rects);
+      ctrls.forEach((c) => { const r = res[c.model.id]; if (r) { c.model.fx = PFS.clamp(r.fx, 0, 1 - c.model.fw); c.model.fy = PFS.clamp(r.fy, 0, 1 - c.model.fh); c.layout(); } });
+      opts.onChange && opts.onChange();
+      return ctrls.length;
     }
 
     function isPlacing() { return !!placing; }
@@ -3059,6 +3169,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     function clearElements() {
       elements.splice(0).forEach((c) => c.remove());
       clearFieldMarkers();
+      multi.clear();
       selected = null;
       opts.onSelect && opts.onSelect(null);
       opts.onChange && opts.onChange();
@@ -3114,6 +3225,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return {
       registerPage, addElementAt, instantiate, setPlacing, isPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
+      getMulti, alignSelection,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
       overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
       setFieldMarkers, setFieldFilled, clearFieldMarkers
@@ -4868,11 +4980,27 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
-  onSelect: (ctrl) => renderProps(ctrl),
+  onSelect: (ctrl, count) => { renderProps(ctrl); updateAlignBar(count); },
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
     if (!on) document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active'));
   }
+});
+
+// ---------- align / distribute bar (multi-select) ----------
+function updateAlignBar(count) {
+  const bar = $('alignBar'); if (!bar) return;
+  const distributeReady = (overlay.getMulti && overlay.getMulti().length >= 3);
+  bar.classList.toggle('hidden', !(count >= 2));
+  if (count >= 2) $('alignCount').textContent = count + ' פריטים';
+  bar.querySelectorAll('[data-align^="distribute"]').forEach((b) => { b.disabled = !distributeReady; b.style.opacity = distributeReady ? '' : '.4'; });
+}
+document.querySelectorAll('#alignBar .align-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const op = btn.dataset.align;
+    const n = overlay.alignSelection(op);
+    if (n) { markDirty(); updateAlignBar(overlay.getMulti().length); }
+  });
 });
 
 // ---------- pdf view ----------

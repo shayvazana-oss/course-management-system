@@ -122,6 +122,20 @@
         <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
       </div>
       <div class="pages" id="pages"></div>
+      <!-- floating align/distribute bar — shown when 2+ elements are selected -->
+      <div class="align-bar hidden" id="alignBar" role="toolbar" aria-label="יישור וסידור">
+        <span class="align-count" id="alignCount"></span>
+        <button class="align-btn" data-align="left"        title="יישור לשמאל">⇤</button>
+        <button class="align-btn" data-align="centerX"     title="מרכוז אופקי">⇋</button>
+        <button class="align-btn" data-align="right"       title="יישור לימין">⇥</button>
+        <span class="align-sep"></span>
+        <button class="align-btn" data-align="top"         title="יישור למעלה">⤒</button>
+        <button class="align-btn" data-align="centerY"     title="מרכוז אנכי">⇳</button>
+        <button class="align-btn" data-align="bottom"      title="יישור למטה">⤓</button>
+        <span class="align-sep"></span>
+        <button class="align-btn" data-align="distributeH" title="פיזור אופקי אחיד">↔</button>
+        <button class="align-btn" data-align="distributeV" title="פיזור אנכי אחיד">↕</button>
+      </div>
     </main>
 
     <aside class="rightpanel" id="rightpanel">
@@ -444,6 +458,7 @@
         <div><kbd>Ctrl</kbd>+<kbd>D</kbd> שכפול פריט</div>
         <div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> הזזה מדויקת (<kbd>Shift</kbd> = צעד גדול)</div>
         <div><kbd>Alt</kbd> בגרירה — ביטול הצמדה לקווי היישור</div>
+        <div><kbd>Shift</kbd>+קליק — בחירת כמה פריטים ליישור/פיזור</div>
         <div><kbd>Delete</kbd> מחיקת פריט</div>
         <div><kbd>Enter</kbd>/<kbd>↓</kbd> שדה הבא</div>
         <div><kbd>?</kbd> פתיחת עזרה זו</div>
@@ -502,6 +517,7 @@
 <script src="./js/formula.js"></script>
 <script src="./js/vault.js"></script>
 <script src="./js/validate.js"></script>
+<script src="./js/align.js"></script>
 <script src="./js/ui.js"></script>
 <script src="./js/deliver.js"></script>
 <script src="./js/image-tools.js"></script>

@@ -10,6 +10,7 @@
     const pages = [];        // { index, wrapEl, overlayEl }
     const elements = [];     // element controllers
     let selected = null;
+    const multi = new Set(); // multi-selection for align/distribute commands
     let placing = null;      // { create: (pageIndex, fx, fy) => model|null }
 
     function registerPage(index, wrapEl, overlayEl) {
@@ -41,7 +42,7 @@
       const ctrl = PFS.element.createElement(model, {
         overlayEl: page.overlayEl,
         getOverlaySize: () => overlaySizeFor(model.page),
-        onSelect: (c) => selectCtrl(c),
+        onSelect: (c, additive) => selectCtrl(c, additive),
         onChange: () => opts.onChange && opts.onChange(),
         onDelete: (c) => deleteCtrl(c),
         // peer geometries on this page (excluding self) for drag snapping
@@ -68,22 +69,47 @@
       return ctrl;
     }
 
-    function selectCtrl(ctrl) {
-      if (selected && selected !== ctrl) selected.deselect();
-      selected = ctrl;
-      ctrl.select();
-      opts.onSelect && opts.onSelect(ctrl);
+    // additive (Shift-click) toggles membership for align/distribute; a plain
+    // click resets to a single selection. `selected` stays the primary member.
+    function selectCtrl(ctrl, additive) {
+      if (additive) {
+        if (multi.has(ctrl)) {
+          multi.delete(ctrl); ctrl.deselect();
+          if (selected === ctrl) selected = [...multi][multi.size - 1] || null;
+        } else {
+          multi.add(ctrl); ctrl.select(); selected = ctrl;
+        }
+      } else {
+        multi.forEach((c) => { if (c !== ctrl) c.deselect(); });
+        multi.clear();
+        if (selected && selected !== ctrl) selected.deselect();
+        selected = ctrl; multi.add(ctrl); ctrl.select();
+      }
+      opts.onSelect && opts.onSelect(selected, multi.size);
     }
     function deselectAll() {
+      multi.forEach((c) => c.deselect()); multi.clear();
       if (selected) { selected.deselect(); selected = null; }
-      opts.onSelect && opts.onSelect(null);
+      opts.onSelect && opts.onSelect(null, 0);
     }
     function deleteCtrl(ctrl) {
       const i = elements.indexOf(ctrl);
       if (i >= 0) elements.splice(i, 1);
+      multi.delete(ctrl);
       ctrl.remove();
-      if (selected === ctrl) { selected = null; opts.onSelect && opts.onSelect(null); }
+      if (selected === ctrl) { selected = [...multi][0] || null; opts.onSelect && opts.onSelect(selected, multi.size); }
       opts.onChange && opts.onChange();
+    }
+    function getMulti() { return [...multi]; }
+    // apply a pure PFS.align op to the multi-selection (positions only)
+    function alignSelection(op) {
+      const ctrls = [...multi];
+      if (ctrls.length < 2 || !PFS.align || !PFS.align[op]) return 0;
+      const rects = ctrls.map((c) => ({ id: c.model.id, fx: c.model.fx, fy: c.model.fy, fw: c.model.fw, fh: c.model.fh }));
+      const res = PFS.align[op](rects);
+      ctrls.forEach((c) => { const r = res[c.model.id]; if (r) { c.model.fx = PFS.clamp(r.fx, 0, 1 - c.model.fw); c.model.fy = PFS.clamp(r.fy, 0, 1 - c.model.fh); c.layout(); } });
+      opts.onChange && opts.onChange();
+      return ctrls.length;
     }
 
     function isPlacing() { return !!placing; }
@@ -132,6 +158,7 @@
     function clearElements() {
       elements.splice(0).forEach((c) => c.remove());
       clearFieldMarkers();
+      multi.clear();
       selected = null;
       opts.onSelect && opts.onSelect(null);
       opts.onChange && opts.onChange();
@@ -187,6 +214,7 @@
     return {
       registerPage, addElementAt, instantiate, setPlacing, isPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
+      getMulti, alignSelection,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
       overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
       setFieldMarkers, setFieldFilled, clearFieldMarkers

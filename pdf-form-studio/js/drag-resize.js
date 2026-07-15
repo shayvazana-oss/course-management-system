@@ -93,7 +93,9 @@
       if (opts.handle && e.target === opts.handle) return; // handled by resize
       if (node.dataset.editing === '1') return;            // let text caret work
       e.preventDefault();
-      opts.onSelect && opts.onSelect();
+      // Shift-click toggles multi-selection and does NOT start a drag
+      if (e.shiftKey) { opts.onSelect && opts.onSelect(true); return; }
+      opts.onSelect && opts.onSelect(false);
       const size = overlaySize();
       const start = { px: e.clientX, py: e.clientY, fx: model.fx, fy: model.fy };
       node.setPointerCapture(e.pointerId);

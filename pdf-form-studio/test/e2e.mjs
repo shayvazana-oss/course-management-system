@@ -875,6 +875,29 @@ async function main() {
     return selCount === 3 && applied === 3 && allSameTop;
   }));
 
+  check('detect: dot-leaders, numbered fields, and colon-embedded blanks', await page.evaluate(() => {
+    const H = 320, W = 460, fs = 16;
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    const texts = (arr) => arr.filter((f) => f.type === 'text');
+    // (a) a Hebrew label followed by a dot-leader blank on the same line
+    const dot = texts(window.PFS.detect.heuristicForPage([
+      item('שם מלא', 300, 60, 70), item('....................', 90, 60, 190)
+    ], W, H, vp, 0));
+    const dotOk = dot.length >= 1 && dot.some((f) => /שם/.test(f.label));
+    // (b) a numbered field: the enumerator is stripped from label AND key
+    const num = texts(window.PFS.detect.heuristicForPage([
+      item('3. שם משפחה:', 260, 120, 120)
+    ], W, H, vp, 0));
+    const numOk = num.length === 1 && num[0].label === 'שם משפחה' && !/^3/.test(num[0].fieldKey) && /משפחה/.test(num[0].fieldKey);
+    // (c) "label: ____" carried in a single text item → label is the pre-colon text
+    const emb = texts(window.PFS.detect.heuristicForPage([
+      item('טלפון: __________', 200, 180, 180)
+    ], W, H, vp, 0));
+    const embOk = emb.length === 1 && emb[0].label === 'טלפון';
+    return dotOk && numOk && embOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

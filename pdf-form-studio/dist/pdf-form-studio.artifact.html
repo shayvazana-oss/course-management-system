@@ -4189,8 +4189,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return t.length > 0 && t.length < 40 && /[:：׃]\s*[*＊]?\s*$/.test(t);
   };
   const isUnderscores = (s) => /_{3,}/.test(s || '');
+  // dot leaders ("שם מלא ........") are as common as underscores on official
+  // Israeli forms; a run of ≥4 dots or an ellipsis run marks a fill-in blank.
+  const isDotLeader = (s) => /\.{4,}|…{1,}/.test(s || '');
+  const isBlankRun = (s) => isUnderscores(s) || isDotLeader(s);
+  // strip a leading field number ("3." / "3)" / "3．") so numbered forms yield
+  // clean labels and keys ("3. שם משפחה" → "שם משפחה").
+  const stripEnum = (s) => (s || '').replace(/^\s*\d{1,3}\s*[.)．]\s*/, '');
   function slug(label, i) {
-    let t = (label || '').replace(/[:：׃]\s*$/, '').trim();
+    let t = stripEnum((label || '')).replace(/[:：׃]\s*$/, '').trim();
     if (!t) return 'field_' + (i + 1);
     t = t.replace(/[^\w֐-׿]+/g, '_').replace(/^_+|_+$/g, '');
     return t.slice(0, 40) || ('field_' + (i + 1));
@@ -4242,24 +4249,30 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         });
         return;
       }
-      if (!isLabel(label) && !isUnderscores(label)) return;
+      if (!isLabel(label) && !isBlankRun(label)) return;
       const sameLine = boxes.filter((o) => o !== b && Math.abs(o.yBase - b.yBase) < b.fontH * 0.7);
-      // For a bare underscore-blank, borrow the real label from the nearest
-      // text on the same line (bidi sometimes splits "label: ____" into two
-      // items — happens with Arabic and some Hebrew). Prefer the label to the
-      // RIGHT (RTL) of the blank, else the nearest with letters.
+      // For a bare blank run, borrow the real label from the nearest text on
+      // the same line (bidi sometimes splits "label: ____" into two items —
+      // happens with Arabic and some Hebrew). Prefer the label to the RIGHT
+      // (RTL) of the blank, else the nearest with letters.
       let displayLabel = label;
       const hasLetters = (s) => /[A-Za-z֐-׿؀-ۿ]/.test(s || '');
-      if (isUnderscores(label)) {
-        const cand = sameLine.filter((o) => hasLetters(o.str) && !isUnderscores(o.str.trim()));
-        const right = cand.filter((o) => o.x > b.x).sort((a, c) => a.x - c.x)[0];
-        const chosen = right || cand.sort((a, c) => c.x - a.x)[0];
-        if (chosen) displayLabel = chosen.str.trim();
+      if (isBlankRun(label)) {
+        // "label: ____" carried in ONE item → take the pre-colon text as label
+        const embedded = label.match(/^(.*?[:：׃])\s*[_.．…]{2,}\s*$/);
+        if (embedded && hasLetters(embedded[1])) {
+          displayLabel = embedded[1].trim();
+        } else {
+          const cand = sameLine.filter((o) => hasLetters(o.str) && !isBlankRun(o.str.trim()));
+          const right = cand.filter((o) => o.x > b.x).sort((a, c) => a.x - c.x)[0];
+          const chosen = right || cand.sort((a, c) => c.x - a.x)[0];
+          if (chosen) displayLabel = chosen.str.trim();
+        }
       }
       const rtl = hasHebrew(displayLabel);
       let fx, fw;
       const defW = Math.min(0.34 * W, W * 0.5);
-      if (isUnderscores(label)) {
+      if (isBlankRun(label)) {
         fx = b.x / W; fw = Math.max(b.w, 0.15 * W) / W;
       } else if (rtl) {
         // blank is to the LEFT of the label
@@ -4279,7 +4292,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       // required field is the usual reason a government form is bounced back
       const reqMark = /[*＊]|\(?\s*חובה\s*\)?|required/i;
       const required = reqMark.test(displayLabel) || sameLine.some((o) => /^[*＊]$/.test((o.str || '').trim()));
-      const cleanLabel = displayLabel.replace(/[*＊]/g, '').replace(/\(?\s*חובה\s*\)?/g, '').replace(/[:：׃]\s*$/, '').replace(/\s+/g, ' ').trim();
+      const cleanLabel = stripEnum(displayLabel).replace(/[*＊]/g, '').replace(/\(?\s*חובה\s*\)?/g, '').replace(/[:：׃]\s*$/, '').replace(/\s+/g, ' ').trim();
       out.push({
         page: startIndex, fieldKey: slug(cleanLabel || displayLabel, out.length),
         label: cleanLabel || 'שדה',

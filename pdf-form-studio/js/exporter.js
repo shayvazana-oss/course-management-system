@@ -148,6 +148,15 @@
     // each scaled to fit an A4 portrait — so form + attachments submit as one PDF
     const attachments = opts.attachments || [];
     for (const att of attachments) {
+      // a PDF attachment → copy all its pages through unchanged
+      if (att && att.kind === 'pdf' && att.bytes) {
+        try {
+          const donor = await PDFDocument.load(att.bytes);
+          const copied = await pdfDoc.copyPages(donor, donor.getPageIndices());
+          copied.forEach((p) => pdfDoc.addPage(p));
+        } catch (e) { console.warn('[export] pdf attachment skipped:', e && e.message); }
+        continue;
+      }
       const src = att && (att.url || att);
       if (!src) continue;
       let emb;

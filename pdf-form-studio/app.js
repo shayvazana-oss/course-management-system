@@ -678,14 +678,16 @@ $('attachInput') && $('attachInput').addEventListener('change', async (e) => {
   const files = [...(e.target.files || [])];
   e.target.value = '';
   for (const f of files) {
-    if (!/^image\/(png|jpeg|webp)$/.test(f.type)) continue;
     try {
-      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-      // webp isn't embeddable by pdf-lib → normalize to PNG; keep jpeg/png as-is
-      if (f.type === 'image/webp') {
+      if (f.type === 'application/pdf') {
+        const buf = await f.arrayBuffer();
+        attachments.push({ kind: 'pdf', bytes: new Uint8Array(buf), name: f.name });
+      } else if (f.type === 'image/webp') {
+        // webp isn't embeddable by pdf-lib → normalize to PNG
         const conv = await PFS.imageTools.processUpload(f, { removeWhite: false });
         attachments.push({ url: conv.url, type: 'image/png', name: f.name });
-      } else {
+      } else if (/^image\/(png|jpeg)$/.test(f.type)) {
+        const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
         attachments.push({ url, type: f.type, name: f.name });
       }
     } catch (err) { console.warn('attach failed', err); }

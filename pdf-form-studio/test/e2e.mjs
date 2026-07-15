@@ -435,6 +435,17 @@ async function main() {
     return (await PDFDocument.load(out)).getPageCount() === 4; // 2 original + 2 attachments
   }));
 
+  // a PDF attachment appends ALL its pages (supporting docs are often PDFs)
+  check('PDF attachments append all their pages on export', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const base = await PDFDocument.create(); base.addPage([300, 400]);
+    const baseBytes = await base.save();
+    const donor = await PDFDocument.create(); donor.addPage([200, 200]); donor.addPage([200, 200]); donor.addPage([200, 200]);
+    const donorBytes = await donor.save();
+    const out = await window.PFS.exporter.exportPdf(baseBytes, [], { attachments: [{ kind: 'pdf', bytes: donorBytes }] });
+    return (await PDFDocument.load(out)).getPageCount() === 4; // 1 base + 3 donor pages
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -252,7 +252,7 @@ async function openPdfFile(file) {
       // one-click: also fill the active profile into the (now tagged) fields
       const ap = profiles.active();
       if (ap && ap.values && Object.keys(ap.values).length) {
-        const n = overlay.fillByKeys(ap.values);
+        const n = smartFill(ap.values);
         if (n) PFS.toast(`מולאו אוטומטית ${n} שדות מהפרופיל`, 'ok');
       }
     }
@@ -841,10 +841,21 @@ $('profileAddRow').addEventListener('click', () => {
   if (!p) { profiles.saveProfile('פרופיל חדש', {}); renderProfileSelect(); p = profiles.active(); }
   $('profileRows').appendChild(profileRow(p.id, '', ''));
 });
+// Fill tagged elements by MEANING (+ address/name/amount-in-words derivation),
+// so the profile button & Fill-All are as smart as the detected-fields panel.
+function smartFill(map) {
+  if (!map) return 0;
+  try {
+    const keys = overlay.fieldKeys ? overlay.fieldKeys() : [];
+    const fields = keys.map((k) => ({ fieldKey: k, label: k, type: 'text' }));
+    const resolved = PFS.vault && PFS.vault.matchValues ? PFS.vault.matchValues(fields, map, []) : {};
+    return overlay.fillByKeys(Object.assign({}, map, resolved));
+  } catch (e) { return overlay.fillByKeys(map); }
+}
 $('profileFill').addEventListener('click', () => {
   const p = profiles.all().find((x) => x.id === $('profileSel').value);
   if (!p || !p.values) { PFS.toast('אין נתונים בפרופיל', 'err'); return; }
-  const n = overlay.fillByKeys(p.values);
+  const n = smartFill(p.values);
   PFS.toast(n ? `מולאו ${n} שדות` : 'לא נמצאו שדות מתויגים תואמים', n ? 'ok' : 'err');
 });
 $('profileGrab').addEventListener('click', async () => {
@@ -909,7 +920,7 @@ $('qsSave').addEventListener('click', () => {
   // AND re-prefill the detected-fields panel (text + gender/marital/health tick)
   let n = 0;
   if (pdfView.hasDoc()) {
-    n += overlay.fillByKeys(merged);
+    n += smartFill(merged);
     if (lastDet && lastDet.fields && lastDet.fields.length) n += fieldsPanel.show(lastDet, vaultPrefill(lastDet));
   }
   PFS.toast(n ? `נשמר ✓ — ${n} שדות מולאו בטופס` : 'הפרטים נשמרו ✓', 'ok');
@@ -1221,7 +1232,7 @@ function fillAll() {
   const match = currentFp && templates.findMatch(currentFp);
   if (match) { templates.apply(match.tpl.id); did.push('תבנית'); }
   const ap = profiles.active();
-  if (ap && ap.values && Object.keys(ap.values).length) { const n = overlay.fillByKeys(ap.values); if (n) did.push(n + ' שדות'); }
+  if (ap && ap.values && Object.keys(ap.values).length) { const n = smartFill(ap.values); if (n) did.push(n + ' שדות'); }
   const kinds = overlay.getElements().map((c) => c.model.kind);
   // signature/stamp: land on a detected line when one exists, else a corner
   ['signature', 'stamp'].forEach((kind) => {

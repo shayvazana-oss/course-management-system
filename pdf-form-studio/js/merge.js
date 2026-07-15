@@ -40,10 +40,31 @@
 
   function cloneModels(models) { return models.map((m) => Object.assign({}, m)); }
 
+  // Enrich a CSV record with meaning-matched + derived values for the tagged
+  // fields, so batch fill is as smart as interactive fill: an "address" column
+  // fills separate city/house/zip fields, "full_name" fills first/last, and a
+  // "סכום" column fills a "סכום במילים" field. Falls back to the raw record.
+  function enrichRecord(models, record) {
+    if (!(PFS.vault && PFS.vault.matchValues)) return record;
+    const keys = [...new Set(models.filter((m) => m.type === 'text' && m.fieldKey).map((m) => m.fieldKey))];
+    const fields = keys.map((k) => ({ fieldKey: k, label: k, type: 'text' }));
+    const out = Object.assign({}, record, PFS.vault.matchValues(fields, record, []));
+    if (PFS.numwords) {
+      keys.forEach((k) => {
+        if (PFS.vault.matchKey(k) === 'amount_words' && out[k] === undefined) {
+          const amtKey = keys.find((x) => PFS.vault.matchKey(x) === 'amount');
+          const num = parseFloat(String((amtKey && out[amtKey]) || '').replace(/[^\d.]/g, ''));
+          if (isFinite(num)) out[k] = PFS.numwords.shekels(num);
+        }
+      });
+    }
+    return out;
+  }
   function applyRecord(models, record) {
+    const rec = enrichRecord(models, record);
     return cloneModels(models).map((m) => {
-      if (m.type === 'text' && m.fieldKey && Object.prototype.hasOwnProperty.call(record, m.fieldKey)) {
-        m = Object.assign({}, m, { text: String(record[m.fieldKey] ?? '') });
+      if (m.type === 'text' && m.fieldKey && Object.prototype.hasOwnProperty.call(rec, m.fieldKey)) {
+        m = Object.assign({}, m, { text: String(rec[m.fieldKey] ?? '') });
       }
       return m;
     });
@@ -75,5 +96,5 @@
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, applyRecord, runBatch, downloadZip };
+  PFS.merge = { parseCSV, applyRecord, enrichRecord, runBatch, downloadZip };
 })(window);

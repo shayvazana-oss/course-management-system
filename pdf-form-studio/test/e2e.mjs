@@ -555,6 +555,18 @@ async function main() {
     return re.getPageCount() === 2 && Math.round(re.getPage(0).getSize().width) === 310 && re.getPage(1).getRotation().angle === 90;
   }));
 
+  // mail-merge is now as smart as interactive fill: an address column fills
+  // split city/zip fields, and a סכום column fills a סכום-במילים field per record
+  check('mail-merge derives split + amount-in-words fields per record', await page.evaluate(() => {
+    const models = [
+      { type: 'text', fieldKey: 'כתובת' }, { type: 'text', fieldKey: 'עיר' }, { type: 'text', fieldKey: 'מיקוד' },
+      { type: 'text', fieldKey: 'סכום' }, { type: 'text', fieldKey: 'סכום במילים' }
+    ];
+    const out = window.PFS.merge.applyRecord(models, { 'כתובת': 'רחוב הרצל 15, תל אביב 6100000', 'סכום': '1234' });
+    const b = {}; out.forEach((m) => { b[m.fieldKey] = m.text; });
+    return /תל אביב/.test(b['עיר']) && b['מיקוד'] === '6100000' && /הרצל/.test(b['כתובת']) && /אלף מאתיים/.test(b['סכום במילים']);
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

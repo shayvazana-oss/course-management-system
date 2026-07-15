@@ -924,6 +924,20 @@ async function main() {
     return posOk && neg1Ok && neg2Ok;
   }));
 
+  check('vault: expanded synonyms + marital coverage map correctly', await page.evaluate(() => {
+    const mk = window.PFS.vault.matchKey, cc = window.PFS.vault.classifyChoice;
+    const synOk = mk('משלח יד') === 'occupation'      // Form 101 term for occupation
+      && mk('מספר זיהוי') === 'id'
+      && mk('סלולארי') === 'phone'                     // alt spelling of סלולרי
+      && mk('דואל') === 'email'
+      && mk('כתובת דואל') === 'email'                  // must beat the address phrase
+      && mk('כתובת מגורים') === 'address';             // unchanged: plain address still maps
+    const marOk = cc('ידוע בציבור').canon === 'marital_status' && cc('ידוע בציבור').value
+      && cc('פרודה').canon === 'marital_status'
+      && cc('נשוי').canon === 'marital_status';        // unchanged
+    return synOk && marOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

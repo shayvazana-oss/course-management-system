@@ -41,6 +41,7 @@
       </div>
     </div>
     <div class="tb-left">
+      <button class="btn ghost" id="helpBtn" title="עזרה וקיצורי מקלדת (?)" aria-label="עזרה וקיצורי מקלדת"><span class="ic">?</span></button>
       <button class="btn ghost" id="themeBtn" title="מצב תצוגה (בהיר/כהה)" aria-label="החלפת מצב תצוגה בהיר או כהה"><span class="ic" id="themeIc">🌙</span></button>
       <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל" aria-label="פתיחת פאנל הצד">☰</button>
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
@@ -393,7 +394,40 @@
 <input type="file" id="mergeFile" accept=".csv,text/csv,text/plain" class="hidden" />
 
 <datalist id="fieldKeyList"></datalist>
-<div class="toast-wrap" id="toastWrap"></div>
+<div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<!-- Help & shortcuts -->
+<div class="modal-back" id="helpModal">
+  <div class="modal" style="max-width:560px">
+    <header>💡 עזרה — כל מה ש-Fillo יודע לעשות</header>
+    <div class="m-body" style="max-height:70vh;overflow:auto">
+      <div class="help-grid">
+        <div class="help-card"><b>🪄 מילוי אוטומטי</b><span>סרקו ת״ז פעם אחת (📷 בפרטים שלי) — וכל טופס נפתח כבר ממולא לפי משמעות השדות. עברית, אנגלית וערבית.</span></div>
+        <div class="help-card"><b>🎯 מצב ראיון</b><span>הכלי שואל שדה-אחרי-שדה. Enter/↓ לשדה הבא, ↑ לקודם. אפשר גם 🎤 בדיבור.</span></div>
+        <div class="help-card"><b>✍️ חתימה וכתב-יד</b><span>ציירו חתימה, או אמנו את כתב-ידכם וכתבו איתו טקסט אמיתי על הטופס.</span></div>
+        <div class="help-card"><b>🔖 חותמת · ✏️ ציור חופשי</b><span>העלו חותמת (רקע לבן מוסר לבד), או ציירו סימונים חופשיים על הטופס.</span></div>
+        <div class="help-card"><b>🟡 שדות ריקים · 📊 מד השלמה</b><span>סימון ענבר מראה מה עוד לא מולא, ומד מראה כמה נשאר. אזהרה לפני ייצוא אם נשארו שדות ריקים.</span></div>
+        <div class="help-card"><b>📅 תאריך · 🪪 ולידציה</b><span>בורר תאריך לשדות תאריך; ת״ז שגויה נצבעת אדום מיד.</span></div>
+        <div class="help-card"><b>📑 עמודים · ☀️ חידוד</b><span>ממוזערות וקפיצה לעמוד בטפסים ארוכים; חידוד סריקות דהויות לקריאוּת.</span></div>
+        <div class="help-card"><b>⏱️ זיכרון · ☁️ סנכרון</b><span>טופס שמילאתם חוזר ממולא; מסמכים אחרונים במסך הבית; סנכרון מוצפן בין מכשירים (הגדרות).</span></div>
+        <div class="help-card"><b>🧬 מיזוג מרובה</b><span>טופס אחד + טבלת CSV = קובץ PDF לכל שורה, בבת אחת.</span></div>
+        <div class="help-card"><b>📲 בנייד</b><span>התקינו כאפליקציה; שתפו PDF מ-WhatsApp אל Fillo — נפתח ממולא, וחוזר חתום לצ׳אט.</span></div>
+      </div>
+      <div class="sec-title" style="margin-top:14px">⌨️ קיצורי מקלדת</div>
+      <div class="help-keys">
+        <div><kbd>Ctrl</kbd>+<kbd>O</kbd> פתיחת PDF</div>
+        <div><kbd>Ctrl</kbd>+<kbd>S</kbd> ייצוא</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> ביטול</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Y</kbd> חזרה</div>
+        <div><kbd>Ctrl</kbd>+<kbd>D</kbd> שכפול פריט</div>
+        <div><kbd>Delete</kbd> מחיקת פריט</div>
+        <div><kbd>Enter</kbd>/<kbd>↓</kbd> שדה הבא</div>
+        <div><kbd>?</kbd> פתיחת עזרה זו</div>
+      </div>
+    </div>
+    <footer><button class="btn primary" id="helpClose">הבנתי</button></footer>
+  </div>
+</div>
 
 <!-- ===================== SCRIPTS ===================== -->
 <!-- pdf-lib (UMD → window.PDFLib) and pdf.js v3 (UMD → window.pdfjsLib) -->

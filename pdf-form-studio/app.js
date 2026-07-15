@@ -619,7 +619,8 @@ document.addEventListener('keydown', (e) => {
   const sel = overlay.getSelected();
   const editing = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true';
   const inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
-  if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); }
+  if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
+  if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
     e.preventDefault(); overlay.deleteCtrl(sel);
   }
@@ -1163,6 +1164,10 @@ if (!PFS.store.persistent) {
   if (backupCard) backupCard.prepend(note);
   PFS.toast('שימו לב: ההגדרות נשמרות רק לחלון הזה — גבו לקובץ דרך ⚙️ הגדרות', 'err', 6000);
 }
+
+// ---- help & shortcuts ---------------------------------------------------
+$('helpBtn') && $('helpBtn').addEventListener('click', () => openModal('helpModal'));
+$('helpClose') && $('helpClose').addEventListener('click', () => closeModal('helpModal'));
 
 // ---- theme (auto / light / dark) ---------------------------------------
 const THEMES = ['auto', 'light', 'dark'];

@@ -365,6 +365,20 @@ async function main() {
     return resolves && bad && ok;
   }));
 
+  // marital status is a single-choice like gender: saved value auto-ticks the
+  // matching option and never the others; a manual pick is classified/learned
+  check('saved marital status auto-selects the matching option', await page.evaluate(() => {
+    const later = [
+      { fieldKey: 'm1', label: 'רווק', type: 'check', radio: true, group: 'ms' },
+      { fieldKey: 'm2', label: 'נשוי', type: 'check', radio: true, group: 'ms' },
+      { fieldKey: 'm3', label: 'גרוש', type: 'check', radio: true, group: 'ms' }
+    ];
+    const sel = window.PFS.vault.matchChecks(later, { 'מצב משפחתי': 'נשוי' }, []);
+    const cls = window.PFS.vault.classifyChoice('נשואה'); // cross-form / different spelling
+    return sel.m2 === true && !sel.m1 && !sel.m3 && cls && cls.canon === 'marital_status'
+      && window.PFS.vault.matchKey('מצב משפחתי') === 'marital_status';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

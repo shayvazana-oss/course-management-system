@@ -46,6 +46,7 @@
     // SAME 9-digit checksum as ת.ז, so they can be validated the same way.
     business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
     business_name: ['שם העסק', 'שם החברה', 'שם התאגיד', 'שם עסק', 'business name', 'company name'],
+    marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
 
@@ -56,6 +57,15 @@
     male:   ['זכר', 'ז', 'male', 'm', 'man', 'ذكر'],
     female: ['נקבה', 'נ', 'female', 'f', 'woman', 'أنثى', 'انثى']
   };
+  // marital status — Form 101 and most Israeli forms ask it as a radio group
+  const MARITAL = {
+    single:   ['רווק', 'רווקה', 'single', 'أعزب', 'عزباء'],
+    married:  ['נשוי', 'נשואה', 'married', 'متزوج', 'متزوجة'],
+    divorced: ['גרוש', 'גרושה', 'divorced', 'مطلق', 'مطلقة'],
+    widowed:  ['אלמן', 'אלמנה', 'widowed', 'أرمل', 'أرملة']
+  };
+  // single-choice categories: canonical field → its option-value dictionary
+  const CHOICE_CATS = { gender: GENDER, marital_status: MARITAL };
   // which canonical value (if any) a free string denotes in a dictionary —
   // exact or whole-word match on the normalized form (so "ז" won't hit "מזכיר")
   function valInDict(str, dict) {
@@ -178,7 +188,9 @@
    * ("○ זכר" ticked → {canon:'gender', value:'זכר'}). null when the option
    * isn't a known single-choice value. */
   function classifyChoice(label) {
-    if (valInDict(label, GENDER)) return { canon: 'gender', value: String(label).trim() };
+    for (const cat of Object.keys(CHOICE_CATS)) {
+      if (valInDict(label, CHOICE_CATS[cat])) return { canon: cat, value: String(label).trim() };
+    }
     return null;
   }
 
@@ -199,7 +211,9 @@
       const c = matchKey(k);
       if (c && canonVal[c] === undefined && String(values[k]).trim()) canonVal[c] = values[k];
     });
-    const storedGender = canonVal.gender ? valInDict(canonVal.gender, GENDER) : null;
+    // resolve each single-choice category's saved value to its canonical key
+    const storedKey = {};
+    Object.keys(CHOICE_CATS).forEach((cat) => { if (canonVal[cat]) storedKey[cat] = valInDict(canonVal[cat], CHOICE_CATS[cat]); });
     // every saved value, normalized, for a verbatim option match (min length 2
     // so a stray letter can't tick unrelated boxes)
     const storedNorms = new Set();
@@ -208,8 +222,13 @@
     fields.forEach((f) => {
       if (f.type !== 'check' || skip.has(f.fieldKey)) return;
       const nlabel = norm(f.label);
-      const og = valInDict(f.label, GENDER);
-      const hit = (og && storedGender && og === storedGender) || (nlabel.length >= 2 && storedNorms.has(nlabel));
+      let hit = nlabel.length >= 2 && storedNorms.has(nlabel);
+      if (!hit) {
+        for (const cat of Object.keys(CHOICE_CATS)) {
+          const ov = valInDict(f.label, CHOICE_CATS[cat]);
+          if (ov && storedKey[cat] && ov === storedKey[cat]) { hit = true; break; }
+        }
+      }
       if (!hit) return;
       if (f.group) { if (usedGroup.has(f.group)) return; usedGroup.add(f.group); }
       out[f.fieldKey] = true;

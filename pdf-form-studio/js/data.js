@@ -14,6 +14,7 @@
     { key: 'last_name', label: 'שם משפחה' },
     { key: 'id', label: 'תעודת זהות' },
     { key: 'gender', label: 'מין (זכר/נקבה)' },
+    { key: 'marital_status', label: 'מצב משפחתי' },
     { key: 'birth_date', label: 'תאריך לידה' },
     { key: 'phone', label: 'טלפון' },
     { key: 'email', label: 'דוא״ל' },

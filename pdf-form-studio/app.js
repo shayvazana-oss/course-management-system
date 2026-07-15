@@ -792,6 +792,8 @@ function openQuickSetup() {
   QUICK_FIELDS.forEach((f) => { const el = $(f.id); if (el) el.value = cv[f.canon] || ''; });
   const g = cv.gender || '';
   document.querySelectorAll('input[name="qsGender"]').forEach((r) => { r.checked = (r.value === g); });
+  const ms = cv.marital_status || '';
+  document.querySelectorAll('input[name="qsMarital"]').forEach((r) => { r.checked = (r.value === ms); });
   openModal('quickModal');
 }
 $('quickSetupBtn').addEventListener('click', openQuickSetup);
@@ -802,6 +804,8 @@ $('qsSave').addEventListener('click', () => {
   QUICK_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
   const gEl = document.querySelector('input[name="qsGender"]:checked');
   if (gEl) merged['מין'] = gEl.value; else delete merged['מין'];
+  const mEl = document.querySelector('input[name="qsMarital"]:checked');
+  if (mEl) merged['מצב משפחתי'] = mEl.value; else delete merged['מצב משפחתי'];
   profiles.saveProfile(ap ? ap.name : 'אני', merged);
   renderProfileSelect();
   closeModal('quickModal');

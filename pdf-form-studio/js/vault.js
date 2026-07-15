@@ -22,19 +22,23 @@
       .trim().toLowerCase();
   }
 
-  // canonical key → phrases that mean it (normalized "includes" match, longest wins)
+  // canonical key → phrases that mean it (normalized "includes" match, longest
+  // wins). Hebrew (many real-world variants) + English + Arabic — no other
+  // Hebrew filler auto-maps Arabic labels, and ~20% of Israeli forms need it.
   const SYN = {
-    last_name:  ['שם משפחה', 'משפחה', 'last name', 'surname', 'family name'],
-    first_name: ['שם פרטי', 'פרטי', 'first name', 'given name'],
-    full_name:  ['שם מלא', 'שם משפחה ושם פרטי', 'שם פרטי ומשפחה', 'שם המבקש', 'שם העובד', 'שם הלקוח', 'full name', 'name', 'שם'],
-    id:         ['תעודת זהות', 'מספר תעודת זהות', 'מספר זהות', 'ת ז', 'תז', 'מס זהות', 'id number', 'id'],
-    birth_date: ['תאריך לידה', 'ת לידה', 'שנת לידה', 'date of birth', 'birth date'],
-    phone:      ['טלפון נייד', 'מספר טלפון', 'טלפון', 'נייד', 'סלולרי', 'פלאפון', 'phone', 'mobile', 'cell'],
-    email:      ['דואר אלקטרוני', 'דוא ל', 'אימייל', 'מייל', 'email', 'e mail'],
-    address:    ['כתובת מגורים', 'כתובת מלאה', 'כתובת', 'רחוב', 'address', 'street'],
-    city:       ['עיר', 'יישוב', 'ישוב', 'מקום מגורים', 'city', 'town'],
-    zip:        ['מיקוד', 'zip', 'postal code'],
-    date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך', 'date']
+    last_name:  ['שם משפחה', 'שם המשפחה', 'משפחה', 'שם משפחה באנגלית', 'last name', 'surname', 'family name', 'اسم العائلة', 'العائلة', 'اسم العائله'],
+    first_name: ['שם פרטי', 'השם הפרטי', 'פרטי', 'first name', 'given name', 'الاسم الشخصي', 'الاسم الأول', 'الاسم'],
+    full_name:  ['שם מלא', 'שם משפחה ושם פרטי', 'שם פרטי ומשפחה', 'שם המבקש', 'שם המבוטח', 'שם העובד', 'שם הלקוח', 'שם התלמיד', 'שם ההורה', 'שם וחתימה', 'full name', 'name', 'שם', 'الاسم الكامل', 'الاسم الرباعي'],
+    id:         ['תעודת זהות', 'מספר תעודת זהות', 'מספר זהות', 'מס תעודת זהות', 'ת ז', 'תז', 'ת.ז', 'מס זהות', 'מספר ת ז', 'זהות', 'id number', 'national id', 'id', 'رقم الهوية', 'الهوية', 'رقم هوية', 'بطاقة الهوية'],
+    birth_date: ['תאריך לידה', 'ת לידה', 'שנת לידה', 'תאריך הלידה', 'date of birth', 'birth date', 'dob', 'تاريخ الميلاد', 'تاريخ الولادة', 'الميلاد'],
+    phone:      ['טלפון נייד', 'מספר טלפון', 'מס טלפון', 'טלפון', 'נייד', 'סלולרי', 'פלאפון', 'מספר נייד', 'טל', 'phone', 'mobile', 'cell', 'tel', 'رقم الهاتف', 'الهاتف', 'الجوال', 'هاتف نقال', 'موبايل'],
+    email:      ['דואר אלקטרוני', 'דוא ל', 'אימייל', 'מייל', 'כתובת מייל', 'email', 'e mail', 'البريد الالكتروني', 'الايميل', 'بريد الكتروني'],
+    address:    ['כתובת מגורים', 'כתובת מלאה', 'כתובת', 'מען', 'רחוב ומספר', 'רחוב', 'address', 'street', 'العنوان', 'عنوان السكن', 'الشارع'],
+    house_no:   ['מספר בית', 'מס בית', 'בית מספר', 'house number', 'رقم البيت', 'رقم المنزل'],
+    city:       ['עיר', 'יישוב', 'ישוב', 'עיר מגורים', 'מקום מגורים', 'שם היישוב', 'city', 'town', 'المدينة', 'البلدة', 'مكان السكن'],
+    zip:        ['מיקוד', 'מיקוד דואר', 'zip', 'zip code', 'postal code', 'الرمز البريدي'],
+    occupation: ['מקצוע', 'עיסוק', 'תפקיד', 'occupation', 'profession', 'المهنة', 'الوظيفة'],
+    date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
   // precomputed [key, normalizedPhrase] sorted longest-first so "שם משפחה"
   // beats the generic "שם"

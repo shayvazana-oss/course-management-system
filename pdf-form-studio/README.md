@@ -33,7 +33,9 @@ PWA אופליין + Share Target · גיבוי/שחזור · סנכרון ענ�
 
 צפו ב-Fillo בפעולה — הקלטות אמיתיות מהאפליקציה:
 
-- **המדריך המלא (1:36)** — כל היכולות צעד-צעד, מסריקת ת"ז ועד ייצוא:
+- **המדריך המקיף (3:12)** — 17 פרקים, כל יכולת בקצב נינוח:
+  [`demo/fillo-tutorial-full.mp4`](demo/fillo-tutorial-full.mp4)
+- **המדריך הקצר (1:36)** — הליבה, מסריקת ת"ז ועד ייצוא:
   [`demo/fillo-tutorial.mp4`](demo/fillo-tutorial.mp4)
 - **טעימה מהירה (38 שנ')** — הזרימה המרכזית בלבד:
   [`demo/fillo-demo.webm`](demo/fillo-demo.webm)

@@ -32,7 +32,7 @@ PWA אופליין + Share Target · גיבוי/שחזור · סנכרון ענ�
 ## 🎬 סרטון הדרכה / Demo
 
 צפו ב-Fillo בפעולה — הקלטה אמיתית מהאפליקציה (38 שנ'): פתיחת טופס שמתמלא
-לבד, חתימה, וייצוא: [`demo/fillo-demo.webm`](pdf-form-studio/demo/fillo-demo.webm)
+לבד, חתימה, וייצוא: [`demo/fillo-demo.webm`](demo/fillo-demo.webm)
 
 ## 🌐 גרסה חיה / Live
 

@@ -32,6 +32,28 @@
     for (const k in offY) { const line = fy + offY[k]; for (const ty of ys) { const d = Math.abs(line - ty); if (d < by) { by = d; nfy = ty - offY[k]; gy = ty; } } }
     return { fx: nfx, fy: nfy, guideX: gx, guideY: gy };
   }
+  /* computeResizeSnap(rect, targets, thx, thy) — pure resize alignment.
+   * For a top-left-anchored resize (fx,fy fixed, fw/fh growing), snap the
+   * moving right/bottom edge to a peer edge or the page edge, AND snap the
+   * width/height to equal a peer's — so stacked boxes end up the same size.
+   * Returns the snapped {fw,fh} and the guide lines that fired (or null).
+   */
+  function computeResizeSnap(rect, targets, thx, thy) {
+    const { fx, fy, fw, fh } = rect;
+    const xs = [0, 0.5, 1], ys = [0, 0.5, 1], ws = [], hs = [];
+    (targets || []).forEach((t) => {
+      xs.push(t.fx, t.fx + t.fw / 2, t.fx + t.fw);
+      ys.push(t.fy, t.fy + t.fh / 2, t.fy + t.fh);
+      ws.push(t.fw); hs.push(t.fh);
+    });
+    let bw = thx, nfw = fw, gx = null;
+    for (const tx of xs) { const cand = tx - fx; if (cand > 0.01) { const d = Math.abs((fx + fw) - tx); if (d < bw) { bw = d; nfw = cand; gx = tx; } } }
+    for (const w of ws) { const d = Math.abs(fw - w); if (d < bw) { bw = d; nfw = w; gx = fx + w; } }
+    let bh = thy, nfh = fh, gy = null;
+    for (const ty of ys) { const cand = ty - fy; if (cand > 0.01) { const d = Math.abs((fy + fh) - ty); if (d < bh) { bh = d; nfh = cand; gy = ty; } } }
+    for (const h of hs) { const d = Math.abs(fh - h); if (d < bh) { bh = d; nfh = h; gy = fy + h; } }
+    return { fw: nfw, fh: nfh, guideX: gx, guideY: gy };
+  }
   const SNAP_PX = 6;   // snap when an edge is within this many screen pixels
 
   /* attachDragResize(node, opts)
@@ -127,10 +149,18 @@
         } else {
           model.fw = clamp(start.fw + dxFrac, minFw, 2);
           model.fh = clamp(start.fh + dyFrac, minFh, 2);
+          // snap size to a peer's edge/dimension (Alt drags freely)
+          if (opts.getSnapTargets && !ev.altKey) {
+            const s = computeResizeSnap(model, opts.getSnapTargets(), SNAP_PX / size.w, SNAP_PX / size.h);
+            model.fw = clamp(s.fw, minFw, 2);
+            model.fh = clamp(s.fh, minFh, 2);
+            drawGuides(s.guideX, s.guideY);
+          }
         }
         opts.onChange && opts.onChange();
       };
       const up = (ev) => {
+        clearGuides();
         opts.handle.releasePointerCapture(ev.pointerId);
         opts.handle.removeEventListener('pointermove', move);
         opts.handle.removeEventListener('pointerup', up);
@@ -147,5 +177,6 @@
 
   PFS.attachDragResize = attachDragResize;
   PFS.computeSnap = computeSnap;
+  PFS.computeResizeSnap = computeResizeSnap;
   PFS.clamp = clamp;
 })(window);

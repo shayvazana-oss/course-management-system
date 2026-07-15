@@ -826,6 +826,21 @@ async function main() {
     return snappedLeft && centered && noSnap;
   }));
 
+  check('resize snapping matches a peer size and aligns to its edge', await page.evaluate(() => {
+    const rs = window.PFS.computeResizeSnap;
+    const th = 0.01;
+    // width almost equal to a peer's width (0.20) → snaps to equal width
+    const a = rs({ fx: 0.1, fy: 0.5, fw: 0.205, fh: 0.04 }, [{ fx: 0.5, fy: 0.2, fw: 0.20, fh: 0.06 }], th, th);
+    const equalW = Math.abs(a.fw - 0.20) < 1e-9;
+    // bottom edge near a peer's bottom (0.24) → height snaps so fy+fh = 0.24
+    const b = rs({ fx: 0.1, fy: 0.2, fw: 0.1, fh: 0.035 }, [{ fx: 0.5, fy: 0.18, fw: 0.1, fh: 0.06 }], th, th);
+    const alignBottom = Math.abs((0.2 + b.fh) - 0.24) < 1e-9 && b.guideY === 0.24;
+    // far from anything → unchanged, no guides
+    const c = rs({ fx: 0.1, fy: 0.1, fw: 0.333, fh: 0.077 }, [{ fx: 0.6, fy: 0.6, fw: 0.05, fh: 0.05 }], th, th);
+    const noSnap = c.fw === 0.333 && c.fh === 0.077 && c.guideX === null && c.guideY === null;
+    return equalW && alignBottom && noSnap;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

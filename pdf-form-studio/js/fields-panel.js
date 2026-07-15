@@ -187,12 +187,24 @@
           control = document.createElement('input'); control.type = 'text'; control.dir = 'auto';
           control.placeholder = 'מלא/י…'; control.style.flex = '1';
           const validate = () => {
-            // live Israeli-ID checksum: catch typos before they land on paper
-            if (canon !== 'id') return;
-            const digits = control.value.replace(/\D/g, '');
-            const bad = digits.length >= 5 && !PFS.vault.checkIsraeliId(digits);
+            // live format checks — catch typos before they land on paper
+            const v = control.value.trim();
+            let bad = false, msg = '';
+            if (canon === 'id') {
+              const digits = v.replace(/\D/g, '');
+              bad = digits.length >= 5 && !PFS.vault.checkIsraeliId(digits);
+              msg = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
+            } else if (canon === 'email' && v) {
+              bad = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+              msg = bad ? 'כתובת אימייל לא תקינה — בדקו הקלדה' : '';
+            } else if (canon === 'phone') {
+              const digits = v.replace(/\D/g, '');
+              // Israeli mobile/landline: 9–10 digits, leading 0
+              bad = digits.length >= 6 && !/^0\d{8,9}$/.test(digits);
+              msg = bad ? 'מספר טלפון לא תקין — בדקו הקלדה' : '';
+            } else return;
             control.style.borderColor = bad ? 'var(--danger)' : '';
-            control.title = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
+            control.title = msg;
           };
           control.__fkey = f.fieldKey;
           if (canon) {

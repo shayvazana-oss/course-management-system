@@ -241,6 +241,25 @@ async function main() {
     return has && resolves;
   }));
 
+  // live validation flags a bad email / phone and clears once corrected
+  check('email & phone typos are flagged live, cleared when fixed', await page.evaluate(() => {
+    const det = { tier: 'text', fields: [
+      { fieldKey: 'em', label: 'דוא״ל', type: 'text' }, { fieldKey: 'ph', label: 'טלפון', type: 'text' }
+    ] };
+    window.PFS.__test.fieldsPanel.show(det);
+    const inputs = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+    const em = inputs.find((i) => i.__fkey === 'em'), ph = inputs.find((i) => i.__fkey === 'ph');
+    if (!em || !ph) return false;
+    const type = (el, val) => { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    // a flagged field gets a non-empty warning title + danger border; a valid
+    // one clears both
+    type(em, 'not-an-email'); const emBad = em.title !== '' && em.style.borderColor !== '';
+    type(em, 'me@example.com'); const emOk = em.title === '' && em.style.borderColor === '';
+    type(ph, '1234567'); const phBad = ph.title !== '';      // 7 digits, no leading 0
+    type(ph, '0501234567'); const phOk = ph.title === '';
+    return emBad && emOk && phBad && phOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

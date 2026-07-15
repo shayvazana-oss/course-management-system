@@ -24,8 +24,34 @@
     const vp = page.getViewport({ scale, rotation: page.rotate });
     const c = document.createElement('canvas');
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    const ctx = c.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    enhanceForOcr(c, ctx);   // grayscale + contrast stretch → better Hebrew OCR on faded scans
     return c;
+  }
+
+  // Lift faint/photographed scans before OCR: grayscale + gamma darkening
+  // (γ≈1.6) that pulls faint gray ink toward black while leaving the near-white
+  // background essentially white — without going fully binary, which can eat
+  // thin Hebrew strokes. A small levels stretch cleans the paper.
+  function enhanceForOcr(canvas, ctx) {
+    try {
+      const im = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = im.data;
+      // precompute lookup: gamma-darken, then push the top end back to white
+      const lut = new Uint8ClampedArray(256);
+      for (let v = 0; v < 256; v++) {
+        let g = 255 * Math.pow(v / 255, 1.6);           // darken midtones/ink
+        g = (g - 20) / (238 - 20) * 255;                // stretch: <20→black, >238→white
+        lut[v] = g < 0 ? 0 : g > 255 ? 255 : g;
+      }
+      for (let i = 0; i < d.length; i += 4) {
+        const y = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+        const v = lut[y];
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+      ctx.putImageData(im, 0, 0);
+    } catch (e) { /* tainted/oversized canvas — OCR still runs on the raw render */ }
   }
 
   const letters = (s) => (s.match(/[A-Za-z֐-׿]/g) || []).length;

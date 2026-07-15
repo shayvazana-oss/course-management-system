@@ -544,6 +544,17 @@ async function main() {
     return reordered && dropped;
   }));
 
+  // reorder + rotation together: a page's rotation survives the reorder copy path
+  check('reorder preserves page rotation in the export', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const d = await PDFDocument.create(); d.addPage([300, 400]); d.addPage([310, 400]);
+    const bytes = await d.save();
+    // rotate original page 0 by 90 and reorder to [1,0]
+    const re = await PDFDocument.load(await window.PFS.exporter.exportPdf(bytes, [], { rotations: { 0: 90 }, pageOrder: [1, 0] }));
+    // output index 1 is original page 0 → must still carry the 90° rotation
+    return re.getPageCount() === 2 && Math.round(re.getPage(0).getSize().width) === 310 && re.getPage(1).getRotation().angle === 90;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

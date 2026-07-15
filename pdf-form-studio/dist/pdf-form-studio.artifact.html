@@ -442,6 +442,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn" id="detectBtn" disabled title="זהה שדות"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
       <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
       <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
+      <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
       <div class="spacer"></div>
     </nav>
 
@@ -2741,7 +2742,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     }
 
     async function renderView(view) {
-      const vp = view.pageProxy.getViewport({ scale, rotation: view.pageProxy.rotate });
+      // intrinsic /Rotate + any user rotation (straightening a sideways scan)
+      const rotation = ((view.pageProxy.rotate + (view.userRot || 0)) % 360 + 360) % 360;
+      const vp = view.pageProxy.getViewport({ scale, rotation });
       const cssW = Math.round(vp.width), cssH = Math.round(vp.height);
       view.canvas.width = Math.round(vp.width * DPR);
       view.canvas.height = Math.round(vp.height * DPR);
@@ -2775,6 +2778,25 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return setScale(s);
     }
     function getScale() { return scale; }
+    // rotate one page by delta degrees (default 90 CW); re-render + relayout
+    async function rotatePage(index, delta = 90) {
+      const v = views[index]; if (!v) return;
+      v.userRot = (((v.userRot || 0) + delta) % 360 + 360) % 360;
+      await renderView(v);
+      overlay.relayoutAll();
+      opts.onRotate && opts.onRotate();
+    }
+    // { pageIndex: degrees } for every page the user turned — for the exporter
+    function getRotations() {
+      const out = {};
+      views.forEach((v, i) => { if (v.userRot) out[i] = v.userRot; });
+      return out;
+    }
+    function setRotations(map) {
+      if (!map) return;
+      views.forEach((v, i) => { v.userRot = (((Number(map[i]) || 0) % 360) + 360) % 360; });
+      return rerenderAll();
+    }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
@@ -2783,7 +2805,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // page canvases + wraps, for building the thumbnail rail
     function viewList() { return views.map((v, i) => ({ n: i + 1, canvas: v.canvas, wrap: v.wrap })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, getBytes, getDoc, hasDoc, numPages, viewList };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;
@@ -3164,18 +3186,28 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       byPage.get(m.page).push(m);
     });
 
-    const pageIdxs = [...byPage.keys()].sort((a, b) => a - b);
+    // per-page user rotation (0/90/180/270) added on top of the intrinsic
+    // /Rotate — for straightening sideways scans. Pages that were rotated but
+    // carry no overlay still need their /Rotate updated, so process the union.
+    const rotations = opts.rotations || {};
+    const userR = (idx) => (((Number(rotations[idx]) || 0) % 360) + 360) % 360;
+    const pageSet = new Set([...byPage.keys(), ...Object.keys(rotations).map(Number).filter((k) => userR(k))]);
+    const pageIdxs = [...pageSet].sort((a, b) => a - b);
     let done = 0;
     for (const idx of pageIdxs) {
       const page = pages[idx];
       if (!page) continue;
       const { width: Wpt, height: Hpt } = page.getSize();
-      const rot = ((page.getRotation().angle % 360) + 360) % 360;
+      const intrinsic = ((page.getRotation().angle % 360) + 360) % 360;
+      const rot = (intrinsic + userR(idx)) % 360;
+      if (userR(idx)) page.setRotation(degrees(rot)); // straighten the page itself
       const swap = (rot === 90 || rot === 270);
       const displayWpt = swap ? Hpt : Wpt;
       const displayHpt = swap ? Wpt : Hpt;
 
-      const canvas = rasterizePage(byPage.get(idx), displayWpt, displayHpt, imgMap);
+      const models = byPage.get(idx);
+      if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
+      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap);
       const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
 
       switch (rot) {
@@ -4149,7 +4181,8 @@ const pdfView = PFS.createPdfView({
   viewportEl: $('viewport'),
   overlay,
   standardFontDataUrl: window.PFS_STDFONTS || undefined,
-  onZoom: (s) => { $('zoomLvl').textContent = Math.round(s * 100) + '%'; }
+  onZoom: (s) => { $('zoomLvl').textContent = Math.round(s * 100) + '%'; },
+  onRotate: () => markDirty()
 });
 
 // ---------- assets & templates ----------
@@ -4176,7 +4209,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, fillAll, setLastDet: (d) => { lastDet = d; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, setLastDet: (d) => { lastDet = d; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -4282,6 +4315,7 @@ async function openPdfFile(file) {
     $('detectBtn').disabled = false;
     $('clearBtn').disabled = false;
     $('enhanceBtn').disabled = false;
+    $('rotateBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -4548,6 +4582,7 @@ async function doExport() {
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
+      rotations: pdfView.getRotations(),
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
     const outName = currentFileName + '-filled.pdf';
@@ -4693,6 +4728,25 @@ $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
   applyEnhance(on);
   PFS.store.set('enhance_scan', on);
   PFS.toast(on ? 'חידוד סריקה: פעיל — קריא יותר (לא משפיע על הקובץ המיוצא)' : 'חידוד סריקה: כבוי', 'ok', 1600);
+});
+// rotate the page currently centered in the viewport (90° CW per click)
+function currentPageIndex() {
+  const list = pdfView.viewList(); if (!list.length) return 0;
+  const vpRect = $('viewport').getBoundingClientRect();
+  const cy = vpRect.top + vpRect.height / 2;
+  let best = 0, bestDist = Infinity;
+  list.forEach((v, i) => {
+    const r = v.wrap.getBoundingClientRect();
+    const d = Math.abs((r.top + r.height / 2) - cy);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+$('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
+  if (!pdfView.hasDoc()) return;
+  const idx = currentPageIndex();
+  await pdfView.rotatePage(idx, 90);
+  PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
 });
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
   const strip = $('thumbs'); strip.classList.toggle('open');

@@ -301,6 +301,31 @@ async function main() {
     return hasStar && reqEmpty === 1;
   }));
 
+  // per-page rotation is baked into the exported PDF's /Rotate, for both a page
+  // that has overlay elements and one that doesn't — round-tripped via pdf-lib
+  check('page rotation is written into the exported PDF', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const src = await PDFDocument.create(); src.addPage([300, 400]); src.addPage([300, 400]);
+    const bytes = await src.save();
+    const models = [{ page: 0, type: 'text', kind: 'text', fx: 0.1, fy: 0.1, fw: 0.4, fh: 0.05, fontFrac: 0.03, text: 'שלום', color: '#000', align: 'right' }];
+    const out = await window.PFS.exporter.exportPdf(bytes, models, { rotations: { 0: 90, 1: 180 } });
+    const re = await PDFDocument.load(out);
+    return re.getPage(0).getRotation().angle === 90 && re.getPage(1).getRotation().angle === 180;
+  }));
+
+  // rotating in the viewer swaps the page canvas dims and records the angle
+  check('rotate turns the page in the viewer and records it for export', await page.evaluate(async () => {
+    const c = document.querySelector('canvas.pdf');
+    const w0 = parseInt(c.style.width, 10), h0 = parseInt(c.style.height, 10);
+    if (w0 === h0) return true; // square page — swap not observable, skip
+    await window.PFS.__test.pdfView.rotatePage(0, 90);
+    const c2 = document.querySelector('canvas.pdf');
+    const swapped = parseInt(c2.style.width, 10) === h0 && parseInt(c2.style.height, 10) === w0;
+    const recorded = window.PFS.__test.pdfView.getRotations()[0] === 90;
+    await window.PFS.__test.pdfView.rotatePage(0, 270); // restore to 0 for later tests
+    return swapped && recorded;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

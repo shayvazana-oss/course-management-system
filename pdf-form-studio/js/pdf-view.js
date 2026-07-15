@@ -56,7 +56,9 @@
     }
 
     async function renderView(view) {
-      const vp = view.pageProxy.getViewport({ scale, rotation: view.pageProxy.rotate });
+      // intrinsic /Rotate + any user rotation (straightening a sideways scan)
+      const rotation = ((view.pageProxy.rotate + (view.userRot || 0)) % 360 + 360) % 360;
+      const vp = view.pageProxy.getViewport({ scale, rotation });
       const cssW = Math.round(vp.width), cssH = Math.round(vp.height);
       view.canvas.width = Math.round(vp.width * DPR);
       view.canvas.height = Math.round(vp.height * DPR);
@@ -90,6 +92,25 @@
       return setScale(s);
     }
     function getScale() { return scale; }
+    // rotate one page by delta degrees (default 90 CW); re-render + relayout
+    async function rotatePage(index, delta = 90) {
+      const v = views[index]; if (!v) return;
+      v.userRot = (((v.userRot || 0) + delta) % 360 + 360) % 360;
+      await renderView(v);
+      overlay.relayoutAll();
+      opts.onRotate && opts.onRotate();
+    }
+    // { pageIndex: degrees } for every page the user turned — for the exporter
+    function getRotations() {
+      const out = {};
+      views.forEach((v, i) => { if (v.userRot) out[i] = v.userRot; });
+      return out;
+    }
+    function setRotations(map) {
+      if (!map) return;
+      views.forEach((v, i) => { v.userRot = (((Number(map[i]) || 0) % 360) + 360) % 360; });
+      return rerenderAll();
+    }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
@@ -98,7 +119,7 @@
     // page canvases + wraps, for building the thumbnail rail
     function viewList() { return views.map((v, i) => ({ n: i + 1, canvas: v.canvas, wrap: v.wrap })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, getBytes, getDoc, hasDoc, numPages, viewList };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;

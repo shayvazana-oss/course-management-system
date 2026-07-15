@@ -101,18 +101,28 @@
       byPage.get(m.page).push(m);
     });
 
-    const pageIdxs = [...byPage.keys()].sort((a, b) => a - b);
+    // per-page user rotation (0/90/180/270) added on top of the intrinsic
+    // /Rotate — for straightening sideways scans. Pages that were rotated but
+    // carry no overlay still need their /Rotate updated, so process the union.
+    const rotations = opts.rotations || {};
+    const userR = (idx) => (((Number(rotations[idx]) || 0) % 360) + 360) % 360;
+    const pageSet = new Set([...byPage.keys(), ...Object.keys(rotations).map(Number).filter((k) => userR(k))]);
+    const pageIdxs = [...pageSet].sort((a, b) => a - b);
     let done = 0;
     for (const idx of pageIdxs) {
       const page = pages[idx];
       if (!page) continue;
       const { width: Wpt, height: Hpt } = page.getSize();
-      const rot = ((page.getRotation().angle % 360) + 360) % 360;
+      const intrinsic = ((page.getRotation().angle % 360) + 360) % 360;
+      const rot = (intrinsic + userR(idx)) % 360;
+      if (userR(idx)) page.setRotation(degrees(rot)); // straighten the page itself
       const swap = (rot === 90 || rot === 270);
       const displayWpt = swap ? Hpt : Wpt;
       const displayHpt = swap ? Wpt : Hpt;
 
-      const canvas = rasterizePage(byPage.get(idx), displayWpt, displayHpt, imgMap);
+      const models = byPage.get(idx);
+      if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
+      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap);
       const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
 
       switch (rot) {

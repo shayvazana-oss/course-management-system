@@ -81,7 +81,8 @@ const pdfView = PFS.createPdfView({
   viewportEl: $('viewport'),
   overlay,
   standardFontDataUrl: window.PFS_STDFONTS || undefined,
-  onZoom: (s) => { $('zoomLvl').textContent = Math.round(s * 100) + '%'; }
+  onZoom: (s) => { $('zoomLvl').textContent = Math.round(s * 100) + '%'; },
+  onRotate: () => markDirty()
 });
 
 // ---------- assets & templates ----------
@@ -108,7 +109,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, fillAll, setLastDet: (d) => { lastDet = d; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, setLastDet: (d) => { lastDet = d; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -214,6 +215,7 @@ async function openPdfFile(file) {
     $('detectBtn').disabled = false;
     $('clearBtn').disabled = false;
     $('enhanceBtn').disabled = false;
+    $('rotateBtn').disabled = false;
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -480,6 +482,7 @@ async function doExport() {
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
+      rotations: pdfView.getRotations(),
       onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
     });
     const outName = currentFileName + '-filled.pdf';
@@ -625,6 +628,25 @@ $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
   applyEnhance(on);
   PFS.store.set('enhance_scan', on);
   PFS.toast(on ? 'חידוד סריקה: פעיל — קריא יותר (לא משפיע על הקובץ המיוצא)' : 'חידוד סריקה: כבוי', 'ok', 1600);
+});
+// rotate the page currently centered in the viewport (90° CW per click)
+function currentPageIndex() {
+  const list = pdfView.viewList(); if (!list.length) return 0;
+  const vpRect = $('viewport').getBoundingClientRect();
+  const cy = vpRect.top + vpRect.height / 2;
+  let best = 0, bestDist = Infinity;
+  list.forEach((v, i) => {
+    const r = v.wrap.getBoundingClientRect();
+    const d = Math.abs((r.top + r.height / 2) - cy);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+$('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
+  if (!pdfView.hasDoc()) return;
+  const idx = currentPageIndex();
+  await pdfView.rotatePage(idx, 90);
+  PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
 });
 $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
   const strip = $('thumbs'); strip.classList.toggle('open');

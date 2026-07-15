@@ -14,6 +14,17 @@
     const ctrlByKey = {};
     let emptyCount = () => 0;   // rebound by show(); how many text fields are still blank
 
+    // value history per canonical field type (address/phone/…) — powers
+    // autocomplete across ALL forms, even without a saved profile.
+    const HKEY = 'field_history';
+    function histFor(canon) { if (!canon) return []; const h = PFS.store.get(HKEY, {}); return Array.isArray(h[canon]) ? h[canon] : []; }
+    function remember(canon, val) {
+      val = String(val || '').trim(); if (!canon || val.length < 2) return;
+      const h = PFS.store.get(HKEY, {}); const list = Array.isArray(h[canon]) ? h[canon] : [];
+      const next = [val, ...list.filter((x) => x !== val)].slice(0, 8);
+      h[canon] = next; PFS.store.set(HKEY, h);
+    }
+
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
       if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
@@ -139,6 +150,15 @@
             control.title = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
           };
           control.__fkey = f.fieldKey;
+          if (canon) {
+            const hist = histFor(canon);
+            if (hist.length) {
+              const dl = document.createElement('datalist'); dl.id = 'dl_' + canon + '_' + Math.random().toString(36).slice(2, 7);
+              hist.forEach((v) => { const o = document.createElement('option'); o.value = v; dl.appendChild(o); });
+              row.appendChild(dl); control.setAttribute('list', dl.id);
+            }
+            control.addEventListener('change', () => remember(canon, control.value));
+          }
           control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); });
           control.addEventListener('keydown', (e) => {
             // keyboard field-wizard: Enter / ArrowDown → next field, ArrowUp → previous

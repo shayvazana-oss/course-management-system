@@ -9,6 +9,8 @@
 
   // tick-style controls (checkbox or radio) count by .checked, not text value.
   const isTick = (c) => c.type === 'checkbox' || c.type === 'radio';
+  // a field whose label asks for a signature (not a stamp — "חותמת" excluded)
+  const isSignatureLabel = (s) => /חתימ|signature|sign here|توقيع/i.test(String(s || ''));
 
   function createFieldsPanel(opts = {}) {
     const overlay = opts.overlay;
@@ -232,6 +234,14 @@
             control.dispatchEvent(new Event('input')); control.dispatchEvent(new Event('change'));
           });
           inRow.appendChild(dp); inRow.appendChild(dbtn);
+        }
+        // signature line → one tap drops the saved signature right on it,
+        // instead of guessing a corner. Keeps the text input too (harmless).
+        if (f.type !== 'check' && isSignatureLabel(f.label) && opts.onPlaceSignature) {
+          const sbtn = document.createElement('button'); sbtn.className = 'btn sm primary'; sbtn.textContent = '✍️';
+          sbtn.title = 'הנח/י את החתימה השמורה על השורה הזו';
+          sbtn.addEventListener('click', () => opts.onPlaceSignature(f));
+          inRow.appendChild(sbtn);
         }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';

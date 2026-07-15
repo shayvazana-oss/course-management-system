@@ -158,6 +158,26 @@ async function main() {
     return !!rc.gender && sel.x_m === true && !sel.x_f;
   }));
 
+  // signature line → one-tap places the saved signature right on that line
+  check('detected signature line offers one-tap signature placement', await page.evaluate(() => {
+    // a saved signature to place (1x1 transparent PNG is enough for the model)
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    window.PFS.store.set('signatures', [{ id: 's1', url: png, w: 300, h: 100, aspect: 3 }]);
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'sig', label: 'חתימה', fx: 0.55, fy: 0.8, fw: 0.3, fh: 0.04, fontFrac: 0.03, type: 'text' }
+    ] };
+    window.PFS.__test.fieldsPanel.show(det);
+    const btn = [...document.querySelectorAll('#fieldsBody button')].find((b) => b.textContent === '✍️');
+    if (!btn) return false;
+    const before = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'signature').length;
+    btn.click();
+    const after = window.PFS.__test.overlay.getElements().filter((e) => e.model.kind === 'signature');
+    const placed = after.length === before + 1;
+    // it landed near the detected signature line, not a guessed corner
+    const near = placed && Math.abs(after[after.length - 1].model.fy - 0.8) < 0.1;
+    return placed && near;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

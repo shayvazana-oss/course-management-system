@@ -3651,6 +3651,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
   // tick-style controls (checkbox or radio) count by .checked, not text value.
   const isTick = (c) => c.type === 'checkbox' || c.type === 'radio';
+  // a field whose label asks for a signature (not a stamp — "חותמת" excluded)
+  const isSignatureLabel = (s) => /חתימ|signature|sign here|توقيع/i.test(String(s || ''));
 
   function createFieldsPanel(opts = {}) {
     const overlay = opts.overlay;
@@ -3875,6 +3877,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           });
           inRow.appendChild(dp); inRow.appendChild(dbtn);
         }
+        // signature line → one tap drops the saved signature right on it,
+        // instead of guessing a corner. Keeps the text input too (harmless).
+        if (f.type !== 'check' && isSignatureLabel(f.label) && opts.onPlaceSignature) {
+          const sbtn = document.createElement('button'); sbtn.className = 'btn sm primary'; sbtn.textContent = '✍️';
+          sbtn.title = 'הנח/י את החתימה השמורה על השורה הזו';
+          sbtn.addEventListener('click', () => opts.onPlaceSignature(f));
+          inRow.appendChild(sbtn);
+        }
         const go = document.createElement('button'); go.className = 'btn sm ghost'; go.textContent = '⤓';
         go.title = 'סמן על הטופס';
         go.addEventListener('click', () => {
@@ -4057,7 +4067,9 @@ const fieldsPanel = PFS.createFieldsPanel({
   // learn choices the user makes by hand (gender, …) for future forms
   rememberChoice: (canon, value) => {
     try { const rc = PFS.store.get('remembered_choices', {}) || {}; rc[canon] = value; PFS.store.set('remembered_choices', rc); } catch (e) {}
-  }
+  },
+  // one-tap: drop the saved signature exactly on a detected signature line
+  onPlaceSignature: (f) => placeSignatureAtField(f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
 PFS.__test = { overlay, fieldsPanel };
@@ -4951,6 +4963,22 @@ updateHwStatus();
 // =====================================================================
 //  Fill-All (one click) + Backup / Restore
 // =====================================================================
+// Place the saved signature on a detected signature line (fields panel ✍️).
+// Falls back to drawing one if nothing is saved yet.
+function placeSignatureAtField(f) {
+  const item = assets.getDefault('signature') || assets.list('signature')[0];
+  if (!item) { PFS.toast('אין חתימה שמורה — ציירו חתימה קודם', 'err'); startSignatureFlow(); return; }
+  const aspect = item.aspect || (item.w / item.h) || 3;
+  const fw = Math.min(Math.max(f.fw || 0.2, 0.14), 0.32);
+  const fh = fw / aspect;
+  // center the signature on the blank and sit it a touch above the baseline
+  const fx = Math.max(0, Math.min(1 - fw, (f.fx != null ? f.fx : 0.5) + ((f.fw || 0) - fw) / 2));
+  const fy = Math.max(0, (f.fy != null ? f.fy : 0.82) - fh * 0.35);
+  const c = overlay.instantiate(PFS.element.makeModel('image', f.page || 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind: 'signature' }));
+  if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  markDirty();
+  PFS.toast('החתימה הונחה על שורת החתימה — אפשר לגרור לכוונון', 'ok');
+}
 function placeDefaultAsset(kind) {
   const item = assets.getDefault(kind);
   if (!item) return false;

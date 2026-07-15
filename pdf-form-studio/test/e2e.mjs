@@ -326,6 +326,32 @@ async function main() {
     return swapped && recorded;
   }));
 
+  // Hebrew number-to-words correctness across the tricky cases
+  check('Hebrew amount-in-words is correct', await page.evaluate(() => {
+    const w = window.PFS.numwords.words;
+    const cases = {
+      0: 'אפס', 1: 'אחד', 2: 'שניים', 10: 'עשרה', 11: 'אחד עשר', 15: 'חמישה עשר',
+      20: 'עשרים', 21: 'עשרים ואחד', 23: 'עשרים ושלושה', 100: 'מאה', 101: 'מאה ואחד',
+      123: 'מאה עשרים ושלושה', 200: 'מאתיים', 300: 'שלוש מאות', 999: 'תשע מאות תשעים ותשעה',
+      1000: 'אלף', 1001: 'אלף ואחד', 2000: 'אלפיים', 3000: 'שלושת אלפים',
+      1234: 'אלף מאתיים שלושים וארבעה', 10000: 'עשרת אלפים', 21000: 'עשרים ואחד אלף', 100000: 'מאה אלף'
+    };
+    return Object.keys(cases).every((k) => w(+k) === cases[k]) && window.PFS.numwords.shekels(1) === 'שקל אחד';
+  }));
+
+  // typing an amount auto-fills the "סכום במילים" field with the words
+  check('amount auto-fills the amount-in-words field', await page.evaluate(() => {
+    const det = { tier: 'text', fields: [
+      { fieldKey: 'amt', label: 'סכום', type: 'text' }, { fieldKey: 'amtw', label: 'סכום במילים', type: 'text' }
+    ] };
+    window.PFS.__test.fieldsPanel.show(det);
+    const inputs = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+    const amt = inputs.find((i) => i.__fkey === 'amt'), amtw = inputs.find((i) => i.__fkey === 'amtw');
+    if (!amt || !amtw) return false;
+    amt.value = '1234'; amt.dispatchEvent(new Event('input', { bubbles: true }));
+    return amtw.value === 'אלף מאתיים שלושים וארבעה שקלים חדשים';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

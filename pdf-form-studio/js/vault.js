@@ -39,6 +39,9 @@
     zip:        ['מיקוד', 'מיקוד דואר', 'zip', 'zip code', 'postal code', 'الرمز البريدي'],
     occupation: ['מקצוע', 'עיסוק', 'תפקיד', 'occupation', 'profession', 'المهنة', 'الوظيفة'],
     gender:     ['מין', 'מגדר', 'sex', 'gender', 'الجنس'],
+    // amount_words must out-rank amount (longer phrase wins in matchKey)
+    amount_words: ['סכום במילים', 'סכום במלים', 'הסכום במילים', 'amount in words', 'sum in words'],
+    amount:     ['סכום בשח', 'סכום', 'סך הכל', 'סך הכול', 'סה״כ', 'סהכ', 'amount', 'total', 'sum', 'المبلغ', 'المجموع'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
 

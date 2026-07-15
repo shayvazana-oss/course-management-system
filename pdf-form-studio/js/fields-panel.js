@@ -294,6 +294,29 @@
         body.appendChild(row);
         controls.push(control); fieldMeta.push(f);
       });
+      // amount → amount-in-words: typing the number fills the "סכום במילים"
+      // field automatically (Hebrew words), the way cheques/official forms want
+      (function wireAmountWords() {
+        if (!PFS.numwords || !PFS.vault) return;
+        const canonOf = (f) => PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey);
+        let amtIdx = -1, wordsIdx = -1;
+        fieldMeta.forEach((f, i) => {
+          if (isTick(controls[i])) return;
+          const c = canonOf(f);
+          if (c === 'amount' && amtIdx < 0) amtIdx = i;
+          if (c === 'amount_words' && wordsIdx < 0) wordsIdx = i;
+        });
+        if (amtIdx < 0 || wordsIdx < 0) return;
+        const amt = controls[amtIdx], wc = controls[wordsIdx], wf = fieldMeta[wordsIdx];
+        const sync = () => {
+          const digits = (amt.value || '').replace(/[^\d]/g, '');
+          if (!digits) return;
+          wc.value = PFS.numwords.shekels(parseInt(digits, 10));
+          ensureCtrl(wf, wc.value); recount();
+        };
+        amt.addEventListener('input', sync);
+        if ((amt.value || '').trim()) sync(); // prefilled amount
+      })();
       // interview mode: one question at a time, Enter advances — fastest way
       // to sweep a long form, especially on a phone
       const ivBtn = document.createElement('button');

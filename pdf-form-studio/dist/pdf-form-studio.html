@@ -1340,6 +1340,78 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 </script>
 <script>
+/* numwords.js — Hebrew number-to-words for the "סכום במילים" field.
+ * Israeli cheques/official forms want the amount written out in words; doing
+ * it by hand is slow and error-prone. Supports 0..999,999 (covers realistic
+ * shekel amounts); larger values fall back to digits. Masculine forms, since
+ * "שקל" is masculine. Formal joining: a "ו" precedes the final component.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  const ONES = ['', 'אחד', 'שניים', 'שלושה', 'ארבעה', 'חמישה', 'שישה', 'שבעה', 'שמונה', 'תשעה'];
+  const TEENS = ['', 'אחד עשר', 'שנים עשר', 'שלושה עשר', 'ארבעה עשר', 'חמישה עשר', 'שישה עשר', 'שבעה עשר', 'שמונה עשר', 'תשעה עשר'];
+  const TENS = ['', '', 'עשרים', 'שלושים', 'ארבעים', 'חמישים', 'שישים', 'שבעים', 'שמונים', 'תשעים'];
+  const HUNDREDS = ['', 'מאה', 'מאתיים', 'שלוש מאות', 'ארבע מאות', 'חמש מאות', 'שש מאות', 'שבע מאות', 'שמונה מאות', 'תשע מאות'];
+  const CONSTRUCT = ['', '', '', 'שלושת', 'ארבעת', 'חמשת', 'ששת', 'שבעת', 'שמונת', 'תשעת', 'עשרת'];
+
+  // atoms (component words) for 1..999
+  function under1000(n) {
+    const parts = [];
+    const h = Math.floor(n / 100), rem = n % 100;
+    if (h) parts.push(HUNDREDS[h]);
+    if (rem) {
+      if (rem < 10) parts.push(ONES[rem]);
+      else if (rem === 10) parts.push('עשרה');
+      else if (rem < 20) parts.push(TEENS[rem - 10]);
+      else {
+        parts.push(TENS[Math.floor(rem / 10)]);
+        if (rem % 10) parts.push(ONES[rem % 10]);
+      }
+    }
+    return parts;
+  }
+
+  // space-join, with a "ו" fused onto the final component (formal Hebrew)
+  function joinVav(comps) {
+    if (!comps.length) return '';
+    if (comps.length === 1) return comps[0];
+    return comps.slice(0, -1).join(' ') + ' ו' + comps[comps.length - 1];
+  }
+
+  // the thousands part as ONE component (so the vav lands on the final unit)
+  function thousandsComp(th) {
+    if (th === 1) return 'אלף';
+    if (th === 2) return 'אלפיים';
+    if (th <= 10) return CONSTRUCT[th] + ' אלפים';
+    return joinVav(under1000(th)) + ' אלף';
+  }
+
+  function words(n) {
+    n = Math.floor(Math.abs(Number(n) || 0));
+    if (n === 0) return 'אפס';
+    if (n > 999999) return String(n); // beyond supported range
+    const comps = [];
+    const th = Math.floor(n / 1000);
+    if (th) comps.push(thousandsComp(th));
+    comps.push(...under1000(n % 1000));
+    return joinVav(comps);
+  }
+
+  // amount as shekels ("שקל אחד" / "שני שקלים חדשים" / "<words> שקלים חדשים")
+  function shekels(n) {
+    n = Math.floor(Math.abs(Number(n) || 0));
+    if (n === 1) return 'שקל אחד';
+    if (n === 2) return 'שני שקלים חדשים';
+    return words(n) + ' שקלים חדשים';
+  }
+
+  PFS.numwords = { words, shekels };
+})(window);
+
+</script>
+<script>
 /* vault.js — the "smart personal vault": understand what a form field MEANS
  * and fill it from the user's saved details automatically.
  *
@@ -1381,6 +1453,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     zip:        ['מיקוד', 'מיקוד דואר', 'zip', 'zip code', 'postal code', 'الرمز البريدي'],
     occupation: ['מקצוע', 'עיסוק', 'תפקיד', 'occupation', 'profession', 'المهنة', 'الوظيفة'],
     gender:     ['מין', 'מגדר', 'sex', 'gender', 'الجنس'],
+    // amount_words must out-rank amount (longer phrase wins in matchKey)
+    amount_words: ['סכום במילים', 'סכום במלים', 'הסכום במילים', 'amount in words', 'sum in words'],
+    amount:     ['סכום בשח', 'סכום', 'סך הכל', 'סך הכול', 'סה״כ', 'סהכ', 'amount', 'total', 'sum', 'المبلغ', 'المجموع'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
 
@@ -4055,6 +4130,29 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         body.appendChild(row);
         controls.push(control); fieldMeta.push(f);
       });
+      // amount → amount-in-words: typing the number fills the "סכום במילים"
+      // field automatically (Hebrew words), the way cheques/official forms want
+      (function wireAmountWords() {
+        if (!PFS.numwords || !PFS.vault) return;
+        const canonOf = (f) => PFS.vault.matchKey(f.label) || PFS.vault.matchKey(f.fieldKey);
+        let amtIdx = -1, wordsIdx = -1;
+        fieldMeta.forEach((f, i) => {
+          if (isTick(controls[i])) return;
+          const c = canonOf(f);
+          if (c === 'amount' && amtIdx < 0) amtIdx = i;
+          if (c === 'amount_words' && wordsIdx < 0) wordsIdx = i;
+        });
+        if (amtIdx < 0 || wordsIdx < 0) return;
+        const amt = controls[amtIdx], wc = controls[wordsIdx], wf = fieldMeta[wordsIdx];
+        const sync = () => {
+          const digits = (amt.value || '').replace(/[^\d]/g, '');
+          if (!digits) return;
+          wc.value = PFS.numwords.shekels(parseInt(digits, 10));
+          ensureCtrl(wf, wc.value); recount();
+        };
+        amt.addEventListener('input', sync);
+        if ((amt.value || '').trim()) sync(); // prefilled amount
+      })();
       // interview mode: one question at a time, Enter advances — fastest way
       // to sweep a long form, especially on a phone
       const ivBtn = document.createElement('button');

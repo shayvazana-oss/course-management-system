@@ -976,6 +976,32 @@ async function main() {
     return formIsDoc && photoIsPhoto;
   }));
 
+  check('cropped overlay lands text in the correct region (no flip/shift)', await page.evaluate(async () => {
+    const { PDFDocument } = window.PDFLib;
+    const src = await PDFDocument.create(); src.addPage([400, 400]);
+    const bytes = await src.save();
+    // text near the TOP-RIGHT (fy small = top, RTL right-aligned)
+    const models = [{ page: 0, type: 'text', kind: 'text', fx: 0.62, fy: 0.08, fw: 0.33, fh: 0.07, fontFrac: 0.05, text: 'ABC123', color: '#000', align: 'right' }];
+    const out = await window.PFS.exporter.exportPdf(bytes, models, {});
+    const doc = await window.pdfjsLib.getDocument({ data: out }).promise;
+    const pg = await doc.getPage(1);
+    const vp = pg.getViewport({ scale: 1 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(vp.width); canvas.height = Math.ceil(vp.height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+    const W = canvas.width, H = canvas.height;
+    const dark = (x0, y0, x1, y1) => {
+      const d = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data; let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] < 120 && d[i + 1] < 120 && d[i + 2] < 120) n++;
+      return n;
+    };
+    const topRight = dark(Math.floor(W * 0.55), Math.floor(H * 0.01), Math.floor(W * 0.99), Math.floor(H * 0.22));
+    const bottomLeft = dark(0, Math.floor(H * 0.8), Math.floor(W * 0.45), H);
+    return topRight > 20 && bottomLeft === 0;   // text at top-right, nothing bottom-left
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

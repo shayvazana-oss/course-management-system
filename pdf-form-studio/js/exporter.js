@@ -100,6 +100,33 @@
     lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + i * lineH));
   }
 
+  // Crop the overlay to the elements' bounding box (padded), so an un-rotated
+  // page embeds only the region that carries content instead of a full-page
+  // mostly-transparent PNG. Measured ~2× smaller per text-light page. Returns
+  // the sub-canvas plus its placement rect in page fractions (top-left origin).
+  function rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale) {
+    const s = scale || EXPORT_SCALE;
+    const fullCw = Math.max(1, Math.round(displayWpt * s));
+    const fullCh = Math.max(1, Math.round(displayHpt * s));
+    const pad = 0.03;   // generous, so text overflowing its box never clips
+    let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+    models.forEach((m) => {
+      x0 = Math.min(x0, m.fx); y0 = Math.min(y0, m.fy);
+      x1 = Math.max(x1, m.fx + (m.fw || 0)); y1 = Math.max(y1, m.fy + (m.fh || 0));
+    });
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+    x1 = Math.min(1, x1 + pad); y1 = Math.min(1, y1 + pad);
+    const px0 = Math.floor(x0 * fullCw), py0 = Math.floor(y0 * fullCh);
+    const px1 = Math.ceil(x1 * fullCw), py1 = Math.ceil(y1 * fullCh);
+    const cw = Math.max(1, px1 - px0), ch = Math.max(1, py1 - py0);
+    const canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(-px0, -py0);   // draw elements at full-page coords into the crop
+    models.forEach((m) => drawElement(ctx, m, fullCw, fullCh, imgMap));
+    return { canvas, fx0: px0 / fullCw, fy0: py0 / fullCh, fx1: px1 / fullCw, fy1: py1 / fullCh };
+  }
+
   // Build the display-oriented overlay canvas for one page's elements.
   function rasterizePage(models, displayWpt, displayHpt, imgMap, scale) {
     const s = scale || EXPORT_SCALE;
@@ -173,24 +200,33 @@
 
       const models = byPage.get(idx);
       if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
-      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale);
-      const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
 
-      switch (rot) {
-        case 90:
-          page.drawImage(png, { x: Wpt, y: 0, width: displayWpt, height: displayHpt, rotate: degrees(90) });
-          break;
-        case 180:
-          page.drawImage(png, { x: Wpt, y: Hpt, width: Wpt, height: Hpt, rotate: degrees(180) });
-          break;
-        case 270:
-          page.drawImage(png, { x: 0, y: Hpt, width: displayWpt, height: displayHpt, rotate: degrees(270) });
-          break;
-        default:
-          page.drawImage(png, { x: 0, y: 0, width: Wpt, height: Hpt });
+      if (rot === 0) {
+        // un-rotated: embed only the cropped content region (smaller file, same pixels)
+        const cr = rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale);
+        const png = await pdfDoc.embedPng(cr.canvas.toDataURL('image/png'));
+        page.drawImage(png, {
+          x: cr.fx0 * Wpt, y: Hpt - cr.fy1 * Hpt,
+          width: (cr.fx1 - cr.fx0) * Wpt, height: (cr.fy1 - cr.fy0) * Hpt
+        });
+        cr.canvas.width = 0; cr.canvas.height = 0;
+      } else {
+        // rotated: keep the full-page raster + rotation-aware anchor switch
+        const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale);
+        const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
+        switch (rot) {
+          case 90:
+            page.drawImage(png, { x: Wpt, y: 0, width: displayWpt, height: displayHpt, rotate: degrees(90) });
+            break;
+          case 180:
+            page.drawImage(png, { x: Wpt, y: Hpt, width: Wpt, height: Hpt, rotate: degrees(180) });
+            break;
+          case 270:
+            page.drawImage(png, { x: 0, y: Hpt, width: displayWpt, height: displayHpt, rotate: degrees(270) });
+            break;
+        }
+        canvas.width = 0; canvas.height = 0;
       }
-      // free memory
-      canvas.width = 0; canvas.height = 0;
       done++;
       opts.onProgress && opts.onProgress(done, pageIdxs.length);
     }

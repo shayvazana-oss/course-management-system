@@ -19,12 +19,13 @@
     const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
 
     const grabRotations = () => { try { return (opts.getRotations && opts.getRotations()) || {}; } catch (e) { return {}; } };
+    const grabRemoved = () => { try { return (opts.getRemovedPages && opts.getRemovedPages()) || []; } catch (e) { return []; } };
 
     function save(name, fp) {
       const els = opts.getElements();
       if (!els.length) { PFS.toast('אין פריטים לשמירה', 'err'); return; }
       const arr = all();
-      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, rotations: grabRotations(), fp: fp || null };
+      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, rotations: grabRotations(), removePages: grabRemoved(), fp: fp || null };
       arr.unshift(tpl);
       if (!persist(arr)) return; // store.set already toasted the quota error
       render();
@@ -38,12 +39,13 @@
       if (!fp || !PFS.fingerprint) return;
       const els = opts.getElements();
       const rotations = grabRotations();
-      // remember the form even with no placed elements if it was rotated
-      if (!els.length && !Object.keys(rotations).length) return;
+      const removePages = grabRemoved();
+      // remember the form even with no placed elements if it was rotated/trimmed
+      if (!els.length && !Object.keys(rotations).length && !removePages.length) return;
       const arr = all();
       let tpl = arr.find((t) => t.auto && t.fp && PFS.fingerprint.score(fp, t.fp) >= 0.9);
-      if (tpl) { tpl.elements = els; tpl.rotations = rotations; tpl.ts = Date.now(); tpl.fp = fp; if (name) tpl.name = name; }
-      else { arr.unshift({ id: uid(), name: name || 'זיכרון אוטומטי', ts: Date.now(), elements: els, rotations, fp: fp, auto: true }); }
+      if (tpl) { tpl.elements = els; tpl.rotations = rotations; tpl.removePages = removePages; tpl.ts = Date.now(); tpl.fp = fp; if (name) tpl.name = name; }
+      else { arr.unshift({ id: uid(), name: name || 'זיכרון אוטומטי', ts: Date.now(), elements: els, rotations, removePages, fp: fp, auto: true }); }
       if (!persist(arr)) return;
       render();
     }
@@ -52,6 +54,7 @@
       if (!tpl) return;
       opts.applyModels(tpl.elements);
       if (opts.applyRotations) opts.applyRotations(tpl.rotations);
+      if (opts.applyRemovedPages) opts.applyRemovedPages(tpl.removePages);
       PFS.toast('התבנית הוחלה', 'ok');
       opts.afterApply && opts.afterApply();
     }

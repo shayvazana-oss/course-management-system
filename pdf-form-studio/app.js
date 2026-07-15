@@ -93,9 +93,12 @@ const templates = PFS.createTemplates({
   getElements: () => overlay.serialize(),
   // applying a template replaces the current layout (avoids stacking duplicates)
   applyModels: (models) => { overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(models); },
-  // page rotations travel with the template so a straightened form reopens straight
+  // page rotations & deletions travel with the template so a straightened/
+  // trimmed form reopens the same way
   getRotations: () => pdfView.getRotations(),
   applyRotations: (r) => { if (r && Object.keys(r).length) pdfView.setRotations(r); },
+  getRemovedPages: () => pdfView.getRemovedPages(),
+  applyRemovedPages: (a) => { if (a && a.length) { pdfView.setRemovedPages(a); buildPageNav(); buildThumbnails(); } },
   afterApply: () => { markDirty(); closeModal('tmplModal'); }
 });
 const profiles = PFS.createDataProfiles();

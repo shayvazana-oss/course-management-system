@@ -120,6 +120,13 @@
       return true;
     }
     function getRemovedPages() { return views.map((v, i) => (v.deleted ? i : -1)).filter((i) => i >= 0); }
+    // restore deletions from memory — but never hide every page
+    function setRemovedPages(arr) {
+      const want = new Set((arr || []).map(Number));
+      if (!want.size) return;
+      if (want.size >= views.length) [...want].sort((a, b) => b - a).slice(0, views.length - 1).forEach((i) => want.add(i)); // keep ≥1 (no-op guard)
+      views.forEach((v, i) => { if (want.has(i) && views.filter((x) => !x.deleted).length > 1) { v.deleted = true; v.wrap.style.display = 'none'; } });
+    }
     function visiblePageCount() { return views.filter((v) => !v.deleted).length; }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
@@ -129,7 +136,7 @@
     // page canvases + wraps, for building the thumbnail rail
     function viewList() { return views.map((v, i) => ({ n: i + 1, idx: i, canvas: v.canvas, wrap: v.wrap, deleted: !!v.deleted })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
   }
 
   PFS.createPdfView = createPdfView;

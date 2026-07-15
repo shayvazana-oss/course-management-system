@@ -1118,6 +1118,23 @@ async function main() {
     return rec1 && rec2 && baseClean;
   }));
 
+  check('CSV parser: quotes, embedded commas/newlines, escapes, BOM, CRLF, ragged', await page.evaluate(() => {
+    const p = window.PFS.merge.parseCSV;
+    let r = p('name,note\n"Doe, John","she said ""hi"""');           // quoted comma + escaped quote
+    const c1 = r.records.length === 1 && r.records[0].name === 'Doe, John' && r.records[0].note === 'she said "hi"';
+    r = p('a,b\n"line1\nline2",x');                                  // newline inside quotes = one field
+    const c2 = r.records.length === 1 && r.records[0].a === 'line1\nline2' && r.records[0].b === 'x';
+    r = p('﻿a,b\r\n1,2\r\n');                                   // BOM + CRLF + trailing newline
+    const c3 = r.headers.join(',') === 'a,b' && r.records.length === 1 && r.records[0].a === '1' && r.records[0].b === '2';
+    r = p('a,b,c\n1,2');                                             // ragged: missing cols → ''
+    const c4 = r.records[0].a === '1' && r.records[0].b === '2' && r.records[0].c === '';
+    r = p('a,b\n1,2\n\n3,4');                                        // blank line dropped
+    const c5 = r.records.length === 2 && r.records[1].a === '3' && r.records[1].b === '4';
+    r = p('a,b\n"",y');                                              // quoted empty field
+    const c6 = r.records[0].a === '' && r.records[0].b === 'y';
+    return c1 && c2 && c3 && c4 && c5 && c6;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -609,6 +609,22 @@ async function main() {
     return px[0] > 200 && px[1] > 200 && px[2] < 220 && px[2] > 120;
   }));
 
+  // secure/flat export rasterizes every page → no extractable text (true redaction)
+  check('secure export produces an image-only PDF (no extractable text)', await page.evaluate(async () => {
+    // the fixture (already loaded) has a real text layer; flatten it and confirm
+    // the output has no selectable text
+    const bytes = await window.PFS.__test.buildFlattenedBytes();
+    if (!bytes || !bytes.length) return false;
+    const doc = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+    let text = '';
+    for (let i = 1; i <= doc.numPages; i++) {
+      const tc = await (await doc.getPage(i)).getTextContent();
+      text += tc.items.map((it) => it.str).join('');
+    }
+    // pages still render (image), but there is zero extractable text
+    return doc.numPages >= 1 && text.trim().length === 0;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

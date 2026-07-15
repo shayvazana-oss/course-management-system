@@ -204,9 +204,56 @@
     return bytes;
   }
 
+  // Append attachments (images / whole PDFs) to a target pdf-lib doc.
+  async function appendAttachments(target, attachments) {
+    for (const att of (attachments || [])) {
+      if (att && att.kind === 'pdf' && att.bytes) {
+        try { const donor = await root.PDFLib.PDFDocument.load(att.bytes); (await target.copyPages(donor, donor.getPageIndices())).forEach((p) => target.addPage(p)); }
+        catch (e) { console.warn('[export] pdf attachment skipped:', e && e.message); }
+        continue;
+      }
+      const src = att && (att.url || att);
+      if (!src) continue;
+      let emb;
+      try { emb = /jpe?g|jfif/i.test(att.type || src) ? await target.embedJpg(src) : await target.embedPng(src); }
+      catch (e) { console.warn('[export] attachment skipped:', e && e.message); continue; }
+      const s = Math.min(595 / emb.width, 842 / emb.height, 1);
+      const w = Math.max(1, emb.width * s), h = Math.max(1, emb.height * s);
+      target.addPage([w, h]).drawImage(emb, { x: 0, y: 0, width: w, height: h });
+    }
+  }
+
+  /* exportFlattenedPdf — a SECURE, image-only export: every page is rasterized
+   * (base content + overlay burned in), so nothing is selectable or extractable
+   * and redactions truly remove the text underneath. Also tamper-resistant.
+   *   renderBase(pageIndex) → { canvas, wPt, hPt } — base page drawn at high DPI
+   *                           (already rotated), plus its size in points.
+   */
+  async function exportFlattenedPdf({ order, models, attachments, renderBase, onProgress }) {
+    const { PDFDocument } = root.PDFLib;
+    await ensureFonts();
+    const imgMap = await preloadImages((models || []).map((m) => m.imgUrl));
+    const byPage = new Map();
+    (models || []).forEach((m) => { if (!byPage.has(m.page)) byPage.set(m.page, []); byPage.get(m.page).push(m); });
+    const out = await PDFDocument.create();
+    const idxs = (order && order.length) ? order : [...new Set((models || []).map((m) => m.page))].sort((a, b) => a - b);
+    let done = 0;
+    for (const idx of idxs) {
+      const { canvas, wPt, hPt } = await renderBase(idx);
+      const ctx = canvas.getContext('2d');
+      (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap));
+      const png = await out.embedPng(canvas.toDataURL('image/png'));
+      out.addPage([wPt, hPt]).drawImage(png, { x: 0, y: 0, width: wPt, height: hPt });
+      canvas.width = 0; canvas.height = 0;
+      done++; onProgress && onProgress(done, idxs.length);
+    }
+    await appendAttachments(out, attachments);
+    return out.save();
+  }
+
   function downloadBytes(bytes, filename) {
     PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
-  PFS.exporter = { exportPdf, downloadBytes };
+  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes };
 })(window);

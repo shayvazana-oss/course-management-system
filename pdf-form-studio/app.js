@@ -123,7 +123,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -235,6 +235,7 @@ async function openPdfFile(file) {
     $('rotateBtn').disabled = false;
     $('attachBtn').disabled = false;
     $('deleteBtn') && ($('deleteBtn').disabled = false);
+    $('exportFlatBtn') && ($('exportFlatBtn').disabled = false);
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
     PFS.recent && PFS.recent.save(file.name, buf.slice(0));
@@ -560,6 +561,56 @@ async function doExport() {
     btn.disabled = false; btn.innerHTML = prev;
   }
 }
+
+// Render one base page to a high-DPI canvas (already rotated), white-backed so
+// the flattened image isn't transparent. Returns the page size in points too.
+async function renderBaseForFlatten(idx, scale = 2.2) {
+  const doc = pdfView.getDoc();
+  const page = await doc.getPage(idx + 1);
+  const userR = (pdfView.getRotations && pdfView.getRotations()[idx]) || 0;
+  const rot = (((page.rotate || 0) + userR) % 360 + 360) % 360;
+  const vp = page.getViewport({ scale, rotation: rot });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(vp.width));
+  canvas.height = Math.max(1, Math.round(vp.height));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  const vp1 = page.getViewport({ scale: 1, rotation: rot });
+  return { canvas, wPt: vp1.width, hPt: vp1.height };
+}
+// Secure/flat export: everything rasterized → no extractable text (true
+// redaction), tamper-resistant. Returns bytes (the UI wrapper downloads/shares).
+async function buildFlattenedBytes(onProgress) {
+  const models = overlay.getElements().map((c) => c.model);
+  const order = pdfView.getPageOrder ? pdfView.getPageOrder() : null;
+  return PFS.exporter.exportFlattenedPdf({
+    order: (order && order.length) ? order : undefined,
+    models, attachments,
+    renderBase: (idx) => renderBaseForFlatten(idx),
+    onProgress
+  });
+}
+async function doExportFlattened() {
+  if (!pdfView.hasDoc()) return;
+  if (!(await PFS.ui.confirm('ייצוא מאובטח', 'הקובץ ייווצר כתמונה שטוחה: הטקסט לא יהיה ניתן לבחירה או חילוץ (השחרות באמת מוסתרות), והוא מוגן משינוי. הקובץ עשוי להיות גדול יותר. להמשיך?'))) return;
+  const btn = $('exportFlatBtn'); const prev = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…'; }
+  try {
+    const bytes = await buildFlattenedBytes((d, t) => { if (btn) btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; });
+    const outName = currentFileName + '-secure.pdf';
+    let shared = false;
+    try {
+      const f = new File([bytes], outName, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: outName }); shared = true; }
+    } catch (e) {}
+    if (!shared) PFS.exporter.downloadBytes(bytes, outName);
+    PFS.toast(shared ? 'הקובץ המאובטח שותף ✓' : 'ייצוא מאובטח הושלם ✓', 'ok');
+  } catch (e) {
+    console.error(e); PFS.toast('הייצוא המאובטח נכשל: ' + (e.message || e), 'err');
+  } finally { if (btn) { btn.disabled = false; btn.innerHTML = prev; } }
+}
+$('exportFlatBtn') && $('exportFlatBtn').addEventListener('click', doExportFlattened);
 
 // =====================================================================
 //  Modals

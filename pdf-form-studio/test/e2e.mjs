@@ -667,6 +667,23 @@ async function main() {
     return disarmed && stillArmed;
   }));
 
+  // rect elements (highlight) survive serialize→apply (templates/backup) with
+  // their color AND opacity intact — else a saved highlight would turn opaque
+  check('highlight rect round-trips through serialize/apply with opacity', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    ov.clearElements();
+    ov.addElementAt('highlight', 0, 0.3, 0.3, {});
+    const ser = ov.serialize();
+    const hl = ser.find((m) => m.kind === 'highlight');
+    const serOk = hl && hl.type === 'rect' && Math.abs(hl.opacity - 0.35) < 0.01 && hl.color === '#ffe600';
+    ov.clearElements();
+    ov.applyModels(ser);
+    const el = ov.getElements().find((e) => e.model.kind === 'highlight');
+    const restoredOk = el && el.model.type === 'rect' && Math.abs(el.model.opacity - 0.35) < 0.01 && el.model.color === '#ffe600';
+    ov.clearElements();
+    return serOk && restoredOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

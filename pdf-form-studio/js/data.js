@@ -15,6 +15,7 @@
     { key: 'id', label: 'תעודת זהות' },
     { key: 'gender', label: 'מין (זכר/נקבה)' },
     { key: 'marital_status', label: 'מצב משפחתי' },
+    { key: 'health_fund', label: 'קופת חולים' },
     { key: 'birth_date', label: 'תאריך לידה' },
     { key: 'phone', label: 'טלפון' },
     { key: 'email', label: 'דוא״ל' },

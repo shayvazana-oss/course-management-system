@@ -392,6 +392,20 @@ async function main() {
     return /סיסמה/.test(pw) && /פגום/.test(bad) && /נכשלה/.test(other) && pw !== bad && bad !== other;
   }));
 
+  // health fund (קופת חולים) is another learned single-choice (Form 101)
+  check('saved health fund auto-selects the matching option', await page.evaluate(() => {
+    const opts = [
+      { fieldKey: 'h1', label: 'כללית', type: 'check', radio: true, group: 'hf' },
+      { fieldKey: 'h2', label: 'מכבי', type: 'check', radio: true, group: 'hf' },
+      { fieldKey: 'h3', label: 'מאוחדת', type: 'check', radio: true, group: 'hf' },
+      { fieldKey: 'h4', label: 'לאומית', type: 'check', radio: true, group: 'hf' }
+    ];
+    const sel = window.PFS.vault.matchChecks(opts, { 'קופת חולים': 'מכבי' }, []);
+    const cls = window.PFS.vault.classifyChoice('כללית');
+    return sel.h2 === true && !sel.h1 && !sel.h3 && !sel.h4
+      && cls && cls.canon === 'health_fund' && window.PFS.vault.matchKey('קופת חולים') === 'health_fund';
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

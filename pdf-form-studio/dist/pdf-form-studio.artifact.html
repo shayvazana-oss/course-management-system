@@ -820,6 +820,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         <label>תעודת זהות<input type="text" id="qsId" inputmode="numeric" placeholder="123456782"></label>
         <label>מין<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsGender" value="זכר"> זכר</label><label class="qs-r"><input type="radio" name="qsGender" value="נקבה"> נקבה</label></span></label>
         <label>מצב משפחתי<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsMarital" value="רווק"> רווק/ה</label><label class="qs-r"><input type="radio" name="qsMarital" value="נשוי"> נשוי/אה</label><label class="qs-r"><input type="radio" name="qsMarital" value="גרוש"> גרוש/ה</label><label class="qs-r"><input type="radio" name="qsMarital" value="אלמן"> אלמן/ה</label></span></label>
+        <label>קופת חולים<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsHealth" value="כללית"> כללית</label><label class="qs-r"><input type="radio" name="qsHealth" value="מכבי"> מכבי</label><label class="qs-r"><input type="radio" name="qsHealth" value="מאוחדת"> מאוחדת</label><label class="qs-r"><input type="radio" name="qsHealth" value="לאומית"> לאומית</label></span></label>
         <label>תאריך לידה<input type="text" id="qsBirth" dir="auto" placeholder="15/03/1990"></label>
         <label>טלפון<input type="text" id="qsPhone" inputmode="tel" placeholder="0501234567"></label>
         <label>דוא״ל<input type="text" id="qsEmail" inputmode="email" placeholder="me@example.com"></label>
@@ -1474,6 +1475,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
     business_name: ['שם העסק', 'שם החברה', 'שם התאגיד', 'שם עסק', 'business name', 'company name'],
     marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
+    health_fund: ['קופת חולים', 'קופ״ח', 'קופח', 'קופה', 'health fund', 'hmo', 'صندوق المرضى'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
 
@@ -1491,8 +1493,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     divorced: ['גרוש', 'גרושה', 'divorced', 'مطلق', 'مطلقة'],
     widowed:  ['אלמן', 'אלמנה', 'widowed', 'أرمل', 'أرملة']
   };
+  // health funds (קופת חולים) — Form 101 and health forms ask this
+  const HEALTH = {
+    clalit:   ['כללית', 'שירותי בריאות כללית', 'clalit'],
+    maccabi:  ['מכבי', 'מכבי שירותי בריאות', 'maccabi'],
+    meuhedet: ['מאוחדת', 'meuhedet'],
+    leumit:   ['לאומית', 'leumit']
+  };
   // single-choice categories: canonical field → its option-value dictionary
-  const CHOICE_CATS = { gender: GENDER, marital_status: MARITAL };
+  const CHOICE_CATS = { gender: GENDER, marital_status: MARITAL, health_fund: HEALTH };
   // which canonical value (if any) a free string denotes in a dictionary —
   // exact or whole-word match on the normalized form (so "ז" won't hit "מזכיר")
   function valInDict(str, dict) {
@@ -3382,6 +3391,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     { key: 'id', label: 'תעודת זהות' },
     { key: 'gender', label: 'מין (זכר/נקבה)' },
     { key: 'marital_status', label: 'מצב משפחתי' },
+    { key: 'health_fund', label: 'קופת חולים' },
     { key: 'birth_date', label: 'תאריך לידה' },
     { key: 'phone', label: 'טלפון' },
     { key: 'email', label: 'דוא״ל' },
@@ -5053,6 +5063,8 @@ function openQuickSetup() {
   document.querySelectorAll('input[name="qsGender"]').forEach((r) => { r.checked = (r.value === g); });
   const ms = cv.marital_status || '';
   document.querySelectorAll('input[name="qsMarital"]').forEach((r) => { r.checked = (r.value === ms); });
+  const hf = cv.health_fund || '';
+  document.querySelectorAll('input[name="qsHealth"]').forEach((r) => { r.checked = (r.value === hf); });
   openModal('quickModal');
 }
 $('quickSetupBtn').addEventListener('click', openQuickSetup);
@@ -5065,6 +5077,8 @@ $('qsSave').addEventListener('click', () => {
   if (gEl) merged['מין'] = gEl.value; else delete merged['מין'];
   const mEl = document.querySelector('input[name="qsMarital"]:checked');
   if (mEl) merged['מצב משפחתי'] = mEl.value; else delete merged['מצב משפחתי'];
+  const hEl = document.querySelector('input[name="qsHealth"]:checked');
+  if (hEl) merged['קופת חולים'] = hEl.value; else delete merged['קופת חולים'];
   profiles.saveProfile(ap ? ap.name : 'אני', merged);
   renderProfileSelect();
   closeModal('quickModal');

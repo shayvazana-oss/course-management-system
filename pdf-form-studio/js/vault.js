@@ -47,6 +47,7 @@
     business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
     business_name: ['שם העסק', 'שם החברה', 'שם התאגיד', 'שם עסק', 'business name', 'company name'],
     marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
+    health_fund: ['קופת חולים', 'קופ״ח', 'קופח', 'קופה', 'health fund', 'hmo', 'صندوق المرضى'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
   };
 
@@ -64,8 +65,15 @@
     divorced: ['גרוש', 'גרושה', 'divorced', 'مطلق', 'مطلقة'],
     widowed:  ['אלמן', 'אלמנה', 'widowed', 'أرمل', 'أرملة']
   };
+  // health funds (קופת חולים) — Form 101 and health forms ask this
+  const HEALTH = {
+    clalit:   ['כללית', 'שירותי בריאות כללית', 'clalit'],
+    maccabi:  ['מכבי', 'מכבי שירותי בריאות', 'maccabi'],
+    meuhedet: ['מאוחדת', 'meuhedet'],
+    leumit:   ['לאומית', 'leumit']
+  };
   // single-choice categories: canonical field → its option-value dictionary
-  const CHOICE_CATS = { gender: GENDER, marital_status: MARITAL };
+  const CHOICE_CATS = { gender: GENDER, marital_status: MARITAL, health_fund: HEALTH };
   // which canonical value (if any) a free string denotes in a dictionary —
   // exact or whole-word match on the normalized form (so "ז" won't hit "מזכיר")
   function valInDict(str, dict) {

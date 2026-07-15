@@ -79,5 +79,31 @@
     return value;
   }
 
-  PFS.formula = { isFormula, evaluate, format };
+  /* resolve(models, onChange) — recompute every calculated field in a set of
+   * element models, in place. ONE implementation shared by interactive fill and
+   * mail-merge so they can't drift. Handles calc fields that reference other
+   * calc fields via fixed-point iteration; the pass cap makes circular
+   * references stop cleanly. `onChange(model)` fires whenever a field's text
+   * changes, so a caller can update the DOM. Models need {type,fieldKey,formula,
+   * format,text}; `text` is mutated to the computed (and formatted) value. */
+  function resolve(models, onChange) {
+    models = models || [];
+    const formulaMs = models.filter((m) => m && m.type === 'text' && isFormula(m.formula));
+    if (!formulaMs.length) return;
+    const vars = {};
+    models.forEach((m) => { if (m && m.type === 'text' && m.fieldKey) vars[m.fieldKey] = m.text; });
+    const maxPasses = formulaMs.length + 1;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let changed = false;
+      formulaMs.forEach((m) => {
+        const v = evaluate(m.formula, vars);                   // raw numeric string
+        if (m.fieldKey && vars[m.fieldKey] !== v) { vars[m.fieldKey] = v; changed = true; }
+        const shown = (v !== '' && m.format) ? format(v, m.format) : v;
+        if (m.text !== shown) { m.text = shown; if (onChange) onChange(m); }
+      });
+      if (!changed) break;
+    }
+  }
+
+  PFS.formula = { isFormula, evaluate, format, resolve };
 })(window);

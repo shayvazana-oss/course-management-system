@@ -75,35 +75,17 @@ function redoAction() { if (!redo.length) return; const s = redo.pop(); history.
 // Guarded so setting a formula field's text can't re-enter and loop.
 let computingFormulas = false;
 function recomputeFormulas() {
-  if (computingFormulas || !PFS.formula) return;
+  if (computingFormulas || !PFS.formula || !PFS.formula.resolve) return;
   const els = overlay.getElements();
-  const formulaEls = els.filter((c) => c.model.type === 'text' && PFS.formula.isFormula(c.model.formula));
-  if (!formulaEls.length) return; // nothing to do
   computingFormulas = true;
   try {
-    const vars = {};
-    // seed with EVERY tagged text field's current value — formula fields too, so
-    // one calculated field can reference another (e.g. total = subtotal * 1.17).
-    // evaluate() strips any currency/%/thousands formatting back to a number.
-    els.forEach((c) => { const m = c.model; if (m.type === 'text' && m.fieldKey) vars[m.fieldKey] = m.text; });
-    // iterate so dependency chains resolve regardless of element order; the pass
-    // cap guards against circular references (they simply stop, never hang).
-    const maxPasses = formulaEls.length + 1;
-    for (let pass = 0; pass < maxPasses; pass++) {
-      let changed = false;
-      formulaEls.forEach((c) => {
-        const m = c.model;
-        const val = PFS.formula.evaluate(m.formula, vars);       // raw numeric string
-        if (m.fieldKey && vars[m.fieldKey] !== val) { vars[m.fieldKey] = val; changed = true; }
-        const shown = (val !== '' && m.format) ? PFS.formula.format(val, m.format) : val;
-        if (m.text !== shown) {
-          m.text = shown;
-          const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = shown;
-          c.layout();
-        }
-      });
-      if (!changed) break;
-    }
+    // one shared resolver (also used by mail-merge); update the DOM per change
+    const byModel = new Map(els.map((c) => [c.model, c]));
+    PFS.formula.resolve(els.map((c) => c.model), (m) => {
+      const c = byModel.get(m); if (!c) return;
+      const inner = c.node.querySelector('.txt'); if (inner) inner.textContent = m.text;
+      c.layout();
+    });
   } finally { computingFormulas = false; }
 }
 

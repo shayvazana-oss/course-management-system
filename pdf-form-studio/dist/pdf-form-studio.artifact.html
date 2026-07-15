@@ -3461,11 +3461,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         if (ctrl) { overlay.deleteCtrl(ctrl); delete ctrlByKey[field.fieldKey]; }
         return null;
       }
+      const baseFont = field.fontFrac || 0.016;
       if (!ctrl) {
         const align = /[֐-׿؀-ۿ]/.test(field.label) ? 'right' : 'left';   // Hebrew or Arabic → right-align
         const model = PFS.element.makeModel('text', field.page, {
           fx: field.fx, fy: field.fy, fw: field.fw || 0.2,
-          fontFrac: field.fontFrac || 0.016, align,
+          fontFrac: baseFont, align,
           fieldKey: field.fieldKey, text: value
         });
         ctrl = overlay.instantiate(model);
@@ -3473,11 +3474,29 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         ctrlByKey[field.fieldKey] = ctrl;
       } else {
         ctrl.model.text = value;
+        ctrl.model.fontFrac = baseFont;   // reset before re-fitting for the new value
         const inner = ctrl.node.querySelector('.txt');
         if (inner) inner.textContent = value;
         ctrl.layout();
       }
+      fitFont(ctrl, field);
       return ctrl;
+    }
+
+    // Shrink the font just enough for a long value to sit within the detected
+    // blank's width — no overflow past the line. Only shrinks (never grows past
+    // the detected size), and only when the field's width is known.
+    function fitFont(ctrl, field) {
+      if (!field || !field.fw || !overlay.overlaySizeFor) return;
+      let W;
+      try { W = overlay.overlaySizeFor(field.page).w; } catch (e) { return; }
+      if (!W) return;
+      const maxW = field.fw * W * 1.02;
+      let guard = 0;
+      while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > 0.008 && guard++ < 14) {
+        ctrl.model.fontFrac *= 0.9;
+        ctrl.layout();
+      }
     }
 
     function ensureCheck(field, on) {

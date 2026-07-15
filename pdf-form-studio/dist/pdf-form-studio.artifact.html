@@ -3541,7 +3541,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             control.style.borderColor = bad ? 'var(--danger)' : '';
             control.title = bad ? 'מספר תעודת הזהות לא עובר ביקורת ספרת ביקורת — בדקו הקלדה' : '';
           };
+          control.__fkey = f.fieldKey;
           control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); });
+          control.addEventListener('keydown', (e) => {
+            // keyboard field-wizard: Enter / ArrowDown → next field, ArrowUp → previous
+            if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            const texts = controls.filter((c) => c.type !== 'checkbox');
+            const i = texts.indexOf(control);
+            const next = (e.key === 'ArrowUp') ? texts[i - 1] : texts[i + 1];
+            e.preventDefault();
+            if (next) { next.focus(); next.select && next.select(); const ct = ctrlByKey[next.__fkey]; if (ct) ct.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            else control.blur();
+          });
           const pv = prefill && prefill[f.fieldKey];
           if (pv != null && String(pv).trim()) {
             control.value = pv;

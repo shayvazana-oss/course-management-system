@@ -1495,6 +1495,16 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   // number → tidy string (integer, else up to 2 decimals)
   function fmt(n) { if (!isFinite(n)) return ''; const r = Math.round(n * 100) / 100; return Number.isInteger(r) ? String(r) : String(r); }
 
+  // functions available in formulas (args already reduced to numbers)
+  const FUNCS = {
+    sum: (a) => a.reduce((s, x) => s + x, 0),
+    avg: (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0),
+    min: (a) => (a.length ? Math.min.apply(null, a) : 0),
+    max: (a) => (a.length ? Math.max.apply(null, a) : 0),
+    round: (a) => Math.round(a[0] || 0),
+    abs: (a) => Math.abs(a[0] || 0)
+  };
+
   /* evaluate(formulaString, varsByKey) → computed value as a string, '' on error */
   function evaluate(expr, vars) {
     if (!isFormula(expr)) return '';
@@ -1506,10 +1516,16 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const v = parseFloat(String(raw == null ? '' : raw).replace(/[^\d.\-]/g, ''));
       return isFinite(v) ? String(v) : '0';
     });
-    // sum(a,b,c) → (a+b+c), innermost first
+    // resolve function calls innermost-first: name(a,b,…) → its numeric result
     let guard = 0;
-    while (/sum\s*\(/i.test(s) && guard++ < 30) {
-      s = s.replace(/sum\s*\(([^()]*)\)/i, (_m, args) => '(' + args.split(',').map((x) => (x.trim() || '0')).join('+') + ')');
+    while (/[A-Za-z]+\s*\([^()]*\)/.test(s) && guard++ < 40) {
+      s = s.replace(/([A-Za-z]+)\s*\(([^()]*)\)/, (_m, fn, argstr) => {
+        const f = FUNCS[fn.toLowerCase()];
+        if (!f) return '(' + argstr + ')';                 // unknown fn → plain group
+        const args = argstr.split(',').map((x) => evalArith(x.trim() || '0'));
+        const r = f(args);
+        return isFinite(r) ? '(' + r + ')' : '0';
+      });
     }
     if (!/^[\d.+\-*/() ]*$/.test(s) || !s.trim()) return '';
     const n = evalArith(s);

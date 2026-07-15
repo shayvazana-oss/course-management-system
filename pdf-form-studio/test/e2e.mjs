@@ -707,7 +707,12 @@ async function main() {
       && F.evaluate('=[a]-[b]', v) === '50'
       && F.evaluate('=([a]+[b])/2', v) === '75'
       && F.evaluate('=[amount]*2', v) === '2400'   // strips the comma
-      && F.evaluate('=alert(1)', v) === '' && F.evaluate('=[a]', {}) === '0';
+      && F.evaluate('=max([a],[b],[c])', v) === '100'
+      && F.evaluate('=min([b],[c])', v) === '25'
+      && F.evaluate('=avg([b],[c])', v) === '37.5'   // (50+25)/2
+      && F.evaluate('=round([price])', v) === '11'    // round(10.5)
+      && F.evaluate('=[a]+xyz', v) === ''             // stray identifiers can't resolve → safe
+      && F.evaluate('=[a]', {}) === '0';
   }));
 
   // a calculated field auto-updates from the fields it references

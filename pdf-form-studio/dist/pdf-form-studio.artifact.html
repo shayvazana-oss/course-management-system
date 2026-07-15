@@ -613,6 +613,17 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         </section>
 
         <section class="tab-panel" data-panel="settings">
+          <div class="card">
+            <h3>🖨️ איכות הייצוא</h3>
+            <div class="body-p">
+              <div class="hint muted">רזולוציית ה־PDF המיוצא. <b>גבוהה</b> חדה יותר להדפסה; <b>טיוטה</b> קלה ומהירה יותר לשליחה במייל/וואטסאפ.</div>
+              <select id="exportQuality" class="sel block">
+                <option value="draft">טיוטה — קובץ קל</option>
+                <option value="standard" selected>רגילה (מומלץ)</option>
+                <option value="high">גבוהה — להדפסה</option>
+              </select>
+            </div>
+          </div>
           <div class="card" id="acctCard">
             <h3>👤 חשבון · סנכרון אוטומטי</h3>
             <div class="body-p" id="acctBody">
@@ -3725,7 +3736,16 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
 
-  const EXPORT_SCALE = 2.6; // raster DPI multiplier (sharpness vs memory)
+  const EXPORT_SCALE = 2.6; // default raster DPI multiplier (sharpness vs memory)
+  // named quality presets → DPI multiplier. Draft is lighter/faster for e-mail
+  // and quick proofs; High is crisper for printing. Clamped to a safe range so
+  // a bad value can never blow up canvas memory.
+  const QUALITY = { draft: 1.8, standard: 2.6, high: 3.4 };
+  function resolveScale(opts) {
+    const s = opts && (opts.scale || QUALITY[opts.quality]);
+    const v = Number(s) || EXPORT_SCALE;
+    return Math.max(1.5, Math.min(4, v));
+  }
 
   function preloadImages(urls) {
     const uniq = [...new Set(urls.filter(Boolean))];
@@ -3782,9 +3802,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   }
 
   // Build the display-oriented overlay canvas for one page's elements.
-  function rasterizePage(models, displayWpt, displayHpt, imgMap) {
-    const cw = Math.max(1, Math.round(displayWpt * EXPORT_SCALE));
-    const ch = Math.max(1, Math.round(displayHpt * EXPORT_SCALE));
+  function rasterizePage(models, displayWpt, displayHpt, imgMap, scale) {
+    const s = scale || EXPORT_SCALE;
+    const cw = Math.max(1, Math.round(displayWpt * s));
+    const ch = Math.max(1, Math.round(displayHpt * s));
     const canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
@@ -3833,6 +3854,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // /Rotate — for straightening sideways scans. Pages that were rotated but
     // carry no overlay still need their /Rotate updated, so process the union.
     const rotations = opts.rotations || {};
+    const scale = resolveScale(opts);
     const removeSet = new Set((opts.removePages || []).map(Number));
     const userR = (idx) => (((Number(rotations[idx]) || 0) % 360) + 360) % 360;
     const pageSet = new Set([...byPage.keys(), ...Object.keys(rotations).map(Number).filter((k) => userR(k))]);
@@ -3852,7 +3874,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
       const models = byPage.get(idx);
       if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
-      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap);
+      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale);
       const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
 
       switch (rot) {
@@ -3975,7 +3997,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
-  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes };
+  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale };
 })(window);
 
 </script>
@@ -5544,6 +5566,7 @@ async function doExport() {
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
+      quality: exportQuality(),
       rotations: pdfView.getRotations(),
       // a real reorder → pageOrder (encodes reorder AND deletion); else removePages
       ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
@@ -5575,9 +5598,13 @@ async function doExport() {
   }
 }
 
+// the user's chosen export quality → DPI multiplier (shared by both paths)
+function exportQuality() { return PFS.store.get('export_quality', 'standard'); }
+function qualityScale() { const q = PFS.exporter.QUALITY || {}; return q[exportQuality()] || 2.6; }
+
 // Render one base page to a high-DPI canvas (already rotated), white-backed so
 // the flattened image isn't transparent. Returns the page size in points too.
-async function renderBaseForFlatten(idx, scale = 2.2) {
+async function renderBaseForFlatten(idx, scale = qualityScale()) {
   const doc = pdfView.getDoc();
   const page = await doc.getPage(idx + 1);
   const userR = (pdfView.getRotations && pdfView.getRotations()[idx]) || 0;
@@ -5749,6 +5776,17 @@ function applyEnhance(on) {
   $('pages').classList.toggle('enhance', on);
   $('enhanceBtn') && $('enhanceBtn').classList.toggle('active', on);
 }
+// export-quality selector: restore the saved choice + persist on change
+(function () {
+  const q = $('exportQuality'); if (!q) return;
+  q.value = exportQuality();
+  q.addEventListener('change', () => {
+    const v = PFS.exporter.QUALITY && PFS.exporter.QUALITY[q.value] ? q.value : 'standard';
+    PFS.store.set('export_quality', v);
+    PFS.toast('איכות הייצוא נשמרה', 'ok', 1400);
+  });
+})();
+
 applyEnhance(PFS.store.get('enhance_scan', false));   // restore preference
 $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
   const on = !$('pages').classList.contains('enhance');

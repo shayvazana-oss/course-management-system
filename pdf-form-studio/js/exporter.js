@@ -9,7 +9,16 @@
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
 
-  const EXPORT_SCALE = 2.6; // raster DPI multiplier (sharpness vs memory)
+  const EXPORT_SCALE = 2.6; // default raster DPI multiplier (sharpness vs memory)
+  // named quality presets → DPI multiplier. Draft is lighter/faster for e-mail
+  // and quick proofs; High is crisper for printing. Clamped to a safe range so
+  // a bad value can never blow up canvas memory.
+  const QUALITY = { draft: 1.8, standard: 2.6, high: 3.4 };
+  function resolveScale(opts) {
+    const s = opts && (opts.scale || QUALITY[opts.quality]);
+    const v = Number(s) || EXPORT_SCALE;
+    return Math.max(1.5, Math.min(4, v));
+  }
 
   function preloadImages(urls) {
     const uniq = [...new Set(urls.filter(Boolean))];
@@ -66,9 +75,10 @@
   }
 
   // Build the display-oriented overlay canvas for one page's elements.
-  function rasterizePage(models, displayWpt, displayHpt, imgMap) {
-    const cw = Math.max(1, Math.round(displayWpt * EXPORT_SCALE));
-    const ch = Math.max(1, Math.round(displayHpt * EXPORT_SCALE));
+  function rasterizePage(models, displayWpt, displayHpt, imgMap, scale) {
+    const s = scale || EXPORT_SCALE;
+    const cw = Math.max(1, Math.round(displayWpt * s));
+    const ch = Math.max(1, Math.round(displayHpt * s));
     const canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
@@ -117,6 +127,7 @@
     // /Rotate — for straightening sideways scans. Pages that were rotated but
     // carry no overlay still need their /Rotate updated, so process the union.
     const rotations = opts.rotations || {};
+    const scale = resolveScale(opts);
     const removeSet = new Set((opts.removePages || []).map(Number));
     const userR = (idx) => (((Number(rotations[idx]) || 0) % 360) + 360) % 360;
     const pageSet = new Set([...byPage.keys(), ...Object.keys(rotations).map(Number).filter((k) => userR(k))]);
@@ -136,7 +147,7 @@
 
       const models = byPage.get(idx);
       if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
-      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap);
+      const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale);
       const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
 
       switch (rot) {
@@ -259,5 +270,5 @@
     PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
-  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes };
+  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale };
 })(window);

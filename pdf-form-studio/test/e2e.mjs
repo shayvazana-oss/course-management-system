@@ -938,6 +938,24 @@ async function main() {
     return synOk && marOk;
   }));
 
+  check('export quality: presets resolve + clamp, and change the raster size', await page.evaluate(async () => {
+    const ex = window.PFS.exporter;
+    const R = ex.resolveScale;
+    const presetsOk = R({ quality: 'draft' }) === 1.8 && R({ quality: 'standard' }) === 2.6 && R({ quality: 'high' }) === 3.4;
+    const defOk = R({}) === 2.6 && R({ quality: 'bogus' }) === 2.6;             // fall back to default
+    const clampOk = R({ scale: 99 }) === 4 && R({ scale: 0.1 }) === 1.5;         // never blow up memory
+    // end-to-end: the SAME page+text exported at high quality is a bigger raster
+    // (more bytes) than at draft quality — proves opts.quality reaches the canvas
+    const { PDFDocument } = window.PDFLib;
+    const src = await PDFDocument.create(); src.addPage([300, 400]);
+    const bytes = await src.save();
+    const models = [{ page: 0, type: 'text', kind: 'text', fx: 0.1, fy: 0.1, fw: 0.6, fh: 0.06, fontFrac: 0.04, text: 'שלום עולם 12345', color: '#000', align: 'right' }];
+    const draft = await ex.exportPdf(bytes, models, { quality: 'draft' });
+    const high = await ex.exportPdf(bytes, models, { quality: 'high' });
+    const sizeOk = high.length > draft.length * 1.2;   // meaningfully larger
+    return presetsOk && defOk && clampOk && sizeOk;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

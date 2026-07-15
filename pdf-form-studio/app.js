@@ -625,6 +625,7 @@ async function doExport() {
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
   try {
     const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
+      quality: exportQuality(),
       rotations: pdfView.getRotations(),
       // a real reorder → pageOrder (encodes reorder AND deletion); else removePages
       ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
@@ -656,9 +657,13 @@ async function doExport() {
   }
 }
 
+// the user's chosen export quality → DPI multiplier (shared by both paths)
+function exportQuality() { return PFS.store.get('export_quality', 'standard'); }
+function qualityScale() { const q = PFS.exporter.QUALITY || {}; return q[exportQuality()] || 2.6; }
+
 // Render one base page to a high-DPI canvas (already rotated), white-backed so
 // the flattened image isn't transparent. Returns the page size in points too.
-async function renderBaseForFlatten(idx, scale = 2.2) {
+async function renderBaseForFlatten(idx, scale = qualityScale()) {
   const doc = pdfView.getDoc();
   const page = await doc.getPage(idx + 1);
   const userR = (pdfView.getRotations && pdfView.getRotations()[idx]) || 0;
@@ -830,6 +835,17 @@ function applyEnhance(on) {
   $('pages').classList.toggle('enhance', on);
   $('enhanceBtn') && $('enhanceBtn').classList.toggle('active', on);
 }
+// export-quality selector: restore the saved choice + persist on change
+(function () {
+  const q = $('exportQuality'); if (!q) return;
+  q.value = exportQuality();
+  q.addEventListener('change', () => {
+    const v = PFS.exporter.QUALITY && PFS.exporter.QUALITY[q.value] ? q.value : 'standard';
+    PFS.store.set('export_quality', v);
+    PFS.toast('איכות הייצוא נשמרה', 'ok', 1400);
+  });
+})();
+
 applyEnhance(PFS.store.get('enhance_scan', false));   // restore preference
 $('enhanceBtn') && $('enhanceBtn').addEventListener('click', () => {
   const on = !$('pages').classList.contains('enhance');

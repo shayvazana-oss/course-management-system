@@ -456,6 +456,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="rail-btn tool" data-tool="date" title="תאריך"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
       <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
       <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
+      <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
       <div class="rail-sep"></div>
       <button class="rail-btn tool" data-tool="signature" title="חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
       <button class="rail-btn tool" data-tool="stamp" title="חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
@@ -2515,11 +2516,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     cross: { fontFrac: 0.026, color: '#842029', bold: true,  align: 'center', text: '✗' },
     date:  { fontFrac: 0.016, color: '#111111', bold: false, align: 'center', text: '' },
     // filled rectangles: cover a pre-printed error (white) / redact info (black)
-    whiteout: { color: '#ffffff', fw: 0.22, fh: 0.035 },
-    redact:   { color: '#111111', fw: 0.22, fh: 0.035 }
+    // / highlight text (semi-transparent yellow, so the text shows through)
+    whiteout:  { color: '#ffffff', fw: 0.22, fh: 0.035, opacity: 1 },
+    redact:    { color: '#111111', fw: 0.22, fh: 0.035, opacity: 1 },
+    highlight: { color: '#ffe600', fw: 0.22, fh: 0.03,  opacity: 0.35 }
   };
   // element render type from the tool kind
-  const RECT_KINDS = { whiteout: 1, redact: 1 };
+  const RECT_KINDS = { whiteout: 1, redact: 1, highlight: 1 };
   function typeOf(kind) { return kind === 'image' ? 'image' : (RECT_KINDS[kind] ? 'rect' : 'text'); }
 
   function makeModel(type, page, partial) {
@@ -2560,7 +2563,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     } else if (isRect) {
       inner = document.createElement('div');
       inner.className = 'fill';
-      inner.style.cssText = 'width:100%;height:100%;background:' + (model.color || '#fff');
+      inner.style.cssText = 'width:100%;height:100%;background:' + (model.color || '#fff') + ';opacity:' + (model.opacity != null ? model.opacity : 1);
       node.appendChild(inner);
     } else {
       inner = document.createElement('div');
@@ -2580,7 +2583,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (isBox) {
         node.style.width = (model.fw * W) + 'px';
         node.style.height = (model.fh * H) + 'px';
-        if (isRect && inner) inner.style.background = model.color || '#fff';
+        if (isRect && inner) { inner.style.background = model.color || '#fff'; inner.style.opacity = (model.opacity != null ? model.opacity : 1); }
       } else {
         inner.style.fontSize = (model.fontFrac * H) + 'px';
         inner.style.color = model.color;
@@ -2801,7 +2804,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           type: m.type, kind: m.kind, page: m.page,
           fx: round(m.fx), fy: round(m.fy), fw: round(m.fw), fh: round(m.fh),
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
-          text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || ''
+          text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
+          opacity: m.opacity
         };
       });
     }
@@ -3365,9 +3369,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (img) ctx.drawImage(img, x, y, m.fw * cw, m.fh * ch);
       return;
     }
-    if (m.type === 'rect') {   // whiteout / redact — a filled box
+    if (m.type === 'rect') {   // whiteout / redact / highlight — a filled box
+      const a = m.opacity != null ? m.opacity : 1;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, a));
       ctx.fillStyle = m.color || '#ffffff';
       ctx.fillRect(x, y, m.fw * cw, m.fh * ch);
+      ctx.restore();
       return;
     }
     // text
@@ -4739,7 +4747,7 @@ let currentFileName = 'filled';
 // =====================================================================
 //  Tools
 // =====================================================================
-const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact' };
+const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
 
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
@@ -4936,6 +4944,12 @@ function renderProps(ctrl) {
     col.type = 'color'; col.value = toHex(m.color || '#ffffff');
     col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
     fCol.appendChild(col); body.appendChild(fCol);
+    // opacity — for a see-through highlight (or a softer cover)
+    const fOp = field('שקיפות'); const op = document.createElement('input');
+    op.type = 'range'; op.min = '10'; op.max = '100'; op.step = '5';
+    op.value = Math.round((m.opacity != null ? m.opacity : 1) * 100);
+    op.addEventListener('input', () => { m.opacity = parseInt(op.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fOp.appendChild(op); body.appendChild(fOp);
   } else {
     const f = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';

@@ -17,11 +17,13 @@
     cross: { fontFrac: 0.026, color: '#842029', bold: true,  align: 'center', text: '✗' },
     date:  { fontFrac: 0.016, color: '#111111', bold: false, align: 'center', text: '' },
     // filled rectangles: cover a pre-printed error (white) / redact info (black)
-    whiteout: { color: '#ffffff', fw: 0.22, fh: 0.035 },
-    redact:   { color: '#111111', fw: 0.22, fh: 0.035 }
+    // / highlight text (semi-transparent yellow, so the text shows through)
+    whiteout:  { color: '#ffffff', fw: 0.22, fh: 0.035, opacity: 1 },
+    redact:    { color: '#111111', fw: 0.22, fh: 0.035, opacity: 1 },
+    highlight: { color: '#ffe600', fw: 0.22, fh: 0.03,  opacity: 0.35 }
   };
   // element render type from the tool kind
-  const RECT_KINDS = { whiteout: 1, redact: 1 };
+  const RECT_KINDS = { whiteout: 1, redact: 1, highlight: 1 };
   function typeOf(kind) { return kind === 'image' ? 'image' : (RECT_KINDS[kind] ? 'rect' : 'text'); }
 
   function makeModel(type, page, partial) {
@@ -62,7 +64,7 @@
     } else if (isRect) {
       inner = document.createElement('div');
       inner.className = 'fill';
-      inner.style.cssText = 'width:100%;height:100%;background:' + (model.color || '#fff');
+      inner.style.cssText = 'width:100%;height:100%;background:' + (model.color || '#fff') + ';opacity:' + (model.opacity != null ? model.opacity : 1);
       node.appendChild(inner);
     } else {
       inner = document.createElement('div');
@@ -82,7 +84,7 @@
       if (isBox) {
         node.style.width = (model.fw * W) + 'px';
         node.style.height = (model.fh * H) + 'px';
-        if (isRect && inner) inner.style.background = model.color || '#fff';
+        if (isRect && inner) { inner.style.background = model.color || '#fff'; inner.style.opacity = (model.opacity != null ? model.opacity : 1); }
       } else {
         inner.style.fontSize = (model.fontFrac * H) + 'px';
         inner.style.color = model.color;

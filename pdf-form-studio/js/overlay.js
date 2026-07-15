@@ -142,7 +142,8 @@
           type: m.type, kind: m.kind, page: m.page,
           fx: round(m.fx), fy: round(m.fy), fw: round(m.fw), fh: round(m.fh),
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
-          text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || ''
+          text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
+          opacity: m.opacity
         };
       });
     }

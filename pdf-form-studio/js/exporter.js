@@ -36,9 +36,13 @@
       if (img) ctx.drawImage(img, x, y, m.fw * cw, m.fh * ch);
       return;
     }
-    if (m.type === 'rect') {   // whiteout / redact — a filled box
+    if (m.type === 'rect') {   // whiteout / redact / highlight — a filled box
+      const a = m.opacity != null ? m.opacity : 1;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, a));
       ctx.fillStyle = m.color || '#ffffff';
       ctx.fillRect(x, y, m.fw * cw, m.fh * ch);
+      ctx.restore();
       return;
     }
     // text

@@ -592,6 +592,23 @@ async function main() {
     return px[0] < 60 && px[1] < 60 && px[2] < 60; // center pixel is black → redacted
   }));
 
+  // a highlight is a semi-transparent yellow box — the content shows through
+  check('highlight is semi-transparent yellow in the export', await page.evaluate(async () => {
+    const { PDFDocument, rgb } = window.PDFLib;
+    const d = await PDFDocument.create(); const pg0 = d.addPage([200, 200]);
+    pg0.drawRectangle({ x: 0, y: 0, width: 200, height: 200, color: rgb(1, 1, 1) }); // white bg
+    const bytes = await d.save();
+    const hl = { type: 'rect', kind: 'highlight', page: 0, fx: 0.25, fy: 0.25, fw: 0.5, fh: 0.5, color: '#ffe600', opacity: 0.35 };
+    const out = await window.PFS.exporter.exportPdf(bytes, [hl], {});
+    const doc = await window.pdfjsLib.getDocument({ data: out }).promise;
+    const p = await doc.getPage(1); const vp = p.getViewport({ scale: 1 });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    await p.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    const px = c.getContext('2d').getImageData(Math.floor(vp.width / 2), Math.floor(vp.height / 2), 1, 1).data;
+    // yellow-ish (R,G high, B low) AND lighter than pure yellow (semi-transparent over white)
+    return px[0] > 200 && px[1] > 200 && px[2] < 220 && px[2] > 120;
+  }));
+
   // handwriting BiDi: digits render left-to-right (0,5,4), not mirrored
   check('handwriting keeps numbers un-mirrored', await page.evaluate(async () => {
     const hw = window.PFS.handwriting, p = hw.getProfile();

@@ -281,7 +281,7 @@ let currentFileName = 'filled';
 // =====================================================================
 //  Tools
 // =====================================================================
-const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact' };
+const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
 
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
@@ -478,6 +478,12 @@ function renderProps(ctrl) {
     col.type = 'color'; col.value = toHex(m.color || '#ffffff');
     col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
     fCol.appendChild(col); body.appendChild(fCol);
+    // opacity — for a see-through highlight (or a softer cover)
+    const fOp = field('שקיפות'); const op = document.createElement('input');
+    op.type = 'range'; op.min = '10'; op.max = '100'; op.step = '5';
+    op.value = Math.round((m.opacity != null ? m.opacity : 1) * 100);
+    op.addEventListener('input', () => { m.opacity = parseInt(op.value, 10) / 100; ctrl.layout(); markDirty(); });
+    fOp.appendChild(op); body.appendChild(fOp);
   } else {
     const f = field('גודל'); const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';

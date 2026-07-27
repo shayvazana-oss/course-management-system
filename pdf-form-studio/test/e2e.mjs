@@ -708,6 +708,66 @@ async function main() {
     return worst <= 8 && darkest > 180;
   }));
 
+  // Forms are made of boxes, and people drag the cover straight across a cell's
+  // rule. Erasing that rule leaves a mutilated box that advertises the edit even
+  // louder than the old value did — so a line entering one edge and leaving the
+  // opposite one must be carried through the patch, with no grey bruise left
+  // behind from sampling the ink.
+  check('cover erases the value but keeps the form\'s own ruling intact', await page.evaluate(async () => {
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const W = 320, H = 170;
+    const d = await PDFDocument.create(); const pg = d.addPage([W, H]);
+    pg.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
+    const f = await d.embedFont(StandardFonts.Helvetica);
+    // a bordered cell (like a date field) carrying a value
+    pg.drawRectangle({ x: 150, y: 104, width: 110, height: 26, borderColor: rgb(0.1, 0.1, 0.1), borderWidth: 1, color: rgb(1, 1, 1) });
+    pg.drawText('01/01/2020', { x: 162, y: 111, size: 14, font: f, color: rgb(0.05, 0.05, 0.05) });
+    const bytes = await d.save();
+
+    // cover the value AND overlap the cell's top rule (y=130 → top-origin 40)
+    const cover = { type: 'rect', kind: 'whiteout', page: 0, auto: true,
+      fx: 152 / W, fy: 36 / H, fw: 106 / W, fh: 24 / H, color: '#ffffff', opacity: 1 };
+
+    const renderBase = async (idx, scale) => {
+      const doc = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+      const p = await doc.getPage(idx + 1);
+      const vp = p.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+      await p.render({ canvasContext: cx, viewport: vp }).promise;
+      return { canvas: c, wPt: W, hPt: H };
+    };
+    const out = await window.PFS.exporter.exportPdf(bytes.slice(0), [cover], { quality: 'high', renderBase });
+
+    const doc = await window.pdfjsLib.getDocument({ data: out }).promise;
+    const p1 = await doc.getPage(1);
+    const S = 3;
+    const vp = p1.getViewport({ scale: S });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    const cx = c.getContext('2d');
+    await p1.render({ canvasContext: cx, viewport: vp }).promise;
+    // darkest luminance in a small probe box, in PDF points (y from the bottom)
+    const probe = (xa, xb, ya, yb) => {
+      let dark = 255;
+      for (let X = xa; X <= xb; X += 0.5) {
+        for (let Y = ya; Y <= yb; Y += 0.5) {
+          const q = cx.getImageData(Math.round(X * S), Math.round((H - Y) * S), 1, 1).data;
+          dark = Math.min(dark, (q[0] + q[1] + q[2]) / 3);
+        }
+      }
+      return dark;
+    };
+    // 1) the cell's top rule still runs through the middle of the covered span
+    const ruleKept = probe(200, 215, 129, 131) < 140;
+    // 2) the old value is gone from the cell's interior
+    const valueGone = probe(165, 250, 108, 124) > 205;
+    // 3) no grey bruise smeared in from the ring near the covered corners
+    const noSmear = probe(155, 170, 115, 125) > 215 && probe(240, 255, 115, 125) > 215;
+    return ruleKept && valueGone && noSmear;
+  }));
+
   // a redact rectangle is actually painted into the exported PDF (center → black)
   check('redact rectangle is drawn into the exported PDF', await page.evaluate(async () => {
     const { PDFDocument } = window.PDFLib;

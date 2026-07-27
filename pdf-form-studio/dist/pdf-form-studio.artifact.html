@@ -201,8 +201,12 @@ button, input, select, textarea { font-family: inherit; }
 .thumbs { position: fixed; top: var(--topbar-h); bottom: 0; right: var(--rail-w); width: 132px; z-index: 40;
   background: var(--surface); border-inline-start: 1px solid var(--line); box-shadow: var(--shadow-2);
   overflow-y: auto; padding: 12px 10px; display: flex; flex-direction: column; gap: 10px;
-  transform: translateX(112%); transition: transform .2s ease; }
-.thumbs.open { transform: none; }
+  /* Closed: slide clear of the rail as well as its own width — translating by
+     112% alone left the drawer parked ON TOP of the tool rail, covering the
+     tools and swallowing their clicks. */
+  transform: translateX(calc(var(--rail-w) + 100%)); visibility: hidden;
+  transition: transform .2s ease, visibility .2s ease; }
+.thumbs.open { transform: none; visibility: visible; }
 .thumbs[hidden] { display: none; }
 .thumb { border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; position: relative; transition: border-color .12s, box-shadow .12s; }
 .thumb:hover { border-color: var(--brand); }
@@ -2628,6 +2632,183 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 </script>
 <script>
+/* inpaint.js — content-aware fill for "erase this bit of the form" covers.
+ *
+ * A flat colour never truly disappears on a real document: scans have grain and
+ * a slight tone, table cells are tinted, and backgrounds drift across the page.
+ * At screen zoom a flat patch looks fine, but at export resolution it reads as
+ * an obvious white rectangle — the "you can see this was edited" giveaway.
+ *
+ * So instead of painting a colour, reconstruct what the paper looked like:
+ * sample a ring of pixels just OUTSIDE the region and interpolate them inward
+ * (inverse-distance from all four sides — a Coons-style fill), which reproduces
+ * the surrounding tone, colour and any gradient. Ink strokes that happen to
+ * cross the ring are suppressed with a median filter along each edge, and the
+ * grain of the surroundings is re-applied so the patch doesn't read as a
+ * suspiciously smooth blank against a noisy scan.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  const clampi = (v, lo, hi) => (v < lo ? lo : (v > hi ? hi : v));
+
+  // median of a small window along a border line — kills thin ink strokes that
+  // cross the sampling ring without flattening a real gradient
+  function medianSmooth(arr, len, win) {
+    const out = new Float32Array(len * 3);
+    const half = win >> 1;
+    const bucket = [];
+    for (let c = 0; c < 3; c++) {
+      for (let i = 0; i < len; i++) {
+        bucket.length = 0;
+        for (let k = -half; k <= half; k++) bucket.push(arr[clampi(i + k, 0, len - 1) * 3 + c]);
+        bucket.sort((a, b) => a - b);
+        out[i * 3 + c] = bucket[half];
+      }
+    }
+    return out;
+  }
+
+  /* patch(src, x, y, w, h, opts) → canvas (w×h) reconstructing the background.
+   *   src : source canvas (the page rendered at the SAME scale as the caller's
+   *         coordinate space), x/y/w/h in that canvas's pixels.
+   *   opts.ring  : how far outside to sample (px, default scales with size)
+   *   opts.grain : 0..1 amount of surrounding noise to re-apply (default 1)
+   * Returns null when the region is degenerate or nothing can be sampled.
+   */
+  function patch(src, x, y, w, h, opts) {
+    opts = opts || {};
+    w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+    x = Math.round(x); y = Math.round(y);
+    if (!src || !src.width || !src.height) return null;
+
+    let sctx;
+    try { sctx = src.getContext('2d'); } catch (e) { return null; }
+    if (!sctx) return null;
+
+    // thickness of the band we average per side — a few px so grain averages out
+    const ring = Math.max(2, Math.min(8, opts.ring || Math.round(Math.min(w, h) * 0.25) || 2));
+    const grab = (gx, gy, gw, gh) => {
+      gx = clampi(gx, 0, src.width - 1); gy = clampi(gy, 0, src.height - 1);
+      gw = clampi(gw, 1, src.width - gx); gh = clampi(gh, 1, src.height - gy);
+      try { return { d: sctx.getImageData(gx, gy, gw, gh), gw, gh }; } catch (e) { return null; }
+    };
+
+    // ---- collect the four border lines (averaged across the ring thickness) ----
+    const top = new Float32Array(w * 3), bot = new Float32Array(w * 3);
+    const left = new Float32Array(h * 3), right = new Float32Array(h * 3);
+    const stats = { n: 0, sum: 0, sum2: 0 };
+
+    const tBand = grab(x, y - ring, w, ring);
+    const bBand = grab(x, y + h, w, ring);
+    const lBand = grab(x - ring, y, ring, h);
+    const rBand = grab(x + w, y, ring, h);
+    if (!tBand && !bBand && !lBand && !rBand) return null;
+
+    // vertical bands (top/bottom): average down each column
+    const fillH = (band, out, len) => {
+      if (!band) return false;
+      const { d, gw, gh } = band;
+      for (let i = 0; i < len; i++) {
+        const col = clampi(i, 0, gw - 1);
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let j = 0; j < gh; j++) {
+          const o = (j * gw + col) * 4;
+          if (d.data[o + 3] < 8) continue;
+          r += d.data[o]; g += d.data[o + 1]; b += d.data[o + 2]; n++;
+          const lum = (d.data[o] + d.data[o + 1] + d.data[o + 2]) / 3;
+          stats.n++; stats.sum += lum; stats.sum2 += lum * lum;
+        }
+        if (!n) { n = 1; r = g = b = 255; }
+        out[i * 3] = r / n; out[i * 3 + 1] = g / n; out[i * 3 + 2] = b / n;
+      }
+      return true;
+    };
+    // horizontal bands (left/right): average across each row
+    const fillV = (band, out, len) => {
+      if (!band) return false;
+      const { d, gw, gh } = band;
+      for (let j = 0; j < len; j++) {
+        const row = clampi(j, 0, gh - 1);
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < gw; i++) {
+          const o = (row * gw + i) * 4;
+          if (d.data[o + 3] < 8) continue;
+          r += d.data[o]; g += d.data[o + 1]; b += d.data[o + 2]; n++;
+          const lum = (d.data[o] + d.data[o + 1] + d.data[o + 2]) / 3;
+          stats.n++; stats.sum += lum; stats.sum2 += lum * lum;
+        }
+        if (!n) { n = 1; r = g = b = 255; }
+        out[j * 3] = r / n; out[j * 3 + 1] = g / n; out[j * 3 + 2] = b / n;
+      }
+      return true;
+    };
+
+    const hasT = fillH(tBand, top, w), hasB = fillH(bBand, bot, w);
+    const hasL = fillV(lBand, left, h), hasR = fillV(rBand, right, h);
+
+    // a side that fell outside the canvas mirrors its opposite, so the blend
+    // stays balanced instead of dragging toward an arbitrary default
+    const mirrorH = (src2, dst) => { for (let i = 0; i < w * 3; i++) dst[i] = src2[i]; };
+    const mirrorV = (src2, dst) => { for (let i = 0; i < h * 3; i++) dst[i] = src2[i]; };
+    if (!hasT && hasB) mirrorH(bot, top); if (!hasB && hasT) mirrorH(top, bot);
+    if (!hasL && hasR) mirrorV(right, left); if (!hasR && hasL) mirrorV(left, right);
+    if (!hasT && !hasB) {
+      // no horizontal bands at all — derive them from the vertical ones
+      for (let i = 0; i < w; i++) for (let c = 0; c < 3; c++) { top[i * 3 + c] = left[c]; bot[i * 3 + c] = left[c]; }
+    }
+    if (!hasL && !hasR) {
+      for (let j = 0; j < h; j++) for (let c = 0; c < 3; c++) { left[j * 3 + c] = top[c]; right[j * 3 + c] = top[c]; }
+    }
+
+    const mw = Math.min(9, Math.max(3, (w >> 3) | 1));
+    const mh = Math.min(9, Math.max(3, (h >> 3) | 1));
+    const T = medianSmooth(top, w, mw), B = medianSmooth(bot, w, mw);
+    const L = medianSmooth(left, h, mh), R = medianSmooth(right, h, mh);
+
+    // ---- inverse-distance blend of the four edges ----
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const octx = out.getContext('2d');
+    const img = octx.createImageData(w, h);
+
+    // grain: re-apply the surroundings' noise so the patch isn't unnaturally flat
+    let sigma = 0;
+    if (stats.n > 8) {
+      const mean = stats.sum / stats.n;
+      sigma = Math.sqrt(Math.max(0, stats.sum2 / stats.n - mean * mean));
+    }
+    const grain = Math.min(sigma, 9) * (opts.grain != null ? opts.grain : 1);
+    // deterministic pseudo-noise — same input always yields the same patch, so
+    // a re-export is byte-comparable and tests stay stable
+    let seed = 0x2f6e2b1 ^ (w * 73856093) ^ (h * 19349663);
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff - 0.5; };
+
+    for (let j = 0; j < h; j++) {
+      const dT = j + 1, dB = h - j;
+      for (let i = 0; i < w; i++) {
+        const dL = i + 1, dR = w - i;
+        const wT = 1 / (dT * dT), wB = 1 / (dB * dB), wL = 1 / (dL * dL), wR = 1 / (dR * dR);
+        const wsum = wT + wB + wL + wR;
+        const o = (j * w + i) * 4;
+        const n = grain ? rnd() * grain : 0;
+        for (let c = 0; c < 3; c++) {
+          const v = (T[i * 3 + c] * wT + B[i * 3 + c] * wB + L[j * 3 + c] * wL + R[j * 3 + c] * wR) / wsum;
+          img.data[o + c] = clampi(Math.round(v + n), 0, 255);
+        }
+        img.data[o + 3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    return out;
+  }
+
+  PFS.inpaint = { patch };
+})(window);
+
+</script>
+<script>
 /* handwriting.js — "כתב היד שלי": compose typed text from the user's own
  * hand-drawn glyphs. The user trains once (draws each letter/digit); we store
  * each glyph as normalized vector strokes, then render typed text by drawing
@@ -3446,7 +3627,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           fx: round(m.fx), fy: round(m.fy), fw: round(m.fw), fh: round(m.fh),
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
-          opacity: m.opacity, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0
+          opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0
         };
       });
     }
@@ -3695,7 +3876,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const x0 = Math.round(fx * cw), y0 = Math.round(fy * ch);
       const w = Math.round(fw * cw), h = Math.round(fh * ch);
       const pad = Math.max(3, Math.round(Math.min(w, h) * 0.4));
+      // bucket coarsely to find the dominant tone, but keep the exact pixel sums
+      // per bucket so the final colour is their true average — rounding to the
+      // bucket centre alone leaves a few levels of error, which is enough to
+      // show as a faint rectangle on a large flat area.
       const counts = new Map();
+      const sums = new Map();
       const tally = (rx, ry, rw, rh) => {
         rx = Math.max(0, Math.round(rx)); ry = Math.max(0, Math.round(ry));
         rw = Math.min(cw - rx, Math.round(rw)); rh = Math.min(ch - ry, Math.round(rh));
@@ -3706,6 +3892,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           if (data[i + 3] < 200) continue; // skip transparent
           const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
           counts.set(key, (counts.get(key) || 0) + 1);
+          const s = sums.get(key) || [0, 0, 0];
+          s[0] += data[i]; s[1] += data[i + 1]; s[2] += data[i + 2];
+          sums.set(key, s);
         }
       };
       tally(x0 - pad, y0 - pad, w + 2 * pad, pad); // top band
@@ -3715,9 +3904,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (!counts.size) return null;
       let best = -1, bkey = 0;
       counts.forEach((c, k) => { if (c > best) { best = c; bkey = k; } });
-      const ch5 = (n) => (((n & 31) << 3) | 4); // re-centre the 5-bit bucket
-      const r = ch5(bkey >> 10), g = ch5(bkey >> 5), b = ch5(bkey);
-      return '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
+      const s = sums.get(bkey);
+      const r = Math.round(s[0] / best), g = Math.round(s[1] / best), b = Math.round(s[2] / best);
+      return '#' + [r, g, b].map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('');
     }
 
     return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
@@ -4075,7 +4264,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     } catch (e) { /* fall back to system font */ }
   }
 
-  function drawElement(ctx, m, cw, ch, imgMap) {
+  function drawElement(ctx, m, cw, ch, imgMap, baseCanvas) {
     const x = m.fx * cw, y = m.fy * ch;
     if (m.type === 'image') {
       const img = imgMap.get(m.imgUrl);
@@ -4083,11 +4272,24 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return;
     }
     if (m.type === 'rect') {   // whiteout / redact / highlight — a filled box
+      const w = m.fw * cw, h = m.fh * ch;
+      // Background-matched covers reconstruct the paper from its surroundings
+      // instead of stamping a flat colour, so the erase stays invisible at full
+      // export resolution (a flat fill shows up as a rectangle on any scan or
+      // tinted cell). Falls back to the sampled colour if inpainting can't run.
+      // whiteout means "erase this" — always blend unless explicitly opted out,
+      // so covers saved before this existed benefit too. Redact/highlight are
+      // meant to be seen, so they only blend when explicitly asked.
+      const wantsBlend = m.kind === 'whiteout' ? (m.auto !== false) : !!m.auto;
+      if (wantsBlend && baseCanvas && root.PFS && root.PFS.inpaint) {
+        const p = root.PFS.inpaint.patch(baseCanvas, x, y, w, h);
+        if (p) { ctx.drawImage(p, Math.round(x), Math.round(y)); p.width = 0; p.height = 0; return; }
+      }
       const a = m.opacity != null ? m.opacity : 1;
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, a));
       ctx.fillStyle = m.color || '#ffffff';
-      ctx.fillRect(x, y, m.fw * cw, m.fh * ch);
+      ctx.fillRect(x, y, w, h);
       ctx.restore();
       return;
     }
@@ -4115,7 +4317,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   // page embeds only the region that carries content instead of a full-page
   // mostly-transparent PNG. Measured ~2× smaller per text-light page. Returns
   // the sub-canvas plus its placement rect in page fractions (top-left origin).
-  function rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale) {
+  function rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale, baseCanvas) {
     const s = scale || EXPORT_SCALE;
     const fullCw = Math.max(1, Math.round(displayWpt * s));
     const fullCh = Math.max(1, Math.round(displayHpt * s));
@@ -4134,19 +4336,19 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
     ctx.translate(-px0, -py0);   // draw elements at full-page coords into the crop
-    models.forEach((m) => drawElement(ctx, m, fullCw, fullCh, imgMap));
+    models.forEach((m) => drawElement(ctx, m, fullCw, fullCh, imgMap, baseCanvas));
     return { canvas, fx0: px0 / fullCw, fy0: py0 / fullCh, fx1: px1 / fullCw, fy1: py1 / fullCh };
   }
 
   // Build the display-oriented overlay canvas for one page's elements.
-  function rasterizePage(models, displayWpt, displayHpt, imgMap, scale) {
+  function rasterizePage(models, displayWpt, displayHpt, imgMap, scale, baseCanvas) {
     const s = scale || EXPORT_SCALE;
     const cw = Math.max(1, Math.round(displayWpt * s));
     const ch = Math.max(1, Math.round(displayHpt * s));
     const canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
-    models.forEach((m) => drawElement(ctx, m, cw, ch, imgMap));
+    models.forEach((m) => drawElement(ctx, m, cw, ch, imgMap, baseCanvas));
     return canvas;
   }
 
@@ -4212,9 +4414,20 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const models = byPage.get(idx);
       if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
 
+      // Background-matched covers need the page's own pixels to reconstruct
+      // from, so render the base page (already rotated, at the export scale)
+      // only when such a cover is actually present on it.
+      let baseCanvas = null;
+      if (opts.renderBase && models.some((m) => m.type === 'rect' && (m.kind === 'whiteout' ? m.auto !== false : m.auto))) {
+        try {
+          const b = await opts.renderBase(idx, scale);
+          baseCanvas = b && (b.canvas || b);
+        } catch (e) { console.warn('[export] base render for cover blending failed:', e && e.message); }
+      }
+
       if (rot === 0) {
         // un-rotated: embed only the cropped content region (smaller file, same pixels)
-        const cr = rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale);
+        const cr = rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale, baseCanvas);
         const png = await pdfDoc.embedPng(cr.canvas.toDataURL('image/png'));
         page.drawImage(png, {
           x: cr.fx0 * Wpt, y: Hpt - cr.fy1 * Hpt,
@@ -4223,7 +4436,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         cr.canvas.width = 0; cr.canvas.height = 0;
       } else {
         // rotated: keep the full-page raster + rotation-aware anchor switch
-        const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale);
+        const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale, baseCanvas);
         const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
         switch (rot) {
           case 90:
@@ -4332,7 +4545,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     for (const idx of idxs) {
       const { canvas, wPt, hPt } = await renderBase(idx);
       const ctx = canvas.getContext('2d');
-      (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap));
+      // the page raster itself is the source for background-matched covers
+      (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap, canvas));
       let img;
       if (!forceJpeg && isDocumentLikeCanvas(canvas)) {
         img = await out.embedPng(canvas.toDataURL('image/png'));           // crisp text
@@ -5662,7 +5876,13 @@ function activateTool(btn, tool) {
       createRect: (pageIndex, fx, fy, fw, fh) => {
         if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
         const extra = { fx, fy, fw, fh };
-        if (tool === 'whiteout') { const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg; }
+        // whiteout is a background-matched erase: remember that, so the export
+        // reconstructs the paper from its surroundings instead of stamping a
+        // flat colour (which shows as a rectangle at full resolution)
+        if (tool === 'whiteout') {
+          extra.auto = true;
+          const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg;
+        }
         overlay.addModelAt(tool, pageIndex, extra);
       }
     });
@@ -5689,7 +5909,7 @@ function activateTool(btn, tool) {
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
   const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
-  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg });
+  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg, auto: true });
   // size the text to the covered box, vertically centred within it
   const fontFrac = clamp(fh * 0.62, 0.01, 0.06);
   const textH = fontFrac * 1.2;
@@ -6013,7 +6233,9 @@ async function exBuild() {
         quality: exportQuality(),
         rotations: pdfView.getRotations(),
         ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
-        attachments, onProgress
+        attachments, onProgress,
+        // lets background-matched covers rebuild the paper at export resolution
+        renderBase: (idx, s) => renderBaseForFlatten(idx, s)
       });
     if (my !== exState.token) return;                 // superseded by a newer build
     exState.bytes = bytes;

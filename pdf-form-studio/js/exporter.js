@@ -64,7 +64,7 @@
     } catch (e) { /* fall back to system font */ }
   }
 
-  function drawElement(ctx, m, cw, ch, imgMap) {
+  function drawElement(ctx, m, cw, ch, imgMap, baseCanvas) {
     const x = m.fx * cw, y = m.fy * ch;
     if (m.type === 'image') {
       const img = imgMap.get(m.imgUrl);
@@ -72,11 +72,24 @@
       return;
     }
     if (m.type === 'rect') {   // whiteout / redact / highlight — a filled box
+      const w = m.fw * cw, h = m.fh * ch;
+      // Background-matched covers reconstruct the paper from its surroundings
+      // instead of stamping a flat colour, so the erase stays invisible at full
+      // export resolution (a flat fill shows up as a rectangle on any scan or
+      // tinted cell). Falls back to the sampled colour if inpainting can't run.
+      // whiteout means "erase this" — always blend unless explicitly opted out,
+      // so covers saved before this existed benefit too. Redact/highlight are
+      // meant to be seen, so they only blend when explicitly asked.
+      const wantsBlend = m.kind === 'whiteout' ? (m.auto !== false) : !!m.auto;
+      if (wantsBlend && baseCanvas && root.PFS && root.PFS.inpaint) {
+        const p = root.PFS.inpaint.patch(baseCanvas, x, y, w, h);
+        if (p) { ctx.drawImage(p, Math.round(x), Math.round(y)); p.width = 0; p.height = 0; return; }
+      }
       const a = m.opacity != null ? m.opacity : 1;
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, a));
       ctx.fillStyle = m.color || '#ffffff';
-      ctx.fillRect(x, y, m.fw * cw, m.fh * ch);
+      ctx.fillRect(x, y, w, h);
       ctx.restore();
       return;
     }
@@ -104,7 +117,7 @@
   // page embeds only the region that carries content instead of a full-page
   // mostly-transparent PNG. Measured ~2× smaller per text-light page. Returns
   // the sub-canvas plus its placement rect in page fractions (top-left origin).
-  function rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale) {
+  function rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale, baseCanvas) {
     const s = scale || EXPORT_SCALE;
     const fullCw = Math.max(1, Math.round(displayWpt * s));
     const fullCh = Math.max(1, Math.round(displayHpt * s));
@@ -123,19 +136,19 @@
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
     ctx.translate(-px0, -py0);   // draw elements at full-page coords into the crop
-    models.forEach((m) => drawElement(ctx, m, fullCw, fullCh, imgMap));
+    models.forEach((m) => drawElement(ctx, m, fullCw, fullCh, imgMap, baseCanvas));
     return { canvas, fx0: px0 / fullCw, fy0: py0 / fullCh, fx1: px1 / fullCw, fy1: py1 / fullCh };
   }
 
   // Build the display-oriented overlay canvas for one page's elements.
-  function rasterizePage(models, displayWpt, displayHpt, imgMap, scale) {
+  function rasterizePage(models, displayWpt, displayHpt, imgMap, scale, baseCanvas) {
     const s = scale || EXPORT_SCALE;
     const cw = Math.max(1, Math.round(displayWpt * s));
     const ch = Math.max(1, Math.round(displayHpt * s));
     const canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
-    models.forEach((m) => drawElement(ctx, m, cw, ch, imgMap));
+    models.forEach((m) => drawElement(ctx, m, cw, ch, imgMap, baseCanvas));
     return canvas;
   }
 
@@ -201,9 +214,20 @@
       const models = byPage.get(idx);
       if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
 
+      // Background-matched covers need the page's own pixels to reconstruct
+      // from, so render the base page (already rotated, at the export scale)
+      // only when such a cover is actually present on it.
+      let baseCanvas = null;
+      if (opts.renderBase && models.some((m) => m.type === 'rect' && (m.kind === 'whiteout' ? m.auto !== false : m.auto))) {
+        try {
+          const b = await opts.renderBase(idx, scale);
+          baseCanvas = b && (b.canvas || b);
+        } catch (e) { console.warn('[export] base render for cover blending failed:', e && e.message); }
+      }
+
       if (rot === 0) {
         // un-rotated: embed only the cropped content region (smaller file, same pixels)
-        const cr = rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale);
+        const cr = rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale, baseCanvas);
         const png = await pdfDoc.embedPng(cr.canvas.toDataURL('image/png'));
         page.drawImage(png, {
           x: cr.fx0 * Wpt, y: Hpt - cr.fy1 * Hpt,
@@ -212,7 +236,7 @@
         cr.canvas.width = 0; cr.canvas.height = 0;
       } else {
         // rotated: keep the full-page raster + rotation-aware anchor switch
-        const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale);
+        const canvas = rasterizePage(models, displayWpt, displayHpt, imgMap, scale, baseCanvas);
         const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
         switch (rot) {
           case 90:
@@ -321,7 +345,8 @@
     for (const idx of idxs) {
       const { canvas, wPt, hPt } = await renderBase(idx);
       const ctx = canvas.getContext('2d');
-      (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap));
+      // the page raster itself is the source for background-matched covers
+      (byPage.get(idx) || []).forEach((m) => drawElement(ctx, m, canvas.width, canvas.height, imgMap, canvas));
       let img;
       if (!forceJpeg && isDocumentLikeCanvas(canvas)) {
         img = await out.embedPng(canvas.toDataURL('image/png'));           // crisp text

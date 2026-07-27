@@ -194,7 +194,12 @@
       const x0 = Math.round(fx * cw), y0 = Math.round(fy * ch);
       const w = Math.round(fw * cw), h = Math.round(fh * ch);
       const pad = Math.max(3, Math.round(Math.min(w, h) * 0.4));
+      // bucket coarsely to find the dominant tone, but keep the exact pixel sums
+      // per bucket so the final colour is their true average — rounding to the
+      // bucket centre alone leaves a few levels of error, which is enough to
+      // show as a faint rectangle on a large flat area.
       const counts = new Map();
+      const sums = new Map();
       const tally = (rx, ry, rw, rh) => {
         rx = Math.max(0, Math.round(rx)); ry = Math.max(0, Math.round(ry));
         rw = Math.min(cw - rx, Math.round(rw)); rh = Math.min(ch - ry, Math.round(rh));
@@ -205,6 +210,9 @@
           if (data[i + 3] < 200) continue; // skip transparent
           const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
           counts.set(key, (counts.get(key) || 0) + 1);
+          const s = sums.get(key) || [0, 0, 0];
+          s[0] += data[i]; s[1] += data[i + 1]; s[2] += data[i + 2];
+          sums.set(key, s);
         }
       };
       tally(x0 - pad, y0 - pad, w + 2 * pad, pad); // top band
@@ -214,9 +222,9 @@
       if (!counts.size) return null;
       let best = -1, bkey = 0;
       counts.forEach((c, k) => { if (c > best) { best = c; bkey = k; } });
-      const ch5 = (n) => (((n & 31) << 3) | 4); // re-centre the 5-bit bucket
-      const r = ch5(bkey >> 10), g = ch5(bkey >> 5), b = ch5(bkey);
-      return '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
+      const s = sums.get(bkey);
+      const r = Math.round(s[0] / best), g = Math.round(s[1] / best), b = Math.round(s[2] / best);
+      return '#' + [r, g, b].map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('');
     }
 
     return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };

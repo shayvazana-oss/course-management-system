@@ -354,7 +354,13 @@ function activateTool(btn, tool) {
       createRect: (pageIndex, fx, fy, fw, fh) => {
         if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
         const extra = { fx, fy, fw, fh };
-        if (tool === 'whiteout') { const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg; }
+        // whiteout is a background-matched erase: remember that, so the export
+        // reconstructs the paper from its surroundings instead of stamping a
+        // flat colour (which shows as a rectangle at full resolution)
+        if (tool === 'whiteout') {
+          extra.auto = true;
+          const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg;
+        }
         overlay.addModelAt(tool, pageIndex, extra);
       }
     });
@@ -381,7 +387,7 @@ function activateTool(btn, tool) {
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
   const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
-  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg });
+  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg, auto: true });
   // size the text to the covered box, vertically centred within it
   const fontFrac = clamp(fh * 0.62, 0.01, 0.06);
   const textH = fontFrac * 1.2;
@@ -705,7 +711,9 @@ async function exBuild() {
         quality: exportQuality(),
         rotations: pdfView.getRotations(),
         ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
-        attachments, onProgress
+        attachments, onProgress,
+        // lets background-matched covers rebuild the paper at export resolution
+        renderBase: (idx, s) => renderBaseForFlatten(idx, s)
       });
     if (my !== exState.token) return;                 // superseded by a newer build
     exState.bytes = bytes;

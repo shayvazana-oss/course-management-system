@@ -74,6 +74,27 @@ async function main() {
   check('date picker on a date field', await page.evaluate(() => [...document.querySelectorAll('#fieldsBody button')].some((b) => b.textContent === '📅')));
   check('keyboard field-nav wired', await page.evaluate(() => typeof document.querySelector('#fieldsBody input[type=text]').__fkey === 'string'));
   check('page thumbnails available (multi-page)', await page.evaluate(() => !document.getElementById('thumbsBtn').hidden));
+
+  // the thumbnails drawer docks BESIDE the tool rail — parked closed it used to
+  // sit on top of it, hiding the tools and swallowing their clicks
+  check('thumbnails drawer never covers the tool rail (closed or open)', await page.evaluate(async () => {
+    const t = document.getElementById('thumbs'), rail = document.getElementById('rail');
+    const btn = document.querySelector('.rail-btn.tool[data-tool="replace"]');
+    const probe = () => {
+      const tr = t.getBoundingClientRect(), rr = rail.getBoundingClientRect();
+      const overlap = Math.max(0, Math.min(tr.right, rr.right) - Math.max(tr.left, rr.left));
+      const b = btn.getBoundingClientRect();
+      const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return { overlap, clickable: !!(hit && btn.contains(hit)) };
+    };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    if (t.classList.contains('open')) { document.getElementById('thumbsBtn').click(); await wait(350); }
+    const closed = probe();                                  // parked out of the way
+    document.getElementById('thumbsBtn').click(); await wait(350);
+    const open = probe();                                    // docked alongside
+    document.getElementById('thumbsBtn').click(); await wait(350);   // restore
+    return closed.overlap === 0 && closed.clickable && open.overlap === 0 && open.clickable;
+  }));
   check('checkbox (☐) detected as tickable field', await page.evaluate(() => document.querySelectorAll('#fieldsBody input[type=checkbox]').length > 0));
 
   // round radio bullets (○ זכר / ○ נקבה) → one tickable field per option, each
@@ -617,6 +638,74 @@ async function main() {
       && txt.model.fy >= cover.model.fy - 1e-6 && (txt.model.fy + txt.model.fh) <= (cover.model.fy + cover.model.fh) + 1e-3;
     ov.clearElements();
     return coverOk && txtOk;
+  }));
+
+  // THE seamlessness test: on a real form the paper is rarely pure white, so a
+  // flat-colour cover shows up as an obvious rectangle in the exported file even
+  // though it looked fine on screen. An `auto` cover must reconstruct the
+  // background so the covered area is indistinguishable from its surroundings.
+  check('background-matched cover leaves no visible rectangle in the export', await page.evaluate(async () => {
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const W = 300, H = 200;
+    // a tinted page with a vertical gradient — like a scan or a shaded cell
+    const src = await PDFDocument.create();
+    const pg = src.addPage([W, H]);
+    for (let i = 0; i < 40; i++) {
+      const t = i / 39;
+      pg.drawRectangle({ x: 0, y: (H / 40) * i, width: W, height: H / 40 + 1,
+        color: rgb(0.90 - 0.06 * t, 0.89 - 0.06 * t, 0.84 - 0.06 * t) });
+    }
+    const font = await src.embedFont(StandardFonts.Helvetica);
+    pg.drawText('01/01/2020', { x: 90, y: 96, size: 15, font, color: rgb(0.1, 0.1, 0.1) });
+    const bytes = await src.save();
+
+    // cover exactly where the old value sits (top-origin fractions)
+    const cover = { type: 'rect', kind: 'whiteout', page: 0, auto: true,
+      fx: 88 / W, fy: 1 - 116 / H, fw: 80 / W, fh: 26 / H, color: '#ffffff', opacity: 1 };
+
+    const renderBase = async (idx, scale) => {
+      const doc = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+      const p = await doc.getPage(idx + 1);
+      const vp = p.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
+      await p.render({ canvasContext: cx, viewport: vp }).promise;
+      return { canvas: c, wPt: W, hPt: H };
+    };
+    const out = await window.PFS.exporter.exportPdf(bytes.slice(0), [cover], { renderBase });
+
+    // render the result and compare inside the cover vs. just outside it
+    const doc = await window.pdfjsLib.getDocument({ data: out }).promise;
+    const p1 = await doc.getPage(1);
+    const vp = p1.getViewport({ scale: 3 });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    const cx = c.getContext('2d');
+    await p1.render({ canvasContext: cx, viewport: vp }).promise;
+
+    const px = (X, Y) => { const d = cx.getImageData(Math.round(X), Math.round(Y), 1, 1).data; return [d[0], d[1], d[2]]; };
+    const S = 3;
+    // sample rows inside the covered band and the same rows just outside it
+    let worst = 0;
+    for (const yPt of [90, 98, 106]) {
+      const Y = (H - yPt) * S;
+      const inside = px(128 * S, Y);              // middle of the cover
+      const outsideL = px(70 * S, Y);             // left of the cover, same row
+      const outsideR = px(190 * S, Y);            // right of the cover, same row
+      const ref = [0, 1, 2].map((i) => (outsideL[i] + outsideR[i]) / 2);
+      const diff = Math.max(...[0, 1, 2].map((i) => Math.abs(inside[i] - ref[i])));
+      worst = Math.max(worst, diff);
+    }
+    // the old text must be gone (no dark ink left inside the cover)
+    let darkest = 255;
+    for (let X = 95; X < 165; X += 3) {
+      for (let yPt = 92; yPt < 112; yPt += 3) {
+        const v = px(X * S, (H - yPt) * S); darkest = Math.min(darkest, (v[0] + v[1] + v[2]) / 3);
+      }
+    }
+    // seamless = within a few levels of the paper around it; erased = no ink left
+    return worst <= 8 && darkest > 180;
   }));
 
   // a redact rectangle is actually painted into the exported PDF (center → black)

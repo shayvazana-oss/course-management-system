@@ -639,65 +639,226 @@ function toHex(c) {
 // =====================================================================
 //  Export
 // =====================================================================
-async function doExport() {
+/* Export review — instead of firing off a chain of blocking confirm() dialogs
+ * and downloading blind, opening the export shows the REAL output: the bytes
+ * are built, rendered back with pdf.js and paged through, with the pre-flight
+ * checks and options (quality / secure) beside them. Changing an option
+ * rebuilds the preview, so what you see is exactly what gets downloaded. */
+const exState = { bytes: null, doc: null, page: 1, pages: 1, token: 0, busy: false, checks: null };
+
+function exSetBusy(on, txt) {
+  exState.busy = on;
+  const b = $('exBusy'); if (!b) return;
+  b.classList.toggle('on', !!on);
+  if (txt) $('exBusyTxt').textContent = txt;
+  ['exDownload', 'exShare'].forEach((id) => { const el = $(id); if (el) el.disabled = !!on; });
+}
+const fmtSize = (n) => (n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
+
+// Pre-flight: the same guards as before, but shown together as a checklist
+// instead of interrupting one modal at a time.
+function exBuildChecks(models) {
+  const out = [];
+  const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
+  const blanks = (fieldsPanel.emptyCount && fieldsPanel.emptyCount()) || 0;
+  let suspects = [];
+  if (PFS.validate && PFS.validate.scan) {
+    suspects = PFS.validate.scan(
+      models.filter((m) => m.type === 'text' && m.fieldKey).map((m) => ({ key: m.fieldKey, value: m.text }))
+    ) || [];
+  }
+  if (reqBlanks > 0) out.push({ t: 'err', i: '⚠️', h: reqBlanks + ' שדות חובה (*) ריקים', s: 'טופס עם שדות חובה חסרים עלול להידחות' });
+  if (blanks > 0) out.push({ t: 'warn', i: '◻️', h: blanks + ' שדות ריקים', s: 'אפשר לייצא כך — רק ודאו שזו הכוונה' });
+  if (suspects.length) {
+    const list = suspects.slice(0, 4).map((s) => (s.value || '') + ' — ' + s.msg).join(' · ');
+    out.push({ t: 'warn', i: '🔍', h: suspects.length + ' ערכים שכדאי לבדוק', s: list + (suspects.length > 4 ? ' …' : '') });
+  }
+  if (!out.length) out.push({ t: 'ok', i: '✓', h: 'הכול נראה תקין', s: 'לא נמצאו שדות חובה ריקים או ערכים חשודים' });
+  return out;
+}
+function exRenderChecks(checks) {
+  const wrap = $('exChecks'); if (!wrap) return;
+  wrap.innerHTML = '';
+  checks.forEach((c) => {
+    const d = document.createElement('div');
+    d.className = 'ex-chk ' + c.t;
+    d.innerHTML = '<span class="i"></span><span><b></b><span class="sub"></span></span>';
+    d.querySelector('.i').textContent = c.i;
+    d.querySelector('b').textContent = c.h;
+    d.querySelector('.sub').textContent = c.s;
+    wrap.appendChild(d);
+  });
+}
+
+// Build the export bytes for the CURRENT options and render page 1.
+// Each call takes a token so a slow older build can't overwrite a newer one.
+async function exBuild() {
+  const my = ++exState.token;
+  exSetBusy(true, 'מכין תצוגה מקדימה…');
+  try {
+    const models = overlay.getElements().map((c) => c.model);
+    const secure = $('exSecure') && $('exSecure').checked;
+    const onProgress = (d, t) => { if (my === exState.token) $('exBusyTxt').textContent = `מעבד עמוד ${d} מתוך ${t}…`; };
+    const bytes = secure
+      ? await buildFlattenedBytes(onProgress)
+      : await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
+        quality: exportQuality(),
+        rotations: pdfView.getRotations(),
+        ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
+        attachments, onProgress
+      });
+    if (my !== exState.token) return;                 // superseded by a newer build
+    exState.bytes = bytes;
+    exState.doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+    if (my !== exState.token) return;
+    exState.pages = exState.doc.numPages;
+    exState.page = Math.min(exState.page, exState.pages);
+    await exDrawPage();
+    exUpdateMeta();
+  } catch (e) {
+    console.error(e);
+    if (my === exState.token) PFS.toast('בניית התצוגה נכשלה: ' + (e.message || e), 'err');
+  } finally {
+    if (my === exState.token) exSetBusy(false);
+  }
+}
+async function exDrawPage() {
+  if (!exState.doc) return;
+  const page = await exState.doc.getPage(exState.page);
+  const view = $('exView'), canvas = $('exCanvas');
+  const base = page.getViewport({ scale: 1 });
+  // fit the page into the stage, capped so a huge page doesn't blow up memory
+  const availW = Math.max(220, (view.clientWidth || 620) - 40);
+  const availH = Math.max(220, (view.clientHeight || 460) - 40);
+  const scale = Math.min(availW / base.width, availH / base.height, 2.2);
+  const vp = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 2) });
+  canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+  canvas.style.width = Math.round(base.width * scale) + 'px';
+  canvas.style.height = Math.round(base.height * scale) + 'px';
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  $('exPage').textContent = exState.page + ' / ' + exState.pages;
+  $('exPrev').disabled = exState.page <= 1;
+  $('exNext').disabled = exState.page >= exState.pages;
+}
+function exUpdateMeta() {
+  const m = $('exMeta'); if (!m) return;
+  const q = { draft: 'טיוטה', standard: 'רגילה', high: 'להדפסה' }[exportQuality()] || 'רגילה';
+  const secure = $('exSecure') && $('exSecure').checked;
+  const pills = [
+    '<span class="ex-pill">גודל: <b>' + fmtSize(exState.bytes ? exState.bytes.length : 0) + '</b></span>',
+    '<span class="ex-pill">עמודים: <b>' + exState.pages + '</b></span>',
+    '<span class="ex-pill">איכות: <b>' + q + '</b></span>'
+  ];
+  if (secure) pills.push('<span class="ex-pill">🔒 <b>מאובטח</b></span>');
+  m.innerHTML = pills.join('');
+}
+// "What's in this file" — makes the export self-explanatory: how many items
+// were added, attachments, and any page operations that are about to be baked.
+function exRenderSummary(models) {
+  const el = $('exSummary'); if (!el) return;
+  const n = (p) => models.filter(p).length;
+  const rows = [];
+  const texts = n((m) => m.type === 'text' && (m.text || '').trim());
+  const marks = n((m) => m.kind === 'check' || m.kind === 'cross');
+  const covers = n((m) => m.type === 'rect');
+  const imgs = n((m) => m.type === 'image');
+  if (texts) rows.push(['✍️', 'שדות שמולאו', texts]);
+  if (marks) rows.push(['✔️', 'סימוני וי / איקס', marks]);
+  if (covers) rows.push(['🩹', 'כיסוי · השחרה · הדגשה', covers]);
+  if (imgs) rows.push(['🖊️', 'חתימות וחותמות', imgs]);
+  if (attachments && attachments.length) rows.push(['📎', 'עמודים מצורפים', attachments.length]);
+  const removed = (pdfView.getRemovedPages && pdfView.getRemovedPages()) || [];
+  if (removed.length) rows.push(['🗑️', 'עמודים שיוסרו', removed.length]);
+  const rots = Object.keys((pdfView.getRotations && pdfView.getRotations()) || {}).length;
+  if (rots) rows.push(['🔄', 'עמודים שסובבו', rots]);
+  if (pdfView.isReordered && pdfView.isReordered()) rows.push(['↕️', 'סדר העמודים', 'שונה']);
+
+  el.innerHTML = '';
+  if (!rows.length) {
+    const d = document.createElement('div');
+    d.className = 'ex-sum-empty'; d.textContent = 'הקובץ המקורי בלבד — לא נוספו שינויים';
+    el.appendChild(d); return;
+  }
+  rows.forEach(([ic, k, v]) => {
+    const r = document.createElement('div'); r.className = 'ex-sum-row';
+    r.innerHTML = '<span class="ic"></span><span class="k"></span><span class="v"></span>';
+    r.querySelector('.ic').textContent = ic;
+    r.querySelector('.k').textContent = k;
+    r.querySelector('.v').textContent = v;
+    el.appendChild(r);
+  });
+}
+function exFileName() {
+  const secure = $('exSecure') && $('exSecure').checked;
+  return currentFileName + (secure ? '-secure' : '-filled') + '.pdf';
+}
+
+async function doExport(opts) {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
   if (!models.length && !attachments.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
-  // last-mile guard: detected fields still blank? ask before baking the PDF.
-  // required (*) empties are called out first — those bounce a government form.
-  const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
-  const blanks = (fieldsPanel.emptyCount && fieldsPanel.emptyCount()) || 0;
-  if (reqBlanks > 0) {
-    if (!(await PFS.ui.confirm('שדות חובה ריקים', 'נשארו ' + reqBlanks + ' שדות חובה (*) ריקים — טופס עם שדות חובה חסרים עלול להידחות. לייצא בכל זאת?'))) return;
-  } else if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
-  // format sweep: a mistyped ID / phone / e-mail / date on an official form is
-  // the most costly error, so flag anything that looks malformed before baking.
-  if (PFS.validate && PFS.validate.scan) {
-    const suspects = PFS.validate.scan(
-      models.filter((m) => m.type === 'text' && m.fieldKey)
-            .map((m) => ({ key: m.fieldKey, value: m.text }))
-    );
-    if (suspects.length) {
-      const list = suspects.slice(0, 6).map((s) => '• ' + (s.value || '') + ' — ' + s.msg).join('\n');
-      const more = suspects.length > 6 ? '\n…ועוד ' + (suspects.length - 6) : '';
-      if (!(await PFS.ui.confirm('ערכים שכדאי לבדוק', 'נמצאו ' + suspects.length + ' ערכים שנראים שגויים:\n' + list + more + '\n\nלייצא בכל זאת?'))) return;
-    }
-  }
-  const btn = $('exportBtn'); const prev = btn.innerHTML;
-  btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
-  try {
-    const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
-      quality: exportQuality(),
-      rotations: pdfView.getRotations(),
-      // a real reorder → pageOrder (encodes reorder AND deletion); else removePages
-      ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
-      attachments,
-      onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
-    });
-    const outName = currentFileName + '-filled.pdf';
-    // Mobile: hand the filled PDF straight back to WhatsApp/mail via the OS
-    // share sheet (still within the export click's transient activation).
-    // Desktop / unsupported → regular download, as before.
-    let sharedOut = false;
+  // reflect saved prefs into the controls, then open and build the preview
+  const q = exportQuality();
+  document.querySelectorAll('#exQual button').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
+  if ($('exSecure')) $('exSecure').checked = !!(opts && opts.secure);
+  $('exName').textContent = exFileName();
+  exState.page = 1; exState.bytes = null; exState.doc = null;
+  exRenderChecks(exBuildChecks(models));
+  exRenderSummary(models);
+  if (navigator.canShare) $('exShare').hidden = false;
+  openModal('exportModal');
+  await exBuild();
+}
+
+// Deliver the already-built bytes (no rebuild — the preview IS the output).
+async function exDeliver(preferShare) {
+  if (!exState.bytes) return;
+  const outName = exFileName();
+  const bytes = exState.bytes;
+  let shared = false;
+  if (preferShare) {
     try {
       const f = new File([bytes], outName, { type: 'application/pdf' });
       if (navigator.canShare && navigator.canShare({ files: [f] })) {
         await navigator.share({ files: [f], title: outName });
-        sharedOut = true;
+        shared = true;
       }
-    } catch (e) { /* user cancelled or share failed — fall back to download */ }
-    if (!sharedOut) PFS.exporter.downloadBytes(bytes, outName);
-    PFS.toast(sharedOut ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
-    dirty = false;
-    // Commit this layout to memory now, so re-opening the same form restores it.
-    try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
-  } catch (e) {
-    console.error(e);
-    PFS.toast('הייצוא נכשל: ' + (e.message || e), 'err');
-  } finally {
-    btn.disabled = false; btn.innerHTML = prev;
+    } catch (e) { /* cancelled / unsupported → fall through to download */ }
   }
+  if (!shared) PFS.exporter.downloadBytes(bytes, outName);
+  closeModal('exportModal');
+  PFS.toast(shared ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
+  dirty = false;
+  try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
 }
+
+// ---- export modal wiring ----
+$('exClose') && $('exClose').addEventListener('click', () => closeModal('exportModal'));
+$('exCancel') && $('exCancel').addEventListener('click', () => closeModal('exportModal'));
+$('exPrev') && $('exPrev').addEventListener('click', () => { if (exState.page > 1) { exState.page--; exDrawPage(); } });
+$('exNext') && $('exNext').addEventListener('click', () => { if (exState.page < exState.pages) { exState.page++; exDrawPage(); } });
+$('exDownload') && $('exDownload').addEventListener('click', () => exDeliver(false));
+$('exShare') && $('exShare').addEventListener('click', () => exDeliver(true));
+document.querySelectorAll('#exQual button').forEach((b) => {
+  b.addEventListener('click', () => {
+    if (exState.busy) return;
+    document.querySelectorAll('#exQual button').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on');
+    PFS.store.set('export_quality', b.dataset.q);
+    const sel = $('exportQuality'); if (sel) sel.value = b.dataset.q;   // keep Settings in sync
+    exBuild();
+  });
+});
+$('exSecure') && $('exSecure').addEventListener('change', () => {
+  $('exName').textContent = exFileName();
+  exBuild();
+});
+// keep the preview filling the stage when the window (or orientation) changes
+let exRz = null;
+window.addEventListener('resize', () => {
+  if (!$('exportModal') || !$('exportModal').classList.contains('show') || !exState.doc) return;
+  clearTimeout(exRz); exRz = setTimeout(() => exDrawPage(), 180);
+});
 
 // the user's chosen export quality → DPI multiplier (shared by both paths)
 function exportQuality() { return PFS.store.get('export_quality', 'standard'); }
@@ -733,25 +894,9 @@ async function buildFlattenedBytes(onProgress) {
     onProgress
   });
 }
-async function doExportFlattened() {
-  if (!pdfView.hasDoc()) return;
-  if (!(await PFS.ui.confirm('ייצוא מאובטח', 'הקובץ ייווצר כתמונה שטוחה: הטקסט לא יהיה ניתן לבחירה או חילוץ (השחרות באמת מוסתרות), והוא מוגן משינוי. הקובץ עשוי להיות גדול יותר. להמשיך?'))) return;
-  const btn = $('exportFlatBtn'); const prev = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…'; }
-  try {
-    const bytes = await buildFlattenedBytes((d, t) => { if (btn) btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; });
-    const outName = currentFileName + '-secure.pdf';
-    let shared = false;
-    try {
-      const f = new File([bytes], outName, { type: 'application/pdf' });
-      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: outName }); shared = true; }
-    } catch (e) {}
-    if (!shared) PFS.exporter.downloadBytes(bytes, outName);
-    PFS.toast(shared ? 'הקובץ המאובטח שותף ✓' : 'ייצוא מאובטח הושלם ✓', 'ok');
-  } catch (e) {
-    console.error(e); PFS.toast('הייצוא המאובטח נכשל: ' + (e.message || e), 'err');
-  } finally { if (btn) { btn.disabled = false; btn.innerHTML = prev; } }
-}
+// Secure export goes through the same review modal, with the toggle pre-set —
+// one export surface, so the flattened output is previewed before it downloads.
+async function doExportFlattened() { return doExport({ secure: true }); }
 $('exportFlatBtn') && $('exportFlatBtn').addEventListener('click', doExportFlattened);
 
 // =====================================================================

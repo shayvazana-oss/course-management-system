@@ -694,6 +694,87 @@ async function main() {
     return re.getPageCount() === 3 && Math.round(re.getPage(0).getSize().height) === 140;
   }));
 
+  // ---- export review: the preview IS the output ----
+  // Opening the export shows a real rendered preview of the built bytes plus a
+  // non-blocking checklist, instead of a chain of confirm() dialogs.
+  {
+    const waitBuild = () => page.waitForFunction(
+      () => { const b = document.getElementById('exBusy'); const c = document.getElementById('exCanvas'); return b && !b.classList.contains('on') && c && c.width > 10; },
+      { timeout: 60000 }
+    );
+    await page.evaluate(() => {
+      const ov = window.PFS.__test.overlay;
+      ov.clearElements();
+      ov.addElementAt('text', 0, 0.3, 0.3, { text: 'ישראלי', noEdit: true });
+      ov.deselectAll();
+      document.getElementById('exportBtn').click();
+    });
+    await waitBuild();
+
+    check('export opens a review modal with a live preview of the real output', await page.evaluate(() => {
+      const open = document.getElementById('exportModal').classList.contains('show');
+      const c = document.getElementById('exCanvas');
+      const lbl = document.getElementById('exPage').textContent;
+      const meta = document.getElementById('exMeta').textContent;
+      // canvas actually painted (not blank) and the meta reports a real size
+      const px = c.getContext('2d').getImageData(0, 0, c.width, Math.min(40, c.height)).data;
+      let ink = false; for (let i = 0; i < px.length; i += 4) { if (px[i + 3] > 0) { ink = true; break; } }
+      return open && c.width > 100 && ink && /^\d+ \/ \d+$/.test(lbl) && /(KB|MB)/.test(meta);
+    }));
+
+    check('pre-flight checks render as a checklist, not blocking dialogs', await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.ex-chk')];
+      // every row is one of the three severities and carries a headline
+      return rows.length > 0 && rows.every((r) => /\b(ok|warn|err)\b/.test(r.className) && r.querySelector('b').textContent.trim().length > 0);
+    }));
+
+    check('summary lists what will be baked into the file', await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('#exSummary .ex-sum-row')];
+      return rows.some((r) => /שדות שמולאו/.test(r.querySelector('.k').textContent) && r.querySelector('.v').textContent === '1');
+    }));
+
+    // paging through the preview
+    const multi = await page.evaluate(() => document.getElementById('exPage').textContent.split('/')[1].trim() !== '1');
+    if (multi) {
+      await page.evaluate(() => document.getElementById('exNext').click());
+      await page.waitForTimeout(900);
+      check('preview pages through the exported document', await page.evaluate(() => document.getElementById('exPage').textContent.startsWith('2')));
+    } else {
+      check('preview pages through the exported document', true); // single-page output
+    }
+
+    // switching quality rebuilds the preview and persists the choice
+    const sizeBefore = await page.evaluate(() => document.getElementById('exMeta').textContent);
+    await page.evaluate(() => [...document.querySelectorAll('#exQual button')].find((b) => b.dataset.q === 'high').click());
+    await waitBuild();
+    check('changing quality rebuilds the preview and is remembered', await page.evaluate((prev) => {
+      const on = document.querySelector('#exQual button.on');
+      const meta = document.getElementById('exMeta').textContent;
+      return on && on.dataset.q === 'high' && window.PFS.store.get('export_quality', '') === 'high'
+        && /להדפסה/.test(meta) && meta !== prev;
+    }, sizeBefore));
+
+    // the secure toggle rebuilds through the flattened path and renames the file
+    await page.evaluate(() => { const c = document.getElementById('exSecure'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
+    await waitBuild();
+    check('secure toggle rebuilds a flattened preview and renames the output', await page.evaluate(async () => {
+      const nameOk = /-secure\.pdf$/.test(document.getElementById('exName').textContent);
+      const pillOk = /מאובטח/.test(document.getElementById('exMeta').textContent);
+      return nameOk && pillOk;
+    }));
+
+    // reset for the tests that follow
+    await page.evaluate(() => {
+      const c = document.getElementById('exSecure'); c.checked = false;
+      [...document.querySelectorAll('#exQual button')].find((b) => b.dataset.q === 'standard').click();
+      window.PFS.store.set('export_quality', 'standard');
+      document.getElementById('exCancel').click();
+      window.PFS.__test.overlay.clearElements();
+    });
+    await page.waitForTimeout(400);
+    check('cancel closes the review without exporting', await page.evaluate(() => !document.getElementById('exportModal').classList.contains('show')));
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

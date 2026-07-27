@@ -130,8 +130,12 @@ button, input, select, textarea { font-family: inherit; }
 .rail-btn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tab svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn.sm { padding: 6px 10px; font-size: 12.5px; }
-.btn.primary { background: linear-gradient(180deg, #2A5DA0, var(--brand)); border-color: var(--brand-600); color: #fff; box-shadow: 0 1px 2px rgba(19,28,43,.18), inset 0 1px 0 rgba(255,255,255,.16); }
-.btn.primary:hover { background: linear-gradient(180deg, #2E64AB, var(--brand-600)); box-shadow: 0 3px 10px rgba(30,78,140,.28); }
+/* petrol brand — the navy gradient here was left over from the pre-redesign
+ * palette and clashed with the teal chrome everywhere outside the topbar */
+.btn.primary { background: linear-gradient(180deg, #12838F, var(--brand)); border-color: var(--brand-600); color: #fff; box-shadow: 0 1px 2px rgba(19,28,43,.18), inset 0 1px 0 rgba(255,255,255,.16); }
+.btn.primary:hover { background: linear-gradient(180deg, #0F757F, var(--brand-600)); box-shadow: 0 3px 10px rgba(14,110,120,.30); }
+/* .btn sets display:inline-flex, which would otherwise defeat the attribute */
+[hidden] { display: none !important; }
 .btn.accent { background: linear-gradient(180deg, #EBA23F, var(--accent)); border-color: var(--accent-600); color: #2B1B04; box-shadow: 0 1px 2px rgba(19,28,43,.14), inset 0 1px 0 rgba(255,255,255,.28); }
 .btn.accent:hover { box-shadow: 0 3px 10px rgba(224,147,47,.35); }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
@@ -392,3 +396,82 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .el.rect:hover { box-shadow: 0 0 0 1px rgba(0,0,0,.28); }
 .el.rect.selected { box-shadow: 0 0 0 2px var(--brand); }
 .el.rect .fill { width: 100%; height: 100%; pointer-events: none; }
+
+/* ============================================================= *
+ *  Export review — live preview of the real output, pre-flight
+ *  checks and options in one modern surface (replaces the old
+ *  chain of blocking confirm() dialogs).
+ * ============================================================= */
+/* a real working height so the preview gets the room — otherwise the dialog
+ * shrinks to the side column's content and the page renders postage-stamp size */
+.ex-modal { max-width: 1040px; display: flex; flex-direction: column; height: min(92vh, 820px); }
+.ex-modal header { justify-content: flex-start; gap: 10px; }
+.ex-ttl { display: inline-flex; align-items: center; gap: 8px; }
+.ex-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
+.ex-name { font-weight: 500; font-size: 13px; color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--line); padding: 3px 10px; border-radius: 999px; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-x { margin-inline-start: auto; background: transparent; border: 0; font-size: 17px; color: var(--ink-3); cursor: pointer; width: 32px; height: 32px; border-radius: 9px; }
+.ex-x:hover { background: var(--surface-3); color: var(--ink-1); }
+
+.ex-split { display: grid; grid-template-columns: 1fr 330px; gap: 0; min-height: 0; flex: 1; }
+.ex-stage { display: flex; flex-direction: column; min-width: 0; background: var(--canvas); border-inline-start: 1px solid var(--line); }
+.ex-view { position: relative; flex: 1; min-height: 340px; display: flex; align-items: center; justify-content: center; padding: 18px; overflow: auto; }
+.ex-canvas { max-width: 100%; max-height: 100%; border-radius: 6px; background: #fff; box-shadow: var(--shadow-2, 0 6px 20px rgba(19,28,43,.13)); display: block; }
+.ex-busy { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: color-mix(in srgb, var(--canvas) 82%, transparent); font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.ex-busy.on { display: flex; }
+.ex-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--line-2); border-top-color: var(--brand); animation: ex-rot .8s linear infinite; }
+@keyframes ex-rot { to { transform: rotate(360deg); } }
+.ex-pager { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+.ex-nav { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 17px; line-height: 1; cursor: pointer; }
+.ex-nav:hover:not(:disabled) { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+.ex-nav:disabled { opacity: .38; cursor: default; }
+.ex-pg { font-size: 13px; font-weight: 700; color: var(--ink-2); min-width: 62px; text-align: center; }
+.ex-live { margin-inline-start: auto; font-size: 11.5px; color: var(--ink-4); font-weight: 600; }
+
+.ex-side { padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: auto; min-width: 0; }
+.ex-checks { display: flex; flex-direction: column; gap: 7px; }
+.ex-chk { display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border-radius: 11px; font-size: 12.8px; line-height: 1.45; border: 1px solid transparent; }
+.ex-chk .i { flex: none; font-size: 14px; line-height: 1.3; }
+.ex-chk b { display: block; font-size: 13px; margin-bottom: 1px; }
+.ex-chk.ok { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 22%, transparent); }
+.ex-chk.warn { background: var(--accent-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 26%, transparent); }
+.ex-chk.err { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.ex-chk .sub { opacity: .85; font-weight: 500; }
+
+.ex-group { display: flex; flex-direction: column; gap: 7px; }
+.ex-lbl { font-size: 12px; font-weight: 800; color: var(--ink-3); letter-spacing: .2px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
+.seg button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 700 12.5px var(--font); color: var(--ink-3); cursor: pointer; transition: background .15s, color .15s; }
+.seg button:hover { color: var(--ink-1); }
+.seg button.on { background: var(--brand); color: #fff; box-shadow: var(--shadow-1); }
+
+.ex-switch { display: flex; align-items: flex-start; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 13px; cursor: pointer; background: var(--surface-2); }
+.ex-switch:hover { border-color: var(--line-2); }
+.ex-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.ex-sw { flex: none; width: 40px; height: 23px; border-radius: 999px; background: var(--line-2); position: relative; transition: background .18s; margin-top: 1px; }
+.ex-sw::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-1); transition: transform .18s; }
+.ex-switch input:checked + .ex-sw { background: var(--brand); }
+.ex-switch input:checked + .ex-sw::after { transform: translateX(-17px); }
+:dir(ltr) .ex-switch input:checked + .ex-sw::after { transform: translateX(17px); }
+.ex-swtx { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ex-swtx small { color: var(--ink-3); font-size: 11.5px; line-height: 1.4; font-weight: 500; }
+
+.ex-meta { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.ex-pill { font-size: 11.5px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; }
+.ex-pill b { color: var(--brand); }
+.ex-foot { align-items: center; }
+.ex-spacer { flex: 1; }
+
+@media (max-width: 900px) {
+  .ex-modal { max-height: 94vh; }
+  .ex-split { grid-template-columns: 1fr; }
+  .ex-stage { border-inline-start: 0; border-top: 1px solid var(--line); order: 2; }
+  .ex-side { order: 1; max-height: none; }
+  .ex-view { min-height: 210px; padding: 12px; }
+  .ex-canvas { max-height: 34vh; }
+}
+.ex-sum { display: flex; flex-direction: column; gap: 1px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ex-sum-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; background: var(--surface-2); font-size: 12.6px; color: var(--ink-2); }
+.ex-sum-row .k { flex: 1; }
+.ex-sum-row .v { font-weight: 800; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.ex-sum-row .ic { font-size: 13px; opacity: .8; }
+.ex-sum-empty { padding: 10px 11px; background: var(--surface-2); font-size: 12.5px; color: var(--ink-3); }

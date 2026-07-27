@@ -164,8 +164,12 @@ button, input, select, textarea { font-family: inherit; }
 .rail-btn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tab svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn.sm { padding: 6px 10px; font-size: 12.5px; }
-.btn.primary { background: linear-gradient(180deg, #2A5DA0, var(--brand)); border-color: var(--brand-600); color: #fff; box-shadow: 0 1px 2px rgba(19,28,43,.18), inset 0 1px 0 rgba(255,255,255,.16); }
-.btn.primary:hover { background: linear-gradient(180deg, #2E64AB, var(--brand-600)); box-shadow: 0 3px 10px rgba(30,78,140,.28); }
+/* petrol brand — the navy gradient here was left over from the pre-redesign
+ * palette and clashed with the teal chrome everywhere outside the topbar */
+.btn.primary { background: linear-gradient(180deg, #12838F, var(--brand)); border-color: var(--brand-600); color: #fff; box-shadow: 0 1px 2px rgba(19,28,43,.18), inset 0 1px 0 rgba(255,255,255,.16); }
+.btn.primary:hover { background: linear-gradient(180deg, #0F757F, var(--brand-600)); box-shadow: 0 3px 10px rgba(14,110,120,.30); }
+/* .btn sets display:inline-flex, which would otherwise defeat the attribute */
+[hidden] { display: none !important; }
 .btn.accent { background: linear-gradient(180deg, #EBA23F, var(--accent)); border-color: var(--accent-600); color: #2B1B04; box-shadow: 0 1px 2px rgba(19,28,43,.14), inset 0 1px 0 rgba(255,255,255,.28); }
 .btn.accent:hover { box-shadow: 0 3px 10px rgba(224,147,47,.35); }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
@@ -426,6 +430,85 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .el.rect:hover { box-shadow: 0 0 0 1px rgba(0,0,0,.28); }
 .el.rect.selected { box-shadow: 0 0 0 2px var(--brand); }
 .el.rect .fill { width: 100%; height: 100%; pointer-events: none; }
+
+/* ============================================================= *
+ *  Export review — live preview of the real output, pre-flight
+ *  checks and options in one modern surface (replaces the old
+ *  chain of blocking confirm() dialogs).
+ * ============================================================= */
+/* a real working height so the preview gets the room — otherwise the dialog
+ * shrinks to the side column's content and the page renders postage-stamp size */
+.ex-modal { max-width: 1040px; display: flex; flex-direction: column; height: min(92vh, 820px); }
+.ex-modal header { justify-content: flex-start; gap: 10px; }
+.ex-ttl { display: inline-flex; align-items: center; gap: 8px; }
+.ex-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
+.ex-name { font-weight: 500; font-size: 13px; color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--line); padding: 3px 10px; border-radius: 999px; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-x { margin-inline-start: auto; background: transparent; border: 0; font-size: 17px; color: var(--ink-3); cursor: pointer; width: 32px; height: 32px; border-radius: 9px; }
+.ex-x:hover { background: var(--surface-3); color: var(--ink-1); }
+
+.ex-split { display: grid; grid-template-columns: 1fr 330px; gap: 0; min-height: 0; flex: 1; }
+.ex-stage { display: flex; flex-direction: column; min-width: 0; background: var(--canvas); border-inline-start: 1px solid var(--line); }
+.ex-view { position: relative; flex: 1; min-height: 340px; display: flex; align-items: center; justify-content: center; padding: 18px; overflow: auto; }
+.ex-canvas { max-width: 100%; max-height: 100%; border-radius: 6px; background: #fff; box-shadow: var(--shadow-2, 0 6px 20px rgba(19,28,43,.13)); display: block; }
+.ex-busy { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: color-mix(in srgb, var(--canvas) 82%, transparent); font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.ex-busy.on { display: flex; }
+.ex-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--line-2); border-top-color: var(--brand); animation: ex-rot .8s linear infinite; }
+@keyframes ex-rot { to { transform: rotate(360deg); } }
+.ex-pager { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+.ex-nav { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 17px; line-height: 1; cursor: pointer; }
+.ex-nav:hover:not(:disabled) { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+.ex-nav:disabled { opacity: .38; cursor: default; }
+.ex-pg { font-size: 13px; font-weight: 700; color: var(--ink-2); min-width: 62px; text-align: center; }
+.ex-live { margin-inline-start: auto; font-size: 11.5px; color: var(--ink-4); font-weight: 600; }
+
+.ex-side { padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: auto; min-width: 0; }
+.ex-checks { display: flex; flex-direction: column; gap: 7px; }
+.ex-chk { display: flex; gap: 9px; align-items: flex-start; padding: 9px 11px; border-radius: 11px; font-size: 12.8px; line-height: 1.45; border: 1px solid transparent; }
+.ex-chk .i { flex: none; font-size: 14px; line-height: 1.3; }
+.ex-chk b { display: block; font-size: 13px; margin-bottom: 1px; }
+.ex-chk.ok { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 22%, transparent); }
+.ex-chk.warn { background: var(--accent-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 26%, transparent); }
+.ex-chk.err { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.ex-chk .sub { opacity: .85; font-weight: 500; }
+
+.ex-group { display: flex; flex-direction: column; gap: 7px; }
+.ex-lbl { font-size: 12px; font-weight: 800; color: var(--ink-3); letter-spacing: .2px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
+.seg button { border: 0; background: transparent; border-radius: 9px; padding: 8px 4px; font: 700 12.5px var(--font); color: var(--ink-3); cursor: pointer; transition: background .15s, color .15s; }
+.seg button:hover { color: var(--ink-1); }
+.seg button.on { background: var(--brand); color: #fff; box-shadow: var(--shadow-1); }
+
+.ex-switch { display: flex; align-items: flex-start; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 13px; cursor: pointer; background: var(--surface-2); }
+.ex-switch:hover { border-color: var(--line-2); }
+.ex-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.ex-sw { flex: none; width: 40px; height: 23px; border-radius: 999px; background: var(--line-2); position: relative; transition: background .18s; margin-top: 1px; }
+.ex-sw::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-1); transition: transform .18s; }
+.ex-switch input:checked + .ex-sw { background: var(--brand); }
+.ex-switch input:checked + .ex-sw::after { transform: translateX(-17px); }
+:dir(ltr) .ex-switch input:checked + .ex-sw::after { transform: translateX(17px); }
+.ex-swtx { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ex-swtx small { color: var(--ink-3); font-size: 11.5px; line-height: 1.4; font-weight: 500; }
+
+.ex-meta { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.ex-pill { font-size: 11.5px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; }
+.ex-pill b { color: var(--brand); }
+.ex-foot { align-items: center; }
+.ex-spacer { flex: 1; }
+
+@media (max-width: 900px) {
+  .ex-modal { max-height: 94vh; }
+  .ex-split { grid-template-columns: 1fr; }
+  .ex-stage { border-inline-start: 0; border-top: 1px solid var(--line); order: 2; }
+  .ex-side { order: 1; max-height: none; }
+  .ex-view { min-height: 210px; padding: 12px; }
+  .ex-canvas { max-height: 34vh; }
+}
+.ex-sum { display: flex; flex-direction: column; gap: 1px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ex-sum-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; background: var(--surface-2); font-size: 12.6px; color: var(--ink-2); }
+.ex-sum-row .k { flex: 1; }
+.ex-sum-row .v { font-weight: 800; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.ex-sum-row .ic { font-size: 13px; opacity: .8; }
+.ex-sum-empty { padding: 10px 11px; background: var(--surface-2); font-size: 12.5px; color: var(--ink-3); }
 
 </style>
 
@@ -929,6 +1012,58 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       </div>
     </div>
     <footer><button class="btn ghost" id="qsCancel">ביטול</button><button class="btn primary" id="qsSave">שמירה</button></footer>
+  </div>
+</div>
+
+<!-- Export review: live preview of the real output + pre-flight checks + options -->
+<div class="modal-back" id="exportModal">
+  <div class="modal ex-modal">
+    <header>
+      <span class="ex-ttl"><span class="ex-dot"></span>סקירה לפני ייצוא</span>
+      <span class="ex-name" id="exName"></span>
+      <button class="ex-x" id="exClose" title="סגור" aria-label="סגור">✕</button>
+    </header>
+    <div class="ex-split">
+      <div class="ex-stage">
+        <div class="ex-view" id="exView">
+          <canvas id="exCanvas" class="ex-canvas"></canvas>
+          <div class="ex-busy" id="exBusy"><span class="ex-spin"></span><span id="exBusyTxt">מכין תצוגה מקדימה…</span></div>
+        </div>
+        <div class="ex-pager">
+          <button class="ex-nav" id="exPrev" title="עמוד קודם">‹</button>
+          <span class="ex-pg" id="exPage">— / —</span>
+          <button class="ex-nav" id="exNext" title="עמוד הבא">›</button>
+          <span class="ex-live">תצוגה של הקובץ הסופי</span>
+        </div>
+      </div>
+      <aside class="ex-side">
+        <div class="ex-checks" id="exChecks"></div>
+        <div class="ex-group">
+          <div class="ex-lbl">איכות הקובץ</div>
+          <div class="seg" id="exQual" role="group">
+            <button type="button" data-q="draft">טיוטה</button>
+            <button type="button" data-q="standard">רגילה</button>
+            <button type="button" data-q="high">להדפסה</button>
+          </div>
+        </div>
+        <label class="ex-switch">
+          <input type="checkbox" id="exSecure">
+          <span class="ex-sw" aria-hidden="true"></span>
+          <span class="ex-swtx"><b>🔒 ייצוא מאובטח</b><small>משטח לתמונה — הטקסט לא ניתן לחילוץ והשחרות באמת מסתירות</small></span>
+        </label>
+        <div class="ex-group">
+          <div class="ex-lbl">מה ייכלל בקובץ</div>
+          <div class="ex-sum" id="exSummary"></div>
+        </div>
+        <div class="ex-meta" id="exMeta"></div>
+      </aside>
+    </div>
+    <footer class="ex-foot">
+      <button class="btn ghost" id="exCancel">ביטול</button>
+      <div class="ex-spacer"></div>
+      <button class="btn" id="exShare" hidden>📤 שיתוף</button>
+      <button class="btn primary" id="exDownload">⬇️ הורדת PDF</button>
+    </footer>
   </div>
 </div>
 
@@ -5812,65 +5947,226 @@ function toHex(c) {
 // =====================================================================
 //  Export
 // =====================================================================
-async function doExport() {
+/* Export review — instead of firing off a chain of blocking confirm() dialogs
+ * and downloading blind, opening the export shows the REAL output: the bytes
+ * are built, rendered back with pdf.js and paged through, with the pre-flight
+ * checks and options (quality / secure) beside them. Changing an option
+ * rebuilds the preview, so what you see is exactly what gets downloaded. */
+const exState = { bytes: null, doc: null, page: 1, pages: 1, token: 0, busy: false, checks: null };
+
+function exSetBusy(on, txt) {
+  exState.busy = on;
+  const b = $('exBusy'); if (!b) return;
+  b.classList.toggle('on', !!on);
+  if (txt) $('exBusyTxt').textContent = txt;
+  ['exDownload', 'exShare'].forEach((id) => { const el = $(id); if (el) el.disabled = !!on; });
+}
+const fmtSize = (n) => (n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
+
+// Pre-flight: the same guards as before, but shown together as a checklist
+// instead of interrupting one modal at a time.
+function exBuildChecks(models) {
+  const out = [];
+  const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
+  const blanks = (fieldsPanel.emptyCount && fieldsPanel.emptyCount()) || 0;
+  let suspects = [];
+  if (PFS.validate && PFS.validate.scan) {
+    suspects = PFS.validate.scan(
+      models.filter((m) => m.type === 'text' && m.fieldKey).map((m) => ({ key: m.fieldKey, value: m.text }))
+    ) || [];
+  }
+  if (reqBlanks > 0) out.push({ t: 'err', i: '⚠️', h: reqBlanks + ' שדות חובה (*) ריקים', s: 'טופס עם שדות חובה חסרים עלול להידחות' });
+  if (blanks > 0) out.push({ t: 'warn', i: '◻️', h: blanks + ' שדות ריקים', s: 'אפשר לייצא כך — רק ודאו שזו הכוונה' });
+  if (suspects.length) {
+    const list = suspects.slice(0, 4).map((s) => (s.value || '') + ' — ' + s.msg).join(' · ');
+    out.push({ t: 'warn', i: '🔍', h: suspects.length + ' ערכים שכדאי לבדוק', s: list + (suspects.length > 4 ? ' …' : '') });
+  }
+  if (!out.length) out.push({ t: 'ok', i: '✓', h: 'הכול נראה תקין', s: 'לא נמצאו שדות חובה ריקים או ערכים חשודים' });
+  return out;
+}
+function exRenderChecks(checks) {
+  const wrap = $('exChecks'); if (!wrap) return;
+  wrap.innerHTML = '';
+  checks.forEach((c) => {
+    const d = document.createElement('div');
+    d.className = 'ex-chk ' + c.t;
+    d.innerHTML = '<span class="i"></span><span><b></b><span class="sub"></span></span>';
+    d.querySelector('.i').textContent = c.i;
+    d.querySelector('b').textContent = c.h;
+    d.querySelector('.sub').textContent = c.s;
+    wrap.appendChild(d);
+  });
+}
+
+// Build the export bytes for the CURRENT options and render page 1.
+// Each call takes a token so a slow older build can't overwrite a newer one.
+async function exBuild() {
+  const my = ++exState.token;
+  exSetBusy(true, 'מכין תצוגה מקדימה…');
+  try {
+    const models = overlay.getElements().map((c) => c.model);
+    const secure = $('exSecure') && $('exSecure').checked;
+    const onProgress = (d, t) => { if (my === exState.token) $('exBusyTxt').textContent = `מעבד עמוד ${d} מתוך ${t}…`; };
+    const bytes = secure
+      ? await buildFlattenedBytes(onProgress)
+      : await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
+        quality: exportQuality(),
+        rotations: pdfView.getRotations(),
+        ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
+        attachments, onProgress
+      });
+    if (my !== exState.token) return;                 // superseded by a newer build
+    exState.bytes = bytes;
+    exState.doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+    if (my !== exState.token) return;
+    exState.pages = exState.doc.numPages;
+    exState.page = Math.min(exState.page, exState.pages);
+    await exDrawPage();
+    exUpdateMeta();
+  } catch (e) {
+    console.error(e);
+    if (my === exState.token) PFS.toast('בניית התצוגה נכשלה: ' + (e.message || e), 'err');
+  } finally {
+    if (my === exState.token) exSetBusy(false);
+  }
+}
+async function exDrawPage() {
+  if (!exState.doc) return;
+  const page = await exState.doc.getPage(exState.page);
+  const view = $('exView'), canvas = $('exCanvas');
+  const base = page.getViewport({ scale: 1 });
+  // fit the page into the stage, capped so a huge page doesn't blow up memory
+  const availW = Math.max(220, (view.clientWidth || 620) - 40);
+  const availH = Math.max(220, (view.clientHeight || 460) - 40);
+  const scale = Math.min(availW / base.width, availH / base.height, 2.2);
+  const vp = page.getViewport({ scale: scale * Math.min(window.devicePixelRatio || 1, 2) });
+  canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+  canvas.style.width = Math.round(base.width * scale) + 'px';
+  canvas.style.height = Math.round(base.height * scale) + 'px';
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  $('exPage').textContent = exState.page + ' / ' + exState.pages;
+  $('exPrev').disabled = exState.page <= 1;
+  $('exNext').disabled = exState.page >= exState.pages;
+}
+function exUpdateMeta() {
+  const m = $('exMeta'); if (!m) return;
+  const q = { draft: 'טיוטה', standard: 'רגילה', high: 'להדפסה' }[exportQuality()] || 'רגילה';
+  const secure = $('exSecure') && $('exSecure').checked;
+  const pills = [
+    '<span class="ex-pill">גודל: <b>' + fmtSize(exState.bytes ? exState.bytes.length : 0) + '</b></span>',
+    '<span class="ex-pill">עמודים: <b>' + exState.pages + '</b></span>',
+    '<span class="ex-pill">איכות: <b>' + q + '</b></span>'
+  ];
+  if (secure) pills.push('<span class="ex-pill">🔒 <b>מאובטח</b></span>');
+  m.innerHTML = pills.join('');
+}
+// "What's in this file" — makes the export self-explanatory: how many items
+// were added, attachments, and any page operations that are about to be baked.
+function exRenderSummary(models) {
+  const el = $('exSummary'); if (!el) return;
+  const n = (p) => models.filter(p).length;
+  const rows = [];
+  const texts = n((m) => m.type === 'text' && (m.text || '').trim());
+  const marks = n((m) => m.kind === 'check' || m.kind === 'cross');
+  const covers = n((m) => m.type === 'rect');
+  const imgs = n((m) => m.type === 'image');
+  if (texts) rows.push(['✍️', 'שדות שמולאו', texts]);
+  if (marks) rows.push(['✔️', 'סימוני וי / איקס', marks]);
+  if (covers) rows.push(['🩹', 'כיסוי · השחרה · הדגשה', covers]);
+  if (imgs) rows.push(['🖊️', 'חתימות וחותמות', imgs]);
+  if (attachments && attachments.length) rows.push(['📎', 'עמודים מצורפים', attachments.length]);
+  const removed = (pdfView.getRemovedPages && pdfView.getRemovedPages()) || [];
+  if (removed.length) rows.push(['🗑️', 'עמודים שיוסרו', removed.length]);
+  const rots = Object.keys((pdfView.getRotations && pdfView.getRotations()) || {}).length;
+  if (rots) rows.push(['🔄', 'עמודים שסובבו', rots]);
+  if (pdfView.isReordered && pdfView.isReordered()) rows.push(['↕️', 'סדר העמודים', 'שונה']);
+
+  el.innerHTML = '';
+  if (!rows.length) {
+    const d = document.createElement('div');
+    d.className = 'ex-sum-empty'; d.textContent = 'הקובץ המקורי בלבד — לא נוספו שינויים';
+    el.appendChild(d); return;
+  }
+  rows.forEach(([ic, k, v]) => {
+    const r = document.createElement('div'); r.className = 'ex-sum-row';
+    r.innerHTML = '<span class="ic"></span><span class="k"></span><span class="v"></span>';
+    r.querySelector('.ic').textContent = ic;
+    r.querySelector('.k').textContent = k;
+    r.querySelector('.v').textContent = v;
+    el.appendChild(r);
+  });
+}
+function exFileName() {
+  const secure = $('exSecure') && $('exSecure').checked;
+  return currentFileName + (secure ? '-secure' : '-filled') + '.pdf';
+}
+
+async function doExport(opts) {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
   if (!models.length && !attachments.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }
-  // last-mile guard: detected fields still blank? ask before baking the PDF.
-  // required (*) empties are called out first — those bounce a government form.
-  const reqBlanks = (fieldsPanel.requiredEmpty && fieldsPanel.requiredEmpty()) || 0;
-  const blanks = (fieldsPanel.emptyCount && fieldsPanel.emptyCount()) || 0;
-  if (reqBlanks > 0) {
-    if (!(await PFS.ui.confirm('שדות חובה ריקים', 'נשארו ' + reqBlanks + ' שדות חובה (*) ריקים — טופס עם שדות חובה חסרים עלול להידחות. לייצא בכל זאת?'))) return;
-  } else if (blanks > 0 && !(await PFS.ui.confirm('שדות ריקים', 'נשארו ' + blanks + ' שדות ריקים בטופס. לייצא בכל זאת?'))) return;
-  // format sweep: a mistyped ID / phone / e-mail / date on an official form is
-  // the most costly error, so flag anything that looks malformed before baking.
-  if (PFS.validate && PFS.validate.scan) {
-    const suspects = PFS.validate.scan(
-      models.filter((m) => m.type === 'text' && m.fieldKey)
-            .map((m) => ({ key: m.fieldKey, value: m.text }))
-    );
-    if (suspects.length) {
-      const list = suspects.slice(0, 6).map((s) => '• ' + (s.value || '') + ' — ' + s.msg).join('\n');
-      const more = suspects.length > 6 ? '\n…ועוד ' + (suspects.length - 6) : '';
-      if (!(await PFS.ui.confirm('ערכים שכדאי לבדוק', 'נמצאו ' + suspects.length + ' ערכים שנראים שגויים:\n' + list + more + '\n\nלייצא בכל זאת?'))) return;
-    }
-  }
-  const btn = $('exportBtn'); const prev = btn.innerHTML;
-  btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…';
-  try {
-    const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), models, {
-      quality: exportQuality(),
-      rotations: pdfView.getRotations(),
-      // a real reorder → pageOrder (encodes reorder AND deletion); else removePages
-      ...(pdfView.isReordered && pdfView.isReordered() ? { pageOrder: pdfView.getPageOrder() } : { removePages: pdfView.getRemovedPages() }),
-      attachments,
-      onProgress: (d, t) => { btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; }
-    });
-    const outName = currentFileName + '-filled.pdf';
-    // Mobile: hand the filled PDF straight back to WhatsApp/mail via the OS
-    // share sheet (still within the export click's transient activation).
-    // Desktop / unsupported → regular download, as before.
-    let sharedOut = false;
+  // reflect saved prefs into the controls, then open and build the preview
+  const q = exportQuality();
+  document.querySelectorAll('#exQual button').forEach((b) => b.classList.toggle('on', b.dataset.q === q));
+  if ($('exSecure')) $('exSecure').checked = !!(opts && opts.secure);
+  $('exName').textContent = exFileName();
+  exState.page = 1; exState.bytes = null; exState.doc = null;
+  exRenderChecks(exBuildChecks(models));
+  exRenderSummary(models);
+  if (navigator.canShare) $('exShare').hidden = false;
+  openModal('exportModal');
+  await exBuild();
+}
+
+// Deliver the already-built bytes (no rebuild — the preview IS the output).
+async function exDeliver(preferShare) {
+  if (!exState.bytes) return;
+  const outName = exFileName();
+  const bytes = exState.bytes;
+  let shared = false;
+  if (preferShare) {
     try {
       const f = new File([bytes], outName, { type: 'application/pdf' });
       if (navigator.canShare && navigator.canShare({ files: [f] })) {
         await navigator.share({ files: [f], title: outName });
-        sharedOut = true;
+        shared = true;
       }
-    } catch (e) { /* user cancelled or share failed — fall back to download */ }
-    if (!sharedOut) PFS.exporter.downloadBytes(bytes, outName);
-    PFS.toast(sharedOut ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
-    dirty = false;
-    // Commit this layout to memory now, so re-opening the same form restores it.
-    try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
-  } catch (e) {
-    console.error(e);
-    PFS.toast('הייצוא נכשל: ' + (e.message || e), 'err');
-  } finally {
-    btn.disabled = false; btn.innerHTML = prev;
+    } catch (e) { /* cancelled / unsupported → fall through to download */ }
   }
+  if (!shared) PFS.exporter.downloadBytes(bytes, outName);
+  closeModal('exportModal');
+  PFS.toast(shared ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
+  dirty = false;
+  try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
 }
+
+// ---- export modal wiring ----
+$('exClose') && $('exClose').addEventListener('click', () => closeModal('exportModal'));
+$('exCancel') && $('exCancel').addEventListener('click', () => closeModal('exportModal'));
+$('exPrev') && $('exPrev').addEventListener('click', () => { if (exState.page > 1) { exState.page--; exDrawPage(); } });
+$('exNext') && $('exNext').addEventListener('click', () => { if (exState.page < exState.pages) { exState.page++; exDrawPage(); } });
+$('exDownload') && $('exDownload').addEventListener('click', () => exDeliver(false));
+$('exShare') && $('exShare').addEventListener('click', () => exDeliver(true));
+document.querySelectorAll('#exQual button').forEach((b) => {
+  b.addEventListener('click', () => {
+    if (exState.busy) return;
+    document.querySelectorAll('#exQual button').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on');
+    PFS.store.set('export_quality', b.dataset.q);
+    const sel = $('exportQuality'); if (sel) sel.value = b.dataset.q;   // keep Settings in sync
+    exBuild();
+  });
+});
+$('exSecure') && $('exSecure').addEventListener('change', () => {
+  $('exName').textContent = exFileName();
+  exBuild();
+});
+// keep the preview filling the stage when the window (or orientation) changes
+let exRz = null;
+window.addEventListener('resize', () => {
+  if (!$('exportModal') || !$('exportModal').classList.contains('show') || !exState.doc) return;
+  clearTimeout(exRz); exRz = setTimeout(() => exDrawPage(), 180);
+});
 
 // the user's chosen export quality → DPI multiplier (shared by both paths)
 function exportQuality() { return PFS.store.get('export_quality', 'standard'); }
@@ -5906,25 +6202,9 @@ async function buildFlattenedBytes(onProgress) {
     onProgress
   });
 }
-async function doExportFlattened() {
-  if (!pdfView.hasDoc()) return;
-  if (!(await PFS.ui.confirm('ייצוא מאובטח', 'הקובץ ייווצר כתמונה שטוחה: הטקסט לא יהיה ניתן לבחירה או חילוץ (השחרות באמת מוסתרות), והוא מוגן משינוי. הקובץ עשוי להיות גדול יותר. להמשיך?'))) return;
-  const btn = $('exportFlatBtn'); const prev = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מייצא…'; }
-  try {
-    const bytes = await buildFlattenedBytes((d, t) => { if (btn) btn.innerHTML = `<span class="ic">⏳</span> ${d}/${t}`; });
-    const outName = currentFileName + '-secure.pdf';
-    let shared = false;
-    try {
-      const f = new File([bytes], outName, { type: 'application/pdf' });
-      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: outName }); shared = true; }
-    } catch (e) {}
-    if (!shared) PFS.exporter.downloadBytes(bytes, outName);
-    PFS.toast(shared ? 'הקובץ המאובטח שותף ✓' : 'ייצוא מאובטח הושלם ✓', 'ok');
-  } catch (e) {
-    console.error(e); PFS.toast('הייצוא המאובטח נכשל: ' + (e.message || e), 'err');
-  } finally { if (btn) { btn.disabled = false; btn.innerHTML = prev; } }
-}
+// Secure export goes through the same review modal, with the toggle pre-set —
+// one export surface, so the flattened output is previewed before it downloads.
+async function doExportFlattened() { return doExport({ secure: true }); }
 $('exportFlatBtn') && $('exportFlatBtn').addEventListener('click', doExportFlattened);
 
 // =====================================================================

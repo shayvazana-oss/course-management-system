@@ -514,6 +514,58 @@
   </div>
 </div>
 
+<!-- Export review: live preview of the real output + pre-flight checks + options -->
+<div class="modal-back" id="exportModal">
+  <div class="modal ex-modal">
+    <header>
+      <span class="ex-ttl"><span class="ex-dot"></span>סקירה לפני ייצוא</span>
+      <span class="ex-name" id="exName"></span>
+      <button class="ex-x" id="exClose" title="סגור" aria-label="סגור">✕</button>
+    </header>
+    <div class="ex-split">
+      <div class="ex-stage">
+        <div class="ex-view" id="exView">
+          <canvas id="exCanvas" class="ex-canvas"></canvas>
+          <div class="ex-busy" id="exBusy"><span class="ex-spin"></span><span id="exBusyTxt">מכין תצוגה מקדימה…</span></div>
+        </div>
+        <div class="ex-pager">
+          <button class="ex-nav" id="exPrev" title="עמוד קודם">‹</button>
+          <span class="ex-pg" id="exPage">— / —</span>
+          <button class="ex-nav" id="exNext" title="עמוד הבא">›</button>
+          <span class="ex-live">תצוגה של הקובץ הסופי</span>
+        </div>
+      </div>
+      <aside class="ex-side">
+        <div class="ex-checks" id="exChecks"></div>
+        <div class="ex-group">
+          <div class="ex-lbl">איכות הקובץ</div>
+          <div class="seg" id="exQual" role="group">
+            <button type="button" data-q="draft">טיוטה</button>
+            <button type="button" data-q="standard">רגילה</button>
+            <button type="button" data-q="high">להדפסה</button>
+          </div>
+        </div>
+        <label class="ex-switch">
+          <input type="checkbox" id="exSecure">
+          <span class="ex-sw" aria-hidden="true"></span>
+          <span class="ex-swtx"><b>🔒 ייצוא מאובטח</b><small>משטח לתמונה — הטקסט לא ניתן לחילוץ והשחרות באמת מסתירות</small></span>
+        </label>
+        <div class="ex-group">
+          <div class="ex-lbl">מה ייכלל בקובץ</div>
+          <div class="ex-sum" id="exSummary"></div>
+        </div>
+        <div class="ex-meta" id="exMeta"></div>
+      </aside>
+    </div>
+    <footer class="ex-foot">
+      <button class="btn ghost" id="exCancel">ביטול</button>
+      <div class="ex-spacer"></div>
+      <button class="btn" id="exShare" hidden>📤 שיתוף</button>
+      <button class="btn primary" id="exDownload">⬇️ הורדת PDF</button>
+    </footer>
+  </div>
+</div>
+
 <!-- ===================== SCRIPTS ===================== -->
 <!-- pdf-lib (UMD → window.PDFLib) and pdf.js v3 (UMD → window.pdfjsLib) -->
 <script src="./vendor/pdf-lib/pdf-lib.min.js"></script>

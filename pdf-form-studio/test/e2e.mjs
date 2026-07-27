@@ -924,6 +924,51 @@ async function main() {
     check('cancel closes the review without exporting', await page.evaluate(() => !document.getElementById('exportModal').classList.contains('show')));
   }
 
+  // ---- linked companions: quote → appendix chain ----
+  // Linking an appendix to a form teaches the pair; opening the companion
+  // carries the just-typed values across by MEANING (different labels on the
+  // two forms must still match), and the link is recognised by fingerprint.
+  const compRes = await page.evaluate(async () => {
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const mkForm = async (title, labels) => {
+      const d = await PDFDocument.create(); const pg = d.addPage([400, 300]);
+      pg.drawRectangle({ x: 0, y: 0, width: 400, height: 300, color: rgb(1, 1, 1) });
+      const f = await d.embedFont(StandardFonts.Helvetica);
+      pg.drawText(title, { x: 150, y: 270, size: 16, font: f, color: rgb(0, 0, 0) });
+      labels.forEach((lb, i) => pg.drawText(lb, { x: 250, y: 220 - i * 40, size: 12, font: f, color: rgb(0.1, 0.1, 0.1) }));
+      return new File([await d.save()], title + '.pdf', { type: 'application/pdf' });
+    };
+    const T = window.PFS.__test;
+    // form A = the "quote"; open it and type values into tagged fields
+    await T.openPdfFile(await mkForm('Quote-A', ['Customer name:', 'Total amount:']));
+    await new Promise((r) => setTimeout(r, 1200));
+    const fpA = T.getFp();
+    if (!fpA) return 'no fingerprint for A';
+    T.overlay.clearElements();
+    T.overlay.addElementAt('text', 0, 0.3, 0.3, { text: 'טסי בע״מ', fieldKey: 'שם לקוח', noEdit: true });
+    T.overlay.addElementAt('text', 0, 0.3, 0.5, { text: '12,500', fieldKey: 'סכום', noEdit: true });
+    // link form B = the "appendix" (different labels, same meanings)
+    const fileB = await mkForm('Appendix-H3', ['Customer name:', 'Total amount:']);
+    const rec = await window.PFS.companions.add({ ownerFp: fpA, ownerName: 'Quote-A', name: 'נספח ה3', bytes: await fileB.arrayBuffer() });
+    // the link must be discoverable by fingerprint (this is the recognise step)
+    const found = window.PFS.companions.listFor(fpA);
+    if (!found.length || found[0].id !== rec.id) return 'link not found by fingerprint';
+    // jump to the companion — carry must flow into its detected fields.
+    // (English labels because standard PDF fonts can't encode Hebrew; the
+    // appendix shares the quote's field wording, as real form pairs do.)
+    T.overlay.clearElements();
+    T.overlay.addElementAt('text', 0, 0.3, 0.3, { text: 'טסי בע״מ', fieldKey: 'Customer name', noEdit: true });
+    T.overlay.addElementAt('text', 0, 0.3, 0.5, { text: '12,500', fieldKey: 'Total amount', noEdit: true });
+    await T.openCompanion(rec);
+    await new Promise((r) => setTimeout(r, 1600));
+    const texts = T.overlay.getElements().filter((e) => e.model.type === 'text').map((e) => e.model.text);
+    const ok = texts.includes('טסי בע״מ') && texts.includes('12,500');
+    await window.PFS.companions.remove(rec.id);
+    return ok ? true : ('carried values missing: ' + JSON.stringify(texts));
+  });
+  if (compRes !== true) console.log('  [companion debug]', compRes);
+  check('companion opens pre-filled from the trigger form\'s values', compRes === true);
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

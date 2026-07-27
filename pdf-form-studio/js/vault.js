@@ -156,11 +156,22 @@
     // a plain "תאריך:" field means "today" unless the profile says otherwise
     // (birth-date fields map to birth_date, a different canon — never touched)
     if (canonVal.date === undefined) canonVal.date = new Date().toLocaleDateString('he-IL');
+    // normalized-label fallback: when no canonical meaning is known for a key,
+    // an identically-worded label still matches (a quote and its appendix
+    // usually share field wording — that carry-over must work even for terms
+    // the synonym map has never heard of, in any language).
+    const normVal = {};
+    Object.keys(values).forEach((k) => {
+      const nk = norm(k);
+      if (nk && normVal[nk] === undefined && String(values[k]).trim()) normVal[nk] = values[k];
+    });
     fields.forEach((f) => {
       if (f.type === 'check' || skip.has(f.fieldKey)) return;
       if (values[f.fieldKey] !== undefined && String(values[f.fieldKey]).trim()) { out[f.fieldKey] = values[f.fieldKey]; return; }
       const c = matchKey(f.label) || matchKey(f.fieldKey);
-      if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
+      if (c && canonVal[c] !== undefined) { out[f.fieldKey] = canonVal[c]; return; }
+      const nv = normVal[norm(f.label)] !== undefined ? normVal[norm(f.label)] : normVal[norm(f.fieldKey)];
+      if (nv !== undefined) out[f.fieldKey] = nv;
     });
     return out;
   }

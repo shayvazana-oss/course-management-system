@@ -167,6 +167,15 @@
             <h3>🔎 שדות שזוהו</h3>
             <div class="body-p" id="fieldsBody"></div>
           </div>
+          <div class="card" id="compCard" style="display:none">
+            <h3>🔗 נספחים מקושרים</h3>
+            <div class="body-p">
+              <div class="hint muted">קשרו לטופס הזה נספח (למשל נספח ה3 להצעת מחיר) — ובכל פעם שתמלאו אותו, Fillo יציע למלא את הנספח אוטומטית מהנתונים שהקלדתם.</div>
+              <div id="compList"></div>
+              <button class="btn sm block" id="compAddBtn">🔗 קשר נספח לטופס זה</button>
+              <input id="compInput" type="file" accept="application/pdf" hidden>
+            </div>
+          </div>
           <div class="card">
             <h3>👤 הפרטים שלי</h3>
             <div class="body-p">
@@ -602,6 +611,7 @@
 <script src="./js/deliver.js"></script>
 <script src="./js/image-tools.js"></script>
 <script src="./js/inpaint.js"></script>
+<script src="./js/companions.js"></script>
 <script src="./js/handwriting.js"></script>
 <script src="./js/drag-resize.js"></script>
 <script src="./js/element.js"></script>

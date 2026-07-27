@@ -166,7 +166,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -206,13 +206,17 @@ function vaultPrefill(det) {
     // remembered choices (learned from manual ticks) fill gaps; an explicit
     // profile value always wins over a remembered one.
     const remembered = PFS.store.get('remembered_choices', {}) || {};
-    const values = Object.assign({}, remembered, ap && ap.values);
-    if (!Object.keys(values).length) return null;
+    const carry = pendingCarry; pendingCarry = null;   // one-shot
+    const base = Object.assign({}, remembered, ap && ap.values);
+    if (!Object.keys(base).length && !(carry && Object.keys(carry).length)) return null;
     const skip = overlay.fieldKeys();
-    // text values + auto-ticked selections (gender, verbatim option matches)
-    const text = PFS.vault.matchValues(det.fields, values, skip);
-    const checks = PFS.vault.matchChecks(det.fields, values, skip);
-    return Object.assign({}, text, checks);
+    // profile/remembered fill first — then values carried from a linked form
+    // (הצעת מחיר → נספח) override them: the appendix must mirror what was just
+    // typed, not what the profile happens to say for the same meaning.
+    const text = PFS.vault.matchValues(det.fields, base, skip);
+    const checks = PFS.vault.matchChecks(det.fields, base, skip);
+    const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip) : {};
+    return Object.assign({}, text, checks, carryText);
   } catch (e) { return null; }
 }
 
@@ -250,6 +254,79 @@ let loadGen = 0; // bumped on every load so in-flight detection can bail
 let lastDet = null; // most recent detection result (for Fill-All signature/stamp lines)
 let attachments = []; // extra pages (photos of ID etc.) appended on export
 let currentFp = null; // fingerprint of the currently-loaded form
+let pendingCarry = null; // values captured from a form before jumping to its linked companion
+
+// =====================================================================
+//  Linked companions (נספחים) — quote → appendix chains
+// =====================================================================
+function renderCompanions() {
+  const card = $('compCard'), list = $('compList');
+  if (!card || !list) return;
+  if (!pdfView.hasDoc()) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const links = (PFS.companions && currentFp) ? PFS.companions.listFor(currentFp) : [];
+  list.innerHTML = '';
+  links.forEach((ln) => {
+    const row = document.createElement('div');
+    row.className = 'row'; row.style.alignItems = 'center'; row.style.gap = '6px';
+    const name = document.createElement('span');
+    name.textContent = '📎 ' + ln.name;
+    name.style.cssText = 'flex:1;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    const fill = document.createElement('button');
+    fill.className = 'btn sm'; fill.textContent = 'מלא עכשיו';
+    fill.addEventListener('click', () => openCompanion(ln));
+    const del = document.createElement('button');
+    del.className = 'btn sm'; del.style.color = 'var(--danger)'; del.textContent = '✕'; del.title = 'הסר קישור';
+    del.addEventListener('click', async () => { await PFS.companions.remove(ln.id); renderCompanions(); });
+    row.append(name, fill, del);
+    list.appendChild(row);
+  });
+}
+
+// open a linked companion pre-filled with the CURRENT form's values
+async function openCompanion(link) {
+  try {
+    const bytes = await PFS.companions.getBytes(link.id);
+    if (!bytes) { PFS.toast('קובץ הנספח לא נמצא באחסון — קשרו אותו מחדש', 'err'); return; }
+    // capture what was typed here BEFORE the document switches
+    pendingCarry = overlay.currentValues();
+    await openPdfFile(new File([bytes], link.name + '.pdf', { type: 'application/pdf' }));
+  } catch (e) {
+    pendingCarry = null;
+    console.error(e); PFS.toast('פתיחת הנספח נכשלה: ' + (e.message || e), 'err');
+  }
+}
+
+// after a successful export, offer the linked companion — the moment the data
+// is complete is exactly when the appendix should be produced
+async function offerCompanions() {
+  if (!PFS.companions || !currentFp) return;
+  const links = PFS.companions.listFor(currentFp);
+  if (!links.length) return;
+  const ln = links[0];
+  if (await PFS.ui.confirm('נספח מקושר 🔗', 'לטופס הזה מקושר "' + ln.name + '".\nלמלא אותו עכשיו אוטומטית עם הנתונים שמילאת?')) {
+    openCompanion(ln);
+  }
+}
+
+$('compAddBtn') && $('compAddBtn').addEventListener('click', () => {
+  if (!currentFp) { PFS.toast('פתח קודם את הטופס שאליו רוצים לקשר נספח', 'err'); return; }
+  $('compInput').click();
+});
+$('compInput') && $('compInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (f.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
+  try {
+    const rec = await PFS.companions.add({
+      ownerFp: currentFp, ownerName: currentFileName,
+      name: f.name, bytes: await f.arrayBuffer()
+    });
+    renderCompanions();
+    PFS.toast('"' + rec.name + '" קושר לטופס — יוצע אוטומטית בכל מילוי ✓', 'ok');
+  } catch (err) { PFS.toast(err.message || 'קישור הנספח נכשל', 'err'); }
+});
+
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   const buf = await file.arrayBuffer();
@@ -289,6 +366,12 @@ async function openPdfFile(file) {
     updateHwStatus();
     currentFp = null;
     try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
+    renderCompanions();
+    // a recognised form with a linked appendix announces itself right away
+    if (loadGen === myGen && PFS.companions && currentFp) {
+      const links = PFS.companions.listFor(currentFp);
+      if (links.length) PFS.toast('🔗 מקושר לטופס זה: "' + links[0].name + '" — אציע למלא אותו אחרי הייצוא', 'ok', 5000);
+    }
     const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp);
     if (match) {
       templates.apply(match.tpl.id);
@@ -846,6 +929,7 @@ async function exDeliver(preferShare) {
   PFS.toast(shared ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
   dirty = false;
   try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
+  offerCompanions();
 }
 
 // ---- export modal wiring ----

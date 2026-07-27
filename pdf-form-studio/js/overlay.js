@@ -17,17 +17,61 @@
       pages[index] = { index, wrapEl, overlayEl };
       overlayEl.addEventListener('pointerdown', (e) => {
         if (e.target !== overlayEl) return; // clicked an element, not empty space
-        if (placing) {
-          const r = overlayEl.getBoundingClientRect();
-          const fx = (e.clientX - r.left) / r.width;
-          const fy = (e.clientY - r.top) / r.height;
-          const model = placing.create(index, fx, fy);
-          if (model) instantiate(model);
-          if (!placing.sticky) setPlacing(null);
-        } else {
-          deselectAll();
-        }
+        if (!placing) { deselectAll(); return; }
+        const r = overlayEl.getBoundingClientRect();
+        const fx = (e.clientX - r.left) / r.width;
+        const fy = (e.clientY - r.top) / r.height;
+        // rect tools (whiteout / redact / highlight / replace): drag to draw the
+        // exact area to cover; a plain click drops a sensible default-sized box.
+        if (placing.rect) { startMarquee(index, overlayEl, fx, fy); return; }
+        const model = placing.create(index, fx, fy);
+        if (model) instantiate(model);
+        if (!placing.sticky) setPlacing(null);
       });
+    }
+
+    // Drag a marquee over the page to define a rect cover's exact bounds. The
+    // active placing.createRect(pageIndex, fx, fy, fw, fh) receives page fractions.
+    function startMarquee(index, overlayEl, sfx, sfy) {
+      const cb = placing.createRect, sticky = !!placing.sticky;
+      const defW = placing.defW || 0.2, defH = placing.defH || 0.03;
+      const box = document.createElement('div');
+      box.className = 'pfs-marquee';
+      box.style.cssText = 'position:absolute;border:1.5px dashed var(--brand,#0E6E78);' +
+        'background:rgba(14,110,120,.12);pointer-events:none;z-index:9999;border-radius:2px;';
+      overlayEl.appendChild(box);
+      let cfx = sfx, cfy = sfy;
+      const draw = () => {
+        const r = overlayEl.getBoundingClientRect();
+        box.style.left = (Math.min(sfx, cfx) * r.width) + 'px';
+        box.style.top = (Math.min(sfy, cfy) * r.height) + 'px';
+        box.style.width = (Math.abs(cfx - sfx) * r.width) + 'px';
+        box.style.height = (Math.abs(cfy - sfy) * r.height) + 'px';
+      };
+      draw();
+      const move = (e) => {
+        const r = overlayEl.getBoundingClientRect();
+        cfx = PFS.clamp((e.clientX - r.left) / r.width, 0, 1);
+        cfy = PFS.clamp((e.clientY - r.top) / r.height, 0, 1);
+        draw();
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        box.remove();
+        let fx = Math.min(sfx, cfx), fy = Math.min(sfy, cfy);
+        let fw = Math.abs(cfx - sfx), fh = Math.abs(cfy - sfy);
+        if (fw < 0.02 || fh < 0.008) {            // treated as a click → default box
+          fw = defW; fh = defH;
+          fx = PFS.clamp(sfx - fw / 2, 0, 1 - fw); fy = PFS.clamp(sfy - fh / 2, 0, 1 - fh);
+        } else {
+          fx = PFS.clamp(fx, 0, 1 - fw); fy = PFS.clamp(fy, 0, 1 - fh);
+        }
+        if (cb) cb(index, fx, fy, fw, fh);
+        if (!sticky) setPlacing(null);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
     }
 
     function overlaySizeFor(pageIndex) {
@@ -66,6 +110,18 @@
       if (ctrl && ctrl.model.type === 'text' && !extra?.noEdit) {
         setTimeout(() => ctrl.focusText(), 0);
       }
+      return ctrl;
+    }
+
+    // place a model at exact bounds (fx/fy/fw/fh supplied in `extra`), clamped
+    // to stay on-page. Used by the drag-drawn rect covers and the replace flow.
+    function addModelAt(type, pageIndex, extra, focus) {
+      if (!pages[pageIndex]) return null;
+      const model = PFS.element.makeModel(type, pageIndex, extra);
+      model.fx = PFS.clamp(model.fx, 0, 1 - model.fw);
+      model.fy = PFS.clamp(model.fy, 0, 1 - model.fh);
+      const ctrl = instantiate(model);
+      if (ctrl && focus && ctrl.model.type === 'text') setTimeout(() => ctrl.focusText(), 0);
       return ctrl;
     }
 
@@ -212,7 +268,7 @@
     }
 
     return {
-      registerPage, addElementAt, instantiate, setPlacing, isPlacing,
+      registerPage, addElementAt, addModelAt, instantiate, setPlacing, isPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       getMulti, alignSelection,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,

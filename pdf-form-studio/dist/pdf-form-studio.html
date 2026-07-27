@@ -492,10 +492,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         <button class="rail-btn tool" data-tool="handwriting" title="טקסט בכתב היד שלך"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
       </div>
       <div class="rail-group">
-        <div class="rail-head">הדגשה ותיקון</div>
-        <button class="rail-btn tool" data-tool="highlight" title="הדגשה — סימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
-        <button class="rail-btn tool" data-tool="whiteout" title="כיסוי לבן — לתקן שגיאה מודפסת"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי לבן</span></button>
-        <button class="rail-btn tool" data-tool="redact" title="השחרה — להסתיר מידע רגיש"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
+        <div class="rail-head">מחיקה והחלפה</div>
+        <button class="rail-btn tool" data-tool="replace" title="החלפת נתון — גררו מעל טקסט קיים: הישן מכוסה בצבע הרקע ותיבה חדשה נפתחת להקלדה"><svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3M4 8l3 3"/><path d="M20 16H8l3 3M20 16l-3-3"/></svg><span class="lbl">החלפה</span></button>
+        <button class="rail-btn tool" data-tool="whiteout" title="כיסוי — גררו לצייר אזור; הצבע מותאם אוטומטית לרקע כדי למחוק בצורה חלקה"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי חלק</span></button>
+        <button class="rail-btn tool" data-tool="redact" title="השחרה — גררו כדי להסתיר מידע רגיש בשחור"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
+        <button class="rail-btn tool" data-tool="highlight" title="הדגשה — גררו לסימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
       </div>
       <div class="rail-group">
         <div class="rail-head">עמוד וקובץ</div>
@@ -3103,17 +3104,61 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       pages[index] = { index, wrapEl, overlayEl };
       overlayEl.addEventListener('pointerdown', (e) => {
         if (e.target !== overlayEl) return; // clicked an element, not empty space
-        if (placing) {
-          const r = overlayEl.getBoundingClientRect();
-          const fx = (e.clientX - r.left) / r.width;
-          const fy = (e.clientY - r.top) / r.height;
-          const model = placing.create(index, fx, fy);
-          if (model) instantiate(model);
-          if (!placing.sticky) setPlacing(null);
-        } else {
-          deselectAll();
-        }
+        if (!placing) { deselectAll(); return; }
+        const r = overlayEl.getBoundingClientRect();
+        const fx = (e.clientX - r.left) / r.width;
+        const fy = (e.clientY - r.top) / r.height;
+        // rect tools (whiteout / redact / highlight / replace): drag to draw the
+        // exact area to cover; a plain click drops a sensible default-sized box.
+        if (placing.rect) { startMarquee(index, overlayEl, fx, fy); return; }
+        const model = placing.create(index, fx, fy);
+        if (model) instantiate(model);
+        if (!placing.sticky) setPlacing(null);
       });
+    }
+
+    // Drag a marquee over the page to define a rect cover's exact bounds. The
+    // active placing.createRect(pageIndex, fx, fy, fw, fh) receives page fractions.
+    function startMarquee(index, overlayEl, sfx, sfy) {
+      const cb = placing.createRect, sticky = !!placing.sticky;
+      const defW = placing.defW || 0.2, defH = placing.defH || 0.03;
+      const box = document.createElement('div');
+      box.className = 'pfs-marquee';
+      box.style.cssText = 'position:absolute;border:1.5px dashed var(--brand,#0E6E78);' +
+        'background:rgba(14,110,120,.12);pointer-events:none;z-index:9999;border-radius:2px;';
+      overlayEl.appendChild(box);
+      let cfx = sfx, cfy = sfy;
+      const draw = () => {
+        const r = overlayEl.getBoundingClientRect();
+        box.style.left = (Math.min(sfx, cfx) * r.width) + 'px';
+        box.style.top = (Math.min(sfy, cfy) * r.height) + 'px';
+        box.style.width = (Math.abs(cfx - sfx) * r.width) + 'px';
+        box.style.height = (Math.abs(cfy - sfy) * r.height) + 'px';
+      };
+      draw();
+      const move = (e) => {
+        const r = overlayEl.getBoundingClientRect();
+        cfx = PFS.clamp((e.clientX - r.left) / r.width, 0, 1);
+        cfy = PFS.clamp((e.clientY - r.top) / r.height, 0, 1);
+        draw();
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        box.remove();
+        let fx = Math.min(sfx, cfx), fy = Math.min(sfy, cfy);
+        let fw = Math.abs(cfx - sfx), fh = Math.abs(cfy - sfy);
+        if (fw < 0.02 || fh < 0.008) {            // treated as a click → default box
+          fw = defW; fh = defH;
+          fx = PFS.clamp(sfx - fw / 2, 0, 1 - fw); fy = PFS.clamp(sfy - fh / 2, 0, 1 - fh);
+        } else {
+          fx = PFS.clamp(fx, 0, 1 - fw); fy = PFS.clamp(fy, 0, 1 - fh);
+        }
+        if (cb) cb(index, fx, fy, fw, fh);
+        if (!sticky) setPlacing(null);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
     }
 
     function overlaySizeFor(pageIndex) {
@@ -3152,6 +3197,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (ctrl && ctrl.model.type === 'text' && !extra?.noEdit) {
         setTimeout(() => ctrl.focusText(), 0);
       }
+      return ctrl;
+    }
+
+    // place a model at exact bounds (fx/fy/fw/fh supplied in `extra`), clamped
+    // to stay on-page. Used by the drag-drawn rect covers and the replace flow.
+    function addModelAt(type, pageIndex, extra, focus) {
+      if (!pages[pageIndex]) return null;
+      const model = PFS.element.makeModel(type, pageIndex, extra);
+      model.fx = PFS.clamp(model.fx, 0, 1 - model.fw);
+      model.fy = PFS.clamp(model.fy, 0, 1 - model.fh);
+      const ctrl = instantiate(model);
+      if (ctrl && focus && ctrl.model.type === 'text') setTimeout(() => ctrl.focusText(), 0);
       return ctrl;
     }
 
@@ -3298,7 +3355,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     }
 
     return {
-      registerPage, addElementAt, instantiate, setPlacing, isPlacing,
+      registerPage, addElementAt, addModelAt, instantiate, setPlacing, isPlacing,
       selectCtrl, deselectAll, deleteCtrl, getSelected, getElements,
       getMulti, alignSelection,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
@@ -3497,7 +3554,43 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // page canvases + wraps, for building the thumbnail rail
     function viewList() { return views.map((v, i) => ({ n: i + 1, idx: i, canvas: v.canvas, wrap: v.wrap, deleted: !!v.deleted })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
+    // Sample the dominant background colour in a thin band just OUTSIDE the given
+    // rect (page fractions), so a cover box can be tinted to match the paper and
+    // blend in seamlessly — invisible even over off-white scans or coloured cells.
+    // Returns a #rrggbb string, or null if the page isn't ready / nothing sampled.
+    function sampleBg(pageIndex, fx, fy, fw, fh) {
+      const v = views[pageIndex]; if (!v || !v.canvas) return null;
+      const cw = v.canvas.width, ch = v.canvas.height;
+      let ctx; try { ctx = v.canvas.getContext('2d'); } catch (e) { return null; }
+      const x0 = Math.round(fx * cw), y0 = Math.round(fy * ch);
+      const w = Math.round(fw * cw), h = Math.round(fh * ch);
+      const pad = Math.max(3, Math.round(Math.min(w, h) * 0.4));
+      const counts = new Map();
+      const tally = (rx, ry, rw, rh) => {
+        rx = Math.max(0, Math.round(rx)); ry = Math.max(0, Math.round(ry));
+        rw = Math.min(cw - rx, Math.round(rw)); rh = Math.min(ch - ry, Math.round(rh));
+        if (rw < 1 || rh < 1) return;
+        let data; try { data = ctx.getImageData(rx, ry, rw, rh).data; } catch (e) { return; }
+        const step = 4 * Math.max(1, Math.round(data.length / 4 / 400)); // ≤~400 samples/band
+        for (let i = 0; i < data.length; i += step) {
+          if (data[i + 3] < 200) continue; // skip transparent
+          const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+      };
+      tally(x0 - pad, y0 - pad, w + 2 * pad, pad); // top band
+      tally(x0 - pad, y0 + h, w + 2 * pad, pad);   // bottom band
+      tally(x0 - pad, y0, pad, h);                 // left band
+      tally(x0 + w, y0, pad, h);                   // right band
+      if (!counts.size) return null;
+      let best = -1, bkey = 0;
+      counts.forEach((c, k) => { if (c > best) { best = c; bkey = k; } });
+      const ch5 = (n) => (((n & 31) << 3) | 4); // re-centre the 5-bit bucket
+      const r = ch5(bkey >> 10), g = ch5(bkey >> 5), b = ch5(bkey);
+      return '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
+    }
+
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
   }
 
   PFS.createPdfView = createPdfView;
@@ -5243,7 +5336,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -5402,7 +5495,9 @@ let currentFileName = 'filled';
 // =====================================================================
 //  Tools
 // =====================================================================
-const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
+const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date' };
+// rect covers are drag-drawn (marquee), not click-placed like the text tools
+const RECT_TOOLS = { whiteout: 1, redact: 1, highlight: 1 };
 let stickyTools = false; // "repeat mode": keep a tool armed for multiple placements
 // remember the last text style so filling a form stays visually consistent
 let lastTextStyle = null;
@@ -5428,6 +5523,21 @@ function activateTool(btn, tool) {
     tool === 'signature' ? startSignatureFlow() : startStampFlow();
     return;
   }
+  // rect covers + replace: drag over the page to draw the exact area. Whiteout
+  // and replace auto-match the paper colour underneath so the cover is seamless;
+  // replace also drops a fresh text box in place, ready to type the new value.
+  if (RECT_TOOLS[tool] || tool === 'replace') {
+    overlay.setPlacing({
+      rect: true, sticky: stickyTools, defW: 0.2, defH: 0.03,
+      createRect: (pageIndex, fx, fy, fw, fh) => {
+        if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
+        const extra = { fx, fy, fw, fh };
+        if (tool === 'whiteout') { const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg; }
+        overlay.addModelAt(tool, pageIndex, extra);
+      }
+    });
+    return;
+  }
   // text-like: arm placement — click on a page to drop it. In "repeat mode" the
   // tool stays armed so you can place many (checkmarks, boxes) fast; Esc stops.
   overlay.setPlacing({
@@ -5441,6 +5551,24 @@ function activateTool(btn, tool) {
       return null; // addElementAt already instantiated
     }
   });
+}
+
+// "Replace" — one gesture over existing content: cover it with a paper-matched
+// box (seamless erase), then drop an empty text box in the same spot, focused so
+// the new value can be typed immediately. The result reads like edited-in-place.
+function placeReplacement(pageIndex, fx, fy, fw, fh) {
+  const clamp = PFS.clamp;
+  const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
+  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg });
+  // size the text to the covered box, vertically centred within it
+  const fontFrac = clamp(fh * 0.62, 0.01, 0.06);
+  const textH = fontFrac * 1.2;
+  const extra = {
+    fx, fy: clamp(fy + (fh - textH) / 2, 0, 1 - textH),
+    fw, fh: textH, fontFrac, align: 'right'
+  };
+  if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
+  overlay.addModelAt('text', pageIndex, extra, true);
 }
 
 function armImagePlacement(kind, item) {
@@ -5637,7 +5765,21 @@ function renderProps(ctrl) {
     const fCol = field('צבע כיסוי'); const col = document.createElement('input');
     col.type = 'color'; col.value = toHex(m.color || '#ffffff');
     col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
-    fCol.appendChild(col); body.appendChild(fCol);
+    fCol.appendChild(col);
+    // sample the paper colour under the box so the cover blends in perfectly
+    if (m.kind === 'whiteout') {
+      const matchBtn = document.createElement('button');
+      matchBtn.className = 'btn sm'; matchBtn.type = 'button';
+      matchBtn.style.marginInlineStart = '8px'; matchBtn.textContent = '🎯 התאם לרקע';
+      matchBtn.title = 'דגום את צבע הרקע מתחת לתיבה כדי שהכיסוי יתמזג';
+      matchBtn.addEventListener('click', () => {
+        const bg = pdfView.sampleBg(m.page, m.fx, m.fy, m.fw, m.fh);
+        if (bg) { m.color = bg; col.value = toHex(bg); ctrl.layout(); markDirty(); PFS.toast('הכיסוי הותאם לרקע ✓', 'ok', 1400); }
+        else PFS.toast('לא ניתן לדגום כאן', 'err');
+      });
+      fCol.appendChild(matchBtn);
+    }
+    body.appendChild(fCol);
     // opacity — for a see-through highlight (or a softer cover)
     const fOp = field('שקיפות'); const op = document.createElement('input');
     op.type = 'range'; op.min = '10'; op.max = '100'; op.step = '5';

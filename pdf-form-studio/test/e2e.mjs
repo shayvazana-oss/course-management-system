@@ -582,6 +582,43 @@ async function main() {
     return ov.getElements().length === before + 1 && rect && rect.model.type === 'rect' && rect.model.color === '#ffffff';
   }));
 
+  // addModelAt places a cover at EXACT drawn bounds (not centred on a point)
+  check('addModelAt places a rect at the exact drawn bounds', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    ov.clearElements();
+    ov.addModelAt('whiteout', 0, { fx: 0.3, fy: 0.25, fw: 0.24, fh: 0.04, color: '#eeeeee' });
+    const r = ov.getElements().find((e) => e.model.kind === 'whiteout');
+    const ok = r && Math.abs(r.model.fx - 0.3) < 1e-6 && Math.abs(r.model.fy - 0.25) < 1e-6
+      && Math.abs(r.model.fw - 0.24) < 1e-6 && Math.abs(r.model.fh - 0.04) < 1e-6 && r.model.color === '#eeeeee';
+    ov.clearElements();
+    return ok;
+  }));
+
+  // background sampler returns a valid #rrggbb colour from the rendered page,
+  // so a cover box can be tinted to match the paper (seamless erase)
+  check('sampleBg returns a valid page colour for cover-matching', await page.evaluate(() => {
+    const c = window.PFS.__test.pdfView.sampleBg(0, 0.3, 0.3, 0.2, 0.03);
+    return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+  }));
+
+  // "Replace" = cover the old data (paper-matched) + an editable text box on top,
+  // in one gesture. Both elements land at the drawn spot; the text is focused.
+  check('replace covers the old data and drops an editable text box in place', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    ov.clearElements();
+    window.PFS.__test.placeReplacement(0, 0.35, 0.4, 0.22, 0.045);
+    const els = ov.getElements();
+    const cover = els.find((e) => e.model.kind === 'whiteout');
+    const txt = els.find((e) => e.model.type === 'text');
+    const coverOk = cover && Math.abs(cover.model.fx - 0.35) < 1e-6 && Math.abs(cover.model.fw - 0.22) < 1e-6
+      && /^#[0-9a-f]{6}$/i.test(cover.model.color);           // tinted to a real colour, not left blank
+    // the text box sits inside the cover, right-aligned, sized to the box height
+    const txtOk = txt && txt.model.align === 'right' && txt.model.fontFrac > 0
+      && txt.model.fy >= cover.model.fy - 1e-6 && (txt.model.fy + txt.model.fh) <= (cover.model.fy + cover.model.fh) + 1e-3;
+    ov.clearElements();
+    return coverOk && txtOk;
+  }));
+
   // a redact rectangle is actually painted into the exported PDF (center → black)
   check('redact rectangle is drawn into the exported PDF', await page.evaluate(async () => {
     const { PDFDocument } = window.PDFLib;

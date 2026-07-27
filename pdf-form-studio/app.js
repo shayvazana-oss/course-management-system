@@ -158,7 +158,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -317,7 +317,9 @@ let currentFileName = 'filled';
 // =====================================================================
 //  Tools
 // =====================================================================
-const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date', whiteout: 'whiteout', redact: 'redact', highlight: 'highlight' };
+const TEXT_TOOLS = { text: 'text', check: 'check', cross: 'cross', date: 'date' };
+// rect covers are drag-drawn (marquee), not click-placed like the text tools
+const RECT_TOOLS = { whiteout: 1, redact: 1, highlight: 1 };
 let stickyTools = false; // "repeat mode": keep a tool armed for multiple placements
 // remember the last text style so filling a form stays visually consistent
 let lastTextStyle = null;
@@ -343,6 +345,21 @@ function activateTool(btn, tool) {
     tool === 'signature' ? startSignatureFlow() : startStampFlow();
     return;
   }
+  // rect covers + replace: drag over the page to draw the exact area. Whiteout
+  // and replace auto-match the paper colour underneath so the cover is seamless;
+  // replace also drops a fresh text box in place, ready to type the new value.
+  if (RECT_TOOLS[tool] || tool === 'replace') {
+    overlay.setPlacing({
+      rect: true, sticky: stickyTools, defW: 0.2, defH: 0.03,
+      createRect: (pageIndex, fx, fy, fw, fh) => {
+        if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
+        const extra = { fx, fy, fw, fh };
+        if (tool === 'whiteout') { const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg; }
+        overlay.addModelAt(tool, pageIndex, extra);
+      }
+    });
+    return;
+  }
   // text-like: arm placement — click on a page to drop it. In "repeat mode" the
   // tool stays armed so you can place many (checkmarks, boxes) fast; Esc stops.
   overlay.setPlacing({
@@ -356,6 +373,24 @@ function activateTool(btn, tool) {
       return null; // addElementAt already instantiated
     }
   });
+}
+
+// "Replace" — one gesture over existing content: cover it with a paper-matched
+// box (seamless erase), then drop an empty text box in the same spot, focused so
+// the new value can be typed immediately. The result reads like edited-in-place.
+function placeReplacement(pageIndex, fx, fy, fw, fh) {
+  const clamp = PFS.clamp;
+  const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
+  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg });
+  // size the text to the covered box, vertically centred within it
+  const fontFrac = clamp(fh * 0.62, 0.01, 0.06);
+  const textH = fontFrac * 1.2;
+  const extra = {
+    fx, fy: clamp(fy + (fh - textH) / 2, 0, 1 - textH),
+    fw, fh: textH, fontFrac, align: 'right'
+  };
+  if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
+  overlay.addModelAt('text', pageIndex, extra, true);
 }
 
 function armImagePlacement(kind, item) {
@@ -552,7 +587,21 @@ function renderProps(ctrl) {
     const fCol = field('צבע כיסוי'); const col = document.createElement('input');
     col.type = 'color'; col.value = toHex(m.color || '#ffffff');
     col.addEventListener('input', () => { m.color = col.value; ctrl.layout(); markDirty(); });
-    fCol.appendChild(col); body.appendChild(fCol);
+    fCol.appendChild(col);
+    // sample the paper colour under the box so the cover blends in perfectly
+    if (m.kind === 'whiteout') {
+      const matchBtn = document.createElement('button');
+      matchBtn.className = 'btn sm'; matchBtn.type = 'button';
+      matchBtn.style.marginInlineStart = '8px'; matchBtn.textContent = '🎯 התאם לרקע';
+      matchBtn.title = 'דגום את צבע הרקע מתחת לתיבה כדי שהכיסוי יתמזג';
+      matchBtn.addEventListener('click', () => {
+        const bg = pdfView.sampleBg(m.page, m.fx, m.fy, m.fw, m.fh);
+        if (bg) { m.color = bg; col.value = toHex(bg); ctrl.layout(); markDirty(); PFS.toast('הכיסוי הותאם לרקע ✓', 'ok', 1400); }
+        else PFS.toast('לא ניתן לדגום כאן', 'err');
+      });
+      fCol.appendChild(matchBtn);
+    }
+    body.appendChild(fCol);
     // opacity — for a see-through highlight (or a softer cover)
     const fOp = field('שקיפות'); const op = document.createElement('input');
     op.type = 'range'; op.min = '10'; op.max = '100'; op.step = '5';

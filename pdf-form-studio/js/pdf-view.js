@@ -183,7 +183,43 @@
     // page canvases + wraps, for building the thumbnail rail
     function viewList() { return views.map((v, i) => ({ n: i + 1, idx: i, canvas: v.canvas, wrap: v.wrap, deleted: !!v.deleted })); }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList };
+    // Sample the dominant background colour in a thin band just OUTSIDE the given
+    // rect (page fractions), so a cover box can be tinted to match the paper and
+    // blend in seamlessly — invisible even over off-white scans or coloured cells.
+    // Returns a #rrggbb string, or null if the page isn't ready / nothing sampled.
+    function sampleBg(pageIndex, fx, fy, fw, fh) {
+      const v = views[pageIndex]; if (!v || !v.canvas) return null;
+      const cw = v.canvas.width, ch = v.canvas.height;
+      let ctx; try { ctx = v.canvas.getContext('2d'); } catch (e) { return null; }
+      const x0 = Math.round(fx * cw), y0 = Math.round(fy * ch);
+      const w = Math.round(fw * cw), h = Math.round(fh * ch);
+      const pad = Math.max(3, Math.round(Math.min(w, h) * 0.4));
+      const counts = new Map();
+      const tally = (rx, ry, rw, rh) => {
+        rx = Math.max(0, Math.round(rx)); ry = Math.max(0, Math.round(ry));
+        rw = Math.min(cw - rx, Math.round(rw)); rh = Math.min(ch - ry, Math.round(rh));
+        if (rw < 1 || rh < 1) return;
+        let data; try { data = ctx.getImageData(rx, ry, rw, rh).data; } catch (e) { return; }
+        const step = 4 * Math.max(1, Math.round(data.length / 4 / 400)); // ≤~400 samples/band
+        for (let i = 0; i < data.length; i += step) {
+          if (data[i + 3] < 200) continue; // skip transparent
+          const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+      };
+      tally(x0 - pad, y0 - pad, w + 2 * pad, pad); // top band
+      tally(x0 - pad, y0 + h, w + 2 * pad, pad);   // bottom band
+      tally(x0 - pad, y0, pad, h);                 // left band
+      tally(x0 + w, y0, pad, h);                   // right band
+      if (!counts.size) return null;
+      let best = -1, bkey = 0;
+      counts.forEach((c, k) => { if (c > best) { best = c; bkey = k; } });
+      const ch5 = (n) => (((n & 31) << 3) | 4); // re-centre the 5-bit bucket
+      const r = ch5(bkey >> 10), g = ch5(bkey >> 5), b = ch5(bkey);
+      return '#' + [r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('');
+    }
+
+    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
   }
 
   PFS.createPdfView = createPdfView;

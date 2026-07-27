@@ -753,6 +753,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           </div>
           <div class="card">
             <h3>💾 גיבוי ושחזור</h3>
+            <div class="hint muted" id="buildTag" style="padding:0 14px 2px;font-size:11px"></div>
             <div class="body-p">
               <div class="hint muted">כל ההגדרות (תבניות, פרופילים, חתימות, חותמות, כתב-יד) שמורות בדפדפן. גבו לקובץ, ושחזרו בכל מכשיר.</div>
               <div class="row">
@@ -1153,6 +1154,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = null; /* OCR omitted from single-file build */
   window.PFS_SINGLE_FILE = true; /* no service worker / manifest here */
+  /* Deploy stamp — the Pages workflow rewrites __PFS_BUILD__ to the commit
+     SHA, so the running version is verifiable (Settings + console). */
+  window.PFS_BUILD = '__PFS_BUILD__'.indexOf('__') === 0 ? 'dev' : '__PFS_BUILD__';
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script>
@@ -1323,7 +1327,29 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   const canSW = 'serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !root.PFS_SINGLE_FILE;
   if (canSW) {
     root.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('[pwa] sw register failed', e));
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+        // actively look for a newer deploy — on load and whenever the tab
+        // comes back to the foreground (long-lived pinned tabs).
+        const check = () => reg.update().catch(() => {});
+        check();
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+        // when an updated worker takes control, reload ONCE so the user is
+        // actually running the new code (the old cache-first worker used to
+        // freeze users on their first-ever version — never again).
+        const hadController = !!navigator.serviceWorker.controller;
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!hadController || reloaded) return;   // first install → no reload
+          reloaded = true;
+          // never yank a form out from under the user — with unsaved work we
+          // announce instead of reloading
+          if (PFS.isDirty && PFS.isDirty()) {
+            PFS.toast && PFS.toast('גרסה חדשה של Fillo מוכנה — שמרו/ייצאו ורעננו את הדף 🔄', 'ok', 8000);
+            return;
+          }
+          location.reload();
+        });
+      }).catch((e) => console.warn('[pwa] sw register failed', e));
     });
   }
 
@@ -5628,6 +5654,14 @@ PFS.toast = function (msg, kind) {
 // ---------- state ----------
 let dirty = false;
 const markDirty = () => { dirty = true; scheduleAutoMemory(); };
+// pwa.js asks before auto-reloading into a fresh deploy — unsaved work wins
+PFS.isDirty = () => dirty;
+// surface the deploy stamp so "which version am I running?" is answerable
+try {
+  const bt = document.getElementById('buildTag');
+  if (bt) bt.textContent = 'גרסת אפליקציה: ' + (window.PFS_BUILD || 'dev');
+  console.info('[fillo] build', window.PFS_BUILD || 'dev');
+} catch (e) {}
 
 // Automatic per-form memory: a short while after any edit, silently remember
 // the current layout linked to this form's fingerprint. Next time the same

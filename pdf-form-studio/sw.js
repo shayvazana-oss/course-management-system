@@ -1,23 +1,38 @@
 /* sw.js — Fillo service worker.
- * 1. Offline app shell: core files precached on install; vendor assets are
- *    runtime-cached on first use (tesseract/fonts are heavy — no precache).
- * 2. Web Share Target: WhatsApp/any app shares a PDF → the OS POSTs it to
- *    ./share-target → we stash it in a cache and redirect to the app, which
- *    picks it up and opens it (see js/pwa.js).
+ *
+ * Strategy: NETWORK-FIRST for every same-origin GET, with the cache as an
+ * offline fallback. The previous worker was cache-first with a fixed version,
+ * which froze index.html/app.js/styles.css at whatever the user's FIRST visit
+ * installed — every later deploy silently never reached them (hard refresh
+ * included, since the worker answered before the network). Freshness beats
+ * a few ms of latency for a tool that gets bug fixes; offline still works
+ * because every successful response refreshes the fallback cache.
+ *
+ * '__PFS_BUILD__' is stamped with the commit SHA by the deploy workflow, so
+ * each deploy gets its own cache and activate() purges all older ones.
+ *
+ * Also: Web Share Target — WhatsApp/any app shares a PDF → the OS POSTs it to
+ * ./share-target → stash in a cache and redirect to the app (see js/pwa.js).
  */
-const VER = 'fillo-v1';
+const VER = 'fillo-__PFS_BUILD__';
+const SHARE_CACHE = 'fillo-shared';
 const CORE = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png'
 ];
-const SHARE_CACHE = 'fillo-shared';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VER).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
+  // best-effort precache so offline works even before first runtime fill
+  e.waitUntil(
+    caches.open(VER)
+      .then((c) => Promise.allSettled(CORE.map((p) => c.add(p))))
+      .then(() => self.skipWaiting())
+  );
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VER && k !== SHARE_CACHE).map((k) => caches.delete(k))))
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== VER && k !== SHARE_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -45,20 +60,22 @@ self.addEventListener('fetch', (e) => {
 
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  // App shell + same-origin assets: cache-first with network fill.
   e.respondWith((async () => {
-    const hit = await caches.match(e.request, { ignoreSearch: url.pathname.endsWith('/index.html') });
-    if (hit) return hit;
     try {
       const res = await fetch(e.request);
-      if (res.ok && (url.pathname.includes('/vendor/') || CORE.some((p) => url.pathname.endsWith(p.slice(1))))) {
+      if (res && res.ok) {
         const c = await caches.open(VER);
-        c.put(e.request, res.clone());
+        c.put(e.request, res.clone());     // refresh the offline fallback
       }
       return res;
     } catch (err) {
-      // offline fallback: the shell for navigations
-      if (e.request.mode === 'navigate') { const shell = await caches.match('./index.html'); if (shell) return shell; }
+      // offline: serve the last good copy; navigations fall back to the shell
+      const hit = await caches.match(e.request, { ignoreSearch: url.pathname.endsWith('/index.html') });
+      if (hit) return hit;
+      if (e.request.mode === 'navigate') {
+        const shell = await caches.match('./index.html');
+        if (shell) return shell;
+      }
       throw err;
     }
   })());

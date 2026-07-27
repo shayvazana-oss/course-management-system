@@ -29,6 +29,14 @@ PFS.toast = function (msg, kind) {
 // ---------- state ----------
 let dirty = false;
 const markDirty = () => { dirty = true; scheduleAutoMemory(); };
+// pwa.js asks before auto-reloading into a fresh deploy — unsaved work wins
+PFS.isDirty = () => dirty;
+// surface the deploy stamp so "which version am I running?" is answerable
+try {
+  const bt = document.getElementById('buildTag');
+  if (bt) bt.textContent = 'גרסת אפליקציה: ' + (window.PFS_BUILD || 'dev');
+  console.info('[fillo] build', window.PFS_BUILD || 'dev');
+} catch (e) {}
 
 // Automatic per-form memory: a short while after any edit, silently remember
 // the current layout linked to this form's fingerprint. Next time the same

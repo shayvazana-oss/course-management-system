@@ -248,6 +248,7 @@
           </div>
           <div class="card">
             <h3>💾 גיבוי ושחזור</h3>
+            <div class="hint muted" id="buildTag" style="padding:0 14px 2px;font-size:11px"></div>
             <div class="body-p">
               <div class="hint muted">כל ההגדרות (תבניות, פרופילים, חתימות, חותמות, כתב-יד) שמורות בדפדפן. גבו לקובץ, ושחזרו בכל מכשיר.</div>
               <div class="row">
@@ -582,6 +583,9 @@
   window.PFS_SUPABASE = { url: '', anonKey: '' };
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = { worker: './vendor/tesseract/worker.min.js', core: './vendor/tesseract/', lang: './vendor/tesseract/tessdata/' };
+  /* Deploy stamp — the Pages workflow rewrites __PFS_BUILD__ to the commit
+     SHA, so the running version is verifiable (Settings + console). */
+  window.PFS_BUILD = '__PFS_BUILD__'.indexOf('__') === 0 ? 'dev' : '__PFS_BUILD__';
 </script>
 <!-- IIFE modules hang on window.PFS -->
 <script src="./js/store.js"></script>

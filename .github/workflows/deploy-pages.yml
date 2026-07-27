@@ -26,6 +26,11 @@ jobs:
         run: |
           cd pdf-form-studio
           touch .nojekyll
+          # Stamp the deploy SHA into the app + service worker. This gives the
+          # SW a fresh cache name per deploy and makes the running version
+          # verifiable in the UI (Settings) — the old fixed-version cache-first
+          # worker froze users on their first-installed version forever.
+          sed -i "s/__PFS_BUILD__/${GITHUB_SHA::7}/g" index.html sw.js
           git init -b gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

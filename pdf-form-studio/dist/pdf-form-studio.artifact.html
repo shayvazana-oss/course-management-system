@@ -1941,7 +1941,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
    * (both sides run through matchKey). `skipKeys` avoids refilling elements
    * that already exist (e.g. restored from the form's auto-memory).
    */
-  function matchValues(fields, values, skipKeys) {
+  function matchValues(fields, values, skipKeys, opts) {
     const out = {};
     if (!fields || !fields.length || !values) return out;
     const skip = new Set(skipKeys || []);
@@ -1984,10 +1984,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     fields.forEach((f) => {
       if (f.type === 'check' || skip.has(f.fieldKey)) return;
       if (values[f.fieldKey] !== undefined && String(values[f.fieldKey]).trim()) { out[f.fieldKey] = values[f.fieldKey]; return; }
-      const c = matchKey(f.label) || matchKey(f.fieldKey);
-      if (c && canonVal[c] !== undefined) { out[f.fieldKey] = canonVal[c]; return; }
+      // exact wording BEFORE synonyms: when both forms literally say
+      // "שם מנהל מוסד ההכשרה", that beats a fuzzy canon guess (whose
+      // substring matching can misread an institution name as a person's)
       const nv = normVal[norm(f.label)] !== undefined ? normVal[norm(f.label)] : normVal[norm(f.fieldKey)];
-      if (nv !== undefined) out[f.fieldKey] = nv;
+      if (nv !== undefined) { out[f.fieldKey] = nv; return; }
+      if (opts && opts.labelOnly) return;   // carry-over: no synonym guessing
+      const c = matchKey(f.label) || matchKey(f.fieldKey);
+      if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
     });
     return out;
   }
@@ -5016,8 +5020,54 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return { x, yBase, top: yBase - fontH, w, fontH, str: item.str };
   }
 
+  // Merge fragmented text runs. Word/Office exporters often split one visual
+  // word across items mid-word ("תפ"+"קיד"), which turns labels into garbage
+  // ("קיד") and hides colon-endings from the label detector. Consecutive items
+  // on the same baseline with (almost) no horizontal gap are one logical run —
+  // pdf.js yields them in content order, so plain concatenation keeps the
+  // logical text right for RTL too.
+  function mergeFragments(raw) {
+    const out = [];
+    for (const b of raw) {
+      const prev = out[out.length - 1];
+      if (prev) {
+        const fh = Math.max(prev.fontH, b.fontH);
+        if (Math.abs(b.yBase - prev.yBase) < fh * 0.4) {
+          // disjoint distance between the two spans (negative = bidi overlap)
+          const gap = Math.max(b.x - (prev.x + prev.w), prev.x - (b.x + b.w));
+          // a run that already reads "label: ____" is a COMPLETE unit; a NEW
+          // blank-run arriving then belongs to the NEXT label on the line
+          // ("חתימת המאשר: ___ חותמת המוסד: ___" must stay two fields). Letter
+          // fragments still merge — they are the same label's continuation
+          // (visual-order emitters deliver label pieces after its blank).
+          const complete = /[:：׃]\s*[_.．…]{3,}\s*$/.test(prev.str) && isBlankRun(b.str);
+          if (!complete && gap < fh * 0.3 && gap > -fh * 1.2) {
+            // Concatenation order is decided by GEOMETRY, not array order:
+            // some exporters emit fragments logically, others visually
+            // (left→right) — same document, different blocks. For Hebrew the
+            // fragment further RIGHT is logically earlier; for Latin, further
+            // LEFT. This reassembles both emission styles correctly.
+            const nextIsLeft = (b.x + b.w / 2) < (prev.x + prev.w / 2);
+            const rtlPair = hasHebrew(prev.str) || hasHebrew(b.str);
+            const append = rtlPair ? nextIsLeft : !nextIsLeft;
+            // a visible gap between fragments is a space the splitter ate
+            const sp = gap > fh * 0.12 ? ' ' : '';
+            prev.str = append ? prev.str + sp + b.str : b.str + sp + prev.str;
+            const x0 = Math.min(prev.x, b.x), x1 = Math.max(prev.x + prev.w, b.x + b.w);
+            prev.x = x0; prev.w = x1 - x0;
+            prev.top = Math.min(prev.top, b.top);
+            prev.fontH = fh;
+            continue;
+          }
+        }
+      }
+      out.push(Object.assign({}, b));
+    }
+    return out;
+  }
+
   function heuristicForPage(items, W, H, vp, startIndex) {
-    const boxes = items.filter((it) => it.str && it.str.trim()).map((it) => itemBox(it, vp));
+    const boxes = mergeFragments(items.filter((it) => it.str && it.str.trim()).map((it) => itemBox(it, vp)));
     const out = [];
     // empty tick targets: square checkboxes AND round radio bullets — Israeli
     // forms use both (☐ תושב / ○ זכר ○ נקבה). Filled variants (☑ ●) are skipped.
@@ -5123,6 +5173,51 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         fx, fy, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
       });
     });
+    // ---- table cells: header row above an empty input row ----
+    // Government forms (משרד העבודה et al) lay fields out as tables: the label
+    // sits in a header cell and the answer goes in the EMPTY cell beneath it —
+    // no colon, no underscores, so the rules above never fire. Heuristic, gated
+    // hard: a line made ONLY of 2+ short bare labels, where the band directly
+    // below a label is clear of text, yields one field under each label.
+    const headerish = (b) => {
+      const t = b.str.trim();
+      if (!t || t.length < 2 || t.length > 60) return false;
+      if (isBlankRun(t) || CHECKBOX.test(t)) return false;
+      if (/[:：׃]/.test(t)) return false;             // colon labels handled above
+      if (!/[A-Za-z֐-׿؀-ۿ]/.test(t)) return false;
+      if (t.split(/\s+/).length > 8) return false;     // sentences aren't headers
+      if (/[.?!,;]$/.test(t)) return false;
+      return true;
+    };
+    const lines = [];
+    boxes.forEach((b) => {
+      const ln = lines.find((L) => Math.abs(L.y - b.yBase) < b.fontH * 0.6);
+      if (ln) { ln.items.push(b); } else lines.push({ y: b.yBase, items: [b] });
+    });
+    lines.forEach((L) => {
+      const heads = L.items.filter(headerish);
+      if (heads.length < 2 || heads.length !== L.items.length) return; // pure header rows only
+      heads.forEach((b) => {
+        const belowTop = b.top + b.fontH * 1.35;
+        const belowMid = belowTop + b.fontH * 0.7;
+        // the input band under the label must be empty (that's the table cell)
+        const conflict = boxes.some((o) => o !== b && o.str.trim()
+          && Math.abs((o.top + o.fontH / 2) - belowMid) < b.fontH * 0.9
+          && o.x < b.x + b.w + b.fontH && (o.x + o.w) > b.x - b.fontH);
+        if (conflict || (belowTop + b.fontH * 1.2) / H > 1) return;
+        const fw = Math.min((b.w * 1.5 + b.fontH) / W, 0.45);
+        const rtl = hasHebrew(b.str);
+        // RTL: the answer grows leftward from the label's right edge
+        const fx = rtl ? Math.max(0, (b.x + b.w) / W - fw) : b.x / W;
+        const label = stripEnum(b.str).replace(/\s+/g, ' ').trim();
+        out.push({
+          page: startIndex, fieldKey: slug(label, out.length), label,
+          fx, fy: belowTop / H, fw, fh: (b.fontH * 1.1) / H,
+          fontFrac: Math.min(0.03, (b.fontH * 0.95) / H), type: 'text'
+        });
+      });
+    });
+
     // radio grouping: round-bullet options sharing a line belong to one
     // question (e.g. "○ זכר   ○ נקבה") → mark them one mutually-exclusive group
     // so ticking one clears its siblings. Squares stay independent; a lone
@@ -5955,7 +6050,10 @@ function vaultPrefill(det) {
     // typed, not what the profile happens to say for the same meaning.
     const text = PFS.vault.matchValues(det.fields, base, skip);
     const checks = PFS.vault.matchChecks(det.fields, base, skip);
-    const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip) : {};
+    // carry matches by exact wording only — synonym guessing across two
+    // different forms produces confident-looking wrong fills (e.g. an
+    // institution name landing in a person's "שם מלא")
+    const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
     return Object.assign({}, text, checks, carryText);
   } catch (e) { return null; }
 }

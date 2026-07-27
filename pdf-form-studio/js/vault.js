@@ -125,7 +125,7 @@
    * (both sides run through matchKey). `skipKeys` avoids refilling elements
    * that already exist (e.g. restored from the form's auto-memory).
    */
-  function matchValues(fields, values, skipKeys) {
+  function matchValues(fields, values, skipKeys, opts) {
     const out = {};
     if (!fields || !fields.length || !values) return out;
     const skip = new Set(skipKeys || []);
@@ -168,10 +168,14 @@
     fields.forEach((f) => {
       if (f.type === 'check' || skip.has(f.fieldKey)) return;
       if (values[f.fieldKey] !== undefined && String(values[f.fieldKey]).trim()) { out[f.fieldKey] = values[f.fieldKey]; return; }
-      const c = matchKey(f.label) || matchKey(f.fieldKey);
-      if (c && canonVal[c] !== undefined) { out[f.fieldKey] = canonVal[c]; return; }
+      // exact wording BEFORE synonyms: when both forms literally say
+      // "שם מנהל מוסד ההכשרה", that beats a fuzzy canon guess (whose
+      // substring matching can misread an institution name as a person's)
       const nv = normVal[norm(f.label)] !== undefined ? normVal[norm(f.label)] : normVal[norm(f.fieldKey)];
-      if (nv !== undefined) out[f.fieldKey] = nv;
+      if (nv !== undefined) { out[f.fieldKey] = nv; return; }
+      if (opts && opts.labelOnly) return;   // carry-over: no synonym guessing
+      const c = matchKey(f.label) || matchKey(f.fieldKey);
+      if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
     });
     return out;
   }

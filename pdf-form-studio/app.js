@@ -215,7 +215,10 @@ function vaultPrefill(det) {
     // typed, not what the profile happens to say for the same meaning.
     const text = PFS.vault.matchValues(det.fields, base, skip);
     const checks = PFS.vault.matchChecks(det.fields, base, skip);
-    const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip) : {};
+    // carry matches by exact wording only — synonym guessing across two
+    // different forms produces confident-looking wrong fills (e.g. an
+    // institution name landing in a person's "שם מלא")
+    const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
     return Object.assign({}, text, checks, carryText);
   } catch (e) { return null; }
 }

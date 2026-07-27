@@ -924,6 +924,39 @@ async function main() {
     check('cancel closes the review without exporting', await page.evaluate(() => !document.getElementById('exportModal').classList.contains('show')));
   }
 
+  // ---- real government form: נספח ה3 (משרד העבודה) ----
+  // The real appendix stresses everything at once: text fragmented mid-word,
+  // some blocks emitted in VISUAL order (per-glyph), table-cell fields with no
+  // colons/underscores, and multiple "label: ___" pairs sharing one line.
+  {
+    const h3bytes = fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf'));
+    const h3res = await page.evaluate(async (arr) => {
+      const bytes = new Uint8Array(arr).buffer;
+      const doc = await window.pdfjsLib.getDocument({ data: bytes }).promise;
+      const det = await window.PFS.detect.detectFields(doc);
+      const labels = det.fields.map((f) => f.label);
+      const has = (t) => labels.some((l) => l.includes(t));
+      const wanted = ['שם מוסד ההכשרה', 'כתובת מוסד ההכשרה', 'טלפון מוסד ההכשרה',
+        'שם הקורס המבוקש', 'תאריך תחילת הקורס', 'שם מלא', 'ת.ז',
+        'שם מנהל מוסד ההכשרה או מי מטעמו', 'תפקיד', 'חתימת המאשר', 'חותמת המוסד'];
+      const missing = wanted.filter((w) => !has(w));
+      // no shredded-fragment garbage labels (the pre-merge failure mode)
+      const garbage = labels.filter((l) => l.replace(/[^֐-׿]/g, '').length === 1 && l.length < 4);
+      // carry-over sanity on the real fields: exact wording fills the course
+      // name; an institution name must NOT leak into the person's שם מלא
+      const carry = { 'שם הקורס המבוקש': 'ניהול פרויקטים PMP', 'שם מוסד ההכשרה': 'היחידה ללימודי חוץ' };
+      const mv = window.PFS.vault.matchValues(det.fields, carry, [], { labelOnly: true });
+      const courseKey = det.fields.find((f) => f.label === 'שם הקורס המבוקש');
+      const nameKey = det.fields.find((f) => f.label === 'שם מלא');
+      const carryOk = courseKey && mv[courseKey.fieldKey] === 'ניהול פרויקטים PMP'
+        && (!nameKey || mv[nameKey.fieldKey] === undefined);
+      return { tier: det.tier, missing, garbage, carryOk, n: det.fields.length };
+    }, Array.from(h3bytes));
+    if (h3res.missing.length || h3res.garbage.length || !h3res.carryOk) console.log('  [nispach-h3 debug]', JSON.stringify(h3res));
+    check('real נספח ה3: all 11 fields detected with clean labels', h3res.tier === 'text' && h3res.missing.length === 0 && h3res.garbage.length === 0);
+    check('real נספח ה3: carry fills course name, never leaks into שם מלא', h3res.carryOk === true);
+  }
+
   // ---- linked companions: quote → appendix chain ----
   // Linking an appendix to a form teaches the pair; opening the companion
   // carries the just-typed values across by MEANING (different labels on the

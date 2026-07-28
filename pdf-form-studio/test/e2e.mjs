@@ -1003,6 +1003,83 @@ async function main() {
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
 
+  // ---- undo you can trust: visible, global, and the panel SURVIVES it ----
+  {
+    const undoRes = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      // fresh detected form state
+      T.overlay.clearElements();
+      T.fieldsPanel.show({ tier: 'text', fields: [
+        { page: 0, fieldKey: 'u_name', label: 'שם מלא', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'u_phone', label: 'טלפון', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] });
+      T.setLastDet({ tier: 'text', fields: [
+        { page: 0, fieldKey: 'u_name', label: 'שם מלא', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'u_phone', label: 'טלפון', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] });
+      T.snapshotNow();
+      const rowOf = (k) => [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === k);
+      const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+      // visible controls exist
+      const btns = !!(document.getElementById('undoBtn') && document.getElementById('redoBtn'));
+      // fill one field, let the debounced snapshot land
+      const nameRow = rowOf('u_name');
+      nameRow.focus(); type(nameRow, 'משה ישראלי');
+      await wait(500);
+      const undoEnabled = !document.getElementById('undoBtn').disabled;
+      // Ctrl+Z FROM INSIDE THE INPUT — the exact case that used to be dead
+      nameRow.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+      await wait(300);
+      const elGone = !T.overlay.getElements().some((c) => c.model.fieldKey === 'u_name');
+      // the panel must SURVIVE: rows still rendered, value synced back to empty
+      const rowAfter = rowOf('u_name');
+      const panelAlive = !!rowAfter && !!rowOf('u_phone');
+      const valueSynced = rowAfter && rowAfter.value === '';
+      // typing again must UPDATE, not duplicate
+      if (rowAfter) { rowAfter.focus(); type(rowAfter, 'דנה לוי'); }
+      await wait(500);
+      const count = T.overlay.getElements().filter((c) => c.model.fieldKey === 'u_name').length;
+      // redo path via the visible button
+      document.getElementById('undoBtn').click();
+      await wait(250);
+      const redoEnabled = !document.getElementById('redoBtn').disabled;
+      document.getElementById('redoBtn').click();
+      await wait(250);
+      const redone = T.overlay.getElements().some((c) => c.model.fieldKey === 'u_name' && c.model.text === 'דנה לוי');
+      const rowFinal = rowOf('u_name');
+      const rowFollows = rowFinal && rowFinal.value === 'דנה לוי';
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { btns, undoEnabled, elGone, panelAlive, valueSynced, count, redoEnabled, redone, rowFollows };
+    });
+    if (!(undoRes.btns && undoRes.undoEnabled && undoRes.elGone && undoRes.panelAlive && undoRes.valueSynced && undoRes.count === 1 && undoRes.redoEnabled && undoRes.redone && undoRes.rowFollows)) console.log('  [undo debug]', JSON.stringify(undoRes));
+    check('visible undo works from inside an input and reverts the fill', undoRes.btns && undoRes.undoEnabled && undoRes.elGone);
+    check('fields panel SURVIVES undo: rows alive, values synced, no duplicates', undoRes.panelAlive && undoRes.valueSynced && undoRes.count === 1);
+    check('redo restores the value and the panel row follows', undoRes.redoEnabled && undoRes.redone && undoRes.rowFollows);
+  }
+
+  // ---- click-to-fill: tapping a marker on the form focuses its row ----
+  check('clicking a field marker on the form focuses its input row', await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const T = window.PFS.__test;
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'm_a', label: 'שדה א', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+      { page: 0, fieldKey: 'm_b', label: 'שדה ב', fx: 0.2, fy: 0.35, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+    ] };
+    T.fieldsPanel.show(det);
+    await wait(100);
+    const marker = document.querySelector('.field-marker[data-key="m_b"]');
+    if (!marker) return 'no marker';
+    const clickable = getComputedStyle(marker).pointerEvents !== 'none';
+    marker.click();
+    await wait(350);
+    const focused = document.activeElement && document.activeElement.__fkey === 'm_b';
+    // and focusing lights the marker (panel ↔ form link)
+    const active = marker.classList.contains('active');
+    T.fieldsPanel.clear(); T.overlay.clearElements();
+    return (clickable && focused && active) ? true : JSON.stringify({ clickable, focused, active });
+  }) === true);
+
   // ---- document library: permanent one-click forms ----
   check('library stores, lists, opens and removes a form', await page.evaluate(async () => {
     const { PDFDocument, rgb } = window.PDFLib;

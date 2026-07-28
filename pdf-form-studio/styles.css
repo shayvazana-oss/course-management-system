@@ -189,7 +189,7 @@ button, input, select, textarea { font-family: inherit; }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
 /* subtle amber hint over a detected-but-empty field; vanishes when filled */
-.field-marker { position: absolute; pointer-events: none; z-index: 1; border-radius: 4px;
+.field-marker { position: absolute; pointer-events: auto; cursor: pointer; z-index: 1; border-radius: 4px;
   background: rgba(224,147,47,.12); box-shadow: inset 0 0 0 1.5px rgba(224,147,47,.55);
   animation: fm-pulse 1.8s ease-in-out infinite; }
 @keyframes fm-pulse { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
@@ -495,3 +495,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .tour-text { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin-bottom: 12px; }
 .tour-foot { display: flex; align-items: center; gap: 10px; }
 .tour-dots { flex: 1; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-4); }
+
+/* click-to-fill affordance + the "you are typing here" live link */
+.field-marker:hover { background: rgba(224,147,47,.22) !important; box-shadow: inset 0 0 0 2px rgba(224,147,47,.85); }
+.field-marker.active { animation: none; background: rgba(14,110,120,.14) !important;
+  box-shadow: inset 0 0 0 2px var(--brand), 0 0 0 4px rgba(14,110,120,.18); }

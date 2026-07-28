@@ -197,10 +197,18 @@
         const p = pages[f.page]; if (!p) return;
         const el = document.createElement('div');
         el.className = 'field-marker'; el.dataset.key = f.fieldKey;
+        // click-to-fill: the form itself is the fastest index into the field
+        // list — tapping a marker jumps straight to its input row
+        el.title = 'לחצו למילוי: ' + (f.label || 'שדה');
+        el.addEventListener('click', (e) => { e.stopPropagation(); opts.onMarkerClick && opts.onMarkerClick(f); });
         p.overlayEl.appendChild(el);
         markers.push({ field: f, el });
       });
       layoutMarkers();
+    }
+    // highlight the marker of the field being typed right now (panel ↔ form link)
+    function setFieldActive(key) {
+      markers.forEach((m) => m.el.classList.toggle('active', !!key && m.field.fieldKey === key));
     }
     function setFieldFilled(key, filled) {
       markers.forEach((m) => { if (m.field.fieldKey === key) m.el.style.display = filled ? 'none' : ''; });
@@ -273,7 +281,7 @@
       getMulti, alignSelection,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
       overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
-      setFieldMarkers, setFieldFilled, clearFieldMarkers
+      setFieldMarkers, setFieldFilled, setFieldActive, clearFieldMarkers
     };
   }
 

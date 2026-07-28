@@ -37,12 +37,21 @@
       h[canon] = next; PFS.store.set(HKEY, h);
     }
 
+    let syncValuesImpl = null, focusFieldImpl = null;
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
+      syncValuesImpl = null; focusFieldImpl = null;
       if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
       if (body) body.innerHTML = '';
       if (panel) panel.style.display = 'none';
     }
+    /* syncValues(map): refresh every row from {fieldKey: value|true} WITHOUT
+     * re-rendering the panel — undo/redo restores elements and the rows must
+     * follow, not vanish. Also re-links ctrlByKey to the restored controllers,
+     * else the next keystroke would create a DUPLICATE element. */
+    function syncValues(map) { if (syncValuesImpl) syncValuesImpl(map || {}); }
+    /* focusField(fieldKey): jump the user to a row (click-to-fill on the form) */
+    function focusField(key) { return focusFieldImpl ? focusFieldImpl(key) : false; }
 
     function ensureCtrl(field, value) {
       let ctrl = ctrlByKey[field.fieldKey];
@@ -142,6 +151,14 @@
       meter.style.cssText = 'margin:2px 0 8px';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
+      // interview mode entry — at the TOP where it's seen, it's the fast path
+      if (det.fields.some((f) => f.type !== 'check')) {
+        const ivTop = document.createElement('button');
+        ivTop.className = 'btn sm primary block'; ivTop.style.marginBottom = '8px';
+        ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
+        ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
+        body.appendChild(ivTop);
+      }
       // amber hints over empty detected fields (cleared as they fill)
       if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);
       const controls = []; const fieldMeta = [];
@@ -229,6 +246,13 @@
             control.addEventListener('change', () => remember(canon, control.value));
           }
           control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control); });
+          // panel ↔ form visual link: focusing a row lights its marker on the
+          // form and brings the spot into view — you always see WHERE you type
+          control.addEventListener('focus', () => {
+            if (overlay.setFieldActive) overlay.setFieldActive(f.fieldKey);
+            if (opts.onFieldFocus) opts.onFieldFocus(f);
+          });
+          control.addEventListener('blur', () => { if (overlay.setFieldActive) overlay.setFieldActive(null); });
           control.addEventListener('keydown', (e) => {
             // keyboard field-wizard: Enter / ArrowDown → next field, ArrowUp → previous
             if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -326,14 +350,33 @@
         amt.addEventListener('input', sync);
         if ((amt.value || '').trim()) sync(); // prefilled amount
       })();
-      // interview mode: one question at a time, Enter advances — fastest way
-      // to sweep a long form, especially on a phone
-      const ivBtn = document.createElement('button');
-      ivBtn.className = 'btn sm primary block'; ivBtn.style.marginTop = '8px';
-      ivBtn.textContent = '🎯 מלאו בראיון — שדה אחרי שדה';
-      ivBtn.addEventListener('click', () => startInterview(fieldMeta, controls));
-      body.appendChild(ivBtn);
       recount();
+      syncValuesImpl = (map) => {
+        // re-link row→element controllers to the CURRENT overlay elements
+        Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
+        overlay.getElements().forEach((c) => { if (c.model.fieldKey) ctrlByKey[c.model.fieldKey] = c; });
+        propagating = true;   // identity copy must not fire during a sync
+        try {
+          controls.forEach((c, i) => {
+            const f = fieldMeta[i]; if (!f) return;
+            if (isTick(c)) { c.checked = map[f.fieldKey] === true; }
+            else {
+              const v = map[f.fieldKey] != null && map[f.fieldKey] !== true ? String(map[f.fieldKey]) : '';
+              if (c.value !== v) c.value = v;
+            }
+          });
+        } finally { propagating = false; }
+        recount();
+      };
+      focusFieldImpl = (key) => {
+        const i = fieldMeta.findIndex((f) => f && f.fieldKey === key);
+        if (i < 0 || !controls[i]) return false;
+        const c = controls[i];
+        c.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        c.focus({ preventScroll: true });
+        c.select && c.select();
+        return true;
+      };
       emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
       requiredEmpty = () => controls.filter((c, i) => !isTick(c) && !c.value.trim() && fieldMeta[i] && fieldMeta[i].required).length;
       return autoFilled;
@@ -369,7 +412,7 @@
       showCur();
     }
 
-    return { show, clear, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
+    return { show, clear, syncValues, focusField, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;

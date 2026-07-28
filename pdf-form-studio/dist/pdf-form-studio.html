@@ -229,7 +229,7 @@ button, input, select, textarea { font-family: inherit; }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
 /* subtle amber hint over a detected-but-empty field; vanishes when filled */
-.field-marker { position: absolute; pointer-events: none; z-index: 1; border-radius: 4px;
+.field-marker { position: absolute; pointer-events: auto; cursor: pointer; z-index: 1; border-radius: 4px;
   background: rgba(224,147,47,.12); box-shadow: inset 0 0 0 1.5px rgba(224,147,47,.55);
   animation: fm-pulse 1.8s ease-in-out infinite; }
 @keyframes fm-pulse { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
@@ -536,6 +536,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .tour-foot { display: flex; align-items: center; gap: 10px; }
 .tour-dots { flex: 1; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-4); }
 
+/* click-to-fill affordance + the "you are typing here" live link */
+.field-marker:hover { background: rgba(224,147,47,.22) !important; box-shadow: inset 0 0 0 2px rgba(224,147,47,.85); }
+.field-marker.active { animation: none; background: rgba(14,110,120,.14) !important;
+  box-shadow: inset 0 0 0 2px var(--brand), 0 0 0 4px rgba(14,110,120,.18); }
+
 </style>
 <meta name="theme-color" content="#FFFFFF" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -578,6 +583,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
       <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
       <button class="btn ghost" id="mergeBtn" disabled title="מיזוג מרובה"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">מיזוג</span></button>
+      <button class="btn ghost" id="undoBtn" disabled title="בטל פעולה אחרונה (Ctrl+Z)" aria-label="בטל"><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></span></button>
+      <button class="btn ghost" id="redoBtn" disabled title="בצע שוב (Ctrl+Y)" aria-label="בצע שוב"><span class="ic"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></span></button>
       <button class="btn accent" id="fillAllBtn" disabled title="מלא הכל בקליק"><span class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span><span class="txt">מלא הכל</span></button>
       <button class="btn primary" id="exportBtn" disabled title="ייצוא PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></span><span class="txt">ייצוא PDF</span></button>
     </div>
@@ -4070,10 +4077,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         const p = pages[f.page]; if (!p) return;
         const el = document.createElement('div');
         el.className = 'field-marker'; el.dataset.key = f.fieldKey;
+        // click-to-fill: the form itself is the fastest index into the field
+        // list — tapping a marker jumps straight to its input row
+        el.title = 'לחצו למילוי: ' + (f.label || 'שדה');
+        el.addEventListener('click', (e) => { e.stopPropagation(); opts.onMarkerClick && opts.onMarkerClick(f); });
         p.overlayEl.appendChild(el);
         markers.push({ field: f, el });
       });
       layoutMarkers();
+    }
+    // highlight the marker of the field being typed right now (panel ↔ form link)
+    function setFieldActive(key) {
+      markers.forEach((m) => m.el.classList.toggle('active', !!key && m.field.fieldKey === key));
     }
     function setFieldFilled(key, filled) {
       markers.forEach((m) => { if (m.field.fieldKey === key) m.el.style.display = filled ? 'none' : ''; });
@@ -4146,7 +4161,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       getMulti, alignSelection,
       elementsOnPage, relayoutAll, clearElements, serialize, applyModels,
       overlaySizeFor, pageCount, fieldKeys, currentValues, fillByKeys,
-      setFieldMarkers, setFieldFilled, clearFieldMarkers
+      setFieldMarkers, setFieldFilled, setFieldActive, clearFieldMarkers
     };
   }
 
@@ -5745,12 +5760,21 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       h[canon] = next; PFS.store.set(HKEY, h);
     }
 
+    let syncValuesImpl = null, focusFieldImpl = null;
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
+      syncValuesImpl = null; focusFieldImpl = null;
       if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
       if (body) body.innerHTML = '';
       if (panel) panel.style.display = 'none';
     }
+    /* syncValues(map): refresh every row from {fieldKey: value|true} WITHOUT
+     * re-rendering the panel — undo/redo restores elements and the rows must
+     * follow, not vanish. Also re-links ctrlByKey to the restored controllers,
+     * else the next keystroke would create a DUPLICATE element. */
+    function syncValues(map) { if (syncValuesImpl) syncValuesImpl(map || {}); }
+    /* focusField(fieldKey): jump the user to a row (click-to-fill on the form) */
+    function focusField(key) { return focusFieldImpl ? focusFieldImpl(key) : false; }
 
     function ensureCtrl(field, value) {
       let ctrl = ctrlByKey[field.fieldKey];
@@ -5850,6 +5874,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       meter.style.cssText = 'margin:2px 0 8px';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
+      // interview mode entry — at the TOP where it's seen, it's the fast path
+      if (det.fields.some((f) => f.type !== 'check')) {
+        const ivTop = document.createElement('button');
+        ivTop.className = 'btn sm primary block'; ivTop.style.marginBottom = '8px';
+        ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
+        ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
+        body.appendChild(ivTop);
+      }
       // amber hints over empty detected fields (cleared as they fill)
       if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);
       const controls = []; const fieldMeta = [];
@@ -5937,6 +5969,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             control.addEventListener('change', () => remember(canon, control.value));
           }
           control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control); });
+          // panel ↔ form visual link: focusing a row lights its marker on the
+          // form and brings the spot into view — you always see WHERE you type
+          control.addEventListener('focus', () => {
+            if (overlay.setFieldActive) overlay.setFieldActive(f.fieldKey);
+            if (opts.onFieldFocus) opts.onFieldFocus(f);
+          });
+          control.addEventListener('blur', () => { if (overlay.setFieldActive) overlay.setFieldActive(null); });
           control.addEventListener('keydown', (e) => {
             // keyboard field-wizard: Enter / ArrowDown → next field, ArrowUp → previous
             if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -6034,14 +6073,33 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         amt.addEventListener('input', sync);
         if ((amt.value || '').trim()) sync(); // prefilled amount
       })();
-      // interview mode: one question at a time, Enter advances — fastest way
-      // to sweep a long form, especially on a phone
-      const ivBtn = document.createElement('button');
-      ivBtn.className = 'btn sm primary block'; ivBtn.style.marginTop = '8px';
-      ivBtn.textContent = '🎯 מלאו בראיון — שדה אחרי שדה';
-      ivBtn.addEventListener('click', () => startInterview(fieldMeta, controls));
-      body.appendChild(ivBtn);
       recount();
+      syncValuesImpl = (map) => {
+        // re-link row→element controllers to the CURRENT overlay elements
+        Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
+        overlay.getElements().forEach((c) => { if (c.model.fieldKey) ctrlByKey[c.model.fieldKey] = c; });
+        propagating = true;   // identity copy must not fire during a sync
+        try {
+          controls.forEach((c, i) => {
+            const f = fieldMeta[i]; if (!f) return;
+            if (isTick(c)) { c.checked = map[f.fieldKey] === true; }
+            else {
+              const v = map[f.fieldKey] != null && map[f.fieldKey] !== true ? String(map[f.fieldKey]) : '';
+              if (c.value !== v) c.value = v;
+            }
+          });
+        } finally { propagating = false; }
+        recount();
+      };
+      focusFieldImpl = (key) => {
+        const i = fieldMeta.findIndex((f) => f && f.fieldKey === key);
+        if (i < 0 || !controls[i]) return false;
+        const c = controls[i];
+        c.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        c.focus({ preventScroll: true });
+        c.select && c.select();
+        return true;
+      };
       emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
       requiredEmpty = () => controls.filter((c, i) => !isTick(c) && !c.value.trim() && fieldMeta[i] && fieldMeta[i].required).length;
       return autoFilled;
@@ -6077,7 +6135,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       showCur();
     }
 
-    return { show, clear, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
+    return { show, clear, syncValues, focusField, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;
@@ -6147,24 +6205,54 @@ let history = [], redo = [], restoring = false, snapT = null;
 function snapState() {
   return JSON.stringify({ els: overlay.serialize(), pg: pdfView.getPageState ? pdfView.getPageState() : null });
 }
-function resetHistory() { history = [snapState()]; redo = []; }
+function resetHistory() { history = [snapState()]; redo = []; updateUndoUI(); }
 function scheduleSnap() { if (restoring) return; clearTimeout(snapT); snapT = setTimeout(snapshot, 300); }
 function snapshot() {
   if (restoring) return;
   const s = snapState();
   if (history.length && history[history.length - 1] === s) return;
   history.push(s); if (history.length > 40) history.shift(); redo = [];
+  updateUndoUI();
 }
 function restoreState(json) {
   restoring = true; clearTimeout(snapT);
   const st = JSON.parse(json);
-  overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(st.els || (Array.isArray(st) ? st : []));
+  overlay.clearElements();
+  overlay.applyModels(st.els || (Array.isArray(st) ? st : []));
   // restore page rotation/deletion/order too, so undo covers page operations
   if (st.pg && pdfView.setPageState) { pdfView.setPageState(st.pg); buildPageNav(); buildThumbnails(); }
-  restoring = false; markDirty();
+  // The fields panel must SURVIVE an undo. It used to be cleared here and
+  // never re-rendered — one Ctrl+Z wiped the whole "שדות שזוהו" workspace,
+  // which is why undo felt broken. syncValues refreshes the rows from the
+  // restored elements and re-links them (else the next keystroke duplicates).
+  if (lastDet && lastDet.fields && lastDet.fields.length && fieldsPanel.syncValues) {
+    const map = {};
+    overlay.getElements().forEach((c) => {
+      const m = c.model; if (!m.fieldKey) return;
+      if (m.type === 'text') map[m.fieldKey] = m.text || '';
+      else if (m.kind === 'check' || m.kind === 'cross') map[m.fieldKey] = true;
+    });
+    fieldsPanel.syncValues(map);
+  } else {
+    fieldsPanel.clear();
+  }
+  restoring = false; markDirty(); updateUndoUI();
 }
-function undo() { if (history.length < 2) return; redo.push(history.pop()); restoreState(history[history.length - 1]); }
-function redoAction() { if (!redo.length) return; const s = redo.pop(); history.push(s); restoreState(s); }
+function updateUndoUI() {
+  const u = $('undoBtn'), r = $('redoBtn');
+  if (u) u.disabled = history.length < 2;
+  if (r) r.disabled = !redo.length;
+}
+function undo() {
+  if (history.length < 2) return;
+  redo.push(history.pop()); restoreState(history[history.length - 1]);
+  PFS.toast('↩ הפעולה בוטלה', 'ok', 1100);
+}
+function redoAction() {
+  if (!redo.length) return;
+  const s = redo.pop(); history.push(s); restoreState(s);
+  PFS.toast('↪ הפעולה שוחזרה', 'ok', 1100);
+}
 
 // ---------- calculated fields ----------
 // Recompute every formula element from the current values of keyed fields.
@@ -6188,6 +6276,13 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
+  // click-to-fill: tapping an orange marker on the FORM jumps straight to its
+  // input row — the form itself becomes the index, no hunting in a long list
+  onMarkerClick: (f) => {
+    activateTab('fill');
+    if (isNarrow()) openPanel();
+    fieldsPanel.focusField(f.fieldKey);
+  },
   onSelect: (ctrl, count) => { renderProps(ctrl); updateAlignBar(count); },
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
@@ -7155,6 +7250,11 @@ function openPanel() { $('rightpanel').classList.add('open'); }
 function closePanel() { $('rightpanel').classList.remove('open'); }
 $('panelToggle').addEventListener('click', () => $('rightpanel').classList.toggle('open'));
 
+// undo / redo — visible, always in reach (were keyboard-only before)
+$('undoBtn') && $('undoBtn').addEventListener('click', () => undo());
+$('redoBtn') && $('redoBtn').addEventListener('click', () => redoAction());
+updateUndoUI();
+
 // tool rail
 document.querySelectorAll('.rail-btn.tool').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -7377,11 +7477,16 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'ArrowDown') m.fy = PFS.clamp(m.fy + step, 0, 1 - (m.fh || 0));
     sel.layout(); markDirty();
   }
+  if (e.ctrlKey || e.metaKey) {
+    const k0 = (e.key || '').toLowerCase();
+    // undo/redo are GLOBAL — filling happens inside inputs, and that is
+    // exactly where a mistake needs Ctrl+Z to work
+    if (k0 === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((k0 === 'z' && e.shiftKey) || k0 === 'y') { e.preventDefault(); redoAction(); return; }
+  }
   if ((e.ctrlKey || e.metaKey) && !editing && !inField) {
     const k = (e.key || '').toLowerCase();
-    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-    else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoAction(); }
-    else if (k === 'd') {
+    if (k === 'd') {
       // duplicate the selected element slightly offset — great for repeated
       // checks/labels down a table
       if (sel) {

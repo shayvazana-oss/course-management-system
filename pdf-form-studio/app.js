@@ -59,24 +59,54 @@ let history = [], redo = [], restoring = false, snapT = null;
 function snapState() {
   return JSON.stringify({ els: overlay.serialize(), pg: pdfView.getPageState ? pdfView.getPageState() : null });
 }
-function resetHistory() { history = [snapState()]; redo = []; }
+function resetHistory() { history = [snapState()]; redo = []; updateUndoUI(); }
 function scheduleSnap() { if (restoring) return; clearTimeout(snapT); snapT = setTimeout(snapshot, 300); }
 function snapshot() {
   if (restoring) return;
   const s = snapState();
   if (history.length && history[history.length - 1] === s) return;
   history.push(s); if (history.length > 40) history.shift(); redo = [];
+  updateUndoUI();
 }
 function restoreState(json) {
   restoring = true; clearTimeout(snapT);
   const st = JSON.parse(json);
-  overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(st.els || (Array.isArray(st) ? st : []));
+  overlay.clearElements();
+  overlay.applyModels(st.els || (Array.isArray(st) ? st : []));
   // restore page rotation/deletion/order too, so undo covers page operations
   if (st.pg && pdfView.setPageState) { pdfView.setPageState(st.pg); buildPageNav(); buildThumbnails(); }
-  restoring = false; markDirty();
+  // The fields panel must SURVIVE an undo. It used to be cleared here and
+  // never re-rendered — one Ctrl+Z wiped the whole "שדות שזוהו" workspace,
+  // which is why undo felt broken. syncValues refreshes the rows from the
+  // restored elements and re-links them (else the next keystroke duplicates).
+  if (lastDet && lastDet.fields && lastDet.fields.length && fieldsPanel.syncValues) {
+    const map = {};
+    overlay.getElements().forEach((c) => {
+      const m = c.model; if (!m.fieldKey) return;
+      if (m.type === 'text') map[m.fieldKey] = m.text || '';
+      else if (m.kind === 'check' || m.kind === 'cross') map[m.fieldKey] = true;
+    });
+    fieldsPanel.syncValues(map);
+  } else {
+    fieldsPanel.clear();
+  }
+  restoring = false; markDirty(); updateUndoUI();
 }
-function undo() { if (history.length < 2) return; redo.push(history.pop()); restoreState(history[history.length - 1]); }
-function redoAction() { if (!redo.length) return; const s = redo.pop(); history.push(s); restoreState(s); }
+function updateUndoUI() {
+  const u = $('undoBtn'), r = $('redoBtn');
+  if (u) u.disabled = history.length < 2;
+  if (r) r.disabled = !redo.length;
+}
+function undo() {
+  if (history.length < 2) return;
+  redo.push(history.pop()); restoreState(history[history.length - 1]);
+  PFS.toast('↩ הפעולה בוטלה', 'ok', 1100);
+}
+function redoAction() {
+  if (!redo.length) return;
+  const s = redo.pop(); history.push(s); restoreState(s);
+  PFS.toast('↪ הפעולה שוחזרה', 'ok', 1100);
+}
 
 // ---------- calculated fields ----------
 // Recompute every formula element from the current values of keyed fields.
@@ -100,6 +130,13 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
+  // click-to-fill: tapping an orange marker on the FORM jumps straight to its
+  // input row — the form itself becomes the index, no hunting in a long list
+  onMarkerClick: (f) => {
+    activateTab('fill');
+    if (isNarrow()) openPanel();
+    fieldsPanel.focusField(f.fieldKey);
+  },
   onSelect: (ctrl, count) => { renderProps(ctrl); updateAlignBar(count); },
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
@@ -1067,6 +1104,11 @@ function openPanel() { $('rightpanel').classList.add('open'); }
 function closePanel() { $('rightpanel').classList.remove('open'); }
 $('panelToggle').addEventListener('click', () => $('rightpanel').classList.toggle('open'));
 
+// undo / redo — visible, always in reach (were keyboard-only before)
+$('undoBtn') && $('undoBtn').addEventListener('click', () => undo());
+$('redoBtn') && $('redoBtn').addEventListener('click', () => redoAction());
+updateUndoUI();
+
 // tool rail
 document.querySelectorAll('.rail-btn.tool').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -1289,11 +1331,16 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'ArrowDown') m.fy = PFS.clamp(m.fy + step, 0, 1 - (m.fh || 0));
     sel.layout(); markDirty();
   }
+  if (e.ctrlKey || e.metaKey) {
+    const k0 = (e.key || '').toLowerCase();
+    // undo/redo are GLOBAL — filling happens inside inputs, and that is
+    // exactly where a mistake needs Ctrl+Z to work
+    if (k0 === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((k0 === 'z' && e.shiftKey) || k0 === 'y') { e.preventDefault(); redoAction(); return; }
+  }
   if ((e.ctrlKey || e.metaKey) && !editing && !inField) {
     const k = (e.key || '').toLowerCase();
-    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-    else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redoAction(); }
-    else if (k === 'd') {
+    if (k === 'd') {
       // duplicate the selected element slightly offset — great for repeated
       // checks/labels down a table
       if (sel) {

@@ -47,6 +47,12 @@
     // SAME 9-digit checksum as ת.ז, so they can be validated the same way.
     business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
     business_name: ['שם העסק', 'שם החברה', 'שם התאגיד', 'שם עסק', 'business name', 'company name'],
+    // organization/institution fields — training providers, colleges, schools
+    // (the longer phrases out-rank the generic phone/address/name canons)
+    institution_name:    ['שם מוסד ההכשרה', 'שם מוסד הלימודים', 'שם המוסד', 'שם המכללה', 'שם מוסד', 'מוסד ההכשרה', 'מוסד הלימודים', 'שם בית הספר', 'institution name', 'college name', 'school name'],
+    institution_phone:   ['טלפון מוסד ההכשרה', 'טלפון המוסד', 'טלפון המכללה', 'טלפון מוסד', 'טלפון בית הספר', 'institution phone'],
+    institution_address: ['כתובת מוסד ההכשרה', 'כתובת המוסד', 'כתובת המכללה', 'כתובת מוסד', 'כתובת בית הספר', 'institution address'],
+    contact_person:      ['שם איש קשר', 'איש קשר', 'איש הקשר', 'פרטי איש קשר', 'שם איש הקשר', 'contact person', 'contact name'],
     marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
     health_fund: ['קופת חולים', 'קופ״ח', 'קופח', 'קופה', 'health fund', 'hmo', 'صندوق المرضى'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']

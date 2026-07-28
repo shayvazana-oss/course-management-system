@@ -1992,6 +1992,116 @@ function showOnboarding() {
 }
 showOnboarding();
 
+// =====================================================================
+//  Document library ("המאגר") — the office's permanent forms, one click away
+// =====================================================================
+async function renderLibrary() {
+  if (!PFS.library) return;
+  const docs = await PFS.library.list();
+  // empty-state strip
+  const wrap = $('libWrap'), strip = $('libStrip');
+  if (wrap && strip) {
+    wrap.style.display = docs.length ? '' : 'none';
+    strip.innerHTML = '';
+    docs.slice(0, 6).forEach((d) => {
+      const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
+      row.innerHTML = '<div class="nm">📚 ' + d.name + '</div><span class="pill">פתח</span>';
+      row.addEventListener('click', () => openFromLibrary(d.id));
+      strip.appendChild(row);
+    });
+  }
+  // modal list
+  const list = $('libList');
+  if (list) {
+    list.innerHTML = '';
+    if (!docs.length) {
+      const empty = document.createElement('div');
+      empty.className = 'hint muted'; empty.style.padding = '10px 4px';
+      empty.textContent = 'המאגר ריק — שמרו את הטופס הפתוח או העלו קובץ.';
+      list.appendChild(empty);
+    }
+    docs.forEach((d) => {
+      const row = document.createElement('div'); row.className = 'tmpl-item';
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = '📄 ' + d.name;
+      const openB = document.createElement('button'); openB.className = 'btn sm primary'; openB.textContent = 'פתח';
+      openB.addEventListener('click', () => { closeModal('libModal'); openFromLibrary(d.id); });
+      const renB = document.createElement('button'); renB.className = 'btn sm'; renB.textContent = '✎'; renB.title = 'שנה שם';
+      renB.addEventListener('click', async () => {
+        const name = await PFS.ui.prompt('שם המסמך במאגר', { value: d.name });
+        if (name && name.trim()) { await PFS.library.rename(d.id, name); renderLibrary(); }
+      });
+      const delB = document.createElement('button'); delB.className = 'btn sm'; delB.style.color = 'var(--danger)'; delB.textContent = '🗑'; delB.title = 'הסר מהמאגר';
+      delB.addEventListener('click', async () => {
+        if (await PFS.ui.confirm('הסרה מהמאגר', 'להסיר את "' + d.name + '" מהמאגר?')) { await PFS.library.remove(d.id); renderLibrary(); }
+      });
+      row.append(nm, openB, renB, delB);
+      list.appendChild(row);
+    });
+  }
+  if ($('libAddOpenBtn')) $('libAddOpenBtn').disabled = !pdfView.hasDoc();
+}
+async function openFromLibrary(id) {
+  try {
+    const rec = await PFS.library.get(id);
+    if (!rec || !rec.bytes) { PFS.toast('המסמך לא נמצא במאגר', 'err'); return; }
+    await openPdfFile(new File([rec.bytes], rec.name + '.pdf', { type: 'application/pdf' }));
+  } catch (e) { PFS.toast('פתיחה מהמאגר נכשלה: ' + (e.message || e), 'err'); }
+}
+$('libBtn') && $('libBtn').addEventListener('click', () => { renderLibrary(); openModal('libModal'); });
+$('libClose') && $('libClose').addEventListener('click', () => closeModal('libModal'));
+$('libUploadBtn') && $('libUploadBtn').addEventListener('click', () => $('libInput').click());
+$('libInput') && $('libInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (f.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
+  try {
+    const rec = await PFS.library.add(f.name, await f.arrayBuffer());
+    renderLibrary();
+    PFS.toast('"' + rec.name + '" נשמר במאגר ✓', 'ok');
+  } catch (err) { PFS.toast(err.message || 'השמירה נכשלה', 'err'); }
+});
+$('libAddOpenBtn') && $('libAddOpenBtn').addEventListener('click', async () => {
+  if (!pdfView.hasDoc()) return;
+  try {
+    const name = await PFS.ui.prompt('שם המסמך במאגר', { value: currentFileName });
+    if (!name || !name.trim()) return;
+    const rec = await PFS.library.add(name, pdfView.getBytes().slice(0));
+    renderLibrary();
+    PFS.toast('"' + rec.name + '" נשמר במאגר ✓ — יופיע גם במסך הפתיחה', 'ok');
+  } catch (err) { PFS.toast(err.message || 'השמירה נכשלה', 'err'); }
+});
+renderLibrary();
+
+// ---- organization details ("פרטי המכללה") — fixed org fields that fill
+// themselves on every form via the institution canons in vault.js ----
+const ORG_FIELDS = [
+  { id: 'orgName', key: 'שם מוסד ההכשרה' },
+  { id: 'orgPhone', key: 'טלפון מוסד ההכשרה' },
+  { id: 'orgAddress', key: 'כתובת מוסד ההכשרה' },
+  { id: 'orgContact', key: 'איש קשר' },
+  { id: 'orgBizId', key: 'ח.פ' }
+];
+$('orgSetupBtn') && $('orgSetupBtn').addEventListener('click', () => {
+  const ap = profiles.active();
+  const vals = (ap && ap.values) || {};
+  ORG_FIELDS.forEach((f) => { $(f.id).value = vals[f.key] || ''; });
+  openModal('orgModal');
+});
+$('orgCancel') && $('orgCancel').addEventListener('click', () => closeModal('orgModal'));
+$('orgSave') && $('orgSave').addEventListener('click', () => {
+  const ap = profiles.active();
+  const merged = Object.assign({}, ap && ap.values);
+  ORG_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
+  profiles.saveProfile(ap ? ap.name : 'אני', merged);
+  closeModal('orgModal');
+  let n = 0;
+  if (pdfView.hasDoc()) {
+    n += smartFill(merged);
+    if (lastDet && lastDet.fields && lastDet.fields.length) n += fieldsPanel.show(lastDet, vaultPrefill(lastDet));
+  }
+  PFS.toast(n ? `פרטי הארגון נשמרו ✓ — ${n} שדות מולאו בטופס` : 'פרטי הארגון נשמרו ✓', 'ok');
+});
+
 // recent-documents strip on the empty state: one click reopens (auto-memory
 // then restores everything that was filled)
 async function renderRecent() {

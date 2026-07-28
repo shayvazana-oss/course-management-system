@@ -1003,6 +1003,51 @@ async function main() {
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
 
+  // ---- document library: permanent one-click forms ----
+  check('library stores, lists, opens and removes a form', await page.evaluate(async () => {
+    const { PDFDocument, rgb } = window.PDFLib;
+    const d = await PDFDocument.create(); d.addPage([300, 200]).drawRectangle({ x: 0, y: 0, width: 300, height: 200, color: rgb(1, 1, 1) });
+    const bytes = await d.save();
+    const rec = await window.PFS.library.add('נספח ו', bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    let docs = await window.PFS.library.list();
+    const listed = docs.some((x) => x.id === rec.id && x.name === 'נספח ו');
+    // open straight from the library — the whole pipeline runs on it
+    const stored = await window.PFS.library.get(rec.id);
+    await window.PFS.__test.openPdfFile(new File([stored.bytes], stored.name + '.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1200));
+    const opened = document.getElementById('fname').textContent.indexOf('נספח ו') !== -1;
+    await window.PFS.library.rename(rec.id, 'נספח ו — חדש');
+    docs = await window.PFS.library.list();
+    const renamed = docs.some((x) => x.id === rec.id && x.name === 'נספח ו — חדש');
+    await window.PFS.library.remove(rec.id);
+    docs = await window.PFS.library.list();
+    const removed = !docs.some((x) => x.id === rec.id);
+    return listed && opened && renamed && removed;
+  }));
+
+  // ---- organization details fill institution fields on the REAL נספח ה3 ----
+  check('org details auto-fill institution fields on the real form', await page.evaluate(async () => {
+    const mk = window.PFS.vault.matchKey;
+    const canonOk = mk('שם המכללה') === 'institution_name' && mk('שם מוסד ההכשרה') === 'institution_name'
+      && mk('טלפון מוסד ההכשרה') === 'institution_phone' && mk('כתובת המוסד') === 'institution_address'
+      && mk('איש קשר') === 'contact_person'
+      && mk('טלפון נייד') === 'phone';   // personal phone canon still intact
+    const orgVals = { 'שם מוסד ההכשרה': 'היחידה ללימודי חוץ', 'טלפון המכללה': '03-7654321', 'כתובת המכללה': 'שד׳ העצמאות 1, חיפה' };
+    const resp = await fetch('test/fixtures/nispach-h3.pdf');
+    const doc = await window.pdfjsLib.getDocument({ data: await resp.arrayBuffer() }).promise;
+    const det = await window.PFS.detect.detectFields(doc);
+    const mv = window.PFS.vault.matchValues(det.fields, orgVals, []);
+    const by = (lbl) => { const f = det.fields.find((x) => x.label === lbl); return f ? mv[f.fieldKey] : undefined; };
+    // different wording on each side — the canon bridges מכללה ↔ מוסד ההכשרה
+    const filled = by('שם מוסד ההכשרה') === 'היחידה ללימודי חוץ'
+      && by('טלפון מוסד ההכשרה') === '03-7654321'
+      && by('כתובת מוסד ההכשרה') === 'שד׳ העצמאות 1, חיפה';
+    // the person's שם מלא must NOT get the institution name
+    const nameF = det.fields.find((x) => x.label === 'שם מלא');
+    const clean = !nameF || mv[nameF.fieldKey] === undefined;
+    return canonOk && filled && clean;
+  }));
+
   // ---- first-run guided tour: five stops, skippable, one-time ----
   check('guided tour runs once through its five stops and completes', await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));

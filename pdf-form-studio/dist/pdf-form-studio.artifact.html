@@ -565,6 +565,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="btn ghost" id="helpBtn" title="עזרה וקיצורי מקלדת (?)" aria-label="עזרה וקיצורי מקלדת"><span class="ic">?</span></button>
       <button class="btn ghost" id="themeBtn" title="מצב תצוגה (בהיר/כהה)" aria-label="החלפת מצב תצוגה בהיר או כהה"><span class="ic" id="themeIc">🌙</span></button>
       <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל" aria-label="פתיחת פאנל הצד">☰</button>
+      <button class="btn ghost" id="libBtn" title="המאגר — הטפסים הקבועים שלכם, בקליק אחד"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="txt">מאגר</span></button>
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
       <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
       <button class="btn ghost" id="mergeBtn" disabled title="מיזוג מרובה"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">מיזוג</span></button>
@@ -651,6 +652,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           <div class="dz-step"><div class="n">2</div><div class="t">מלאו וחתמו</div><div class="d">טקסט · חתימה · חותמת</div></div>
           <div class="dz-step"><div class="n">3</div><div class="t">ייצאו PDF</div><div class="d">מוכן לשליחה</div></div>
         </div>
+        <div id="libWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">📚 המאגר שלכם — הטפסים הקבועים, בקליק:</div><div id="libStrip" class="tmpl-list"></div></div>
         <div id="recentWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">⏱️ נפתחו לאחרונה — קליק ונפתח כבר ממולא:</div><div id="recentList" class="tmpl-list"></div></div>
         <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
         <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
@@ -701,6 +703,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             <h3>👤 הפרטים שלי</h3>
             <div class="body-p">
               <button class="btn sm primary block" id="quickSetupBtn" title="הזינו את הפרטים האישיים פעם אחת — וכל טופס יתמלא לבד">⚡ מילוי מהיר של הפרטים שלי</button>
+              <button class="btn sm block" id="orgSetupBtn" title="שם המכללה, טלפון, כתובת ואיש קשר — יתמלאו לבד בכל טופס">🏫 פרטי המכללה / הארגון</button>
               <div class="row">
                 <select id="profileSel" style="flex:1"></select>
                 <button class="btn sm" id="profileNew" title="פרופיל חדש">＋</button>
@@ -1099,6 +1102,39 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="btn" id="exShare" hidden>📤 שיתוף</button>
       <button class="btn primary" id="exDownload">⬇️ הורדת PDF</button>
     </footer>
+  </div>
+</div>
+
+<div class="modal-back" id="libModal">
+  <div class="modal" style="max-width:520px">
+    <header>📚 המאגר — הטפסים הקבועים שלכם</header>
+    <div class="m-body" style="max-height:64vh;overflow:auto">
+      <div class="hint muted">שמרו כאן פעם אחת את הטפסים שחוזרים (הצעת מחיר, נספח ה3, נספח ו…) — ומכאן והלאה קליק אחד פותח אותם, בלי לחפש קבצים. הכול נשמר מקומית בדפדפן.</div>
+      <div id="libList" class="tmpl-list"></div>
+      <div class="row">
+        <button class="btn sm primary" id="libAddOpenBtn" style="flex:1" disabled>➕ שמור את הטופס הפתוח</button>
+        <button class="btn sm" id="libUploadBtn" style="flex:1">⬆️ העלה קובץ למאגר</button>
+      </div>
+      <input id="libInput" type="file" accept="application/pdf" hidden>
+    </div>
+    <footer><button class="btn ghost" id="libClose">סגור</button></footer>
+  </div>
+</div>
+
+<div class="modal-back" id="orgModal">
+  <div class="modal" style="max-width:440px">
+    <header>🏫 פרטי המכללה / הארגון</header>
+    <div class="m-body">
+      <div class="hint muted">הזינו פעם אחת — ובכל טופס, שדות כמו "שם מוסד ההכשרה", "טלפון המוסד" או "איש קשר" יתמלאו לבד (בכל ניסוח נפוץ).</div>
+      <div class="qs-grid">
+        <label>שם המכללה / המוסד<input type="text" id="orgName" dir="auto" placeholder="היחידה ללימודי חוץ"></label>
+        <label>טלפון<input type="text" id="orgPhone" inputmode="tel" placeholder="03-1234567"></label>
+        <label>כתובת<input type="text" id="orgAddress" dir="auto" placeholder="רחוב הרצל 15, תל אביב"></label>
+        <label>איש קשר<input type="text" id="orgContact" dir="auto" placeholder="שי וזאנה"></label>
+        <label>ח.פ / עוסק<input type="text" id="orgBizId" inputmode="numeric" placeholder="512345678"></label>
+      </div>
+    </div>
+    <footer><button class="btn ghost" id="orgCancel">ביטול</button><button class="btn primary" id="orgSave">שמירה</button></footer>
   </div>
 </div>
 
@@ -1884,6 +1920,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // SAME 9-digit checksum as ת.ז, so they can be validated the same way.
     business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
     business_name: ['שם העסק', 'שם החברה', 'שם התאגיד', 'שם עסק', 'business name', 'company name'],
+    // organization/institution fields — training providers, colleges, schools
+    // (the longer phrases out-rank the generic phone/address/name canons)
+    institution_name:    ['שם מוסד ההכשרה', 'שם מוסד הלימודים', 'שם המוסד', 'שם המכללה', 'שם מוסד', 'מוסד ההכשרה', 'מוסד הלימודים', 'שם בית הספר', 'institution name', 'college name', 'school name'],
+    institution_phone:   ['טלפון מוסד ההכשרה', 'טלפון המוסד', 'טלפון המכללה', 'טלפון מוסד', 'טלפון בית הספר', 'institution phone'],
+    institution_address: ['כתובת מוסד ההכשרה', 'כתובת המוסד', 'כתובת המכללה', 'כתובת מוסד', 'כתובת בית הספר', 'institution address'],
+    contact_person:      ['שם איש קשר', 'איש קשר', 'איש הקשר', 'פרטי איש קשר', 'שם איש הקשר', 'contact person', 'contact name'],
     marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
     health_fund: ['קופת חולים', 'קופ״ח', 'קופח', 'קופה', 'health fund', 'hmo', 'صندوق المرضى'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
@@ -3149,6 +3191,86 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   }
 
   PFS.tour = { start, maybeStart, isActive: () => active };
+})(window);
+
+</script>
+<script>
+/* library.js — the permanent document library ("המאגר").
+ *
+ * Recents evict after 10; the library is CURATED: the forms the office uses
+ * every day (הצעת מחיר, נספח ה3, נספח ו…) live here by name, forever, and
+ * open with one click — no re-hunting through the Downloads folder. Bytes +
+ * metadata in IndexedDB (same proven pattern as recent.js, no eviction cap),
+ * so it survives restarts and works offline.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+  const DB = 'fillo-library', STORE = 'docs';
+  const MAX_BYTES = 15 * 1024 * 1024;
+
+  function open() {
+    return new Promise((res, rej) => {
+      const rq = indexedDB.open(DB, 1);
+      rq.onupgradeneeded = () => { rq.result.createObjectStore(STORE, { keyPath: 'id' }); };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    });
+  }
+  function tx(db, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = db.transaction(STORE, mode); const s = t.objectStore(STORE);
+      const out = fn(s);
+      t.oncomplete = () => res(out && out.result !== undefined ? out.result : undefined);
+      t.onerror = () => rej(t.error);
+    });
+  }
+  const uid = () => 'lib' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  async function add(name, bytes) {
+    if (!bytes || !bytes.byteLength) throw new Error('קובץ ריק');
+    if (bytes.byteLength > MAX_BYTES) throw new Error('הקובץ גדול מדי למאגר (עד 15MB)');
+    const clean = String(name || 'מסמך').replace(/\.pdf$/i, '').trim() || 'מסמך';
+    const rec = { id: uid(), name: clean, bytes, size: bytes.byteLength, added: Date.now(), lastUsed: 0 };
+    const db = await open();
+    await tx(db, 'readwrite', (s) => s.put(rec));
+    return { id: rec.id, name: rec.name };
+  }
+
+  async function list() {
+    try {
+      const db = await open();
+      const all = await tx(db, 'readonly', (s) => s.getAll());
+      return (all || [])
+        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed }))
+        .sort((a, b) => (b.lastUsed || b.added) - (a.lastUsed || a.added));
+    } catch (e) { return []; }
+  }
+
+  async function get(id) {
+    const db = await open();
+    const rec = await tx(db, 'readonly', (s) => s.get(id));
+    if (rec) { rec.lastUsed = Date.now(); tx(db, 'readwrite', (s) => s.put(rec)).catch(() => {}); }
+    return rec || null;
+  }
+
+  async function rename(id, name) {
+    const clean = String(name || '').trim();
+    if (!clean) return false;
+    const db = await open();
+    const rec = await tx(db, 'readonly', (s) => s.get(id));
+    if (!rec) return false;
+    rec.name = clean;
+    await tx(db, 'readwrite', (s) => s.put(rec));
+    return true;
+  }
+
+  async function remove(id) {
+    const db = await open();
+    await tx(db, 'readwrite', (s) => s.delete(id));
+  }
+
+  PFS.library = { add, list, get, rename, remove };
 })(window);
 
 </script>
@@ -7948,6 +8070,116 @@ function showOnboarding() {
   back.querySelector('#obSkip').addEventListener('click', done);
 }
 showOnboarding();
+
+// =====================================================================
+//  Document library ("המאגר") — the office's permanent forms, one click away
+// =====================================================================
+async function renderLibrary() {
+  if (!PFS.library) return;
+  const docs = await PFS.library.list();
+  // empty-state strip
+  const wrap = $('libWrap'), strip = $('libStrip');
+  if (wrap && strip) {
+    wrap.style.display = docs.length ? '' : 'none';
+    strip.innerHTML = '';
+    docs.slice(0, 6).forEach((d) => {
+      const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
+      row.innerHTML = '<div class="nm">📚 ' + d.name + '</div><span class="pill">פתח</span>';
+      row.addEventListener('click', () => openFromLibrary(d.id));
+      strip.appendChild(row);
+    });
+  }
+  // modal list
+  const list = $('libList');
+  if (list) {
+    list.innerHTML = '';
+    if (!docs.length) {
+      const empty = document.createElement('div');
+      empty.className = 'hint muted'; empty.style.padding = '10px 4px';
+      empty.textContent = 'המאגר ריק — שמרו את הטופס הפתוח או העלו קובץ.';
+      list.appendChild(empty);
+    }
+    docs.forEach((d) => {
+      const row = document.createElement('div'); row.className = 'tmpl-item';
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = '📄 ' + d.name;
+      const openB = document.createElement('button'); openB.className = 'btn sm primary'; openB.textContent = 'פתח';
+      openB.addEventListener('click', () => { closeModal('libModal'); openFromLibrary(d.id); });
+      const renB = document.createElement('button'); renB.className = 'btn sm'; renB.textContent = '✎'; renB.title = 'שנה שם';
+      renB.addEventListener('click', async () => {
+        const name = await PFS.ui.prompt('שם המסמך במאגר', { value: d.name });
+        if (name && name.trim()) { await PFS.library.rename(d.id, name); renderLibrary(); }
+      });
+      const delB = document.createElement('button'); delB.className = 'btn sm'; delB.style.color = 'var(--danger)'; delB.textContent = '🗑'; delB.title = 'הסר מהמאגר';
+      delB.addEventListener('click', async () => {
+        if (await PFS.ui.confirm('הסרה מהמאגר', 'להסיר את "' + d.name + '" מהמאגר?')) { await PFS.library.remove(d.id); renderLibrary(); }
+      });
+      row.append(nm, openB, renB, delB);
+      list.appendChild(row);
+    });
+  }
+  if ($('libAddOpenBtn')) $('libAddOpenBtn').disabled = !pdfView.hasDoc();
+}
+async function openFromLibrary(id) {
+  try {
+    const rec = await PFS.library.get(id);
+    if (!rec || !rec.bytes) { PFS.toast('המסמך לא נמצא במאגר', 'err'); return; }
+    await openPdfFile(new File([rec.bytes], rec.name + '.pdf', { type: 'application/pdf' }));
+  } catch (e) { PFS.toast('פתיחה מהמאגר נכשלה: ' + (e.message || e), 'err'); }
+}
+$('libBtn') && $('libBtn').addEventListener('click', () => { renderLibrary(); openModal('libModal'); });
+$('libClose') && $('libClose').addEventListener('click', () => closeModal('libModal'));
+$('libUploadBtn') && $('libUploadBtn').addEventListener('click', () => $('libInput').click());
+$('libInput') && $('libInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (f.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
+  try {
+    const rec = await PFS.library.add(f.name, await f.arrayBuffer());
+    renderLibrary();
+    PFS.toast('"' + rec.name + '" נשמר במאגר ✓', 'ok');
+  } catch (err) { PFS.toast(err.message || 'השמירה נכשלה', 'err'); }
+});
+$('libAddOpenBtn') && $('libAddOpenBtn').addEventListener('click', async () => {
+  if (!pdfView.hasDoc()) return;
+  try {
+    const name = await PFS.ui.prompt('שם המסמך במאגר', { value: currentFileName });
+    if (!name || !name.trim()) return;
+    const rec = await PFS.library.add(name, pdfView.getBytes().slice(0));
+    renderLibrary();
+    PFS.toast('"' + rec.name + '" נשמר במאגר ✓ — יופיע גם במסך הפתיחה', 'ok');
+  } catch (err) { PFS.toast(err.message || 'השמירה נכשלה', 'err'); }
+});
+renderLibrary();
+
+// ---- organization details ("פרטי המכללה") — fixed org fields that fill
+// themselves on every form via the institution canons in vault.js ----
+const ORG_FIELDS = [
+  { id: 'orgName', key: 'שם מוסד ההכשרה' },
+  { id: 'orgPhone', key: 'טלפון מוסד ההכשרה' },
+  { id: 'orgAddress', key: 'כתובת מוסד ההכשרה' },
+  { id: 'orgContact', key: 'איש קשר' },
+  { id: 'orgBizId', key: 'ח.פ' }
+];
+$('orgSetupBtn') && $('orgSetupBtn').addEventListener('click', () => {
+  const ap = profiles.active();
+  const vals = (ap && ap.values) || {};
+  ORG_FIELDS.forEach((f) => { $(f.id).value = vals[f.key] || ''; });
+  openModal('orgModal');
+});
+$('orgCancel') && $('orgCancel').addEventListener('click', () => closeModal('orgModal'));
+$('orgSave') && $('orgSave').addEventListener('click', () => {
+  const ap = profiles.active();
+  const merged = Object.assign({}, ap && ap.values);
+  ORG_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
+  profiles.saveProfile(ap ? ap.name : 'אני', merged);
+  closeModal('orgModal');
+  let n = 0;
+  if (pdfView.hasDoc()) {
+    n += smartFill(merged);
+    if (lastDet && lastDet.fields && lastDet.fields.length) n += fieldsPanel.show(lastDet, vaultPrefill(lastDet));
+  }
+  PFS.toast(n ? `פרטי הארגון נשמרו ✓ — ${n} שדות מולאו בטופס` : 'פרטי הארגון נשמרו ✓', 'ok');
+});
 
 // recent-documents strip on the empty state: one click reopens (auto-memory
 // then restores everything that was filled)

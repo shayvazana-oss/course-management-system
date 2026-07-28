@@ -260,7 +260,7 @@
             const i = texts.indexOf(control);
             const next = (e.key === 'ArrowUp') ? texts[i - 1] : texts[i + 1];
             e.preventDefault();
-            if (next) { next.focus(); next.select && next.select(); const ct = ctrlByKey[next.__fkey]; if (ct) ct.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            if (next) { next.focus({ preventScroll: true }); next.select && next.select(); PFS.scrollToEl(next, 'center'); const ct = ctrlByKey[next.__fkey]; if (ct) PFS.scrollToEl(ct.node, 'center'); }
             else control.blur();
           });
           const pv = prefill && prefill[f.fieldKey];
@@ -304,7 +304,7 @@
         go.title = 'סמן על הטופס';
         go.addEventListener('click', () => {
           const c = ctrlByKey[f.fieldKey];
-          if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+          if (c) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); }
         });
         // voice fill (Chrome/Edge; he-IL). Feature-detected — absent elsewhere.
         const SR = root.SpeechRecognition || root.webkitSpeechRecognition;
@@ -372,7 +372,7 @@
         const i = fieldMeta.findIndex((f) => f && f.fieldKey === key);
         if (i < 0 || !controls[i]) return false;
         const c = controls[i];
-        c.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        PFS.scrollToEl(c, 'center');
         c.focus({ preventScroll: true });
         c.select && c.select();
         return true;
@@ -400,8 +400,8 @@
         const j = textIdx[pos]; const f = fields[j];
         lbl.textContent = f.label; prog.textContent = 'שדה ' + (pos + 1) + ' מתוך ' + textIdx.length;
         inp.value = controls[j].value || '';
-        const c = ctrlByKey[f.fieldKey]; if (c) c.node.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        inp.focus();
+        const c = ctrlByKey[f.fieldKey]; if (c) PFS.scrollToEl(c.node, 'center');
+        inp.focus({ preventScroll: true });
       }
       function commit() { const j = textIdx[pos]; controls[j].value = inp.value; controls[j].dispatchEvent(new Event('input')); }
       function end() { ivBar.style.display = 'none'; }

@@ -2445,6 +2445,28 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return new Promise((res) => { resolveFn = res; });
   }
 
+  /* Scroll `node` into view by scrolling ONLY its nearest scrollable ancestor.
+   * scrollIntoView also drags html/body — which are overflow:hidden here, so
+   * once offset the user can never scroll them back and the whole app looks
+   * "stuck" with the toolbar clipped. This never touches the document. */
+  function scrollToEl(node, block) {
+    if (!node) return;
+    let sc = node.parentElement;
+    while (sc && sc !== document.body) {
+      const cs = getComputedStyle(sc);
+      if (/(auto|scroll)/.test(cs.overflowY) && sc.scrollHeight > sc.clientHeight + 2) break;
+      sc = sc.parentElement;
+    }
+    if (!sc || sc === document.body) return;
+    const nr = node.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+    const target = block === 'start'
+      ? sc.scrollTop + (nr.top - sr.top) - 8
+      : sc.scrollTop + (nr.top - sr.top) - (sc.clientHeight / 2) + (nr.height / 2);
+    try { sc.scrollTo({ top: Math.max(0, target), behavior: 'smooth' }); }
+    catch (e) { sc.scrollTop = Math.max(0, target); }
+  }
+  PFS.scrollToEl = scrollToEl;
+
   PFS.ui = { prompt: promptDialog, confirm: confirmDialog };
 })(window);
 
@@ -5983,7 +6005,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             const i = texts.indexOf(control);
             const next = (e.key === 'ArrowUp') ? texts[i - 1] : texts[i + 1];
             e.preventDefault();
-            if (next) { next.focus(); next.select && next.select(); const ct = ctrlByKey[next.__fkey]; if (ct) ct.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            if (next) { next.focus({ preventScroll: true }); next.select && next.select(); PFS.scrollToEl(next, 'center'); const ct = ctrlByKey[next.__fkey]; if (ct) PFS.scrollToEl(ct.node, 'center'); }
             else control.blur();
           });
           const pv = prefill && prefill[f.fieldKey];
@@ -6027,7 +6049,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         go.title = 'סמן על הטופס';
         go.addEventListener('click', () => {
           const c = ctrlByKey[f.fieldKey];
-          if (c) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+          if (c) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); }
         });
         // voice fill (Chrome/Edge; he-IL). Feature-detected — absent elsewhere.
         const SR = root.SpeechRecognition || root.webkitSpeechRecognition;
@@ -6095,7 +6117,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         const i = fieldMeta.findIndex((f) => f && f.fieldKey === key);
         if (i < 0 || !controls[i]) return false;
         const c = controls[i];
-        c.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        PFS.scrollToEl(c, 'center');
         c.focus({ preventScroll: true });
         c.select && c.select();
         return true;
@@ -6123,8 +6145,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         const j = textIdx[pos]; const f = fields[j];
         lbl.textContent = f.label; prog.textContent = 'שדה ' + (pos + 1) + ' מתוך ' + textIdx.length;
         inp.value = controls[j].value || '';
-        const c = ctrlByKey[f.fieldKey]; if (c) c.node.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        inp.focus();
+        const c = ctrlByKey[f.fieldKey]; if (c) PFS.scrollToEl(c.node, 'center');
+        inp.focus({ preventScroll: true });
       }
       function commit() { const j = textIdx[pos]; controls[j].value = inp.value; controls[j].dispatchEvent(new Event('input')); }
       function end() { ivBar.style.display = 'none'; }
@@ -6349,7 +6371,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -6593,6 +6615,21 @@ function loadErrorMessage(e) {
   return 'טעינת ה-PDF נכשלה — ודאו שזהו קובץ PDF תקין';
 }
 let currentFileName = 'filled';
+
+// html/body are overflow:hidden by design — the app is a fixed 100vh shell.
+// Browsers still let programmatic focus/scrollIntoView OFFSET them, and then
+// the user can never scroll back: the toolbar sits clipped off-screen and the
+// app looks "stuck". Clamp any such drift the moment it happens.
+function clampDocScroll() {
+  const d = document.scrollingElement || document.documentElement;
+  if (d.scrollTop) d.scrollTop = 0;
+  if (d.scrollLeft) d.scrollLeft = 0;
+  if (document.body.scrollTop) document.body.scrollTop = 0;
+  if (document.body.scrollLeft) document.body.scrollLeft = 0;
+}
+window.addEventListener('scroll', clampDocScroll, { passive: true });
+document.addEventListener('focusin', () => setTimeout(clampDocScroll, 0));
+clampDocScroll();
 
 // =====================================================================
 //  Tools
@@ -7309,7 +7346,7 @@ $('pageJump') && $('pageJump').addEventListener('change', (e) => {
   // value is the stable original page index — find the wrap by data attr so it
   // works after a reorder (DOM position no longer equals original index)
   const w = document.querySelector('.page-wrap[data-page-idx="' + CSS.escape(e.target.value) + '"]');
-  if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (w) PFS.scrollToEl(w, 'start');
 });
 
 // ---- page thumbnails (rail toggle → slide-in strip) --------------------
@@ -7341,7 +7378,7 @@ function buildThumbnails() {
     dn.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, 1)) { buildThumbnails(); buildPageNav(); markDirty(); scheduleSnap(); } });
     mv.append(up, dn);
     cell.append(tc, tag, mv);
-    cell.addEventListener('click', () => { v.wrap.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    cell.addEventListener('click', () => { PFS.scrollToEl(v.wrap, 'start'); });
     strip.appendChild(cell);
   });
 }
@@ -7838,7 +7875,7 @@ function writeHandwriting() {
   $('hwTracking').value = HW().getTracking();
   $('hwWeight').value = HW().getWeight();
   const inp = $('hwWriteText');
-  requestAnimationFrame(() => { inp.focus(); inp.select(); inp.dispatchEvent(new Event('input')); });
+  requestAnimationFrame(() => { inp.focus({ preventScroll: true }); inp.select(); inp.dispatchEvent(new Event('input')); });
 }
 function placeHandwriting(text, color) {
   const tracking = HW().getTracking();
@@ -7933,7 +7970,7 @@ function placeAssetAtField(kind, f, { silent = false } = {}) {
   const fx = Math.max(0, Math.min(1 - fw, (f.fx != null ? f.fx : 0.5) + ((f.fw || 0) - fw) / 2));
   const fy = Math.max(0, (f.fy != null ? f.fy : 0.82) - fh * 0.35);
   const c = overlay.instantiate(PFS.element.makeModel('image', f.page || 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind }));
-  if (c && !silent) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  if (c && !silent) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); }
   markDirty();
   if (!silent) PFS.toast((kind === 'stamp' ? 'החותמת הונחה' : 'החתימה הונחה') + ' על השורה — אפשר לגרור לכוונון', 'ok');
   return !!c;

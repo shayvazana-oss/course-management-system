@@ -1058,6 +1058,53 @@ async function main() {
     check('redo restores the value and the panel row follows', undoRes.redoEnabled && undoRes.redone && undoRes.rowFollows);
   }
 
+  // ---- the app shell can never get "stuck" scrolled off-screen ----
+  // html/body are overflow:hidden; focus/scrollIntoView used to offset them
+  // with no way for the user to scroll back (clipped toolbar, "everything is
+  // stuck"). The guard must snap any such drift back, and all programmatic
+  // scrolling must move only inner containers.
+  check('document scroll drift self-heals and focus flows never cause it', await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const d = document.scrollingElement || document.documentElement;
+    // 1) simulate the stuck state: make the document genuinely scrollable,
+    //    drag it down like a stray scrollIntoView would, and let it drift
+    const probe = document.createElement('div');
+    probe.style.cssText = 'height:60vh';
+    document.body.appendChild(probe);
+    document.body.style.overflow = 'visible';
+    d.scrollTop = 80;
+    await wait(120);            // guard listens on window scroll
+    const healed = d.scrollTop === 0;
+    document.body.style.overflow = '';
+    probe.remove();
+    // 2) focus/jump flows: field far down the page — the panel + viewport may
+    //    scroll, the DOCUMENT must not move
+    const T = window.PFS.__test;
+    T.fieldsPanel.show({ tier: 'text', fields: [
+      { page: 0, fieldKey: 's_a', label: 'עליון', fx: 0.2, fy: 0.05, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+      { page: 0, fieldKey: 's_b', label: 'תחתון', fx: 0.2, fy: 0.93, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+    ] });
+    await wait(100);
+    T.fieldsPanel.focusField('s_b');
+    await wait(400);
+    const noDrift = d.scrollTop === 0 && document.body.scrollTop === 0;
+    // 3) scoped scroller really scrolls the inner viewport, not the document
+    const vp = document.querySelector('.viewport');
+    const before = vp.scrollTop;
+    const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+    const rb = rows.find((i) => i.__fkey === 's_b');
+    rb.value = 'ערך'; rb.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait(150);
+    const ctrl = T.overlay.getElements().find((c) => c.model.fieldKey === 's_b');
+    window.PFS.scrollToEl(ctrl.node, 'center');
+    await wait(500);
+    const innerScrolled = vp.scrollTop !== before || vp.scrollHeight <= vp.clientHeight + 2;
+    const stillNoDrift = d.scrollTop === 0;
+    T.fieldsPanel.clear(); T.overlay.clearElements();
+    return (healed && noDrift && innerScrolled && stillNoDrift) ? true
+      : JSON.stringify({ healed, noDrift, innerScrolled, stillNoDrift });
+  }) === true);
+
   // ---- click-to-fill: tapping a marker on the form focuses its row ----
   check('clicking a field marker on the form focuses its input row', await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));

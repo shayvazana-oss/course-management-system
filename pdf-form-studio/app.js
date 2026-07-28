@@ -203,7 +203,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -447,6 +447,21 @@ function loadErrorMessage(e) {
   return 'טעינת ה-PDF נכשלה — ודאו שזהו קובץ PDF תקין';
 }
 let currentFileName = 'filled';
+
+// html/body are overflow:hidden by design — the app is a fixed 100vh shell.
+// Browsers still let programmatic focus/scrollIntoView OFFSET them, and then
+// the user can never scroll back: the toolbar sits clipped off-screen and the
+// app looks "stuck". Clamp any such drift the moment it happens.
+function clampDocScroll() {
+  const d = document.scrollingElement || document.documentElement;
+  if (d.scrollTop) d.scrollTop = 0;
+  if (d.scrollLeft) d.scrollLeft = 0;
+  if (document.body.scrollTop) document.body.scrollTop = 0;
+  if (document.body.scrollLeft) document.body.scrollLeft = 0;
+}
+window.addEventListener('scroll', clampDocScroll, { passive: true });
+document.addEventListener('focusin', () => setTimeout(clampDocScroll, 0));
+clampDocScroll();
 
 // =====================================================================
 //  Tools
@@ -1163,7 +1178,7 @@ $('pageJump') && $('pageJump').addEventListener('change', (e) => {
   // value is the stable original page index — find the wrap by data attr so it
   // works after a reorder (DOM position no longer equals original index)
   const w = document.querySelector('.page-wrap[data-page-idx="' + CSS.escape(e.target.value) + '"]');
-  if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (w) PFS.scrollToEl(w, 'start');
 });
 
 // ---- page thumbnails (rail toggle → slide-in strip) --------------------
@@ -1195,7 +1210,7 @@ function buildThumbnails() {
     dn.addEventListener('click', (e) => { e.stopPropagation(); if (pdfView.movePage(v.idx, 1)) { buildThumbnails(); buildPageNav(); markDirty(); scheduleSnap(); } });
     mv.append(up, dn);
     cell.append(tc, tag, mv);
-    cell.addEventListener('click', () => { v.wrap.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    cell.addEventListener('click', () => { PFS.scrollToEl(v.wrap, 'start'); });
     strip.appendChild(cell);
   });
 }
@@ -1692,7 +1707,7 @@ function writeHandwriting() {
   $('hwTracking').value = HW().getTracking();
   $('hwWeight').value = HW().getWeight();
   const inp = $('hwWriteText');
-  requestAnimationFrame(() => { inp.focus(); inp.select(); inp.dispatchEvent(new Event('input')); });
+  requestAnimationFrame(() => { inp.focus({ preventScroll: true }); inp.select(); inp.dispatchEvent(new Event('input')); });
 }
 function placeHandwriting(text, color) {
   const tracking = HW().getTracking();
@@ -1787,7 +1802,7 @@ function placeAssetAtField(kind, f, { silent = false } = {}) {
   const fx = Math.max(0, Math.min(1 - fw, (f.fx != null ? f.fx : 0.5) + ((f.fw || 0) - fw) / 2));
   const fy = Math.max(0, (f.fy != null ? f.fy : 0.82) - fh * 0.35);
   const c = overlay.instantiate(PFS.element.makeModel('image', f.page || 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind }));
-  if (c && !silent) { overlay.selectCtrl(c); c.node.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  if (c && !silent) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); }
   markDirty();
   if (!silent) PFS.toast((kind === 'stamp' ? 'החותמת הונחה' : 'החתימה הונחה') + ' על השורה — אפשר לגרור לכוונון', 'ok');
   return !!c;

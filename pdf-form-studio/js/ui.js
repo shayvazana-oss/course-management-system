@@ -82,5 +82,27 @@
     return new Promise((res) => { resolveFn = res; });
   }
 
+  /* Scroll `node` into view by scrolling ONLY its nearest scrollable ancestor.
+   * scrollIntoView also drags html/body — which are overflow:hidden here, so
+   * once offset the user can never scroll them back and the whole app looks
+   * "stuck" with the toolbar clipped. This never touches the document. */
+  function scrollToEl(node, block) {
+    if (!node) return;
+    let sc = node.parentElement;
+    while (sc && sc !== document.body) {
+      const cs = getComputedStyle(sc);
+      if (/(auto|scroll)/.test(cs.overflowY) && sc.scrollHeight > sc.clientHeight + 2) break;
+      sc = sc.parentElement;
+    }
+    if (!sc || sc === document.body) return;
+    const nr = node.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+    const target = block === 'start'
+      ? sc.scrollTop + (nr.top - sr.top) - 8
+      : sc.scrollTop + (nr.top - sr.top) - (sc.clientHeight / 2) + (nr.height / 2);
+    try { sc.scrollTo({ top: Math.max(0, target), behavior: 'smooth' }); }
+    catch (e) { sc.scrollTop = Math.max(0, target); }
+  }
+  PFS.scrollToEl = scrollToEl;
+
   PFS.ui = { prompt: promptDialog, confirm: confirmDialog };
 })(window);

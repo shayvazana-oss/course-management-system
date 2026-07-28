@@ -1002,6 +1002,53 @@ async function main() {
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
 
+  // ---- the full user-facing ask: export → "fill the appendix now?" → yes ----
+  // This drives the REAL surfaces (export modal Download button, confirm
+  // dialog), not internal APIs — the exact chain the user reported missing.
+  {
+    const askRes = await page.evaluate(async () => {
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const mkForm = async (title, labels) => {
+        const d = await PDFDocument.create(); const pg = d.addPage([400, 300]);
+        pg.drawRectangle({ x: 0, y: 0, width: 400, height: 300, color: rgb(1, 1, 1) });
+        const f = await d.embedFont(StandardFonts.Helvetica);
+        pg.drawText(title, { x: 150, y: 270, size: 16, font: f, color: rgb(0, 0, 0) });
+        labels.forEach((lb, i) => pg.drawText(lb, { x: 250, y: 220 - i * 40, size: 12, font: f, color: rgb(0.1, 0.1, 0.1) }));
+        return new File([await d.save()], title + '.pdf', { type: 'application/pdf' });
+      };
+      const T = window.PFS.__test;
+      await T.openPdfFile(await mkForm('Quote-B', ['Course name:']));
+      await new Promise((r) => setTimeout(r, 1300));
+      const fpA = T.getFp();
+      const fileB = await mkForm('Appendix-B', ['Course name:']);
+      const rec = await window.PFS.companions.add({ ownerFp: fpA, ownerName: 'Quote-B', name: 'נספח בדיקה', bytes: await fileB.arrayBuffer() });
+      T.overlay.clearElements();
+      T.overlay.addElementAt('text', 0, 0.3, 0.3, { text: 'קורס נגרות', fieldKey: 'Course name', noEdit: true });
+      // open the export review — the linked companion must be visible in it
+      document.getElementById('exportBtn').click();
+      await new Promise((r) => setTimeout(r, 300));
+      const shownInModal = [...document.querySelectorAll('#exCompBody b')].some((b) => b.textContent === 'נספח בדיקה');
+      await new Promise((res) => {   // wait for the preview build
+        const t = setInterval(() => { const bz = document.getElementById('exBusy'); if (bz && !bz.classList.contains('on')) { clearInterval(t); res(); } }, 200);
+      });
+      // Download → after delivery the app must ASK about the companion
+      document.getElementById('exDownload').click();
+      await new Promise((r) => setTimeout(r, 700));
+      const dlg = document.getElementById('uiDialog');
+      const asked = !!(dlg && dlg.classList.contains('show') && /נספח בדיקה/.test(document.getElementById('uiDlgMsg').textContent));
+      if (!asked) { await window.PFS.companions.remove(rec.id); return { shownInModal, asked, opened: false }; }
+      document.getElementById('uiDlgOk').click();   // "כן, מלא אותו"
+      await new Promise((r) => setTimeout(r, 1800));
+      const opened = document.getElementById('fname').textContent.indexOf('נספח בדיקה') !== -1;
+      const carried = T.overlay.getElements().some((e) => e.model.text === 'קורס נגרות');
+      await window.PFS.companions.remove(rec.id);
+      return { shownInModal, asked, opened, carried };
+    });
+    if (!(askRes.shownInModal && askRes.asked && askRes.opened && askRes.carried)) console.log('  [ask debug]', JSON.stringify(askRes));
+    check('export modal shows the linked appendix', askRes.shownInModal === true);
+    check('after download the app ASKS to fill the appendix; yes opens it filled', askRes.asked === true && askRes.opened === true && askRes.carried === true);
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

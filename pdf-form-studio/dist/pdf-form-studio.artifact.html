@@ -1069,6 +1069,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           <div class="ex-lbl">מה ייכלל בקובץ</div>
           <div class="ex-sum" id="exSummary"></div>
         </div>
+        <div class="ex-group" id="exCompGroup">
+          <div class="ex-lbl">🔗 נספח מקושר</div>
+          <div id="exCompBody"></div>
+        </div>
         <div class="ex-meta" id="exMeta"></div>
       </aside>
     </div>
@@ -6161,6 +6165,7 @@ $('compInput') && $('compInput').addEventListener('change', async (e) => {
       name: f.name, bytes: await f.arrayBuffer()
     });
     renderCompanions();
+    renderExportCompanions();
     PFS.toast('"' + rec.name + '" קושר לטופס — יוצע אוטומטית בכל מילוי ✓', 'ok');
   } catch (err) { PFS.toast(err.message || 'קישור הנספח נכשל', 'err'); }
 });
@@ -6730,6 +6735,31 @@ function exFileName() {
   return currentFileName + (secure ? '-secure' : '-filled') + '.pdf';
 }
 
+// Export-review companions row — the moment the quote is done is exactly when
+// the appendix matters, so the LINKING step lives here too (the panel card
+// alone was buried under a long field list and nobody found it).
+function renderExportCompanions() {
+  const body = $('exCompBody'); if (!body) return;
+  body.innerHTML = '';
+  const links = (PFS.companions && currentFp) ? PFS.companions.listFor(currentFp) : [];
+  if (links.length) {
+    links.forEach((ln) => {
+      const row = document.createElement('div');
+      row.className = 'ex-chk ok';
+      row.innerHTML = '<span class="i">📎</span><span><b></b><span class="sub">אחרי ההורדה אשאל אם למלא אותו אוטומטית מהנתונים שמילאת</span></span>';
+      row.querySelector('b').textContent = ln.name;
+      body.appendChild(row);
+    });
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'btn sm block'; btn.type = 'button';
+    btn.textContent = '🔗 קשר נספח שימולא אוטומטית אחרי הייצוא';
+    btn.title = 'למשל: נספח ה3 להצעת מחיר — קישור חד-פעמי, ומאז יוצע בכל מילוי';
+    btn.addEventListener('click', () => $('compInput').click());
+    body.appendChild(btn);
+  }
+}
+
 async function doExport(opts) {
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
@@ -6742,6 +6772,7 @@ async function doExport(opts) {
   exState.page = 1; exState.bytes = null; exState.doc = null;
   exRenderChecks(exBuildChecks(models));
   exRenderSummary(models);
+  renderExportCompanions();
   if (navigator.canShare) $('exShare').hidden = false;
   openModal('exportModal');
   await exBuild();

@@ -388,6 +388,8 @@ async function openPdfFile(file) {
       }
     }
     runDetection();
+    // first-run guided tour — now that every zone on screen is alive
+    PFS.tour && PFS.tour.maybeStart();
   } catch (e) {
     console.error(e);
     PFS.toast(loadErrorMessage(e), 'err', 5000);
@@ -1028,6 +1030,12 @@ async function buildFlattenedBytes(onProgress) {
 // one export surface, so the flattened output is previewed before it downloads.
 async function doExportFlattened() { return doExport({ secure: true }); }
 $('exportFlatBtn') && $('exportFlatBtn').addEventListener('click', doExportFlattened);
+
+$('tourBtn') && $('tourBtn').addEventListener('click', () => {
+  closeModal('helpModal');
+  PFS.store.remove('tour_done');
+  PFS.tour && PFS.tour.start();
+});
 
 // =====================================================================
 //  Modals

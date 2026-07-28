@@ -479,3 +479,19 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .ex-sum-row .v { font-weight: 800; color: var(--ink-1); font-variant-numeric: tabular-nums; }
 .ex-sum-row .ic { font-size: 13px; opacity: .8; }
 .ex-sum-empty { padding: 10px 11px; background: var(--surface-2); font-size: 12.5px; color: var(--ink-3); }
+
+/* ===== Guided tour (first run + from Help) ===== */
+.tour-dim { position: fixed; inset: 0; z-index: 300; display: none; }
+.tour-dim.show { display: block; }
+.tour-hole { position: fixed; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(15, 25, 30, .55), 0 0 0 3px var(--brand), 0 0 22px rgba(14,110,120,.5);
+  transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease; }
+.tour-bubble { position: fixed; z-index: 301; display: none; background: var(--surface);
+  border-radius: 16px; box-shadow: var(--shadow-3); padding: 16px 18px 13px; direction: rtl;
+  border: 1px solid var(--line); }
+.tour-bubble.show { display: block; animation: tour-pop .22s ease; }
+@keyframes tour-pop { from { opacity: 0; transform: translateY(6px); } }
+.tour-title { font-weight: 800; font-size: 15.5px; color: var(--brand); margin-bottom: 6px; }
+.tour-text { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); margin-bottom: 12px; }
+.tour-foot { display: flex; align-items: center; gap: 10px; }
+.tour-dots { flex: 1; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-4); }

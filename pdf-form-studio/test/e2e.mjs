@@ -57,6 +57,7 @@ async function main() {
 
   await page.evaluate(() => {
     window.PFS.store.set('onboarded', true);
+    window.PFS.store.set('tour_done', 1);   // tour has its own dedicated test
     window.PFS.store.set('profiles', [{ id: 'p', name: 'me', values: { 'שם משפחה': 'ישראלי', 'תעודת זהות': '123456782', 'טלפון': '0501234567' } }]);
     window.PFS.store.set('active_profile', 'p');
   });
@@ -1001,6 +1002,31 @@ async function main() {
   });
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
+
+  // ---- first-run guided tour: five stops, skippable, one-time ----
+  check('guided tour runs once through its five stops and completes', await page.evaluate(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    window.PFS.store.remove('tour_done');
+    window.PFS.tour.start();
+    await wait(250);
+    const dim = document.querySelector('.tour-dim');
+    const bub = document.querySelector('.tour-bubble');
+    if (!dim || !dim.classList.contains('show') || !bub) return 'tour did not open';
+    const titles = [];
+    for (let i = 0; i < 5; i++) {
+      titles.push(bub.querySelector('.tour-title').textContent);
+      bub.querySelector('.tour-next').click();
+      await wait(150);
+    }
+    const closed = !dim.classList.contains('show');
+    const done = window.PFS.store.get('tour_done', 0) === 1;
+    const allStops = titles.length === 5 && new Set(titles).size === 5;
+    // once done, maybeStart must be a no-op (one-time behaviour)
+    window.PFS.tour.maybeStart();
+    await wait(1400);
+    const stayedClosed = !dim.classList.contains('show');
+    return (closed && done && allStops && stayedClosed) ? true : JSON.stringify({ closed, done, titles, stayedClosed });
+  }) === true);
 
   // ---- the full user-facing ask: export → "fill the appendix now?" → yes ----
   // This drives the REAL surfaces (export modal Download button, confirm

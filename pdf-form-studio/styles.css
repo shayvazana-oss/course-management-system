@@ -280,15 +280,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 /* ===== ELEMENTS ===== */
 .el { position: absolute; box-sizing: border-box; cursor: move; border: 1px dashed transparent; border-radius: 3px; user-select: none; touch-action: none; }
-.el:hover { border-color: rgba(30,78,140,.4); }
+.el:hover { border-color: rgba(30,78,140,.4); z-index: 6; }
 .el.selected { border-color: var(--brand); border-style: solid; box-shadow: 0 0 0 2px rgba(30,78,140,.14); }
 .el.text { display: flex; align-items: flex-start; white-space: pre; line-height: 1.15; padding: 0; }
 .el.text .txt { outline: none; width: 100%; min-width: 6px; background: transparent; direction: rtl; unicode-bidi: plaintext; white-space: pre; overflow: visible; caret-color: var(--brand); }
 .el.text .txt:empty:before { content: 'טקסט…'; color: var(--ink-4); }
 .el.image img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
 .handle { position: absolute; width: 13px; height: 13px; background: #fff; border: 2px solid var(--brand); border-radius: 50%; right: -7px; bottom: -7px; cursor: nwse-resize; box-shadow: var(--shadow-1); z-index: 3; display: none; }
-.el .mini-del { position: absolute; top: -11px; right: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
-.el.selected .mini-del { display: flex; }
+.el .mini-del { position: absolute; top: -13px; right: -13px; width: 26px; height: 26px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
+/* deletion must be one gesture: hovering ANY element reveals its ✕ —
+ * selection-first was two clicks plus knowing you had to select */
+.el:hover .mini-del, .el.selected .mini-del { display: flex; }
+.el .mini-del:hover { transform: scale(1.12); }
 .el.selected .handle { display: block; }
 
 /* ===== EMPTY STATE ===== */
@@ -516,3 +519,4 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .fp-pick { flex: none; padding: 6px 8px; font-weight: 800; }
 /* auto-filled field marker: subtle amber accent + tooltip */
 #fieldsBody input.fp-auto { border-inline-start: 3px solid var(--accent); background: linear-gradient(90deg, var(--accent-soft), transparent 24%); }
+.fp-clear-auto { color: var(--warn); border-color: var(--accent); background: var(--accent-soft); margin-bottom: 8px; }

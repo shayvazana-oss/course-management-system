@@ -80,13 +80,7 @@ function restoreState(json) {
   // which is why undo felt broken. syncValues refreshes the rows from the
   // restored elements and re-links them (else the next keystroke duplicates).
   if (lastDet && lastDet.fields && lastDet.fields.length && fieldsPanel.syncValues) {
-    const map = {};
-    overlay.getElements().forEach((c) => {
-      const m = c.model; if (!m.fieldKey) return;
-      if (m.type === 'text') map[m.fieldKey] = m.text || '';
-      else if (m.kind === 'check' || m.kind === 'cross') map[m.fieldKey] = true;
-    });
-    fieldsPanel.syncValues(map);
+    fieldsPanel.syncValues(panelValueMap());
   } else {
     fieldsPanel.clear();
   }
@@ -130,6 +124,10 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
+  // deleting from the canvas must clear the matching panel row too.
+  // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
+  // that instant would see (and impose) a half-updated state.
+  onDelete: () => { setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0); },
   // click-to-fill: tapping an orange marker on the FORM jumps straight to its
   // input row — the form itself becomes the index, no hunting in a long list
   onMarkerClick: (f) => {
@@ -267,6 +265,10 @@ function vaultPrefill(det) {
     // different forms produces confident-looking wrong fills (e.g. an
     // institution name landing in a person's "שם מלא")
     const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
+    // dates are per-form variables — never carried between companion forms
+    det.fields.forEach((f) => {
+      if (carryText[f.fieldKey] != null && PFS.vault.matchKey(f.label) === 'date') delete carryText[f.fieldKey];
+    });
     return Object.assign({}, patternAuto, text, checks, carryText);
   } catch (e) { return null; }
 }
@@ -305,6 +307,17 @@ let loadGen = 0; // bumped on every load so in-flight detection can bail
 let lastDet = null; // most recent detection result (for Fill-All signature/stamp lines)
 let attachments = []; // extra pages (photos of ID etc.) appended on export
 let currentFp = null; // fingerprint of the currently-loaded form
+// fieldKey → value map of everything currently on the overlay (panel sync)
+function panelValueMap() {
+  const map = {};
+  overlay.getElements().forEach((c) => {
+    const m = c.model; if (!m.fieldKey) return;
+    if (m.type === 'text') map[m.fieldKey] = m.text || '';
+    else if (m.kind === 'check' || m.kind === 'cross') map[m.fieldKey] = true;
+  });
+  return map;
+}
+
 let pendingCarry = null; // values captured from a form before jumping to its linked companion
 
 // =====================================================================
@@ -1401,7 +1414,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
   if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
-    e.preventDefault(); overlay.deleteCtrl(sel);
+    e.preventDefault();
+    const many = overlay.getMulti();
+    (many.length > 1 ? many : [sel]).forEach((c) => overlay.deleteCtrl(c));
   }
   // arrow-key nudging: pixel-precise placement for lining a value up on a
   // ruled form. Shift = bigger step. Fractions, so it survives zoom + export.

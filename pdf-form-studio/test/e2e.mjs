@@ -1004,6 +1004,114 @@ async function main() {
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
 
+  // ---- one-gesture deletion: hover the element, click ✕ ----
+  {
+    const delRes = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      window.PFS.store.set('patterns', {});
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'dx_a', label: 'הערות', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'dx_b', label: 'הערה נוספת', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.setLastDet(det);
+      T.fieldsPanel.show(det);
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      rows[0].value = 'ערך למחיקה'; rows[0].dispatchEvent(new Event('input', { bubbles: true }));
+      rows[1].value = 'ערך שנשאר'; rows[1].dispatchEvent(new Event('input', { bubbles: true }));
+      T.snapshotNow();
+      const el = T.overlay.getElements().find((c) => c.model.fieldKey === 'dx_a');
+      // the ✕ must be revealed on HOVER (no selection first) and clickable
+      const css = getComputedStyle(el.node.querySelector('.mini-del'));
+      const hiddenAtRest = css.display === 'none';
+      el.node.querySelector('.mini-del').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await wait(400);
+      const gone = !T.overlay.getElements().some((c) => c.model.fieldKey === 'dx_a');
+      const otherStays = T.overlay.getElements().some((c) => c.model.fieldKey === 'dx_b');
+      // panel reverse-sync: the row emptied itself
+      const rowCleared = rows[0].value === '' && rows[1].value === 'ערך שנשאר';
+      // idempotence: deleting again is a no-op, not a crash
+      T.overlay.deleteCtrl(el);
+      // undo brings it back
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+      await wait(500);
+      const restored = T.overlay.getElements().some((c) => c.model.fieldKey === 'dx_a' && c.model.text === 'ערך למחיקה');
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { hiddenAtRest, gone, otherStays, rowCleared, restored };
+    });
+    if (!Object.values(delRes).every(Boolean)) console.log('  [del debug]', JSON.stringify(delRes));
+    check('hover-✕ deletes in one click, panel row clears, undo restores', delRes.hiddenAtRest && delRes.gone && delRes.otherStays && delRes.rowCleared && delRes.restored);
+  }
+
+  // hover reveal is CSS-driven — verify the rule with a real hover
+  {
+    await page.evaluate(() => {
+      const T = window.PFS.__test;
+      T.overlay.clearElements();
+      const det = { tier: 'text', fields: [{ page: 0, fieldKey: 'hv_1', label: 'הערות', fx: 0.4, fy: 0.4, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }] };
+      T.fieldsPanel.show(det);
+      const row = document.querySelector('#fieldsBody input[type=text]');
+      row.value = 'ריחוף'; row.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const el = await page.$('.el.text');
+    await el.hover();
+    const shown = await page.evaluate(() => getComputedStyle(document.querySelector('.el .mini-del')).display !== 'none');
+    await page.evaluate(() => { const T = window.PFS.__test; T.overlay.clearElements(); T.fieldsPanel.clear(); });
+    check('hovering an element reveals its delete button', shown === true);
+  }
+
+  // ---- clear-autofill button + dates never carried between companions ----
+  {
+    const clrRes = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      window.PFS.store.set('patterns', {});
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'ca_x', label: 'שם מוסד הלימודים', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'ca_y', label: 'טלפון מוסד ההכשרה', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'ca_z', label: 'הערות', fx: 0.2, fy: 0.4, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      const P = window.PFS.patterns;
+      P.learnFrom([det.fields[0]], { ca_x: 'היחידה ללימודי חוץ' }, []);
+      P.learnFrom([det.fields[0]], { ca_x: 'היחידה ללימודי חוץ' }, []);
+      P.learnFrom([det.fields[1]], { ca_y: '03-1234567' }, []);
+      P.learnFrom([det.fields[1]], { ca_y: '03-1234567' }, []);
+      T.setLastDet(det);
+      T.fieldsPanel.show(det, T.vaultPrefillFor(det) || undefined);
+      await wait(100);
+      const btn = document.querySelector('.fp-clear-auto');
+      if (!btn) return { btn: false };
+      // touch one auto-filled row — it must SURVIVE the sweep
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      const phoneRow = rows.find((i) => i.__fkey === 'ca_y');
+      phoneRow.value = '03-7654321'; phoneRow.dispatchEvent(new Event('input', { bubbles: true }));
+      btn.click();
+      await wait(300);
+      const instGone = !T.overlay.getElements().some((c) => c.model.fieldKey === 'ca_x');
+      const phoneStays = T.overlay.getElements().some((c) => c.model.fieldKey === 'ca_y' && c.model.text === '03-7654321');
+      const instRow = rows.find((i) => i.__fkey === 'ca_x');
+      const rowCleared = instRow.value === '';
+      // dates are never carried from a companion form
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det2 = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'cd_d', label: 'תאריך', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'cd_n', label: 'הערות מיוחדות', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.setCarry({ 'תאריך': '03/09/2026', 'הערות מיוחדות': 'ממשיך' });
+      const pre = T.vaultPrefillFor(det2) || {};
+      // the date key must not come from CARRY (03/09/2026); auto-today is allowed
+      const dateNotCarried = pre.cd_d !== '03/09/2026';
+      const noteCarried = pre.cd_n === 'ממשיך';
+      window.PFS.store.set('patterns', {});
+      return { btn: true, instGone, phoneStays, rowCleared, dateNotCarried, noteCarried };
+    });
+    if (!Object.values(clrRes).every(Boolean)) console.log('  [clear debug]', JSON.stringify(clrRes));
+    check('clear-autofill wipes untouched auto fields, keeps edited ones', clrRes.btn && clrRes.instGone && clrRes.phoneStays && clrRes.rowCleared);
+    check('companion carry never transfers dates', clrRes.dateNotCarried && clrRes.noteCarried);
+  }
+
   // ---- the learning engine: recurring values fill themselves ----
   {
     const patRes = await page.evaluate(async () => {

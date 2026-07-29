@@ -456,6 +456,34 @@
       };
       emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
       requiredEmpty = () => controls.filter((c, i) => !isTick(c) && !c.value.trim() && fieldMeta[i] && fieldMeta[i].required).length;
+
+      // one-click escape hatch for over-eager auto-fill: wipe every field that
+      // was filled automatically and never touched (typed/edited fields stay)
+      if (autoKeys.size) {
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'btn sm block fp-clear-auto';
+        clearBtn.textContent = '🧹 נקה מילוי אוטומטי (' + autoKeys.size + ')';
+        clearBtn.title = 'מחיקת כל השדות שמולאו אוטומטית ולא נגעתם בהם — Ctrl+Z מחזיר';
+        clearBtn.addEventListener('click', () => {
+          const keys = [...autoKeys];
+          keys.forEach((k) => {
+            const ctrl = overlay.getElements().find((c) => c.model.fieldKey === k);
+            if (ctrl) overlay.deleteCtrl(ctrl);
+            const cIdx = fieldMeta.findIndex((m) => m && m.fieldKey === k);
+            if (cIdx >= 0 && controls[cIdx] && !isTick(controls[cIdx])) {
+              controls[cIdx].value = '';
+              controls[cIdx].classList.remove('fp-auto');
+            }
+            delete ctrlByKey[k];
+            autoKeys.delete(k);
+          });
+          clearBtn.remove();
+          if (PFS.toast) PFS.toast('המילוי האוטומטי נוקה — Ctrl+Z מחזיר', 'ok');
+        });
+        // right under the interview button, before the field rows
+        const firstRow = body.querySelector('.field');
+        body.insertBefore(clearBtn, firstRow || null);
+      }
       return autoFilled;
     }
 

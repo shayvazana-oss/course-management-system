@@ -314,15 +314,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 /* ===== ELEMENTS ===== */
 .el { position: absolute; box-sizing: border-box; cursor: move; border: 1px dashed transparent; border-radius: 3px; user-select: none; touch-action: none; }
-.el:hover { border-color: rgba(30,78,140,.4); }
+.el:hover { border-color: rgba(30,78,140,.4); z-index: 6; }
 .el.selected { border-color: var(--brand); border-style: solid; box-shadow: 0 0 0 2px rgba(30,78,140,.14); }
 .el.text { display: flex; align-items: flex-start; white-space: pre; line-height: 1.15; padding: 0; }
 .el.text .txt { outline: none; width: 100%; min-width: 6px; background: transparent; direction: rtl; unicode-bidi: plaintext; white-space: pre; overflow: visible; caret-color: var(--brand); }
 .el.text .txt:empty:before { content: 'טקסט…'; color: var(--ink-4); }
 .el.image img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
 .handle { position: absolute; width: 13px; height: 13px; background: #fff; border: 2px solid var(--brand); border-radius: 50%; right: -7px; bottom: -7px; cursor: nwse-resize; box-shadow: var(--shadow-1); z-index: 3; display: none; }
-.el .mini-del { position: absolute; top: -11px; right: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
-.el.selected .mini-del { display: flex; }
+.el .mini-del { position: absolute; top: -13px; right: -13px; width: 26px; height: 26px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
+/* deletion must be one gesture: hovering ANY element reveals its ✕ —
+ * selection-first was two clicks plus knowing you had to select */
+.el:hover .mini-del, .el.selected .mini-del { display: flex; }
+.el .mini-del:hover { transform: scale(1.12); }
 .el.selected .handle { display: block; }
 
 /* ===== EMPTY STATE ===== */
@@ -550,6 +553,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .fp-pick { flex: none; padding: 6px 8px; font-weight: 800; }
 /* auto-filled field marker: subtle amber accent + tooltip */
 #fieldsBody input.fp-auto { border-inline-start: 3px solid var(--accent); background: linear-gradient(90deg, var(--accent-soft), transparent 24%); }
+.fp-clear-auto { color: var(--warn); border-color: var(--accent); background: var(--accent-soft); margin-bottom: 8px; }
 
 </style>
 
@@ -4288,11 +4292,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     }
     function deleteCtrl(ctrl) {
       const i = elements.indexOf(ctrl);
-      if (i >= 0) elements.splice(i, 1);
+      if (i < 0) return;   // already removed (✕ vs empty-text blur race)
+      elements.splice(i, 1);
       multi.delete(ctrl);
       ctrl.remove();
       if (selected === ctrl) { selected = [...multi][0] || null; opts.onSelect && opts.onSelect(selected, multi.size); }
       opts.onChange && opts.onChange();
+      opts.onDelete && opts.onDelete(ctrl);
     }
     function getMulti() { return [...multi]; }
     // apply a pure PFS.align op to the multi-selection (positions only)
@@ -6437,6 +6443,34 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       };
       emptyCount = () => controls.filter((c) => !isTick(c) && !c.value.trim()).length;
       requiredEmpty = () => controls.filter((c, i) => !isTick(c) && !c.value.trim() && fieldMeta[i] && fieldMeta[i].required).length;
+
+      // one-click escape hatch for over-eager auto-fill: wipe every field that
+      // was filled automatically and never touched (typed/edited fields stay)
+      if (autoKeys.size) {
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'btn sm block fp-clear-auto';
+        clearBtn.textContent = '🧹 נקה מילוי אוטומטי (' + autoKeys.size + ')';
+        clearBtn.title = 'מחיקת כל השדות שמולאו אוטומטית ולא נגעתם בהם — Ctrl+Z מחזיר';
+        clearBtn.addEventListener('click', () => {
+          const keys = [...autoKeys];
+          keys.forEach((k) => {
+            const ctrl = overlay.getElements().find((c) => c.model.fieldKey === k);
+            if (ctrl) overlay.deleteCtrl(ctrl);
+            const cIdx = fieldMeta.findIndex((m) => m && m.fieldKey === k);
+            if (cIdx >= 0 && controls[cIdx] && !isTick(controls[cIdx])) {
+              controls[cIdx].value = '';
+              controls[cIdx].classList.remove('fp-auto');
+            }
+            delete ctrlByKey[k];
+            autoKeys.delete(k);
+          });
+          clearBtn.remove();
+          if (PFS.toast) PFS.toast('המילוי האוטומטי נוקה — Ctrl+Z מחזיר', 'ok');
+        });
+        // right under the interview button, before the field rows
+        const firstRow = body.querySelector('.field');
+        body.insertBefore(clearBtn, firstRow || null);
+      }
       return autoFilled;
     }
 
@@ -6566,13 +6600,7 @@ function restoreState(json) {
   // which is why undo felt broken. syncValues refreshes the rows from the
   // restored elements and re-links them (else the next keystroke duplicates).
   if (lastDet && lastDet.fields && lastDet.fields.length && fieldsPanel.syncValues) {
-    const map = {};
-    overlay.getElements().forEach((c) => {
-      const m = c.model; if (!m.fieldKey) return;
-      if (m.type === 'text') map[m.fieldKey] = m.text || '';
-      else if (m.kind === 'check' || m.kind === 'cross') map[m.fieldKey] = true;
-    });
-    fieldsPanel.syncValues(map);
+    fieldsPanel.syncValues(panelValueMap());
   } else {
     fieldsPanel.clear();
   }
@@ -6616,6 +6644,10 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
+  // deleting from the canvas must clear the matching panel row too.
+  // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
+  // that instant would see (and impose) a half-updated state.
+  onDelete: () => { setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0); },
   // click-to-fill: tapping an orange marker on the FORM jumps straight to its
   // input row — the form itself becomes the index, no hunting in a long list
   onMarkerClick: (f) => {
@@ -6753,6 +6785,10 @@ function vaultPrefill(det) {
     // different forms produces confident-looking wrong fills (e.g. an
     // institution name landing in a person's "שם מלא")
     const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
+    // dates are per-form variables — never carried between companion forms
+    det.fields.forEach((f) => {
+      if (carryText[f.fieldKey] != null && PFS.vault.matchKey(f.label) === 'date') delete carryText[f.fieldKey];
+    });
     return Object.assign({}, patternAuto, text, checks, carryText);
   } catch (e) { return null; }
 }
@@ -6791,6 +6827,17 @@ let loadGen = 0; // bumped on every load so in-flight detection can bail
 let lastDet = null; // most recent detection result (for Fill-All signature/stamp lines)
 let attachments = []; // extra pages (photos of ID etc.) appended on export
 let currentFp = null; // fingerprint of the currently-loaded form
+// fieldKey → value map of everything currently on the overlay (panel sync)
+function panelValueMap() {
+  const map = {};
+  overlay.getElements().forEach((c) => {
+    const m = c.model; if (!m.fieldKey) return;
+    if (m.type === 'text') map[m.fieldKey] = m.text || '';
+    else if (m.kind === 'check' || m.kind === 'cross') map[m.fieldKey] = true;
+  });
+  return map;
+}
+
 let pendingCarry = null; // values captured from a form before jumping to its linked companion
 
 // =====================================================================
@@ -7887,7 +7934,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
   if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
-    e.preventDefault(); overlay.deleteCtrl(sel);
+    e.preventDefault();
+    const many = overlay.getMulti();
+    (many.length > 1 ? many : [sel]).forEach((c) => overlay.deleteCtrl(c));
   }
   // arrow-key nudging: pixel-precise placement for lining a value up on a
   // ruled form. Shift = bigger step. Fractions, so it survives zoom + export.

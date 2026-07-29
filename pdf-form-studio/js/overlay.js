@@ -150,11 +150,13 @@
     }
     function deleteCtrl(ctrl) {
       const i = elements.indexOf(ctrl);
-      if (i >= 0) elements.splice(i, 1);
+      if (i < 0) return;   // already removed (✕ vs empty-text blur race)
+      elements.splice(i, 1);
       multi.delete(ctrl);
       ctrl.remove();
       if (selected === ctrl) { selected = [...multi][0] || null; opts.onSelect && opts.onSelect(selected, multi.size); }
       opts.onChange && opts.onChange();
+      opts.onDelete && opts.onDelete(ctrl);
     }
     function getMulti() { return [...multi]; }
     // apply a pure PFS.align op to the multi-selection (positions only)

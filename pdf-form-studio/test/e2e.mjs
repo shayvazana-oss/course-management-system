@@ -1132,8 +1132,18 @@ async function main() {
     const el = await page.$('.el.text');
     await el.hover();
     const shown = await page.evaluate(() => getComputedStyle(document.querySelector('.el .mini-del')).display !== 'none');
+    // while EDITING the element (typing), the ✕ must vanish — it was
+    // covering the very text being written on small date boxes
+    const hiddenWhileEditing = await page.evaluate(() => {
+      const el = document.querySelector('.el.text');
+      el.dataset.editing = '1';
+      const hidden = getComputedStyle(el.querySelector('.mini-del')).display === 'none';
+      el.dataset.editing = '0';
+      return hidden;
+    });
     await page.evaluate(() => { const T = window.PFS.__test; T.overlay.clearElements(); T.fieldsPanel.clear(); });
     check('hovering an element reveals its delete button', shown === true);
+    check('the ✕ hides while typing inside the element', hiddenWhileEditing === true);
   }
 
   // ---- clear-autofill button + dates never carried between companions ----

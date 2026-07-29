@@ -321,10 +321,17 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .el.text .txt:empty:before { content: 'טקסט…'; color: var(--ink-4); }
 .el.image img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
 .handle { position: absolute; width: 13px; height: 13px; background: #fff; border: 2px solid var(--brand); border-radius: 50%; right: -7px; bottom: -7px; cursor: nwse-resize; box-shadow: var(--shadow-1); z-index: 3; display: none; }
-.el .mini-del { position: absolute; top: -13px; right: -13px; width: 26px; height: 26px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
+/* fully OUTSIDE the element — on small elements (a date box) an overlapping
+ * button covers the very text being typed */
+.el .mini-del { position: absolute; top: -30px; right: -6px; width: 26px; height: 26px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
+/* invisible hover bridge so the pointer can travel from the element up to the
+ * detached button without dropping the :hover on the way */
+.el .mini-del::after { content: ''; position: absolute; top: 100%; left: -6px; right: -6px; height: 10px; }
 /* deletion must be one gesture: hovering ANY element reveals its ✕ —
  * selection-first was two clicks plus knowing you had to select */
 .el:hover .mini-del, .el.selected .mini-del { display: flex; }
+/* …but never while typing INSIDE it — the writer needs the text, not a button */
+.el[data-editing="1"] .mini-del { display: none !important; }
 .el .mini-del:hover { transform: scale(1.12); }
 .el.selected .handle { display: block; }
 

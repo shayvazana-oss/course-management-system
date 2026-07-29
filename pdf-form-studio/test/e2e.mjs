@@ -1079,6 +1079,45 @@ async function main() {
     check('student prefill canon-maps name/tz into differently-worded fields, one-shot', stuRes.nm && stuRes.tz && stuRes.oneShot);
   }
 
+  // ---- wrapped table headers + one uniform font per form ----
+  {
+    const wrapRes = await page.evaluate(async () => {
+      // synthetic form: a 3-column header row where the middle header WRAPS
+      // to a second line — the old heuristic rejected all of it as "conflict"
+      const { PDFDocument, rgb } = window.PDFLib;
+      const doc = await PDFDocument.create();
+      const pg = doc.addPage([595, 842]);
+      const font = await doc.embedFont('Helvetica');
+      const draw = (t, x, y, size) => pg.drawText(t, { x, y, size, font, color: rgb(0, 0, 0) });
+      // Latin labels (Helvetica can't encode Hebrew; the geometry is what's under test)
+      draw('Address of institute', 60, 700, 11);
+      draw('Phone number of', 260, 700, 11);
+      draw('the institute', 260, 686, 11);          // ← wrapped second line
+      draw('Manager name', 430, 700, 11);
+      const bytes = await doc.save();
+      const T = window.PFS.__test;
+      await T.openPdfFile(new File([bytes], 'wrap.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      const det = await window.PFS.detect.detectFields(T.pdfView.getDoc());
+      const labels = det.fields.filter((f) => f.type === 'text').map((f) => f.label);
+      const phone = det.fields.find((f) => /Phone number of the institute/.test(f.label));
+      const addr = det.fields.find((f) => /Address of institute/.test(f.label));
+      const mgr = det.fields.find((f) => /Manager name/.test(f.label));
+      // no duplicate field for the orphan fragment 'the institute'
+      const noDup = !det.fields.some((f) => f.label.trim() === 'the institute');
+      // the wrapped header's answer band starts BELOW the second line
+      const belowWrap = phone && addr && phone.fy > addr.fy + 0.001;
+      // uniform font: after the real pipeline all text fields share one size
+      window.PFS.__test.snapFieldsToInk(det);
+      window.PFS.__test.normalizeFontSizes(det);
+      const uniq = new Set(det.fields.filter((f) => f.type === 'text').map((f) => f.fontFrac));
+      return { labels, got: !!(phone && addr && mgr), noDup, belowWrap, uniform: uniq.size === 1 };
+    });
+    if (!(wrapRes.got && wrapRes.noDup && wrapRes.belowWrap)) console.log('  [wrap debug]', JSON.stringify(wrapRes));
+    check('wrapped table headers detected as one field each, no fragment dupes', wrapRes.got && wrapRes.noDup && wrapRes.belowWrap);
+    check('one uniform handwriting size across all detected text fields', wrapRes.uniform === true);
+  }
+
   // ---- ink-snap: detected text anchors to the printed ruling line ----
   {
     const snapRes = await page.evaluate(() => {

@@ -137,6 +137,13 @@
         ctrl.layout();
       }
       fitFont(ctrl, field);
+      // text elements are content-sized and LEFT-anchored at fx; a Hebrew
+      // answer belongs at the RIGHT edge of its band (beside the label / at
+      // the cell's right). Re-anchor using the measured width.
+      if (ctrl && ctrl.model.align === 'right' && field.fw) {
+        const fx2 = field.fx + field.fw - ctrl.model.fw;
+        if (isFinite(fx2) && fx2 > field.fx - 0.001) { ctrl.model.fx = fx2; ctrl.layout(); }
+      }
       return ctrl;
     }
 

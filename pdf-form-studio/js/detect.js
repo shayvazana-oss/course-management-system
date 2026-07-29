@@ -218,22 +218,40 @@
       const ln = lines.find((L) => Math.abs(L.y - b.yBase) < b.fontH * 0.6);
       if (ln) { ln.items.push(b); } else lines.push({ y: b.yBase, items: [b] });
     });
+    // tall header cells WRAP ("שם מנהל מוסד / ההכשרה"): the second line is a
+    // continuation of the header, not a conflict and not its own header row
+    lines.sort((a, b) => a.y - b.y);   // header line must precede its wrap line
+    const consumedWraps = new Set();
+    const findWrap = (b) => boxes.find((o) => o !== b && headerish(o) && !consumedWraps.has(o)
+      && o.top > b.top && (o.top - (b.top + b.fontH)) < b.fontH * 0.9
+      && o.x >= b.x - b.fontH && (o.x + o.w) <= b.x + b.w + b.fontH);
     lines.forEach((L) => {
-      const heads = L.items.filter(headerish);
-      if (heads.length < 2 || heads.length !== L.items.length) return; // pure header rows only
+      const own = L.items.filter((it) => !consumedWraps.has(it));
+      if (!own.length) return;                       // a fully-consumed wrap line
+      const heads = own.filter(headerish);
+      if (heads.length < 2 || heads.length !== own.length) return; // pure header rows only
       heads.forEach((b) => {
-        const belowTop = b.top + b.fontH * 1.35;
-        const belowMid = belowTop + b.fontH * 0.7;
-        // the input band under the label must be empty (that's the table cell)
-        const conflict = boxes.some((o) => o !== b && o.str.trim()
-          && Math.abs((o.top + o.fontH / 2) - belowMid) < b.fontH * 0.9
+        // absorb up to two wrapped continuation lines into the header
+        let label = stripEnum(b.str).replace(/\s+/g, ' ').trim();
+        let anchor = b;
+        for (let w = 0; w < 2; w++) {
+          const cont = findWrap(anchor);
+          if (!cont) break;
+          consumedWraps.add(cont);
+          label = (label + ' ' + stripEnum(cont.str)).replace(/\s+/g, ' ').trim();
+          anchor = cont;
+        }
+        const belowTop = anchor.top + anchor.fontH * 1.35;
+        const belowMid = belowTop + anchor.fontH * 0.7;
+        // the input band under the (full, unwrapped) label must be empty
+        const conflict = boxes.some((o) => o !== b && o !== anchor && !consumedWraps.has(o) && o.str.trim()
+          && Math.abs((o.top + o.fontH / 2) - belowMid) < anchor.fontH * 0.9
           && o.x < b.x + b.w + b.fontH && (o.x + o.w) > b.x - b.fontH);
-        if (conflict || (belowTop + b.fontH * 1.2) / H > 1) return;
+        if (conflict || (belowTop + anchor.fontH * 1.2) / H > 1) return;
         const fw = Math.min((b.w * 1.5 + b.fontH) / W, 0.45);
         const rtl = hasHebrew(b.str);
         // RTL: the answer grows leftward from the label's right edge
         const fx = rtl ? Math.max(0, (b.x + b.w) / W - fw) : b.x / W;
-        const label = stripEnum(b.str).replace(/\s+/g, ' ').trim();
         out.push({
           page: startIndex, fieldKey: slug(label, out.length), label,
           fx, fy: belowTop / H, fw, fh: (b.fontH * 1.1) / H,

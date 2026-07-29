@@ -201,7 +201,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -357,7 +357,36 @@ function snapFieldsToInk(det) {
         if (!gap) return;
         const slack = (gap.bot - gap.top) - fhPx;
         const newFy = (yTop + gap.top + Math.max(1, Math.min(slack / 2, fhPx * 0.6))) / H;
-        if (newFy > 0 && newFy + fh <= 1 && newFy > f.fy - fh) { f.fy = newFy; snapped++; }
+        if (newFy > 0 && newFy + fh <= 1 && newFy > f.fy - fh) {
+          f.fy = newFy; snapped++;
+          // widen the field to the CELL's vertical borders: a long value gets
+          // the whole cell instead of the guessed header-width (which forced
+          // fitFont to shrink it — the "mismatched fonts" complaint)
+          try {
+            const gy0 = yTop + gap.top, gy1 = yTop + gap.bot;
+            const rows = gy1 - gy0 + 1;
+            const darkCol = (px) => {
+              if (px < 0 || px >= W) return true;   // page edge counts as border
+              const col = ctx.getImageData(px, gy0, 1, rows).data;
+              let d = 0;
+              for (let i = 0; i < rows; i++) {
+                const j = i * 4;
+                if (0.299 * col[j] + 0.587 * col[j + 1] + 0.114 * col[j + 2] < 130) d++;
+              }
+              return d / rows > 0.7;
+            };
+            const maxSpan = Math.round(W * 0.5);
+            let L = Math.floor(f.fx * W), R = Math.ceil((f.fx + fw) * W);
+            let steps = 0;
+            // step 1px — a 2px stride jumps clean over 1px cell borders
+            while (!darkCol(L - 1) && (R - L) < maxSpan && steps++ < 800) L -= 1;
+            steps = 0;
+            while (!darkCol(R + 1) && (R - L) < maxSpan && steps++ < 800) R += 1;
+            const pad = 4;
+            const nfx = (L + pad) / W, nfw = (R - L - pad * 2) / W;
+            if (nfw > fw) { f.fx = nfx; f.fw = nfw; }
+          } catch (e) { /* width stays as guessed */ }
+        }
         return;
       }
       // classic underline: nearest line just below the text — but only when
@@ -375,6 +404,18 @@ function snapFieldsToInk(det) {
   return snapped;
 }
 
+/* one form = one handwriting: every detected text field gets the MEDIAN font
+ * size. Per-field sizes (inherited from each header's glyph height) made
+ * adjacent cells render at visibly different sizes. */
+function normalizeFontSizes(det) {
+  const txt = det.fields.filter((f) => f.type === 'text' && f.fontFrac);
+  if (txt.length < 2) return;
+  const sizes = txt.map((f) => f.fontFrac).sort((a, b) => a - b);
+  const median = sizes[Math.floor(sizes.length / 2)];
+  const uni = Math.min(0.022, Math.max(0.011, median));
+  txt.forEach((f) => { f.fontFrac = uni; });
+}
+
 async function runDetection() {
   if (!pdfView.hasDoc()) return;
   const gen = loadGen;
@@ -384,6 +425,7 @@ async function runDetection() {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
+    normalizeFontSizes(det);
     lastDet = det;
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');

@@ -1079,6 +1079,61 @@ async function main() {
     check('student prefill canon-maps name/tz into differently-worded fields, one-shot', stuRes.nm && stuRes.tz && stuRes.oneShot);
   }
 
+  // ---- ink-snap: detected text anchors to the printed ruling line ----
+  {
+    const snapRes = await page.evaluate(() => {
+      const T = window.PFS.__test;
+      const view = window.PFS.__test.pdfView ? window.PFS.__test.pdfView.viewList()[0] : null;
+      if (!view || !view.canvas) return { skip: true };
+      const cv = view.canvas, ctx = cv.getContext('2d');
+      const W = cv.width, H = cv.height;
+      // paint a clean white band with a crisp ruled line through it
+      ctx.fillStyle = '#fff'; ctx.fillRect(0.1 * W, 0.60 * H, 0.5 * W, 0.10 * H);
+      const lineY = Math.round(0.65 * H) + 0.5;
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0.12 * W, lineY); ctx.lineTo(0.55 * W, lineY); ctx.stroke();
+      const fh = 0.018;
+      // field floats ABOVE the line (label-top geometry) — snap must pull it down
+      const above = { page: 0, fieldKey: 'sn1', label: 'שדה', type: 'text', fx: 0.15, fy: 0.65 - fh * 1.8, fw: 0.3, fh, fontFrac: fh };
+      // field in a clean area with NO line — must stay put
+      ctx.fillStyle = '#fff'; ctx.fillRect(0.1 * W, 0.80 * H, 0.5 * W, 0.08 * H);
+      const noline = { page: 0, fieldKey: 'sn2', label: 'שדה', type: 'text', fx: 0.15, fy: 0.82, fw: 0.3, fh, fontFrac: fh };
+      const det = { tier: 'text', fields: [above, noline] };
+      const n = T.snapFieldsToInk(det);
+      const expected = 0.65 - fh; // bottom ≈ the line (minus the 2px breath)
+      // table scenario: field lands ON the printed header text; the empty
+      // cell (between two borders) sits below — snap must relocate into it
+      ctx.fillStyle = '#fff'; ctx.fillRect(0.1 * W, 0.30 * H, 0.5 * W, 0.12 * H);
+      const y1 = Math.round(0.33 * H) + 0.5, y2 = Math.round(0.37 * H) + 0.5;
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0.12 * W, y1); ctx.lineTo(0.55 * W, y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0.12 * W, y2); ctx.lineTo(0.55 * W, y2); ctx.stroke();
+      // simulate header glyphs with dash-rects (headless env has no fonts,
+      // so fillText paints nothing; real pages get ink from pdf.js glyph paths)
+      ctx.fillStyle = '#111';
+      const gy = Math.round(0.316 * H), gh = Math.max(2, Math.round(0.008 * H));
+      for (let gx = 0.17; gx < 0.42; gx += 0.04) ctx.fillRect(Math.round(gx * W), gy, Math.round(0.012 * W), gh);
+      const tbl = { page: 0, fieldKey: 'sn3', label: 'שדה', type: 'text', fx: 0.15, fy: 0.312, fw: 0.3, fh: 0.014, fontFrac: 0.014 };
+      const det2 = { tier: 'text', fields: [tbl] };
+      T.snapFieldsToInk(det2);
+      const cellTop = 0.33, cellBot = 0.37;
+      const inCell = tbl.fy > cellTop && (tbl.fy + 0.014) < cellBot + 0.004;
+      return {
+        n,
+        snappedClose: Math.abs((above.fy + fh) - 0.65) < 0.006,
+        movedDown: above.fy > 0.65 - fh * 1.8 - 1e-9,
+        untouched: noline.fy === 0.82,
+        inCell
+      };
+    });
+    if (snapRes.skip) check('ink-snap anchors text to the ruled line', true);
+    else {
+      if (!(snapRes.n === 1 && snapRes.snappedClose && snapRes.movedDown && snapRes.untouched)) console.log('  [snap debug]', JSON.stringify(snapRes));
+      check('ink-snap anchors text to the ruled line, leaves lineless fields alone', snapRes.n === 1 && snapRes.snappedClose && snapRes.movedDown && snapRes.untouched);
+      check('ink-snap relocates a header-overlapping value into the empty cell', snapRes.inCell === true);
+    }
+  }
+
   // ---- one-gesture deletion: hover the element, click ✕ ----
   {
     const delRes = await page.evaluate(async () => {

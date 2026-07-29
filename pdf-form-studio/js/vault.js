@@ -102,12 +102,20 @@
   Object.keys(SYN).forEach((k) => SYN[k].forEach((p) => PAIRS.push([k, norm(p)])));
   PAIRS.sort((a, b) => b[1].length - a[1].length);
 
+  // Institution/contact phrases like 'מוסד ההכשרה' appear INSIDE longer labels
+  // that mean something else entirely ('שם מנהל מוסד ההכשרה או מי מטעמו' is a
+  // PERSON, section headings quote the institution too). For these canons a
+  // substring hit only counts when the label is essentially the phrase itself.
+  const TIGHT_CANONS = new Set(['institution_name', 'institution_phone', 'institution_address', 'contact_person']);
   function matchKey(label) {
     const n = norm(label);
     if (!n) return null;
     for (let i = 0; i < PAIRS.length; i++) {
       const [key, phrase] = PAIRS[i];
-      if (n === phrase || n.indexOf(phrase) !== -1) return key;
+      if (n === phrase || n.indexOf(phrase) !== -1) {
+        if (TIGHT_CANONS.has(key) && n.length > phrase.length + 8) continue;
+        return key;
+      }
     }
     return null;
   }

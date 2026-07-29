@@ -58,6 +58,7 @@ async function main() {
   await page.evaluate(() => {
     window.PFS.store.set('onboarded', true);
     window.PFS.store.set('tour_done', 1);   // tour has its own dedicated test
+    window.PFS.store.set('patterns', {});   // learning engine has its own tests
     window.PFS.store.set('profiles', [{ id: 'p', name: 'me', values: { 'שם משפחה': 'ישראלי', 'תעודת זהות': '123456782', 'טלפון': '0501234567' } }]);
     window.PFS.store.set('active_profile', 'p');
   });
@@ -1003,9 +1004,127 @@ async function main() {
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
 
+  // ---- the learning engine: recurring values fill themselves ----
+  {
+    const patRes = await page.evaluate(async () => {
+      const P = window.PFS.patterns;
+      window.PFS.store.set('patterns', {});
+      const F = (label, key) => ({ label, fieldKey: key, type: 'text', page: 0, fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02 });
+      const inst = F('שם מוסד הלימודים', 'k_inst');
+      const addr = F('כתובת מוסד ההכשרה', 'k_addr');
+      const person = F('שם מלא', 'k_name');
+      // 1) one export is NOT enough for auto (n>=2 strict)
+      P.learnFrom([inst], { k_inst: 'היחידה ללימודי חוץ' }, []);
+      const after1 = P.suggest(inst);
+      // 2) a second confirming export flips it to auto — and the wording may
+      //    differ (canon slot bridges שם מוסד הלימודים ↔ שם המכללה)
+      P.learnFrom([F('שם המכללה', 'k2')], { k2: 'היחידה ללימודי חוץ' }, []);
+      const after2 = P.suggest(inst);
+      const autoOk = after1 === null && after2 && after2.mode === 'auto' && after2.value === 'היחידה ללימודי חוץ';
+      // 3) several addresses become a sorted choice list
+      P.learnFrom([addr], { k_addr: 'קמפוס ת״א, הרצל 1' }, []);
+      P.learnFrom([addr], { k_addr: 'קמפוס ת״א, הרצל 1' }, []);
+      P.learnFrom([addr], { k_addr: 'קמפוס חיפה, הנמל 8' }, []);
+      const ch = P.suggest(addr);
+      const choicesOk = ch && ch.mode === 'choices' && ch.options.length === 2 && ch.options[0].v === 'קמפוס ת״א, הרצל 1';
+      // 4) blocklist: person names are NEVER learned
+      P.learnFrom([person], { k_name: 'משה ישראלי' }, []);
+      const blockOk = P.suggest(person) === null && P.optionsFor(person).length === 0;
+      // 5) self-reinforcement guard: auto-filled-untouched keys are skipped
+      const before = P.optionsFor(inst)[0].n;
+      P.learnFrom([inst], { k_inst: 'היחידה ללימודי חוץ' }, ['k_inst']);
+      const guardOk = P.optionsFor(inst)[0].n === before;
+      // 6) pinned values sort first and survive eviction pressure
+      P.touch(addr, 'קמפוס ירושלים, יפו 3'); P.pin(addr, 'קמפוס ירושלים, יפו 3', true);
+      const pinnedFirst = P.optionsFor(addr)[0].v === 'קמפוס ירושלים, יפו 3';
+      // 7) removal works
+      P.removeValue(addr, 'קמפוס חיפה, הנמל 8');
+      const removed = !P.optionsFor(addr).some((o) => o.v === 'קמפוס חיפה, הנמל 8');
+      window.PFS.store.set('patterns', {});
+      return { autoOk, choicesOk, blockOk, guardOk, pinnedFirst, removed };
+    });
+    if (!Object.values(patRes).every(Boolean)) console.log('  [patterns debug]', JSON.stringify(patRes));
+    // regression: an institution phrase INSIDE a longer person-label must not
+    // adopt the institution slot ("שם מנהל מוסד ההכשרה או מי מטעמו" is a person)
+    const leak = await page.evaluate(() => {
+      const P = window.PFS.patterns;
+      window.PFS.store.set('patterns', {});
+      const inst = { label: 'שם מוסד ההכשרה', fieldKey: 'li', type: 'text' };
+      P.learnFrom([inst], { li: 'היחידה ללימודי חוץ' }, []);
+      P.learnFrom([inst], { li: 'היחידה ללימודי חוץ' }, []);
+      const manager = { label: 'שם מנהל מוסד ההכשרה או מי מטעמו', fieldKey: 'lm', type: 'text' };
+      const heading = { label: 'הצהרת מוסד ההכשרה המלמד קורס הכשרה מקצועית', fieldKey: 'lh', type: 'text' };
+      const ok = P.suggest(manager) === null && P.suggest(heading) === null
+        && window.PFS.vault.matchKey('שם מנהל מוסד ההכשרה או מי מטעמו') !== 'institution_name'
+        && window.PFS.vault.matchKey('שם מוסד ההכשרה') === 'institution_name';
+      window.PFS.store.set('patterns', {});
+      return ok;
+    });
+    check('institution learning never leaks into manager-name or headings', leak === true);
+    check('learning: 2 confirmations → auto-fill, cross-wording via canon', patRes.autoOk);
+    check('learning: multiple addresses → sorted choices; person names never learned', patRes.choicesOk && patRes.blockOk);
+    check('learning: no self-reinforcement; pin sorts first; forget works', patRes.guardOk && patRes.pinnedFirst && patRes.removed);
+  }
+
+  // ---- learned patterns flow into the panel: auto-fill badge + ▾ picker ----
+  {
+    const flowRes = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      const P = window.PFS.patterns;
+      window.PFS.store.set('patterns', {});
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'pf_inst', label: 'שם מוסד הלימודים', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'pf_addr', label: 'כתובת מוסד ההכשרה', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      // teach: institution name twice (→auto), two campuses (→choices)
+      P.learnFrom([det.fields[0]], { pf_inst: 'היחידה ללימודי חוץ' }, []);
+      P.learnFrom([det.fields[0]], { pf_inst: 'היחידה ללימודי חוץ' }, []);
+      P.learnFrom([det.fields[1]], { pf_addr: 'קמפוס ת״א, הרצל 1' }, []);
+      P.learnFrom([det.fields[1]], { pf_addr: 'קמפוס חיפה, הנמל 8' }, []);
+      // open "the third time": prefill through the real path
+      T.setLastDet(det);
+      T.fieldsPanel.show(det, (function () {  // vaultPrefill equivalent via app path
+        return window.PFS.__test.vaultPrefillFor ? window.PFS.__test.vaultPrefillFor(det) : null;
+      })() || undefined);
+      await wait(150);
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      const instRow = rows.find((i) => i.__fkey === 'pf_inst');
+      const addrRow = rows.find((i) => i.__fkey === 'pf_addr');
+      // institution auto-filled with the badge; learning marks it auto
+      const autoFilled = instRow && instRow.value === 'היחידה ללימודי חוץ' && instRow.classList.contains('fp-auto');
+      const marked = T.fieldsPanel.autoFilledKeys().includes('pf_inst');
+      // address NOT auto-filled (ambiguous) — has the ▾ picker instead
+      const notGuessed = addrRow && addrRow.value === '';
+      const pickBtn = addrRow && addrRow.closest('.field').querySelector('.fp-pick');
+      if (!pickBtn) return { autoFilled, marked, notGuessed, pick: false };
+      pickBtn.click();
+      await wait(150);
+      const dd = document.querySelector('.pat-dd');
+      const items = dd ? [...dd.querySelectorAll('.pat-dd-item')] : [];
+      const listed = items.filter((i) => !i.classList.contains('free')).map((i) => i.querySelector('.v').textContent);
+      // pick the Haifa campus → fills the row + the form element
+      const haifa = items.find((i) => (i.querySelector('.v') || {}).textContent === 'קמפוס חיפה, הנמל 8');
+      if (haifa) haifa.click();
+      await wait(200);
+      const filled = addrRow.value === 'קמפוס חיפה, הנמל 8'
+        && T.overlay.getElements().some((c) => c.model.fieldKey === 'pf_addr' && c.model.text === 'קמפוס חיפה, הנמל 8');
+      // user-picked → not in the auto set → export would LEARN it (n grows)
+      const notAuto = !T.fieldsPanel.autoFilledKeys().includes('pf_addr');
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      window.PFS.store.set('patterns', {});
+      return { autoFilled, marked, notGuessed, pick: true, listedCount: listed.length, filled, notAuto };
+    });
+    if (!(flowRes.autoFilled && flowRes.marked && flowRes.notGuessed && flowRes.pick && flowRes.filled && flowRes.notAuto)) console.log('  [flow debug]', JSON.stringify(flowRes));
+    check('recurring value auto-fills with badge and is marked non-learnable', flowRes.autoFilled && flowRes.marked);
+    check('ambiguous slot shows the ▾ picker; choosing fills row + form', flowRes.notGuessed && flowRes.pick && flowRes.filled && flowRes.notAuto);
+  }
+
   // ---- undo you can trust: visible, global, and the panel SURVIVES it ----
   {
     const undoRes = await page.evaluate(async () => {
+      window.PFS.store.set('patterns', {});   // isolate from mid-suite learning
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const T = window.PFS.__test;
       // fresh detected form state
@@ -1151,6 +1270,7 @@ async function main() {
 
   // ---- organization details fill institution fields on the REAL נספח ה3 ----
   check('org details auto-fill institution fields on the real form', await page.evaluate(async () => {
+    window.PFS.store.set('patterns', {});   // isolate from mid-suite learning
     const mk = window.PFS.vault.matchKey;
     const canonOk = mk('שם המכללה') === 'institution_name' && mk('שם מוסד ההכשרה') === 'institution_name'
       && mk('טלפון מוסד ההכשרה') === 'institution_phone' && mk('כתובת המוסד') === 'institution_address'

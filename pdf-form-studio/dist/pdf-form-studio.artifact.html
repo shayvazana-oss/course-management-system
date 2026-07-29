@@ -535,6 +535,22 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .field-marker.active { animation: none; background: rgba(14,110,120,.14) !important;
   box-shadow: inset 0 0 0 2px var(--brand), 0 0 0 4px rgba(14,110,120,.18); }
 
+/* ===== Learning engine UI ===== */
+/* learned-values picker (the campus/choices dropdown) */
+.pat-dd { position: fixed; z-index: 320; min-width: 240px; max-width: 360px; max-height: 300px; overflow: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-3);
+  padding: 4px; direction: rtl; }
+.pat-dd-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.pat-dd-item:hover { background: var(--brand-soft); }
+.pat-dd-item .v { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pat-dd-item .tag { flex: none; font-size: 11px; font-weight: 700; color: var(--ink-4); }
+.pat-dd-item .x { flex: none; border: 0; background: none; color: var(--ink-4); cursor: pointer; font-size: 11px; padding: 2px; }
+.pat-dd-item .x:hover { color: var(--danger); }
+.pat-dd-item.free { color: var(--brand); font-weight: 700; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
+.fp-pick { flex: none; padding: 6px 8px; font-weight: 800; }
+/* auto-filled field marker: subtle amber accent + tooltip */
+#fieldsBody input.fp-auto { border-inline-start: 3px solid var(--accent); background: linear-gradient(90deg, var(--accent-soft), transparent 24%); }
+
 </style>
 
 <div class="app">
@@ -784,6 +800,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             <div class="body-p">
               <div class="hint muted">מייצא את הטופס כתמונה שטוחה: הטקסט לא ניתן לבחירה/חילוץ, **השחרות באמת מסתירות** את מה שמתחת, והקובץ מוגן משינוי. מומלץ לפני שיתוף מסמכים עם מידע רגיש.</div>
               <button class="btn sm primary block" id="exportFlatBtn" disabled>🔒 ייצוא מאובטח (תמונה שטוחה)</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🧠 מה נלמד</h3>
+            <div class="body-p">
+              <div class="hint muted">Fillo לומד מכל ייצוא אילו ערכים חוזרים, וממלא/מציע אותם אוטומטית. כאן רואים ושולטים במה שנלמד.</div>
+              <div id="learnedBody"></div>
+              <button class="btn sm block" id="learnedClearBtn" style="color:var(--danger)">🗑 שכח את כל מה שנלמד</button>
             </div>
           </div>
           <div class="card">
@@ -1136,7 +1160,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <div class="qs-grid">
         <label>שם המכללה / המוסד<input type="text" id="orgName" dir="auto" placeholder="היחידה ללימודי חוץ"></label>
         <label>טלפון<input type="text" id="orgPhone" inputmode="tel" placeholder="03-1234567"></label>
-        <label>כתובת<input type="text" id="orgAddress" dir="auto" placeholder="רחוב הרצל 15, תל אביב"></label>
+        <label>כתובות הקמפוסים<span class="hint muted" style="font-weight:400;display:block;margin:2px 0 4px">הקמפוס הראשון הוא הראשי; כולם יופיעו כחלון בחירה בשדות כתובת המוסד</span></label>
+        <div id="orgCampuses" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button type="button" class="btn sm" id="orgAddCampus" style="align-self:start">+ הוסף קמפוס</button>
         <label>איש קשר<input type="text" id="orgContact" dir="auto" placeholder="שי וזאנה"></label>
         <label>ח.פ / עוסק<input type="text" id="orgBizId" inputmode="numeric" placeholder="512345678"></label>
       </div>
@@ -1982,12 +2008,20 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   Object.keys(SYN).forEach((k) => SYN[k].forEach((p) => PAIRS.push([k, norm(p)])));
   PAIRS.sort((a, b) => b[1].length - a[1].length);
 
+  // Institution/contact phrases like 'מוסד ההכשרה' appear INSIDE longer labels
+  // that mean something else entirely ('שם מנהל מוסד ההכשרה או מי מטעמו' is a
+  // PERSON, section headings quote the institution too). For these canons a
+  // substring hit only counts when the label is essentially the phrase itself.
+  const TIGHT_CANONS = new Set(['institution_name', 'institution_phone', 'institution_address', 'contact_person']);
   function matchKey(label) {
     const n = norm(label);
     if (!n) return null;
     for (let i = 0; i < PAIRS.length; i++) {
       const [key, phrase] = PAIRS[i];
-      if (n === phrase || n.indexOf(phrase) !== -1) return key;
+      if (n === phrase || n.indexOf(phrase) !== -1) {
+        if (TIGHT_CANONS.has(key) && n.length > phrase.length + 8) continue;
+        return key;
+      }
     }
     return null;
   }
@@ -2214,6 +2248,217 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   }
 
   PFS.vault = { matchKey, matchValues, matchChecks, classifyChoice, parseAddress, extractFromText, recognizeImage, checkIsraeliId, norm };
+})(window);
+
+</script>
+<script>
+/* patterns.js — the learning engine: Fillo's single value-memory.
+ *
+ * Every successful export is a de-facto confirmation that the filled values
+ * were right. This module records them per field-slot, so that:
+ *   - a value that keeps recurring ("שם מוסד הלימודים") starts filling itself,
+ *   - a slot that accumulates SEVERAL values (campus addresses) becomes a
+ *     choice list the user picks from,
+ * turning a repeatedly-filled form into a form generator.
+ *
+ * Design constraints (each one guards a real failure mode):
+ *   - SLOT SAFETY: canonical slots only for the stable-organization whitelist.
+ *     vault.matchKey is a substring matcher — 'Course name' resolves to
+ *     full_name — so everything else is keyed by its exact normalized label,
+ *     and person/date/amount canons are never learned at all.
+ *   - SINGLE MEMORY: this store absorbs the old fields-panel `field_history`
+ *     (one-time migration); the datalist and the choice dropdown must never
+ *     disagree about what was learned.
+ *   - NO SELF-REINFORCEMENT: learnFrom skips values that were auto-filled and
+ *     left untouched — only human-typed/confirmed values gain weight.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  const KEY = 'patterns';
+  const CAP = 8;                     // values kept per slot
+  const AUTO_MIN = 2;                // strictly: a value auto-fills only from n>=2
+
+  // canons stable enough to share learning across differently-worded forms
+  const CANON_WHITELIST = new Set([
+    'institution_name', 'institution_phone', 'institution_address',
+    'contact_person', 'business_id', 'business_name', 'health_fund',
+    // benign personal canons — wording-stable, non-identity; keeping them
+    // canon-keyed preserves the old cross-form autocomplete behaviour
+    'phone', 'email', 'address', 'city', 'zip', 'house_no', 'occupation'
+  ]);
+  // never learned: per-person identity, dates (auto-today poisons), amounts
+  const CANON_BLOCKLIST = new Set([
+    'date', 'birth_date', 'amount', 'amount_words',
+    'id', 'full_name', 'first_name', 'last_name'
+  ]);
+
+  const norm = (s) => (PFS.vault && PFS.vault.norm) ? PFS.vault.norm(s) : String(s || '').trim().toLowerCase();
+
+  const load = () => PFS.store.get(KEY, {}) || {};
+  const save = (o) => PFS.store.set(KEY, o);
+
+  /* slotFor(labelOrField) → { slot, blocked } */
+  function slotFor(field) {
+    const label = typeof field === 'string' ? field : (field.label || field.fieldKey || '');
+    const canon = PFS.vault && PFS.vault.matchKey ? (PFS.vault.matchKey(label) || PFS.vault.matchKey(field.fieldKey || '')) : null;
+    if (canon && CANON_BLOCKLIST.has(canon)) return { slot: null, blocked: true };
+    if (canon && CANON_WHITELIST.has(canon)) return { slot: canon, blocked: false };
+    const n = norm(label);
+    return { slot: n || null, blocked: !n };
+  }
+
+  function slotEntry(data, slot, label) {
+    if (!data[slot]) data[slot] = { label: label || slot, values: [] };
+    else if (label) data[slot].label = label;
+    return data[slot];
+  }
+
+  function upsert(entry, value, { count = 0, pinned } = {}) {
+    const v = String(value || '').trim();
+    if (!v) return null;
+    const nv = norm(v);
+    let rec = entry.values.find((r) => norm(r.v) === nv);
+    if (!rec) {
+      rec = { v, n: 0, last: Date.now() };
+      entry.values.push(rec);
+    }
+    rec.v = v;                        // keep the freshest spelling/casing
+    rec.n += count;
+    rec.last = Date.now();
+    if (pinned !== undefined) rec.pinned = !!pinned;
+    // eviction: pinned are exempt; lowest (n, recency) goes first
+    const evictable = entry.values.filter((r) => !r.pinned);
+    while (entry.values.length > CAP && evictable.length) {
+      evictable.sort((a, b) => (a.n - b.n) || (a.last - b.last));
+      const drop = evictable.shift();
+      const i = entry.values.indexOf(drop);
+      if (i >= 0) entry.values.splice(i, 1); else break;
+    }
+    return rec;
+  }
+
+  const sortOptions = (a, b) =>
+    ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || (b.n - a.n) || (b.last - a.last);
+
+  /* learnFrom(fields, valuesMap, autoFilledKeys) — the ONLY place counts grow.
+   * fields: detection fields (label+fieldKey+type); valuesMap: {fieldKey: text}
+   * (overlay.currentValues()); autoFilledKeys: fieldKeys whose value came from
+   * prefill and was never touched — skipped to avoid self-reinforcement. */
+  function learnFrom(fields, valuesMap, autoFilledKeys) {
+    if (!fields || !fields.length || !valuesMap) return 0;
+    const skip = new Set(autoFilledKeys || []);
+    const data = load();
+    let learned = 0;
+    fields.forEach((f) => {
+      if (!f || f.type === 'check') return;
+      if (skip.has(f.fieldKey)) return;
+      const val = valuesMap[f.fieldKey];
+      if (val == null || !String(val).trim()) return;
+      const { slot, blocked } = slotFor(f);
+      if (blocked || !slot) return;
+      upsert(slotEntry(data, slot, f.label), val, { count: 1 });
+      learned++;
+    });
+    if (learned) save(data);
+    return learned;
+  }
+
+  /* touch(labelOrField, value) — upsert with NO count (the old `remember`
+   * timing: fires per input-commit; only export confirms enough to count). */
+  function touch(field, value) {
+    const { slot, blocked } = slotFor(field);
+    if (blocked || !slot) return;
+    const data = load();
+    upsert(slotEntry(data, slot, typeof field === 'string' ? field : field.label), value, { count: 0 });
+    save(data);
+  }
+
+  function optionsFor(field) {
+    const { slot } = slotFor(field);
+    if (!slot) return [];
+    const e = load()[slot];
+    return e ? e.values.slice().sort(sortOptions) : [];
+  }
+
+  /* suggest(field) → {mode:'auto', value} | {mode:'choices', options} | null */
+  function suggest(field) {
+    if (field && field.type === 'check') return null;
+    const opts = optionsFor(field);
+    if (!opts.length) return null;
+    if (opts.length === 1) {
+      return (opts[0].n >= AUTO_MIN || opts[0].pinned)
+        ? { mode: 'auto', value: opts[0].v }
+        : null;
+    }
+    return { mode: 'choices', options: opts };
+  }
+
+  function removeValue(field, value) {
+    const { slot } = slotFor(field);
+    if (!slot) return false;
+    const data = load();
+    const e = data[slot];
+    if (!e) return false;
+    const nv = norm(value);
+    const i = e.values.findIndex((r) => norm(r.v) === nv);
+    if (i < 0) return false;
+    e.values.splice(i, 1);
+    if (!e.values.length) delete data[slot];
+    save(data);
+    return true;
+  }
+
+  function pin(field, value, on = true) {
+    const { slot } = slotFor(field);
+    if (!slot) return false;
+    const data = load();
+    const e = data[slot];
+    if (!e) return false;
+    const nv = norm(value);
+    const rec = e.values.find((r) => norm(r.v) === nv);
+    if (!rec) return false;
+    rec.pinned = !!on;
+    save(data);
+    return true;
+  }
+
+  // management-card variant: remove by the STORED slot key (no re-resolution)
+  function removeAt(slot, value) {
+    const data = load();
+    const e = data[slot];
+    if (!e) return false;
+    const nv = norm(value);
+    const i = e.values.findIndex((r) => norm(r.v) === nv);
+    if (i < 0) return false;
+    e.values.splice(i, 1);
+    if (!e.values.length) delete data[slot];
+    save(data);
+    return true;
+  }
+
+  const all = () => load();
+  function clear() { PFS.store.remove(KEY); }
+
+  // one-time migration: absorb the old per-canon field_history (values only,
+  // n:1 — they were remembered, not export-confirmed) then delete it.
+  (function migrate() {
+    try {
+      const old = PFS.store.get('field_history', null);
+      if (!old) return;
+      const data = load();
+      Object.keys(old).forEach((canon) => {
+        if (CANON_BLOCKLIST.has(canon)) return;
+        const slot = CANON_WHITELIST.has(canon) ? canon : canon; // keep original key
+        (old[canon] || []).forEach((v) => upsert(slotEntry(data, slot, canon), v, { count: 1 }));
+      });
+      save(data);
+      PFS.store.remove('field_history');
+    } catch (e) { /* migration is best-effort */ }
+  })();
+
+  PFS.patterns = { learnFrom, touch, optionsFor, suggest, removeValue, removeAt, pin, all, clear, slotFor, AUTO_MIN };
 })(window);
 
 </script>
@@ -5762,21 +6007,77 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     let emptyCount = () => 0;   // rebound by show(); how many text fields are still blank
     let requiredEmpty = () => 0; // rebound by show(); blank text fields marked required (*)
 
-    // value history per canonical field type (address/phone/…) — powers
-    // autocomplete across ALL forms, even without a saved profile.
-    const HKEY = 'field_history';
-    function histFor(canon) { if (!canon) return []; const h = PFS.store.get(HKEY, {}); return Array.isArray(h[canon]) ? h[canon] : []; }
-    function remember(canon, val) {
-      val = String(val || '').trim(); if (!canon || val.length < 2) return;
-      const h = PFS.store.get(HKEY, {}); const list = Array.isArray(h[canon]) ? h[canon] : [];
-      const next = [val, ...list.filter((x) => x !== val)].slice(0, 8);
-      h[canon] = next; PFS.store.set(HKEY, h);
+    // value memory lives in the patterns engine (single memory — the datalist,
+    // the choice dropdown and the learning counters must never disagree).
+    function optionsOf(f) { return (PFS.patterns && PFS.patterns.optionsFor) ? PFS.patterns.optionsFor(f) : []; }
+    function rememberVal(f, val) {
+      val = String(val || '').trim(); if (val.length < 2) return;
+      if (PFS.patterns && PFS.patterns.touch) PFS.patterns.touch(f, val);
     }
+    // fieldKeys whose value came from prefill and was never touched by the
+    // user — the learning loop must skip them (self-reinforcement guard).
+    // Closure-scoped: show() re-runs (org-save, profile apply) and a per-show
+    // set would forget marks for fields already sitting on the overlay.
+    const autoKeys = new Set();
+
+    // floating learned-values picker (the "חלון בחירה" for campuses etc.)
+    let ddEl = null;
+    function closeChoices() { if (ddEl) { ddEl.remove(); ddEl = null; document.removeEventListener('pointerdown', onDDOutside, true); } }
+    function onDDOutside(e) { if (ddEl && !ddEl.contains(e.target)) closeChoices(); }
+    function openChoices(f, control, anchor) {
+      closeChoices();
+      const opts = optionsOf(f);
+      if (!opts.length) return;
+      ddEl = document.createElement('div');
+      ddEl.className = 'pat-dd';
+      const r = anchor.getBoundingClientRect();
+      ddEl.style.top = (r.bottom + 4) + 'px';
+      // RTL: align the list's RIGHT edge near the anchor, clamped to viewport
+      ddEl.style.right = Math.max(8, window.innerWidth - r.right - 4) + 'px';
+      // campus addresses get their campus name as a bold prefix in the list
+      const camps = PFS.store.get('org_campuses', []) || [];
+      const nameOf = (v) => { const c = camps.find((x) => x.address === v); return (c && c.name) ? c.name : null; };
+      opts.forEach((o) => {
+        const item = document.createElement('div');
+        item.className = 'pat-dd-item';
+        const txt = document.createElement('span'); txt.className = 'v';
+        const nm = nameOf(o.v);
+        if (nm) { const b = document.createElement('b'); b.textContent = nm + ' · '; txt.appendChild(b); }
+        txt.appendChild(document.createTextNode(o.v));
+        const tag = document.createElement('span'); tag.className = 'tag';
+        tag.textContent = o.pinned ? '📌 ידני' : ('×' + o.n);
+        const del = document.createElement('button'); del.className = 'x'; del.textContent = '✕';
+        del.title = 'שכח את הערך הזה';
+        del.addEventListener('click', (e) => {
+          e.stopPropagation();
+          PFS.patterns.removeValue(f, o.v);
+          openChoices(f, control, anchor);   // re-render (or close if emptied)
+        });
+        item.append(txt, tag, del);
+        item.addEventListener('click', () => {
+          control.value = o.v;
+          control.dispatchEvent(new Event('input', { bubbles: true }));
+          control.dispatchEvent(new Event('change', { bubbles: true }));
+          closeChoices();
+          control.focus({ preventScroll: true });
+        });
+        ddEl.appendChild(item);
+      });
+      const free = document.createElement('div');
+      free.className = 'pat-dd-item free';
+      free.textContent = '✎ ערך אחר…';
+      free.addEventListener('click', () => { closeChoices(); control.focus({ preventScroll: true }); control.select && control.select(); });
+      ddEl.appendChild(free);
+      document.body.appendChild(ddEl);
+      setTimeout(() => document.addEventListener('pointerdown', onDDOutside, true), 0);
+    }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChoices(); });
 
     let syncValuesImpl = null, focusFieldImpl = null;
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
       syncValuesImpl = null; focusFieldImpl = null;
+      closeChoices();
       if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
       if (body) body.innerHTML = '';
       if (panel) panel.style.display = 'none';
@@ -5873,6 +6174,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         }
         return 0;
       }
+      const detKeys = new Set(det.fields.map((f) => f.fieldKey));
+      [...autoKeys].forEach((k) => { if (!detKeys.has(k)) autoKeys.delete(k); });
       const head = document.createElement('div'); head.className = 'hint muted';
       head.style.marginBottom = '4px';
       head.textContent = det.tier === 'acroform'
@@ -5972,16 +6275,32 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             control.title = r.msg;
           };
           control.__fkey = f.fieldKey; control.__canon = canon || '';
-          if (canon) {
-            const hist = histFor(canon);
-            if (hist.length) {
-              const dl = document.createElement('datalist'); dl.id = 'dl_' + canon + '_' + Math.random().toString(36).slice(2, 7);
-              hist.forEach((v) => { const o = document.createElement('option'); o.value = v; dl.appendChild(o); });
-              row.appendChild(dl); control.setAttribute('list', dl.id);
+          const patOpts = optionsOf(f);
+          if (patOpts.length >= 2) {
+            // learned CHOICES (campus addresses etc.) → a real, visible picker.
+            // No datalist here — one memory, one surface.
+            const pick = document.createElement('button');
+            pick.type = 'button'; pick.className = 'btn sm ghost fp-pick'; pick.textContent = '▾';
+            pick.title = 'בחירה מערכים שנלמדו (' + patOpts.length + ')';
+            pick.addEventListener('click', (e) => { e.preventDefault(); openChoices(f, control, pick); });
+            control.addEventListener('keydown', (e) => {
+              if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); openChoices(f, control, pick); }
+            });
+            inRow.appendChild(pick);
+            if (!control.value) {
+              const top = patOpts[0];
+              control.placeholder = '▾ לבחירה: ' + (top.v.length > 28 ? top.v.slice(0, 28) + '…' : top.v);
             }
-            control.addEventListener('change', () => remember(canon, control.value));
+          } else if (patOpts.length === 1) {
+            const dl = document.createElement('datalist'); dl.id = 'dl_' + Math.random().toString(36).slice(2, 8);
+            const o = document.createElement('option'); o.value = patOpts[0].v; dl.appendChild(o);
+            row.appendChild(dl); control.setAttribute('list', dl.id);
           }
-          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control); });
+          control.addEventListener('change', () => rememberVal(f, control.value));
+          control.addEventListener('input', () => {
+            autoKeys.delete(f.fieldKey); control.classList.remove('fp-auto');
+            ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control);
+          });
           // panel ↔ form visual link: focusing a row lights its marker on the
           // form and brings the spot into view — you always see WHERE you type
           control.addEventListener('focus', () => {
@@ -6004,6 +6323,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             control.value = pv;
             if (ensureCtrl(f, String(pv))) autoFilled++;
             validate();
+            autoKeys.add(f.fieldKey);
+            control.classList.add('fp-auto');
+            control.title = control.title || 'מולא אוטומטית — ערכו אם צריך';
           }
         }
         // date picker for date-type fields — no fumbling with formats
@@ -6148,7 +6470,12 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       showCur();
     }
 
-    return { show, clear, syncValues, focusField, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
+    return {
+      show, clear, syncValues, focusField,
+      emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty(),
+      autoFilledKeys: () => [...autoKeys],
+      resetAutoFilled: () => autoKeys.clear()
+    };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;
@@ -6362,7 +6689,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -6404,8 +6731,19 @@ function vaultPrefill(det) {
     const remembered = PFS.store.get('remembered_choices', {}) || {};
     const carry = pendingCarry; pendingCarry = null;   // one-shot
     const base = Object.assign({}, remembered, ap && ap.values);
-    if (!Object.keys(base).length && !(carry && Object.keys(carry).length)) return null;
-    const skip = overlay.fieldKeys();
+    const skip = new Set(overlay.fieldKeys());
+    // learned patterns: a value that keeps recurring fills itself (auto mode).
+    // Lowest priority — an explicit profile value or carried value always wins.
+    const patternAuto = {};
+    if (PFS.patterns && PFS.patterns.suggest) {
+      det.fields.forEach((f) => {
+        if (f.type === 'check' || skip.has(f.fieldKey)) return;
+        const sg = PFS.patterns.suggest(f);
+        if (sg && sg.mode === 'auto') patternAuto[f.fieldKey] = sg.value;
+      });
+    }
+    if (!Object.keys(base).length && !(carry && Object.keys(carry).length)
+        && !Object.keys(patternAuto).length) return null;
     // profile/remembered fill first — then values carried from a linked form
     // (הצעת מחיר → נספח) override them: the appendix must mirror what was just
     // typed, not what the profile happens to say for the same meaning.
@@ -6415,7 +6753,7 @@ function vaultPrefill(det) {
     // different forms produces confident-looking wrong fills (e.g. an
     // institution name landing in a person's "שם מלא")
     const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
-    return Object.assign({}, text, checks, carryText);
+    return Object.assign({}, patternAuto, text, checks, carryText);
   } catch (e) { return null; }
 }
 
@@ -6535,6 +6873,7 @@ async function openPdfFile(file) {
     loadGen++;
     const myGen = loadGen;
     lastDet = null;
+    fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
     attachments = [];
     updateAttachBadge();
     overlay.clearElements();
@@ -7172,6 +7511,16 @@ async function exDeliver(preferShare) {
   PFS.toast(shared ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
   dirty = false;
   try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
+  // a successful export confirms the filled values — feed the learning engine
+  // (skipping values that were auto-filled and never touched, so learning
+  // can't amplify itself)
+  try {
+    if (lastDet && lastDet.fields && lastDet.fields.length && PFS.patterns) {
+      const n = PFS.patterns.learnFrom(lastDet.fields, overlay.currentValues(),
+        fieldsPanel.autoFilledKeys ? fieldsPanel.autoFilledKeys() : []);
+      if (n) console.info('[patterns] learned from export:', n, 'fields');
+    }
+  } catch (e) { console.warn('[patterns] learn failed', e); }
   offerCompanions();
 }
 
@@ -7269,6 +7618,7 @@ $('pdfInput').addEventListener('change', (e) => { if (e.target.files[0]) openPdf
 function activateTab(name) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === name));
+  if (name === 'settings') renderLearned();
 }
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)));
 
@@ -7277,6 +7627,52 @@ const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
 function openPanel() { $('rightpanel').classList.add('open'); }
 function closePanel() { $('rightpanel').classList.remove('open'); }
 $('panelToggle').addEventListener('click', () => $('rightpanel').classList.toggle('open'));
+
+// "מה נלמד" — transparency + control over the learning store. Automatic
+// learning is only trustworthy when it's inspectable and erasable.
+function renderLearned() {
+  const body = $('learnedBody'); if (!body) return;
+  const data = PFS.patterns ? PFS.patterns.all() : {};
+  body.innerHTML = '';
+  const slots = Object.keys(data);
+  if (!slots.length) {
+    body.innerHTML = '<div class="hint muted" style="padding:6px 0">עוד לא נלמד כלום — מלאו וייצאו טופס, והדפוסים יופיעו כאן.</div>';
+    return;
+  }
+  slots.forEach((slot) => {
+    const e = data[slot];
+    const wrap = document.createElement('div'); wrap.style.margin = '0 0 10px';
+    const h = document.createElement('div');
+    h.style.cssText = 'font-weight:700;font-size:12.5px;margin-bottom:4px;color:var(--ink-2)';
+    h.textContent = e.label || slot;
+    wrap.appendChild(h);
+    const chips = document.createElement('div'); chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px';
+    (e.values || []).forEach((r) => {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:11.5px;max-width:100%';
+      const v = document.createElement('span');
+      v.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px';
+      v.textContent = r.v; v.title = r.v;
+      const tag = document.createElement('span');
+      tag.style.cssText = 'color:var(--ink-4);font-weight:700;flex:none';
+      tag.textContent = r.pinned ? '📌' : ('×' + r.n);
+      const x = document.createElement('button');
+      x.style.cssText = 'border:0;background:none;color:var(--danger);cursor:pointer;padding:0;font-size:11px;flex:none';
+      x.textContent = '✕'; x.title = 'שכח את הערך הזה';
+      x.addEventListener('click', () => { PFS.patterns.removeAt(slot, r.v); renderLearned(); });
+      chip.append(v, tag, x);
+      chips.appendChild(chip);
+    });
+    wrap.appendChild(chips);
+    body.appendChild(wrap);
+  });
+}
+$('learnedClearBtn') && $('learnedClearBtn').addEventListener('click', async () => {
+  if (await PFS.ui.confirm('שכחת כל הלמידה', 'למחוק את כל הערכים שנלמדו? המילוי האוטומטי מהלמידה יתאפס (הפרופיל לא נמחק).')) {
+    PFS.patterns.clear(); renderLearned();
+    PFS.toast('הלמידה אופסה', 'ok');
+  }
+});
 
 // undo / redo — visible, always in reach (were keyboard-only before)
 $('undoBtn') && $('undoBtn').addEventListener('click', () => undo());
@@ -8298,14 +8694,38 @@ renderLibrary();
 const ORG_FIELDS = [
   { id: 'orgName', key: 'שם מוסד ההכשרה' },
   { id: 'orgPhone', key: 'טלפון מוסד ההכשרה' },
-  { id: 'orgAddress', key: 'כתובת מוסד ההכשרה' },
   { id: 'orgContact', key: 'איש קשר' },
   { id: 'orgBizId', key: 'ח.פ' }
 ];
+// campuses: name+address rows. The FIRST one is the primary (written to the
+// profile exactly like the old single address, so profile-beats-patterns and
+// the existing org auto-fill keep working); ALL of them go into the learning
+// store as pinned choices under institution_address — the campus picker.
+function campusRows() {
+  return [...document.querySelectorAll('#orgCampuses .org-campus')].map((r) => ({
+    name: r.querySelector('.cname').value.trim(),
+    address: r.querySelector('.caddr').value.trim()
+  })).filter((c) => c.address);
+}
+function addCampusRow(c) {
+  const row = document.createElement('div');
+  row.className = 'org-campus'; row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = '<input class="cname" type="text" dir="auto" placeholder="שם (קמפוס ת״א)" style="flex:1;min-width:0">' +
+    '<input class="caddr" type="text" dir="auto" placeholder="כתובת מלאה" style="flex:2;min-width:0">' +
+    '<button type="button" class="btn sm" style="color:var(--danger)">✕</button>';
+  if (c) { row.querySelector('.cname').value = c.name || ''; row.querySelector('.caddr').value = c.address || ''; }
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  $('orgCampuses').appendChild(row);
+}
+$('orgAddCampus') && $('orgAddCampus').addEventListener('click', () => addCampusRow());
 $('orgSetupBtn') && $('orgSetupBtn').addEventListener('click', () => {
   const ap = profiles.active();
   const vals = (ap && ap.values) || {};
   ORG_FIELDS.forEach((f) => { $(f.id).value = vals[f.key] || ''; });
+  $('orgCampuses').innerHTML = '';
+  const saved = PFS.store.get('org_campuses', []) || [];
+  if (saved.length) saved.forEach(addCampusRow);
+  else addCampusRow(vals['כתובת מוסד ההכשרה'] ? { name: 'ראשי', address: vals['כתובת מוסד ההכשרה'] } : undefined);
   openModal('orgModal');
 });
 $('orgCancel') && $('orgCancel').addEventListener('click', () => closeModal('orgModal'));
@@ -8313,6 +8733,16 @@ $('orgSave') && $('orgSave').addEventListener('click', () => {
   const ap = profiles.active();
   const merged = Object.assign({}, ap && ap.values);
   ORG_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
+  const campuses = campusRows();
+  if (campuses.length) merged['כתובת מוסד ההכשרה'] = campuses[0].address;
+  else delete merged['כתובת מוסד ההכשרה'];
+  if (PFS.patterns) {
+    // forget campuses that were removed in this edit, pin the current set
+    const prev = PFS.store.get('org_campuses', []) || [];
+    prev.forEach((c) => { if (!campuses.some((n) => n.address === c.address)) PFS.patterns.removeValue('כתובת מוסד ההכשרה', c.address); });
+    campuses.forEach((c) => { PFS.patterns.touch('כתובת מוסד ההכשרה', c.address); PFS.patterns.pin('כתובת מוסד ההכשרה', c.address, true); });
+  }
+  PFS.store.set('org_campuses', campuses);
   profiles.saveProfile(ap ? ap.name : 'אני', merged);
   closeModal('orgModal');
   let n = 0;

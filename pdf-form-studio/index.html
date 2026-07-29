@@ -261,6 +261,14 @@
             </div>
           </div>
           <div class="card">
+            <h3>🧠 מה נלמד</h3>
+            <div class="body-p">
+              <div class="hint muted">Fillo לומד מכל ייצוא אילו ערכים חוזרים, וממלא/מציע אותם אוטומטית. כאן רואים ושולטים במה שנלמד.</div>
+              <div id="learnedBody"></div>
+              <button class="btn sm block" id="learnedClearBtn" style="color:var(--danger)">🗑 שכח את כל מה שנלמד</button>
+            </div>
+          </div>
+          <div class="card">
             <h3>💾 גיבוי ושחזור</h3>
             <div class="hint muted" id="buildTag" style="padding:0 14px 2px;font-size:11px"></div>
             <div class="body-p">
@@ -610,7 +618,9 @@
       <div class="qs-grid">
         <label>שם המכללה / המוסד<input type="text" id="orgName" dir="auto" placeholder="היחידה ללימודי חוץ"></label>
         <label>טלפון<input type="text" id="orgPhone" inputmode="tel" placeholder="03-1234567"></label>
-        <label>כתובת<input type="text" id="orgAddress" dir="auto" placeholder="רחוב הרצל 15, תל אביב"></label>
+        <label>כתובות הקמפוסים<span class="hint muted" style="font-weight:400;display:block;margin:2px 0 4px">הקמפוס הראשון הוא הראשי; כולם יופיעו כחלון בחירה בשדות כתובת המוסד</span></label>
+        <div id="orgCampuses" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button type="button" class="btn sm" id="orgAddCampus" style="align-self:start">+ הוסף קמפוס</button>
         <label>איש קשר<input type="text" id="orgContact" dir="auto" placeholder="שי וזאנה"></label>
         <label>ח.פ / עוסק<input type="text" id="orgBizId" inputmode="numeric" placeholder="512345678"></label>
       </div>
@@ -648,6 +658,7 @@
 <script src="./js/numwords.js"></script>
 <script src="./js/formula.js"></script>
 <script src="./js/vault.js"></script>
+<script src="./js/patterns.js"></script>
 <script src="./js/validate.js"></script>
 <script src="./js/align.js"></script>
 <script src="./js/ui.js"></script>

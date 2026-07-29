@@ -500,3 +500,19 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .field-marker:hover { background: rgba(224,147,47,.22) !important; box-shadow: inset 0 0 0 2px rgba(224,147,47,.85); }
 .field-marker.active { animation: none; background: rgba(14,110,120,.14) !important;
   box-shadow: inset 0 0 0 2px var(--brand), 0 0 0 4px rgba(14,110,120,.18); }
+
+/* ===== Learning engine UI ===== */
+/* learned-values picker (the campus/choices dropdown) */
+.pat-dd { position: fixed; z-index: 320; min-width: 240px; max-width: 360px; max-height: 300px; overflow: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-3);
+  padding: 4px; direction: rtl; }
+.pat-dd-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.pat-dd-item:hover { background: var(--brand-soft); }
+.pat-dd-item .v { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pat-dd-item .tag { flex: none; font-size: 11px; font-weight: 700; color: var(--ink-4); }
+.pat-dd-item .x { flex: none; border: 0; background: none; color: var(--ink-4); cursor: pointer; font-size: 11px; padding: 2px; }
+.pat-dd-item .x:hover { color: var(--danger); }
+.pat-dd-item.free { color: var(--brand); font-weight: 700; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
+.fp-pick { flex: none; padding: 6px 8px; font-weight: 800; }
+/* auto-filled field marker: subtle amber accent + tooltip */
+#fieldsBody input.fp-auto { border-inline-start: 3px solid var(--accent); background: linear-gradient(90deg, var(--accent-soft), transparent 24%); }

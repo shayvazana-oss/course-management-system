@@ -26,21 +26,77 @@
     let emptyCount = () => 0;   // rebound by show(); how many text fields are still blank
     let requiredEmpty = () => 0; // rebound by show(); blank text fields marked required (*)
 
-    // value history per canonical field type (address/phone/…) — powers
-    // autocomplete across ALL forms, even without a saved profile.
-    const HKEY = 'field_history';
-    function histFor(canon) { if (!canon) return []; const h = PFS.store.get(HKEY, {}); return Array.isArray(h[canon]) ? h[canon] : []; }
-    function remember(canon, val) {
-      val = String(val || '').trim(); if (!canon || val.length < 2) return;
-      const h = PFS.store.get(HKEY, {}); const list = Array.isArray(h[canon]) ? h[canon] : [];
-      const next = [val, ...list.filter((x) => x !== val)].slice(0, 8);
-      h[canon] = next; PFS.store.set(HKEY, h);
+    // value memory lives in the patterns engine (single memory — the datalist,
+    // the choice dropdown and the learning counters must never disagree).
+    function optionsOf(f) { return (PFS.patterns && PFS.patterns.optionsFor) ? PFS.patterns.optionsFor(f) : []; }
+    function rememberVal(f, val) {
+      val = String(val || '').trim(); if (val.length < 2) return;
+      if (PFS.patterns && PFS.patterns.touch) PFS.patterns.touch(f, val);
     }
+    // fieldKeys whose value came from prefill and was never touched by the
+    // user — the learning loop must skip them (self-reinforcement guard).
+    // Closure-scoped: show() re-runs (org-save, profile apply) and a per-show
+    // set would forget marks for fields already sitting on the overlay.
+    const autoKeys = new Set();
+
+    // floating learned-values picker (the "חלון בחירה" for campuses etc.)
+    let ddEl = null;
+    function closeChoices() { if (ddEl) { ddEl.remove(); ddEl = null; document.removeEventListener('pointerdown', onDDOutside, true); } }
+    function onDDOutside(e) { if (ddEl && !ddEl.contains(e.target)) closeChoices(); }
+    function openChoices(f, control, anchor) {
+      closeChoices();
+      const opts = optionsOf(f);
+      if (!opts.length) return;
+      ddEl = document.createElement('div');
+      ddEl.className = 'pat-dd';
+      const r = anchor.getBoundingClientRect();
+      ddEl.style.top = (r.bottom + 4) + 'px';
+      // RTL: align the list's RIGHT edge near the anchor, clamped to viewport
+      ddEl.style.right = Math.max(8, window.innerWidth - r.right - 4) + 'px';
+      // campus addresses get their campus name as a bold prefix in the list
+      const camps = PFS.store.get('org_campuses', []) || [];
+      const nameOf = (v) => { const c = camps.find((x) => x.address === v); return (c && c.name) ? c.name : null; };
+      opts.forEach((o) => {
+        const item = document.createElement('div');
+        item.className = 'pat-dd-item';
+        const txt = document.createElement('span'); txt.className = 'v';
+        const nm = nameOf(o.v);
+        if (nm) { const b = document.createElement('b'); b.textContent = nm + ' · '; txt.appendChild(b); }
+        txt.appendChild(document.createTextNode(o.v));
+        const tag = document.createElement('span'); tag.className = 'tag';
+        tag.textContent = o.pinned ? '📌 ידני' : ('×' + o.n);
+        const del = document.createElement('button'); del.className = 'x'; del.textContent = '✕';
+        del.title = 'שכח את הערך הזה';
+        del.addEventListener('click', (e) => {
+          e.stopPropagation();
+          PFS.patterns.removeValue(f, o.v);
+          openChoices(f, control, anchor);   // re-render (or close if emptied)
+        });
+        item.append(txt, tag, del);
+        item.addEventListener('click', () => {
+          control.value = o.v;
+          control.dispatchEvent(new Event('input', { bubbles: true }));
+          control.dispatchEvent(new Event('change', { bubbles: true }));
+          closeChoices();
+          control.focus({ preventScroll: true });
+        });
+        ddEl.appendChild(item);
+      });
+      const free = document.createElement('div');
+      free.className = 'pat-dd-item free';
+      free.textContent = '✎ ערך אחר…';
+      free.addEventListener('click', () => { closeChoices(); control.focus({ preventScroll: true }); control.select && control.select(); });
+      ddEl.appendChild(free);
+      document.body.appendChild(ddEl);
+      setTimeout(() => document.addEventListener('pointerdown', onDDOutside, true), 0);
+    }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChoices(); });
 
     let syncValuesImpl = null, focusFieldImpl = null;
     function clear() {
       Object.keys(ctrlByKey).forEach((k) => delete ctrlByKey[k]);
       syncValuesImpl = null; focusFieldImpl = null;
+      closeChoices();
       if (overlay.clearFieldMarkers) overlay.clearFieldMarkers();
       if (body) body.innerHTML = '';
       if (panel) panel.style.display = 'none';
@@ -137,6 +193,8 @@
         }
         return 0;
       }
+      const detKeys = new Set(det.fields.map((f) => f.fieldKey));
+      [...autoKeys].forEach((k) => { if (!detKeys.has(k)) autoKeys.delete(k); });
       const head = document.createElement('div'); head.className = 'hint muted';
       head.style.marginBottom = '4px';
       head.textContent = det.tier === 'acroform'
@@ -236,16 +294,32 @@
             control.title = r.msg;
           };
           control.__fkey = f.fieldKey; control.__canon = canon || '';
-          if (canon) {
-            const hist = histFor(canon);
-            if (hist.length) {
-              const dl = document.createElement('datalist'); dl.id = 'dl_' + canon + '_' + Math.random().toString(36).slice(2, 7);
-              hist.forEach((v) => { const o = document.createElement('option'); o.value = v; dl.appendChild(o); });
-              row.appendChild(dl); control.setAttribute('list', dl.id);
+          const patOpts = optionsOf(f);
+          if (patOpts.length >= 2) {
+            // learned CHOICES (campus addresses etc.) → a real, visible picker.
+            // No datalist here — one memory, one surface.
+            const pick = document.createElement('button');
+            pick.type = 'button'; pick.className = 'btn sm ghost fp-pick'; pick.textContent = '▾';
+            pick.title = 'בחירה מערכים שנלמדו (' + patOpts.length + ')';
+            pick.addEventListener('click', (e) => { e.preventDefault(); openChoices(f, control, pick); });
+            control.addEventListener('keydown', (e) => {
+              if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); openChoices(f, control, pick); }
+            });
+            inRow.appendChild(pick);
+            if (!control.value) {
+              const top = patOpts[0];
+              control.placeholder = '▾ לבחירה: ' + (top.v.length > 28 ? top.v.slice(0, 28) + '…' : top.v);
             }
-            control.addEventListener('change', () => remember(canon, control.value));
+          } else if (patOpts.length === 1) {
+            const dl = document.createElement('datalist'); dl.id = 'dl_' + Math.random().toString(36).slice(2, 8);
+            const o = document.createElement('option'); o.value = patOpts[0].v; dl.appendChild(o);
+            row.appendChild(dl); control.setAttribute('list', dl.id);
           }
-          control.addEventListener('input', () => { ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control); });
+          control.addEventListener('change', () => rememberVal(f, control.value));
+          control.addEventListener('input', () => {
+            autoKeys.delete(f.fieldKey); control.classList.remove('fp-auto');
+            ensureCtrl(f, control.value); validate(); recount(); propagateIdentity(control);
+          });
           // panel ↔ form visual link: focusing a row lights its marker on the
           // form and brings the spot into view — you always see WHERE you type
           control.addEventListener('focus', () => {
@@ -268,6 +342,9 @@
             control.value = pv;
             if (ensureCtrl(f, String(pv))) autoFilled++;
             validate();
+            autoKeys.add(f.fieldKey);
+            control.classList.add('fp-auto');
+            control.title = control.title || 'מולא אוטומטית — ערכו אם צריך';
           }
         }
         // date picker for date-type fields — no fumbling with formats
@@ -412,7 +489,12 @@
       showCur();
     }
 
-    return { show, clear, syncValues, focusField, emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty() };
+    return {
+      show, clear, syncValues, focusField,
+      emptyCount: () => emptyCount(), requiredEmpty: () => requiredEmpty(),
+      autoFilledKeys: () => [...autoKeys],
+      resetAutoFilled: () => autoKeys.clear()
+    };
   }
 
   PFS.createFieldsPanel = createFieldsPanel;

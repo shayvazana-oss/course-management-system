@@ -203,7 +203,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -245,8 +245,19 @@ function vaultPrefill(det) {
     const remembered = PFS.store.get('remembered_choices', {}) || {};
     const carry = pendingCarry; pendingCarry = null;   // one-shot
     const base = Object.assign({}, remembered, ap && ap.values);
-    if (!Object.keys(base).length && !(carry && Object.keys(carry).length)) return null;
-    const skip = overlay.fieldKeys();
+    const skip = new Set(overlay.fieldKeys());
+    // learned patterns: a value that keeps recurring fills itself (auto mode).
+    // Lowest priority — an explicit profile value or carried value always wins.
+    const patternAuto = {};
+    if (PFS.patterns && PFS.patterns.suggest) {
+      det.fields.forEach((f) => {
+        if (f.type === 'check' || skip.has(f.fieldKey)) return;
+        const sg = PFS.patterns.suggest(f);
+        if (sg && sg.mode === 'auto') patternAuto[f.fieldKey] = sg.value;
+      });
+    }
+    if (!Object.keys(base).length && !(carry && Object.keys(carry).length)
+        && !Object.keys(patternAuto).length) return null;
     // profile/remembered fill first — then values carried from a linked form
     // (הצעת מחיר → נספח) override them: the appendix must mirror what was just
     // typed, not what the profile happens to say for the same meaning.
@@ -256,7 +267,7 @@ function vaultPrefill(det) {
     // different forms produces confident-looking wrong fills (e.g. an
     // institution name landing in a person's "שם מלא")
     const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
-    return Object.assign({}, text, checks, carryText);
+    return Object.assign({}, patternAuto, text, checks, carryText);
   } catch (e) { return null; }
 }
 
@@ -376,6 +387,7 @@ async function openPdfFile(file) {
     loadGen++;
     const myGen = loadGen;
     lastDet = null;
+    fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
     attachments = [];
     updateAttachBadge();
     overlay.clearElements();
@@ -1013,6 +1025,16 @@ async function exDeliver(preferShare) {
   PFS.toast(shared ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
   dirty = false;
   try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
+  // a successful export confirms the filled values — feed the learning engine
+  // (skipping values that were auto-filled and never touched, so learning
+  // can't amplify itself)
+  try {
+    if (lastDet && lastDet.fields && lastDet.fields.length && PFS.patterns) {
+      const n = PFS.patterns.learnFrom(lastDet.fields, overlay.currentValues(),
+        fieldsPanel.autoFilledKeys ? fieldsPanel.autoFilledKeys() : []);
+      if (n) console.info('[patterns] learned from export:', n, 'fields');
+    }
+  } catch (e) { console.warn('[patterns] learn failed', e); }
   offerCompanions();
 }
 
@@ -1110,6 +1132,7 @@ $('pdfInput').addEventListener('change', (e) => { if (e.target.files[0]) openPdf
 function activateTab(name) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === name));
+  if (name === 'settings') renderLearned();
 }
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.tab)));
 
@@ -1118,6 +1141,52 @@ const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
 function openPanel() { $('rightpanel').classList.add('open'); }
 function closePanel() { $('rightpanel').classList.remove('open'); }
 $('panelToggle').addEventListener('click', () => $('rightpanel').classList.toggle('open'));
+
+// "מה נלמד" — transparency + control over the learning store. Automatic
+// learning is only trustworthy when it's inspectable and erasable.
+function renderLearned() {
+  const body = $('learnedBody'); if (!body) return;
+  const data = PFS.patterns ? PFS.patterns.all() : {};
+  body.innerHTML = '';
+  const slots = Object.keys(data);
+  if (!slots.length) {
+    body.innerHTML = '<div class="hint muted" style="padding:6px 0">עוד לא נלמד כלום — מלאו וייצאו טופס, והדפוסים יופיעו כאן.</div>';
+    return;
+  }
+  slots.forEach((slot) => {
+    const e = data[slot];
+    const wrap = document.createElement('div'); wrap.style.margin = '0 0 10px';
+    const h = document.createElement('div');
+    h.style.cssText = 'font-weight:700;font-size:12.5px;margin-bottom:4px;color:var(--ink-2)';
+    h.textContent = e.label || slot;
+    wrap.appendChild(h);
+    const chips = document.createElement('div'); chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px';
+    (e.values || []).forEach((r) => {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:11.5px;max-width:100%';
+      const v = document.createElement('span');
+      v.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px';
+      v.textContent = r.v; v.title = r.v;
+      const tag = document.createElement('span');
+      tag.style.cssText = 'color:var(--ink-4);font-weight:700;flex:none';
+      tag.textContent = r.pinned ? '📌' : ('×' + r.n);
+      const x = document.createElement('button');
+      x.style.cssText = 'border:0;background:none;color:var(--danger);cursor:pointer;padding:0;font-size:11px;flex:none';
+      x.textContent = '✕'; x.title = 'שכח את הערך הזה';
+      x.addEventListener('click', () => { PFS.patterns.removeAt(slot, r.v); renderLearned(); });
+      chip.append(v, tag, x);
+      chips.appendChild(chip);
+    });
+    wrap.appendChild(chips);
+    body.appendChild(wrap);
+  });
+}
+$('learnedClearBtn') && $('learnedClearBtn').addEventListener('click', async () => {
+  if (await PFS.ui.confirm('שכחת כל הלמידה', 'למחוק את כל הערכים שנלמדו? המילוי האוטומטי מהלמידה יתאפס (הפרופיל לא נמחק).')) {
+    PFS.patterns.clear(); renderLearned();
+    PFS.toast('הלמידה אופסה', 'ok');
+  }
+});
 
 // undo / redo — visible, always in reach (were keyboard-only before)
 $('undoBtn') && $('undoBtn').addEventListener('click', () => undo());
@@ -2139,14 +2208,38 @@ renderLibrary();
 const ORG_FIELDS = [
   { id: 'orgName', key: 'שם מוסד ההכשרה' },
   { id: 'orgPhone', key: 'טלפון מוסד ההכשרה' },
-  { id: 'orgAddress', key: 'כתובת מוסד ההכשרה' },
   { id: 'orgContact', key: 'איש קשר' },
   { id: 'orgBizId', key: 'ח.פ' }
 ];
+// campuses: name+address rows. The FIRST one is the primary (written to the
+// profile exactly like the old single address, so profile-beats-patterns and
+// the existing org auto-fill keep working); ALL of them go into the learning
+// store as pinned choices under institution_address — the campus picker.
+function campusRows() {
+  return [...document.querySelectorAll('#orgCampuses .org-campus')].map((r) => ({
+    name: r.querySelector('.cname').value.trim(),
+    address: r.querySelector('.caddr').value.trim()
+  })).filter((c) => c.address);
+}
+function addCampusRow(c) {
+  const row = document.createElement('div');
+  row.className = 'org-campus'; row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = '<input class="cname" type="text" dir="auto" placeholder="שם (קמפוס ת״א)" style="flex:1;min-width:0">' +
+    '<input class="caddr" type="text" dir="auto" placeholder="כתובת מלאה" style="flex:2;min-width:0">' +
+    '<button type="button" class="btn sm" style="color:var(--danger)">✕</button>';
+  if (c) { row.querySelector('.cname').value = c.name || ''; row.querySelector('.caddr').value = c.address || ''; }
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  $('orgCampuses').appendChild(row);
+}
+$('orgAddCampus') && $('orgAddCampus').addEventListener('click', () => addCampusRow());
 $('orgSetupBtn') && $('orgSetupBtn').addEventListener('click', () => {
   const ap = profiles.active();
   const vals = (ap && ap.values) || {};
   ORG_FIELDS.forEach((f) => { $(f.id).value = vals[f.key] || ''; });
+  $('orgCampuses').innerHTML = '';
+  const saved = PFS.store.get('org_campuses', []) || [];
+  if (saved.length) saved.forEach(addCampusRow);
+  else addCampusRow(vals['כתובת מוסד ההכשרה'] ? { name: 'ראשי', address: vals['כתובת מוסד ההכשרה'] } : undefined);
   openModal('orgModal');
 });
 $('orgCancel') && $('orgCancel').addEventListener('click', () => closeModal('orgModal'));
@@ -2154,6 +2247,16 @@ $('orgSave') && $('orgSave').addEventListener('click', () => {
   const ap = profiles.active();
   const merged = Object.assign({}, ap && ap.values);
   ORG_FIELDS.forEach((f) => { const v = ($(f.id).value || '').trim(); if (v) merged[f.key] = v; else delete merged[f.key]; });
+  const campuses = campusRows();
+  if (campuses.length) merged['כתובת מוסד ההכשרה'] = campuses[0].address;
+  else delete merged['כתובת מוסד ההכשרה'];
+  if (PFS.patterns) {
+    // forget campuses that were removed in this edit, pin the current set
+    const prev = PFS.store.get('org_campuses', []) || [];
+    prev.forEach((c) => { if (!campuses.some((n) => n.address === c.address)) PFS.patterns.removeValue('כתובת מוסד ההכשרה', c.address); });
+    campuses.forEach((c) => { PFS.patterns.touch('כתובת מוסד ההכשרה', c.address); PFS.patterns.pin('כתובת מוסד ההכשרה', c.address, true); });
+  }
+  PFS.store.set('org_campuses', campuses);
   profiles.saveProfile(ap ? ap.name : 'אני', merged);
   closeModal('orgModal');
   let n = 0;

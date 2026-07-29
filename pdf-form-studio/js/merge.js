@@ -7,8 +7,21 @@
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
 
-  // Minimal RFC-4180-ish CSV parser (quotes, commas, CRLF, escaped "").
+  // Which delimiter does this table use? Excel paste is TAB-separated, exports
+  // are comma or semicolon — pick whichever splits the first line the most.
+  function detectDelim(text) {
+    const line = String(text || '').replace(/^﻿/, '').split(/\r?\n/, 1)[0] || '';
+    const counts = [['\t', (line.match(/\t/g) || []).length],
+                    [',', (line.match(/,/g) || []).length],
+                    [';', (line.match(/;/g) || []).length]];
+    counts.sort((a, b) => b[1] - a[1]);
+    return counts[0][1] > 0 ? counts[0][0] : ',';
+  }
+
+  // Minimal RFC-4180-ish parser (quotes, CRLF, escaped "") with auto delimiter
+  // so a straight Excel copy-paste just works.
   function parseCSV(text) {
+    const delim = detectDelim(text);
     const rows = [];
     let row = [], field = '', i = 0, inQ = false;
     text = text.replace(/^﻿/, ''); // strip BOM
@@ -22,7 +35,7 @@
         field += c; i++; continue;
       }
       if (c === '"') { inQ = true; i++; continue; }
-      if (c === ',') { row.push(field); field = ''; i++; continue; }
+      if (c === delim) { row.push(field); field = ''; i++; continue; }
       if (c === '\r') { i++; continue; }
       if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
       field += c; i++;
@@ -39,6 +52,44 @@
   }
 
   function cloneModels(models) { return models.map((m) => Object.assign({}, m)); }
+
+  /* mapHeaders(headers, fieldKeys) → { header: fieldKey|null }
+   * Spreadsheet headers rarely match field names letter-for-letter; map them
+   * the way the vault maps labels: exact normalized equality first, then
+   * shared canonical meaning ('שם התלמיד' ↔ 'שם מלא' both → full_name).
+   * A field key is used at most once; ambiguity leaves the header unmapped. */
+  function mapHeaders(headers, fieldKeys) {
+    const V = PFS.vault;
+    const map = {};
+    const taken = new Set();
+    // pass 1: exact normalized equality
+    headers.forEach((h) => {
+      const hit = fieldKeys.find((k) => !taken.has(k) && V.norm(k) === V.norm(h));
+      if (hit) { map[h] = hit; taken.add(hit); }
+    });
+    // pass 2: same canonical meaning. Several fields can share a canon
+    // ('שם מלא' and 'שם מנהל מוסד ההכשרה' are both person-names) — prefer the
+    // SHORTEST normalized key: the purest expression of the meaning.
+    headers.forEach((h) => {
+      if (map[h]) return;
+      const canon = V.matchKey(h);
+      if (!canon) { map[h] = null; return; }
+      const hits = fieldKeys.filter((k) => !taken.has(k) && V.matchKey(k) === canon)
+        .sort((a, b) => V.norm(a).length - V.norm(b).length);
+      if (hits.length) { map[h] = hits[0]; taken.add(hits[0]); }
+      else map[h] = null;
+    });
+    return map;
+  }
+
+  /* remapRecords(records, mapping) → records keyed by fieldKey */
+  function remapRecords(records, mapping) {
+    return records.map((r) => {
+      const o = {};
+      Object.keys(r).forEach((h) => { const k = mapping[h]; if (k) o[k] = r[h]; });
+      return o;
+    });
+  }
 
   // Enrich a CSV record with meaning-matched + derived values for the tagged
   // fields, so batch fill is as smart as interactive fill: an "address" column
@@ -100,5 +151,5 @@
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, applyRecord, enrichRecord, runBatch, downloadZip };
+  PFS.merge = { parseCSV, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip };
 })(window);

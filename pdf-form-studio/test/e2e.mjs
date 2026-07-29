@@ -1004,6 +1004,81 @@ async function main() {
   if (compRes !== true) console.log('  [companion debug]', compRes);
   check('companion opens pre-filled from the trigger form\'s values', compRes === true);
 
+  // ---- class fill: Excel paste + smart header mapping ----
+  {
+    const mapRes = await page.evaluate(() => {
+      const M = window.PFS.merge;
+      // Excel paste is TAB-separated; headers use natural wording, not field keys
+      const tsv = 'שם התלמיד\tת.ז.\tנייד\nישראל ישראלי\t123456782\t050-1111111\nדנה כהן\t207105749\t052-2222222';
+      const parsed = M.parseCSV(tsv);
+      const tsvOk = parsed.headers.length === 3 && parsed.records.length === 2
+        && parsed.records[0]['שם התלמיד'] === 'ישראל ישראלי';
+      // form fields are worded differently — canon mapping must bridge
+      const mapping = M.mapHeaders(parsed.headers, ['שם מלא', 'תעודת זהות', 'טלפון']);
+      const mapOk = mapping['שם התלמיד'] === 'שם מלא'
+        && mapping['ת.ז.'] === 'תעודת זהות'
+        && mapping['נייד'] === 'טלפון';
+      const remapped = M.remapRecords(parsed.records, mapping);
+      const remapOk = remapped[1]['שם מלא'] === 'דנה כהן' && remapped[0]['תעודת זהות'] === '123456782';
+      // semicolon CSV also parses
+      const semi = M.parseCSV('a;b\n1;2');
+      const semiOk = semi.records.length === 1 && semi.records[0].b === '2';
+      return { tsvOk, mapOk, remapOk, semiOk };
+    });
+    if (!Object.values(mapRes).every(Boolean)) console.log('  [map debug]', JSON.stringify(mapRes));
+    check('class-fill: Excel TSV paste parses, headers canon-map to fields', mapRes.tsvOk && mapRes.mapOk && mapRes.remapOk && mapRes.semiOk);
+  }
+
+  // ---- course binder: paste students, track, auto-mark on export ----
+  {
+    const crsRes = await page.evaluate(() => {
+      const C = window.PFS.courses;
+      window.PFS.store.set('courses', []);
+      const c = C.create('אילוף כלבים — מחזור ג');
+      // paste WITH a header row (Excel) — canon-mapped columns
+      const n1 = C.addStudents(c.id, C.parseStudentRows('שם מלא\tתעודת זהות\tטלפון\nישראל ישראלי\t123456782\t050-1111111'));
+      // paste WITHOUT a header (WhatsApp-style lines) — heuristic cells
+      const n2 = C.addStudents(c.id, C.parseStudentRows('דנה כהן, 207105749, 052-2222222'));
+      const dedup = C.addStudents(c.id, C.parseStudentRows('ישראל ישראלי\t123456782\t050-1111111'));
+      C.addForm(c.id, { name: 'נספח ה3', fp: 'fp_test_1', libId: null });
+      const before = C.missingCount(C.get(c.id));
+      // an export of that form containing דנה's ת"ז auto-marks her cell
+      const marks = C.recordExport('fp_test_1', { f1: 'דנה כהן', f2: '207105749', f3: 'טקסט אחר' });
+      const after = C.missingCount(C.get(c.id));
+      const marked = C.isSubmitted(C.get(c.id), '207105749', 'נספח ה3');
+      // an export of an UNKNOWN form marks nothing
+      const noise = C.recordExport('fp_other', { f1: 'ישראל ישראלי' });
+      const stillMissing = C.missingCount(C.get(c.id)) === after;
+      // manual toggle works both ways
+      C.setSubmitted(c.id, '123456782', 'נספח ה3', true);
+      const allDone = C.missingCount(C.get(c.id)) === 0;
+      window.PFS.store.set('courses', []);
+      return { added: n1 === 1 && n2 === 1 && dedup === 0, before2: before === 2, marks: marks.length === 1, marked, after1: after === 1, noise: noise.length === 0 && stillMissing, allDone };
+    });
+    if (!Object.values(crsRes).every(Boolean)) console.log('  [courses debug]', JSON.stringify(crsRes));
+    check('course binder: paste (header/free) + dedup + missing count', crsRes.added && crsRes.before2);
+    check('course binder: export auto-marks the right student, ignores noise', crsRes.marks && crsRes.marked && crsRes.after1 && crsRes.noise && crsRes.allDone);
+  }
+
+  // ---- "מלא עבור תלמיד": student values ride canon matching into any form ----
+  {
+    const stuRes = await page.evaluate(() => {
+      const T = window.PFS.__test;
+      window.PFS.store.set('patterns', {});
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 's_nm', label: 'שם התלמיד', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 's_tz', label: 'ת.ז.', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.setStudent({ 'שם מלא': 'דנה כהן', 'תעודת זהות': '207105749', 'טלפון': '052-2222222' });
+      const pre = T.vaultPrefillFor(det) || {};
+      // one-shot: a second call must not reuse the student
+      const pre2 = T.vaultPrefillFor(det) || {};
+      return { nm: pre.s_nm === 'דנה כהן', tz: pre.s_tz === '207105749', oneShot: pre2.s_nm !== 'דנה כהן' };
+    });
+    if (!Object.values(stuRes).every(Boolean)) console.log('  [student debug]', JSON.stringify(stuRes));
+    check('student prefill canon-maps name/tz into differently-worded fields, one-shot', stuRes.nm && stuRes.tz && stuRes.oneShot);
+  }
+
   // ---- one-gesture deletion: hover the element, click ✕ ----
   {
     const delRes = await page.evaluate(async () => {

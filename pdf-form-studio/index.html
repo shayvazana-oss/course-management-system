@@ -44,6 +44,7 @@
       <button class="btn ghost" id="helpBtn" title="עזרה וקיצורי מקלדת (?)" aria-label="עזרה וקיצורי מקלדת"><span class="ic">?</span></button>
       <button class="btn ghost" id="themeBtn" title="מצב תצוגה (בהיר/כהה)" aria-label="החלפת מצב תצוגה בהיר או כהה"><span class="ic" id="themeIc">🌙</span></button>
       <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל" aria-label="פתיחת פאנל הצד">☰</button>
+      <button class="btn ghost" id="coursesBtn" title="תיקי קורסים — מי הגיש מה"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M9 13h6M9 17h6"/></svg></span><span class="txt">קורסים</span></button>
       <button class="btn ghost" id="libBtn" title="המאגר — הטפסים הקבועים שלכם, בקליק אחד"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="txt">מאגר</span></button>
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
       <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
@@ -441,17 +442,25 @@
 <input type="file" id="backupFile" accept="application/json" class="hidden" />
 
 <!-- Mail-merge modal -->
+<div class="modal-back" id="coursesModal">
+  <div class="modal" style="max-width:760px">
+    <header>🗂 תיקי קורסים</header>
+    <div class="m-body" id="coursesBody" style="max-height:70vh;overflow:auto"></div>
+    <footer class="m-foot"><button class="btn" id="coursesClose">סגור</button></footer>
+  </div>
+</div>
+
 <div class="modal-back" id="mergeModal">
   <div class="modal" style="max-width:560px">
     <header>🧬 מיזוג מרובה — מילוי אצווה</header>
     <div class="m-body">
-      <div class="hint">מלאו טופס אחד עבור הרבה רשומות בבת אחת. תייגו שדות בטופס ב“שם שדה”, טענו טבלה שבה <b>שורת הכותרת = שמות השדות</b>, וקבלו קובץ ZIP עם PDF לכל שורה. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
+      <div class="hint">מלאו טופס אחד לדוגמה, הדביקו את רשימת התלמידים מאקסל — והעמודות ימופו לשדות <b>אוטומטית</b> ("שם התלמיד" יזוהה כ"שם מלא" וכו'). התוצאה: ZIP עם PDF מוכן לכל שורה. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
       <div class="field">
         <label>שדות מתויגים בטופס</label>
         <div id="mergeKeys" class="hint">—</div>
       </div>
       <div class="field">
-        <label>הדביקו CSV או טענו קובץ (שורה ראשונה = שמות השדות)</label>
+        <label>הדביקו טבלה מאקסל (Ctrl+V) או טענו קובץ CSV — שורה ראשונה = כותרות</label>
         <textarea id="mergeCsv" rows="6" style="width:100%; font-family:var(--font-mono); font-size:12px; padding:8px; border:1px solid var(--line); border-radius:8px; direction:ltr"></textarea>
         <div class="row" style="margin-top:6px">
           <button class="btn sm ghost" id="mergeLoadFile">⬆️ טען CSV</button>
@@ -459,8 +468,16 @@
           <span id="mergeStatus" class="hint muted" style="flex:1; text-align:left"></span>
         </div>
       </div>
+      <div class="field hidden" id="mergeMapWrap">
+        <label>מיפוי עמודות → שדות (זוהה אוטומטית; אפשר לשנות)</label>
+        <div id="mergeMap" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <div class="field hidden" id="mergePreviewWrap">
+        <label>תצוגה מקדימה</label>
+        <div id="mergePreview" style="overflow-x:auto;font-size:11.5px"></div>
+      </div>
       <div class="field">
-        <label>שם הקובץ לכל רשומה לפי השדה</label>
+        <label>שם הקובץ לכל רשומה לפי העמודה</label>
         <select id="mergeNameField"><option value="">(מספר רץ)</option></select>
       </div>
     </div>
@@ -659,6 +676,7 @@
 <script src="./js/formula.js"></script>
 <script src="./js/vault.js"></script>
 <script src="./js/patterns.js"></script>
+<script src="./js/courses.js"></script>
 <script src="./js/validate.js"></script>
 <script src="./js/align.js"></script>
 <script src="./js/ui.js"></script>

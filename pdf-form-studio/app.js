@@ -201,7 +201,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -242,7 +242,10 @@ function vaultPrefill(det) {
     // profile value always wins over a remembered one.
     const remembered = PFS.store.get('remembered_choices', {}) || {};
     const carry = pendingCarry; pendingCarry = null;   // one-shot
-    const base = Object.assign({}, remembered, ap && ap.values);
+    const stu = pendingStudent; pendingStudent = null;   // one-shot
+    // student values ride the same canon matching as the profile (a ת"ז column
+    // fills every ת"ז-meaning field) and OUTRANK it — this form is THEIRS
+    const base = Object.assign({}, remembered, ap && ap.values, stu || {});
     const skip = new Set(overlay.fieldKeys());
     // learned patterns: a value that keeps recurring fills itself (auto mode).
     // Lowest priority — an explicit profile value or carried value always wins.
@@ -319,6 +322,7 @@ function panelValueMap() {
 }
 
 let pendingCarry = null; // values captured from a form before jumping to its linked companion
+let pendingStudent = null; // one-shot student values (course binder "מלא עבור…")
 
 // =====================================================================
 //  Linked companions (נספחים) — quote → appendix chains
@@ -1048,6 +1052,13 @@ async function exDeliver(preferShare) {
       if (n) console.info('[patterns] learned from export:', n, 'fields');
     }
   } catch (e) { console.warn('[patterns] learn failed', e); }
+  // course binder: this export may BE a registered student's submission
+  try {
+    if (PFS.courses && currentFp) {
+      const marks = PFS.courses.recordExport(currentFp, overlay.currentValues());
+      marks.forEach((m) => PFS.toast(`🗂 סומן: ${m.student.name} הגיש/ה "${m.form.name}" (${m.course.name})`, 'ok', 5000));
+    }
+  } catch (e) { console.warn('[courses] mark failed', e); }
   offerCompanions();
 }
 
@@ -1598,21 +1609,28 @@ $('vaultScanBtn').addEventListener('click', () => {
   if (!(window.Tesseract && window.PFS_TESS)) { PFS.toast('קריאת תעודות אינה זמינה בגרסה זו (אין OCR)', 'err'); return; }
   $('vaultInput').click();
 });
+/* scanIdPhoto(file, onStatus) → vals ({full_name, id, phone, …} canon keys)
+ * The one OCR pipeline, shared by profile quick-setup AND the course binder's
+ * "add student from an ID photo". All local, nothing leaves the device. */
+async function scanIdPhoto(file, onStatus) {
+  const status = onStatus || (() => {});
+  // downscale big photos for OCR speed
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+  const maxW = 1600, sc = Math.min(1, maxW / img.naturalWidth);
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  URL.revokeObjectURL(img.src);
+  const text = await PFS.vault.recognizeImage(c, (p) => status(`קורא את התעודה… ${Math.round(p * 100)}%`));
+  return PFS.vault.extractFromText(text);
+}
 $('vaultInput').addEventListener('change', async (e) => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   const btn = $('vaultScanBtn'); btn.disabled = true;
   vaultScanStatus('קורא את התעודה… זה לוקח עד חצי דקה, הכול מקומי במכשיר 🔒');
   try {
-    // downscale big photos for OCR speed
-    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
-    const maxW = 1600, sc = Math.min(1, maxW / img.naturalWidth);
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    URL.revokeObjectURL(img.src);
-    const text = await PFS.vault.recognizeImage(c, (p) => vaultScanStatus(`קורא את התעודה… ${Math.round(p * 100)}%`));
-    const vals = PFS.vault.extractFromText(text);
+    const vals = await scanIdPhoto(file, vaultScanStatus);
     const found = Object.keys(vals);
     if (!found.length) { vaultScanStatus(''); PFS.toast('לא הצלחתי לחלץ פרטים מהתמונה — נסו צילום ישר, מואר וחד', 'err'); return; }
     // merge into the active profile (create one on first use), Hebrew keys so
@@ -1632,6 +1650,180 @@ $('vaultInput').addEventListener('change', async (e) => {
 });
 
 // =====================================================================
+//  Course binder — "מי הגיש מה" without the side spreadsheet
+// =====================================================================
+let coursesView = null; // null = course list; courseId = that course's grid
+function renderCourses() {
+  const body = $('coursesBody'); body.innerHTML = '';
+  const C = PFS.courses;
+  if (coursesView) { renderCourseGrid(C.get(coursesView)); return; }
+  const list = C.all();
+  const top = document.createElement('div');
+  top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
+  top.innerHTML = '<span class="hint muted">קורס = רשימת תלמידים + הטפסים שכל אחד צריך להגיש. כל ייצוא מסמן ✓ אוטומטית.</span>';
+  const add = document.createElement('button'); add.className = 'btn sm primary'; add.textContent = '+ קורס חדש';
+  add.addEventListener('click', async () => {
+    const name = await PFS.ui.prompt('קורס חדש', { placeholder: 'למשל: אילוף כלבים — מחזור ג׳' });
+    if (name && name.trim()) { const c = PFS.courses.create(name.trim()); coursesView = c.id; renderCourses(); }
+  });
+  top.appendChild(add); body.appendChild(top);
+  if (!list.length) {
+    body.insertAdjacentHTML('beforeend', '<div class="hint muted" style="text-align:center;padding:24px">עוד אין קורסים — צרו את הראשון ותפסיקו לנהל מעקב באקסל צדדי.</div>');
+    return;
+  }
+  list.forEach((c) => {
+    const miss = PFS.courses.missingCount(c);
+    const row = document.createElement('div');
+    row.className = 'card'; row.style.cssText = 'margin-bottom:8px;cursor:pointer';
+    row.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+      <div style="flex:1;min-width:0"><b>${c.name}</b>
+        <div class="hint muted">${c.students.length} תלמידים · ${c.forms.length} טפסים</div></div>
+      ${miss ? `<span style="background:var(--danger-soft);color:var(--danger);font-weight:800;font-size:12px;border-radius:999px;padding:4px 10px;flex:none">חסרים ${miss}</span>`
+             : (c.students.length && c.forms.length ? '<span style="color:var(--ok);font-weight:800;font-size:12px;flex:none">✓ הכול הוגש</span>' : '')}
+      <button class="btn sm cs-del" style="color:var(--danger);flex:none">✕</button></div>`;
+    row.addEventListener('click', (e) => {
+      if (e.target.classList.contains('cs-del')) return;
+      coursesView = c.id; renderCourses();
+    });
+    row.querySelector('.cs-del').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (await PFS.ui.confirm('מחיקת קורס', `למחוק את "${c.name}" כולל המעקב?`)) { PFS.courses.remove(c.id); renderCourses(); }
+    });
+    body.appendChild(row);
+  });
+}
+function renderCourseGrid(c) {
+  const body = $('coursesBody');
+  if (!c) { coursesView = null; renderCourses(); return; }
+  const C = PFS.courses;
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap';
+  head.innerHTML = `<button class="btn sm" id="csBack">→ חזרה</button><b style="flex:1;font-size:15px">${c.name}</b>`;
+  const pasteB = document.createElement('button'); pasteB.className = 'btn sm'; pasteB.textContent = '📋 הדבק רשימת תלמידים';
+  const photoB = document.createElement('button'); photoB.className = 'btn sm'; photoB.textContent = '📸 תלמיד מצילום ת״ז';
+  const formB = document.createElement('button'); formB.className = 'btn sm'; formB.textContent = '➕ הוסף את הטופס הפתוח';
+  formB.disabled = !pdfView.hasDoc();
+  head.append(pasteB, photoB, formB);
+  body.appendChild(head);
+  head.querySelector('#csBack').addEventListener('click', () => { coursesView = null; renderCourses(); });
+
+  // paste area (hidden until asked)
+  const pasteWrap = document.createElement('div');
+  pasteWrap.className = 'hidden'; pasteWrap.style.marginBottom = '10px';
+  pasteWrap.innerHTML = `<textarea id="csPaste" rows="4" placeholder="הדביקו מאקסל/וואטסאפ — שם, ת״ז, טלפון (עם או בלי שורת כותרת)" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--line);border-radius:8px"></textarea>
+    <button class="btn sm primary" id="csPasteGo" style="margin-top:4px">הוסף תלמידים</button>`;
+  body.appendChild(pasteWrap);
+  pasteB.addEventListener('click', () => pasteWrap.classList.toggle('hidden'));
+  pasteWrap.querySelector('#csPasteGo').addEventListener('click', () => {
+    const rows = C.parseStudentRows(pasteWrap.querySelector('#csPaste').value);
+    const n = C.addStudents(c.id, rows);
+    PFS.toast(n ? `נוספו ${n} תלמידים` : 'לא זוהו תלמידים חדשים ברשימה', n ? 'ok' : 'err');
+    renderCourses();
+  });
+  photoB.addEventListener('click', () => addStudentFromPhoto(c.id));
+  formB.addEventListener('click', async () => {
+    if (!pdfView.hasDoc() || !currentFp) return;
+    // the form must live in the library so a missing cell can reopen it
+    let libId = null;
+    try {
+      const docs = await PFS.library.list();
+      const clean = String(currentFileName || '').replace(/\.pdf$/i, '').trim();
+      const hit = docs.find((d) => d.name === clean);
+      if (!hit) {
+        const b = pdfView.getBytes();
+        const copy = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+        libId = (await PFS.library.add(currentFileName, copy)).id;
+      } else libId = hit.id;
+    } catch (e) { console.warn(e); }
+    const ok = C.addForm(c.id, { name: currentFileName, fp: currentFp, libId });
+    PFS.toast(ok ? `"${currentFileName}" נוסף לקורס` : 'הטופס כבר בקורס', ok ? 'ok' : 'err');
+    renderCourses();
+  });
+
+  if (!c.students.length && !c.forms.length) {
+    body.insertAdjacentHTML('beforeend', '<div class="hint muted" style="text-align:center;padding:18px">התחילו: הדביקו רשימת תלמידים, פתחו טופס והוסיפו אותו לקורס.</div>');
+    return;
+  }
+  const miss = C.missingCount(c);
+  body.insertAdjacentHTML('beforeend', `<div style="margin:0 0 8px;font-weight:700;font-size:13px">${miss ? `⏳ חסרים ${miss} טפסים` : '✅ כל הטפסים הוגשו'}</div>`);
+
+  // the grid: students × forms
+  const wrap = document.createElement('div'); wrap.style.overflowX = 'auto';
+  const tbl = document.createElement('table');
+  tbl.style.cssText = 'border-collapse:collapse;width:100%;font-size:12.5px';
+  let h = '<tr><th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);text-align:right">תלמיד/ה</th>';
+  c.forms.forEach((f) => {
+    h += `<th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.name}">${f.name}
+      <button class="btn sm cs-form-del" data-form="${f.name}" style="border:0;background:none;color:var(--ink-4);padding:0 2px;cursor:pointer">✕</button></th>`;
+  });
+  h += '<th style="border:1px solid var(--line);padding:6px;background:var(--surface-2)"></th></tr>';
+  c.students.forEach((st) => {
+    const k = C.studentKey(st);
+    h += `<tr><td style="border:1px solid var(--line);padding:6px 8px;white-space:nowrap"><b>${st.name}</b>${st.tz ? ` <span class="hint muted">${st.tz}</span>` : ''}</td>`;
+    c.forms.forEach((f) => {
+      const done = C.isSubmitted(c, k, f.name);
+      h += `<td style="border:1px solid var(--line);padding:3px;text-align:center">
+        <button class="cs-cell" data-key="${k}" data-form="${f.name}" data-lib="${f.libId || ''}"
+          title="${done ? 'הוגש — קליק לביטול הסימון' : 'קליק: פתח ומלא עבור התלמיד/ה · Shift+קליק: סמן שהוגש'}"
+          style="border:0;background:${done ? 'var(--ok-soft)' : 'transparent'};color:${done ? 'var(--ok)' : 'var(--ink-4)'};font-weight:800;cursor:pointer;border-radius:6px;padding:4px 12px">${done ? '✓' : '—'}</button></td>`;
+    });
+    h += `<td style="border:1px solid var(--line);padding:3px;text-align:center"><button class="cs-st-del" data-key="${k}" style="border:0;background:none;color:var(--danger);cursor:pointer;font-size:11px">✕</button></td></tr>`;
+  });
+  tbl.innerHTML = h; wrap.appendChild(tbl); body.appendChild(wrap);
+
+  tbl.querySelectorAll('.cs-cell').forEach((btn) => btn.addEventListener('click', async (e) => {
+    const key = btn.dataset.key, formName = btn.dataset.form;
+    const done = C.isSubmitted(C.get(c.id), key, formName);
+    if (done) { C.setSubmitted(c.id, key, formName, false); renderCourses(); return; }
+    if (e.shiftKey || !btn.dataset.lib) { C.setSubmitted(c.id, key, formName, true); renderCourses(); return; }
+    // open the form from the library, pre-filled for THIS student
+    const st = C.get(c.id).students.find((x) => C.studentKey(x) === key);
+    if (st) pendingStudent = { 'שם מלא': st.name, 'תעודת זהות': st.tz || '', 'טלפון': st.phone || '' };
+    closeModal('coursesModal');
+    openFromLibrary(btn.dataset.lib);
+  }));
+  tbl.querySelectorAll('.cs-form-del').forEach((b) => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (await PFS.ui.confirm('הסרת טופס', `להסיר את "${b.dataset.form}" מהקורס?`)) { C.removeForm(c.id, b.dataset.form); renderCourses(); }
+  }));
+  tbl.querySelectorAll('.cs-st-del').forEach((b) => b.addEventListener('click', async () => {
+    if (await PFS.ui.confirm('הסרת תלמיד/ה', 'להסיר מהקורס כולל המעקב?')) { C.removeStudent(c.id, b.dataset.key); renderCourses(); }
+  }));
+}
+// course binder: photograph an ID → a student row (confirmed before saving)
+let csPhotoInput = null;
+function addStudentFromPhoto(courseId) {
+  if (!csPhotoInput) {
+    csPhotoInput = document.createElement('input');
+    csPhotoInput.type = 'file'; csPhotoInput.accept = 'image/*';
+    document.body.appendChild(csPhotoInput);
+    csPhotoInput.style.display = 'none';
+  }
+  csPhotoInput.onchange = async () => {
+    const file = csPhotoInput.files[0]; csPhotoInput.value = '';
+    if (!file) return;
+    PFS.toast('קורא את התעודה… הכול מקומי במכשיר 🔒', 'ok', 3000);
+    try {
+      const vals = await scanIdPhoto(file, () => {});
+      const name = [vals.first_name, vals.last_name].filter(Boolean).join(' ') || vals.full_name || '';
+      if (!name && !vals.id) { PFS.toast('לא זוהו פרטים — נסו צילום ישר ומואר', 'err'); return; }
+      const conf = await PFS.ui.prompt('אישור פרטי תלמיד/ה', {
+        value: `${name || ''}${vals.id ? ', ' + vals.id : ''}${vals.phone ? ', ' + vals.phone : ''}`,
+        message: 'זה מה שחולץ מהצילום (שם, ת״ז, טלפון) — תקנו אם צריך ואשרו'
+      });
+      if (conf == null) return;
+      const rows = PFS.courses.parseStudentRows(conf);
+      const n = rows.length ? PFS.courses.addStudents(courseId, rows) : 0;
+      PFS.toast(n ? `✓ ${rows[0].name} נוסף/ה לקורס` : 'לא נוסף — בדקו את הפורמט', n ? 'ok' : 'err');
+      renderCourses();
+    } catch (e) { console.error(e); PFS.toast('קריאת הצילום נכשלה', 'err'); }
+  };
+  csPhotoInput.click();
+}
+$('coursesBtn') && $('coursesBtn').addEventListener('click', () => { coursesView = null; renderCourses(); openModal('coursesModal'); });
+$('coursesClose') && $('coursesClose').addEventListener('click', () => closeModal('coursesModal'));
+
+// =====================================================================
 //  Mail-merge (batch)
 // =====================================================================
 let mergeParsed = null; // { headers, records }
@@ -1642,8 +1834,47 @@ function openMerge() {
     : '<span class="muted">אין שדות מתויגים — הוסיפו “שם שדה” לשדות טקסט תחילה.</span>';
   // seed CSV textarea with a header row of the field keys if empty
   if (keys.length && !$('mergeCsv').value.trim()) $('mergeCsv').value = keys.join(',') + '\n';
-  mergeParsed = null; $('mergeRun').disabled = true; $('mergeStatus').textContent = ''; $('mergeProg').textContent = '';
+  mergeParsed = null; mergeMapping = null; $('mergeRun').disabled = true; $('mergeStatus').textContent = ''; $('mergeProg').textContent = '';
+  $('mergeMapWrap').classList.add('hidden'); $('mergePreviewWrap').classList.add('hidden');
   openModal('mergeModal');
+}
+let mergeMapping = null; // header → fieldKey|null (auto + manual overrides)
+function renderMergeMapUI(parsed, keys) {
+  const wrap = $('mergeMap'); wrap.innerHTML = '';
+  parsed.headers.forEach((h) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px';
+    const lab = document.createElement('span');
+    lab.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:600';
+    lab.textContent = h; lab.title = h;
+    const sel = document.createElement('select');
+    sel.style.cssText = 'flex:1.2;min-width:0;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--surface)';
+    const none = document.createElement('option'); none.value = ''; none.textContent = '(דלג על העמודה)'; sel.appendChild(none);
+    keys.forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
+    sel.value = mergeMapping[h] || '';
+    if (mergeMapping[h]) sel.style.borderColor = 'var(--ok)';
+    sel.addEventListener('change', () => {
+      mergeMapping[h] = sel.value || null;
+      sel.style.borderColor = sel.value ? 'var(--ok)' : 'var(--line)';
+      renderMergePreview(parsed);
+    });
+    row.append(lab, sel);
+    wrap.appendChild(row);
+  });
+  $('mergeMapWrap').classList.remove('hidden');
+}
+function renderMergePreview(parsed) {
+  const mapped = parsed.headers.filter((h) => mergeMapping[h]);
+  const pv = $('mergePreview');
+  if (!mapped.length) { pv.innerHTML = '<span class="muted">אין עמודות ממופות</span>'; return; }
+  const rows = parsed.records.slice(0, 3);
+  let html = '<table style="border-collapse:collapse;width:100%"><tr>' +
+    mapped.map((h) => `<th style="border:1px solid var(--line);padding:3px 6px;background:var(--surface-2);white-space:nowrap">${mergeMapping[h]}</th>`).join('') + '</tr>';
+  rows.forEach((r) => {
+    html += '<tr>' + mapped.map((h) => `<td style="border:1px solid var(--line);padding:3px 6px;white-space:nowrap">${(r[h] || '')}</td>`).join('') + '</tr>';
+  });
+  pv.innerHTML = html + '</table>' + (parsed.records.length > 3 ? `<div class="hint muted">…ועוד ${parsed.records.length - 3} שורות</div>` : '');
+  $('mergePreviewWrap').classList.remove('hidden');
 }
 function doParseMerge() {
   const txt = $('mergeCsv').value;
@@ -1651,11 +1882,19 @@ function doParseMerge() {
   if (!parsed.records.length) { $('mergeStatus').textContent = 'לא נמצאו רשומות'; $('mergeRun').disabled = true; mergeParsed = null; return; }
   mergeParsed = parsed;
   const keys = overlay.fieldKeys();
-  const matched = parsed.headers.filter((h) => keys.includes(h));
-  $('mergeStatus').textContent = `${parsed.records.length} רשומות · ${matched.length}/${keys.length} שדות תואמים`;
+  // smart mapping: exact-normalized then shared-canon ('שם התלמיד' ↔ 'שם מלא')
+  mergeMapping = PFS.merge.mapHeaders(parsed.headers, keys);
+  const mappedCount = parsed.headers.filter((h) => mergeMapping[h]).length;
+  $('mergeStatus').textContent = `${parsed.records.length} רשומות · ${mappedCount}/${parsed.headers.length} עמודות מופו`;
+  renderMergeMapUI(parsed, keys);
+  renderMergePreview(parsed);
   const nf = $('mergeNameField'); nf.innerHTML = '<option value="">(מספר רץ)</option>';
   parsed.headers.forEach((h) => { const o = document.createElement('option'); o.value=h; o.textContent=h; nf.appendChild(o); });
-  $('mergeRun').disabled = false;
+  // default file naming: the column that means "person name"
+  const nameCol = parsed.headers.find((h) => mergeMapping[h] && PFS.vault.matchKey(mergeMapping[h]) === 'full_name')
+    || parsed.headers.find((h) => PFS.vault.matchKey(h) === 'full_name');
+  if (nameCol) nf.value = nameCol;
+  $('mergeRun').disabled = mappedCount === 0;
 }
 $('mergeParse').addEventListener('click', doParseMerge);
 $('mergeCsv').addEventListener('input', () => { $('mergeRun').disabled = true; });
@@ -1672,11 +1911,19 @@ $('mergeRun').addEventListener('click', async () => {
   if (!baseModels.length) { PFS.toast('הטופס ריק', 'err'); return; }
   const btn = $('mergeRun'); btn.disabled = true; const prev = btn.textContent;
   try {
+    // records arrive keyed by spreadsheet headers — rekey them to fieldKeys
+    // via the mapping; the naming column stays a header, so stash its raw
+    // value under a reserved key that can never collide with a fieldKey.
+    const nameHeader = $('mergeNameField').value;
+    const records = PFS.merge.remapRecords(mergeParsed.records, mergeMapping || {}).map((r, i) => {
+      if (nameHeader) r.__name = mergeParsed.records[i][nameHeader];
+      return r;
+    });
     const { zip, count } = await PFS.merge.runBatch({
       originalBytes: pdfView.getBytes(),
       baseModels,
-      records: mergeParsed.records,
-      nameField: $('mergeNameField').value,
+      records,
+      nameField: nameHeader ? '__name' : '',
       onProgress: (d, t) => { $('mergeProg').textContent = `מפיק ${d}/${t}…`; }
     });
     PFS.merge.downloadZip(zip, currentFileName + '-batch.zip');

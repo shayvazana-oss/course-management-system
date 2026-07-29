@@ -46,7 +46,6 @@
     function openChoices(f, control, anchor) {
       closeChoices();
       const opts = optionsOf(f);
-      if (!opts.length) return;
       ddEl = document.createElement('div');
       ddEl.className = 'pat-dd';
       const r = anchor.getBoundingClientRect();
@@ -70,7 +69,8 @@
         del.addEventListener('click', (e) => {
           e.stopPropagation();
           PFS.patterns.removeValue(f, o.v);
-          openChoices(f, control, anchor);   // re-render (or close if emptied)
+          if (anchor && anchor.__refresh) anchor.__refresh();
+          openChoices(f, control, anchor);   // re-render (or empty-state if none left)
         });
         item.append(txt, tag, del);
         item.addEventListener('click', () => {
@@ -82,6 +82,29 @@
         });
         ddEl.appendChild(item);
       });
+      if (!opts.length) {
+        const hint = document.createElement('div');
+        hint.className = 'pat-dd-item'; hint.style.cursor = 'default'; hint.style.color = 'var(--ink-3)';
+        hint.textContent = 'אין עדיין אפשרויות שמורות לשדה הזה';
+        ddEl.appendChild(hint);
+      }
+      // typed something new? one click turns it into a saved, pinned option —
+      // this is how a field BECOMES a multi-answer choice list
+      const cur = (control.value || '').trim();
+      const V = PFS.vault;
+      if (cur.length >= 2 && !opts.some((o) => V.norm(o.v) === V.norm(cur))) {
+        const add = document.createElement('div');
+        add.className = 'pat-dd-item free';
+        add.textContent = '➕ שמור את "' + (cur.length > 24 ? cur.slice(0, 24) + '…' : cur) + '" כאפשרות';
+        add.addEventListener('click', () => {
+          PFS.patterns.touch(f, cur);
+          PFS.patterns.pin(f, cur, true);
+          if (anchor && anchor.__refresh) anchor.__refresh();
+          openChoices(f, control, anchor);   // re-render with the new option
+          if (PFS.toast) PFS.toast('נשמר — מהפעם הבאה בוחרים בקליק', 'ok');
+        });
+        ddEl.appendChild(add);
+      }
       const free = document.createElement('div');
       free.className = 'pat-dd-item free';
       free.textContent = '✎ ערך אחר…';
@@ -301,26 +324,30 @@
             control.title = r.msg;
           };
           control.__fkey = f.fieldKey; control.__canon = canon || '';
-          const patOpts = optionsOf(f);
-          if (patOpts.length >= 2) {
-            // learned CHOICES (campus addresses etc.) → a real, visible picker.
-            // No datalist here — one memory, one surface.
+          // EVERY learnable text field gets the choice window — with saved
+          // options it's a picker; empty, it's the place to START a list
+          // ("we have several addresses" shouldn't require the settings page).
+          const learnable = !(PFS.patterns && PFS.patterns.slotFor && PFS.patterns.slotFor(f).blocked);
+          if (learnable) {
             const pick = document.createElement('button');
             pick.type = 'button'; pick.className = 'btn sm ghost fp-pick'; pick.textContent = '▾';
-            pick.title = 'בחירה מערכים שנלמדו (' + patOpts.length + ')';
+            pick.__refresh = () => {
+              const opts = optionsOf(f);
+              pick.classList.toggle('empty', !opts.length);
+              pick.title = opts.length
+                ? 'בחירה מהאפשרויות השמורות (' + opts.length + ')'
+                : 'שמרו כאן כמה תשובות קבועות (כתובות, סניפים…) ובחרו ביניהן בקליק';
+              if (!control.value && opts.length) {
+                const top = opts[0];
+                control.placeholder = '▾ לבחירה: ' + (top.v.length > 28 ? top.v.slice(0, 28) + '…' : top.v);
+              }
+            };
+            pick.__refresh();
             pick.addEventListener('click', (e) => { e.preventDefault(); openChoices(f, control, pick); });
             control.addEventListener('keydown', (e) => {
               if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); openChoices(f, control, pick); }
             });
             inRow.appendChild(pick);
-            if (!control.value) {
-              const top = patOpts[0];
-              control.placeholder = '▾ לבחירה: ' + (top.v.length > 28 ? top.v.slice(0, 28) + '…' : top.v);
-            }
-          } else if (patOpts.length === 1) {
-            const dl = document.createElement('datalist'); dl.id = 'dl_' + Math.random().toString(36).slice(2, 8);
-            const o = document.createElement('option'); o.value = patOpts[0].v; dl.appendChild(o);
-            row.appendChild(dl); control.setAttribute('list', dl.id);
           }
           control.addEventListener('change', () => rememberVal(f, control.value));
           control.addEventListener('input', () => {

@@ -527,3 +527,5 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 /* auto-filled field marker: subtle amber accent + tooltip */
 #fieldsBody input.fp-auto { border-inline-start: 3px solid var(--accent); background: linear-gradient(90deg, var(--accent-soft), transparent 24%); }
 .fp-clear-auto { color: var(--warn); border-color: var(--accent); background: var(--accent-soft); margin-bottom: 8px; }
+.fp-pick.empty { opacity: .45; }
+.fp-pick.empty:hover { opacity: 1; }

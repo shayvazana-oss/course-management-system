@@ -1353,6 +1353,61 @@ async function main() {
     check('learning: no self-reinforcement; pin sorts first; forget works', patRes.guardOk && patRes.pinnedFirst && patRes.removed);
   }
 
+  // ---- the choice window is always available: build a list from the field ----
+  {
+    const bcRes = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      window.PFS.store.set('patterns', {});
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'bc_addr', label: 'כתובת מוסד ההכשרה', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'bc_tz', label: 'תעודת זהות', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.setLastDet(det); T.fieldsPanel.show(det);
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      const addr = rows.find((i) => i.__fkey === 'bc_addr');
+      const tz = rows.find((i) => i.__fkey === 'bc_tz');
+      // learnable field: ▾ exists even with ZERO saved options (dimmed)
+      const addrPick = addr.closest('.field').querySelector('.fp-pick');
+      const emptyState = addrPick && addrPick.classList.contains('empty');
+      // blocked field (ת"ז): no choice window at all — identity is per-person
+      const tzPick = tz.closest('.field').querySelector('.fp-pick');
+      if (!addrPick || tzPick) return { addrPick: !!addrPick, tzPick: !!tzPick };
+      // type an address, open the window, save it as an option
+      addr.value = 'ההסתדרות 25 חיפה'; addr.dispatchEvent(new Event('input', { bubbles: true }));
+      addrPick.click(); await wait(120);
+      let dd = document.querySelector('.pat-dd');
+      const saveBtn = dd && [...dd.querySelectorAll('.pat-dd-item')].find((i) => /➕ שמור/.test(i.textContent));
+      if (!saveBtn) return { addrPick: true, tzPick: false, saveBtn: false };
+      saveBtn.click(); await wait(120);
+      // saved as pinned; button no longer dimmed; second value → two options
+      const savedPinned = window.PFS.patterns.optionsFor(det.fields[0]).some((o) => o.v === 'ההסתדרות 25 חיפה' && o.pinned);
+      const undimmed = !addrPick.classList.contains('empty');
+      addr.value = 'דרך בגין 125 תל אביב'; addr.dispatchEvent(new Event('input', { bubbles: true }));
+      dd = document.querySelector('.pat-dd');
+      const saveBtn2 = dd && [...dd.querySelectorAll('.pat-dd-item')].find((i) => /➕ שמור/.test(i.textContent));
+      if (saveBtn2) saveBtn2.click(); else { addrPick.click(); await wait(120); const d2=document.querySelector('.pat-dd'); const b2=[...d2.querySelectorAll('.pat-dd-item')].find((i)=>/➕ שמור/.test(i.textContent)); b2 && b2.click(); }
+      await wait(120);
+      const twoOpts = window.PFS.patterns.optionsFor(det.fields[0]).length === 2;
+      // picking the first option fills row + form
+      addrPick.click(); await wait(120);
+      const dd3 = document.querySelector('.pat-dd');
+      const first = dd3 && [...dd3.querySelectorAll('.pat-dd-item .v')].map((e) => e.textContent);
+      const item = dd3 && [...dd3.querySelectorAll('.pat-dd-item')].find((i) => i.querySelector('.v') && /ההסתדרות/.test(i.querySelector('.v').textContent));
+      if (item) item.click();
+      await wait(200);
+      const picked = addr.value === 'ההסתדרות 25 חיפה'
+        && T.overlay.getElements().some((c) => c.model.fieldKey === 'bc_addr' && c.model.text === 'ההסתדרות 25 חיפה');
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      window.PFS.store.set('patterns', {});
+      return { addrPick: true, tzPick: false, saveBtn: true, savedPinned, undimmed, twoOpts, picked, emptyState };
+    });
+    if (!(bcRes.addrPick && !bcRes.tzPick && bcRes.saveBtn && bcRes.savedPinned && bcRes.twoOpts && bcRes.picked)) console.log('  [choice debug]', JSON.stringify(bcRes));
+    check('▾ exists on every learnable field (dimmed when empty), never on ת"ז', bcRes.addrPick && !bcRes.tzPick && bcRes.emptyState === true);
+    check('save-current-as-option builds a pinned choice list from the field itself', bcRes.saveBtn && bcRes.savedPinned && bcRes.undimmed && bcRes.twoOpts && bcRes.picked);
+  }
+
   // ---- learned patterns flow into the panel: auto-fill badge + ▾ picker ----
   {
     const flowRes = await page.evaluate(async () => {

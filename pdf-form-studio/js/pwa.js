@@ -51,5 +51,28 @@
     } catch (e) { return null; }
   }
 
-  PFS.pwa = { takeSharedPdf };
+  // ---- install-as-app plumbing ----
+  // Chrome/Android fire beforeinstallprompt; iOS never does (install is
+  // Share → "הוסף למסך הבית"), so we expose both: a real prompt when the
+  // browser offers one, and an instructions path otherwise.
+  let deferredPrompt = null;
+  const isStandalone = () =>
+    matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
+  root.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.dispatchEvent(new CustomEvent('pfs-installable'));
+  });
+  async function promptInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const res = await deferredPrompt.userChoice.catch(() => null);
+      deferredPrompt = null;
+      return res && res.outcome === 'accepted' ? 'accepted' : 'dismissed';
+    }
+    return isIOS() ? 'ios' : 'unsupported';
+  }
+
+  PFS.pwa = { takeSharedPdf, promptInstall, canInstall: () => !!deferredPrompt, isStandalone, isIOS };
 })(window);

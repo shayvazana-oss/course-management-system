@@ -18,7 +18,10 @@ const VER = 'fillo-__PFS_BUILD__';
 const SHARE_CACHE = 'fillo-shared';
 const CORE = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
-  './icons/icon-192.png', './icons/icon-512.png'
+  './icons/icon-192.png', './icons/icon-512.png',
+  './js/store.js', './js/ui.js', './js/vault.js', './js/patterns.js', './js/courses.js',
+  './js/merge.js', './js/detect.js', './js/fields-panel.js', './js/overlay.js',
+  './js/element.js', './js/library.js', './js/pwa.js'
 ];
 
 self.addEventListener('install', (e) => {

@@ -555,6 +555,9 @@ async function openPdfFile(file) {
     mergeParsed = null;
     $('dropzone').style.display = 'none';
     await pdfView.load(buf);
+    // a phone screen never fits an A4 at 100% — start fitted so the whole
+    // page is visible and fingers pan less
+    if (window.innerWidth < 720) { try { pdfView.fit(); } catch (e) {} }
     dirty = false;
     $('docbar').classList.remove('hidden');
     $('fname').textContent = file.name;
@@ -1307,6 +1310,29 @@ const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
 function openPanel() { $('rightpanel').classList.add('open'); }
 function closePanel() { $('rightpanel').classList.remove('open'); }
 $('panelToggle').addEventListener('click', () => $('rightpanel').classList.toggle('open'));
+
+// install-as-app: real prompt where the browser offers one; instructions
+// where it doesn't (iOS installs only via Share → הוסף למסך הבית)
+$('installBtn') && $('installBtn').addEventListener('click', async () => {
+  const res = await PFS.pwa.promptInstall();
+  if (res === 'accepted') PFS.toast('🎉 Fillo מותקן — חפשו את האייקון במסך הבית', 'ok', 6000);
+  else if (res === 'ios') {
+    await PFS.ui.confirm('התקנה באייפון', 'בספארי: לחצו על כפתור השיתוף (הריבוע עם החץ למעלה) ואז "הוסף למסך הבית". זהו — Fillo יופיע כאפליקציה.');
+  } else if (res === 'unsupported') {
+    await PFS.ui.confirm('התקנה', 'בתפריט הדפדפן (⋮) בחרו "התקנת אפליקציה" או "הוספה למסך הבית".');
+  }
+});
+// hide the card when already running as the installed app
+if (PFS.pwa && PFS.pwa.isStandalone && PFS.pwa.isStandalone()) {
+  const card = $('installBtn') && $('installBtn').closest('.card');
+  if (card) card.style.display = 'none';
+} else if (window.innerWidth < 720 && !PFS.store.get('install_nudged', false)) {
+  // one-time phone nudge — the whole point of the card is being discovered
+  setTimeout(() => {
+    PFS.toast('📱 טיפ: אפשר להתקין את Fillo כאפליקציה — הגדרות ← התקנה', 'ok', 7000);
+    PFS.store.set('install_nudged', true);
+  }, 4000);
+}
 
 // "מה נלמד" — transparency + control over the learning store. Automatic
 // learning is only trustworthy when it's inspectable and erasable.

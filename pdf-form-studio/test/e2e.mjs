@@ -1196,6 +1196,27 @@ async function main() {
     check('bare-שם synonym never claims "שם הקורס"; real name fields still fill', nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled);
   }
 
+  // ---- self-healing: stored person-name leaks are purged and swept ----
+  {
+    const healRes = await page.evaluate(() => {
+      const P = window.PFS.patterns;
+      // poisoned learning slot (as saved before the guard existed)
+      window.PFS.store.set('patterns', { 'שם הקורס': { label: 'שם הקורס', values: [
+        { v: 'שלום וזאנה', n: 3, last: 1 }, { v: 'אילוף כלבים', n: 2, last: 2 }
+      ] } });
+      window.PFS.store.set('profiles', [{ id: 'p1', name: 'אני', values: { 'שם מלא': 'שלום וזאנה' } }]);
+      const removed = P.purgePersonValues();
+      const left = P.all()['שם הקורס'].values.map((r) => r.v);
+      // and learning refuses to re-absorb the name into a course slot
+      P.learnFrom([{ fieldKey: 'c1', label: 'שם הקורס', type: 'text' }], { c1: 'שלום וזאנה' }, []);
+      const stillClean = !P.all()['שם הקורס'].values.some((r) => r.v === 'שלום וזאנה');
+      window.PFS.store.set('patterns', {});
+      return { removed, keptCourse: left.length === 1 && left[0] === 'אילוף כלבים', stillClean };
+    });
+    if (!(healRes.removed === 1 && healRes.keptCourse && healRes.stillClean)) console.log('  [heal debug]', JSON.stringify(healRes));
+    check('person-name values are purged from learned slots and never relearned', healRes.removed === 1 && healRes.keptCourse && healRes.stillClean);
+  }
+
   // ---- the real form detects CLEAN: no heading-noise, reading order ----
   {
     const h3b64 = fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf')).toString('base64');

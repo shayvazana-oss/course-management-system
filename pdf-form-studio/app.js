@@ -506,6 +506,39 @@ function uniformizeHandwriting(taggedOnly) {
 PFS.uniformizeHandwriting = uniformizeHandwriting;
 PFS.docUniformSize = docUniformSize;
 
+// heal learning slots poisoned before the bare-'שם' guard existed
+try { const n = PFS.patterns.purgePersonValues(); if (n) console.info('[patterns] purged', n, 'person-name values from learned slots'); } catch (e) {}
+
+/* sweepNameLeaks() — heal DOCUMENTS saved with the historical leak: a text
+ * element carrying a profile person-name while tagged to a field whose label
+ * no longer maps to a person canon ('שם הקורס' etc.) is the leak restored
+ * from auto-memory. Remove it (undo can bring it back). */
+function sweepNameLeaks() {
+  const profs = PFS.store.get('profiles', []) || [];
+  const names = new Set();
+  profs.forEach((p) => ['שם מלא', 'שם פרטי', 'שם משפחה'].forEach((k) => {
+    const v = p.values && p.values[k];
+    if (v && String(v).trim().length >= 2) names.add(PFS.vault.norm(v));
+  }));
+  if (!names.size) return 0;
+  let removed = 0;
+  overlay.getElements().slice().forEach((c) => {
+    const m = c.model;
+    if (m.type !== 'text' || !m.fieldKey || !m.text) return;
+    if (!names.has(PFS.vault.norm(m.text))) return;
+    const canon = PFS.vault.matchKey(m.fieldKey);
+    // person canons legitimately hold a person's name; anything else is the leak
+    if (canon === 'full_name' || canon === 'first_name' || canon === 'last_name') return;
+    overlay.deleteCtrl(c);
+    removed++;
+  });
+  if (removed) {
+    PFS.toast(`🧹 הוסרו ${removed} שדות שמולאו בטעות בשם מהפרופיל (Ctrl+Z מחזיר)`, 'ok', 6000);
+    markDirty();
+  }
+  return removed;
+}
+
 async function runDetection() {
   if (!pdfView.hasDoc()) return;
   const gen = loadGen;
@@ -517,6 +550,7 @@ async function runDetection() {
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
     normalizeFontSizes(det);
     lastDet = det;
+    try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
     else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');

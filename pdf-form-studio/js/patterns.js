@@ -97,6 +97,7 @@
     const skip = new Set(autoFilledKeys || []);
     const data = load();
     let learned = 0;
+    const personVals = personNames();
     fields.forEach((f) => {
       if (!f || f.type === 'check') return;
       if (skip.has(f.fieldKey)) return;
@@ -104,6 +105,10 @@
       if (val == null || !String(val).trim()) return;
       const { slot, blocked } = slotFor(f);
       if (blocked || !slot) return;
+      // a person's name never belongs to a learnable slot (person canons are
+      // blocklisted wholesale) — so a profile-name VALUE arriving here is a
+      // leak (e.g. the historical 'שם הקורס' one), not a pattern
+      if (personVals.has(norm(val))) return;
       upsert(slotEntry(data, slot, f.label), val, { count: 1 });
       learned++;
     });
@@ -184,6 +189,41 @@
     return true;
   }
 
+  // normalized person-name values from ALL saved profiles
+  function personNames() {
+    const out = new Set();
+    try {
+      (PFS.store.get('profiles', []) || []).forEach((p) => {
+        ['שם מלא', 'שם פרטי', 'שם משפחה'].forEach((k) => {
+          const v = p.values && p.values[k];
+          if (v && String(v).trim().length >= 2) out.add(norm(v));
+        });
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  /* purgePersonValues() — heal slots poisoned before the bare-'שם' guard:
+   * remove any learned value that equals a profile person-name. Returns the
+   * number removed (app runs this once per boot). */
+  function purgePersonValues() {
+    const pv = personNames();
+    if (!pv.size) return 0;
+    const data = load();
+    let removed = 0;
+    Object.keys(data).forEach((slot) => {
+      const e = data[slot];
+      e.values = e.values.filter((r) => {
+        const bad = pv.has(norm(r.v));
+        if (bad) removed++;
+        return !bad;
+      });
+      if (!e.values.length) delete data[slot];
+    });
+    if (removed) save(data);
+    return removed;
+  }
+
   const all = () => load();
   function clear() { PFS.store.remove(KEY); }
 
@@ -204,5 +244,5 @@
     } catch (e) { /* migration is best-effort */ }
   })();
 
-  PFS.patterns = { learnFrom, touch, optionsFor, suggest, removeValue, removeAt, pin, all, clear, slotFor, AUTO_MIN };
+  PFS.patterns = { learnFrom, touch, optionsFor, suggest, removeValue, removeAt, pin, all, clear, slotFor, purgePersonValues, AUTO_MIN };
 })(window);

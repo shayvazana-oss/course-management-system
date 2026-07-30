@@ -2425,6 +2425,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const skip = new Set(autoFilledKeys || []);
     const data = load();
     let learned = 0;
+    const personVals = personNames();
     fields.forEach((f) => {
       if (!f || f.type === 'check') return;
       if (skip.has(f.fieldKey)) return;
@@ -2432,6 +2433,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (val == null || !String(val).trim()) return;
       const { slot, blocked } = slotFor(f);
       if (blocked || !slot) return;
+      // a person's name never belongs to a learnable slot (person canons are
+      // blocklisted wholesale) — so a profile-name VALUE arriving here is a
+      // leak (e.g. the historical 'שם הקורס' one), not a pattern
+      if (personVals.has(norm(val))) return;
       upsert(slotEntry(data, slot, f.label), val, { count: 1 });
       learned++;
     });
@@ -2512,6 +2517,41 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return true;
   }
 
+  // normalized person-name values from ALL saved profiles
+  function personNames() {
+    const out = new Set();
+    try {
+      (PFS.store.get('profiles', []) || []).forEach((p) => {
+        ['שם מלא', 'שם פרטי', 'שם משפחה'].forEach((k) => {
+          const v = p.values && p.values[k];
+          if (v && String(v).trim().length >= 2) out.add(norm(v));
+        });
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  /* purgePersonValues() — heal slots poisoned before the bare-'שם' guard:
+   * remove any learned value that equals a profile person-name. Returns the
+   * number removed (app runs this once per boot). */
+  function purgePersonValues() {
+    const pv = personNames();
+    if (!pv.size) return 0;
+    const data = load();
+    let removed = 0;
+    Object.keys(data).forEach((slot) => {
+      const e = data[slot];
+      e.values = e.values.filter((r) => {
+        const bad = pv.has(norm(r.v));
+        if (bad) removed++;
+        return !bad;
+      });
+      if (!e.values.length) delete data[slot];
+    });
+    if (removed) save(data);
+    return removed;
+  }
+
   const all = () => load();
   function clear() { PFS.store.remove(KEY); }
 
@@ -2532,7 +2572,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     } catch (e) { /* migration is best-effort */ }
   })();
 
-  PFS.patterns = { learnFrom, touch, optionsFor, suggest, removeValue, removeAt, pin, all, clear, slotFor, AUTO_MIN };
+  PFS.patterns = { learnFrom, touch, optionsFor, suggest, removeValue, removeAt, pin, all, clear, slotFor, purgePersonValues, AUTO_MIN };
 })(window);
 
 </script>
@@ -7431,6 +7471,39 @@ function uniformizeHandwriting(taggedOnly) {
 PFS.uniformizeHandwriting = uniformizeHandwriting;
 PFS.docUniformSize = docUniformSize;
 
+// heal learning slots poisoned before the bare-'שם' guard existed
+try { const n = PFS.patterns.purgePersonValues(); if (n) console.info('[patterns] purged', n, 'person-name values from learned slots'); } catch (e) {}
+
+/* sweepNameLeaks() — heal DOCUMENTS saved with the historical leak: a text
+ * element carrying a profile person-name while tagged to a field whose label
+ * no longer maps to a person canon ('שם הקורס' etc.) is the leak restored
+ * from auto-memory. Remove it (undo can bring it back). */
+function sweepNameLeaks() {
+  const profs = PFS.store.get('profiles', []) || [];
+  const names = new Set();
+  profs.forEach((p) => ['שם מלא', 'שם פרטי', 'שם משפחה'].forEach((k) => {
+    const v = p.values && p.values[k];
+    if (v && String(v).trim().length >= 2) names.add(PFS.vault.norm(v));
+  }));
+  if (!names.size) return 0;
+  let removed = 0;
+  overlay.getElements().slice().forEach((c) => {
+    const m = c.model;
+    if (m.type !== 'text' || !m.fieldKey || !m.text) return;
+    if (!names.has(PFS.vault.norm(m.text))) return;
+    const canon = PFS.vault.matchKey(m.fieldKey);
+    // person canons legitimately hold a person's name; anything else is the leak
+    if (canon === 'full_name' || canon === 'first_name' || canon === 'last_name') return;
+    overlay.deleteCtrl(c);
+    removed++;
+  });
+  if (removed) {
+    PFS.toast(`🧹 הוסרו ${removed} שדות שמולאו בטעות בשם מהפרופיל (Ctrl+Z מחזיר)`, 'ok', 6000);
+    markDirty();
+  }
+  return removed;
+}
+
 async function runDetection() {
   if (!pdfView.hasDoc()) return;
   const gen = loadGen;
@@ -7442,6 +7515,7 @@ async function runDetection() {
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
     normalizeFontSizes(det);
     lastDet = det;
+    try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
     else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');

@@ -1173,6 +1173,40 @@ async function main() {
     }
   }
 
+  // ---- one handwriting: the uniformizer evens out every text size ----
+  {
+    const uniRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'uh_a', label: 'שם מוסד הלימודים', fx: 0.2, fy: 0.2, fw: 0.25, fh: 0.03, fontFrac: 0.016, type: 'text' },
+        { page: 0, fieldKey: 'uh_b', label: 'הערות', fx: 0.2, fy: 0.3, fw: 0.25, fh: 0.03, fontFrac: 0.016, type: 'text' }
+      ] };
+      T.setLastDet(det); T.fieldsPanel.show(det);
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      rows[0].value = 'ערך ראשון'; rows[0].dispatchEvent(new Event('input', { bubbles: true }));
+      rows[1].value = 'ערך שני'; rows[1].dispatchEvent(new Event('input', { bubbles: true }));
+      // sabotage: drift the sizes apart (fitFont/manual-tweak simulation)
+      const els = T.overlay.getElements().filter((c) => c.model.type === 'text');
+      els[0].model.fontFrac = 0.012; els[0].layout();
+      els[1].model.fontFrac = 0.024; els[1].layout();
+      const rightEdgeBefore = els[0].model.fx + els[0].model.fw;
+      const n = T.uniformize(false);
+      const sizes = new Set(T.overlay.getElements().filter((c) => c.model.type === 'text').map((c) => c.model.fontFrac));
+      const uniform = sizes.size === 1 && [...sizes][0] === 0.016;
+      // the right-aligned value kept its right edge planted
+      const rightEdgeAfter = els[0].model.fx + els[0].model.fw;
+      const anchored = Math.abs(rightEdgeAfter - rightEdgeBefore) < 0.002;
+      // the panel offers the one-click evener
+      const btn = [...document.querySelectorAll('#fieldsBody button')].some((b) => /כתב אחיד/.test(b.textContent));
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { n, uniform, anchored, btn };
+    });
+    if (!(uniRes.n === 2 && uniRes.uniform && uniRes.anchored && uniRes.btn)) console.log('  [uni debug]', JSON.stringify(uniRes));
+    check('uniformizer evens all text to the form size, right edges stay planted', uniRes.n === 2 && uniRes.uniform && uniRes.anchored);
+    check('the ✨ one-handwriting button is offered in the panel', uniRes.btn === true);
+  }
+
   // ---- one-gesture deletion: hover the element, click ✕ ----
   {
     const delRes = await page.evaluate(async () => {

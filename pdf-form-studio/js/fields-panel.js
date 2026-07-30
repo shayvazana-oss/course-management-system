@@ -179,8 +179,12 @@
       try { W = overlay.overlaySizeFor(field.page).w; } catch (e) { return; }
       if (!W) return;
       const maxW = field.fw * W * 1.02;
+      // shrink-to-fit is capped at 75% of the form's size — a tiny value next
+      // to full-size neighbours reads worse than a slight overflow (cells have
+      // padding, and ink-snap already widened the field to the cell borders)
+      const floor = Math.max(0.009, (field.fontFrac || 0.016) * 0.75);
       let guard = 0;
-      while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > 0.008 && guard++ < 14) {
+      while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.9;
         ctrl.layout();
       }
@@ -246,6 +250,17 @@
         ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
         ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
         body.appendChild(ivTop);
+        // one handwriting, one click — evens out EVERYTHING on the form,
+        // including manually-placed text and restored documents
+        const uniBtn = document.createElement('button');
+        uniBtn.className = 'btn sm block';
+        uniBtn.textContent = '✨ כתב אחיד — יישר גודל בכל הטופס';
+        uniBtn.title = 'משווה את גודל הכתב של כל הטקסטים על הטופס (Ctrl+Z מבטל)';
+        uniBtn.addEventListener('click', () => {
+          const n = PFS.uniformizeHandwriting ? PFS.uniformizeHandwriting(false) : 0;
+          PFS.toast(n ? `✨ ${n} טקסטים יושרו לגודל אחיד` : 'הכתב כבר אחיד ✓', 'ok');
+        });
+        body.appendChild(uniBtn);
       }
       // amber hints over empty detected fields (cleared as they fill)
       if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);

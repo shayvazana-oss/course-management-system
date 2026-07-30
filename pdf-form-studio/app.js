@@ -201,7 +201,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -415,6 +415,41 @@ function normalizeFontSizes(det) {
   const uni = Math.min(0.022, Math.max(0.011, median));
   txt.forEach((f) => { f.fontFrac = uni; });
 }
+
+// ---- one handwriting across the whole document ----
+// The uniform size lives in detection (normalizeFontSizes); this enforces it
+// on the ELEMENTS too — fitFont shrinkage, manually-placed text, restored
+// docs and per-element tweaks all drift, and a filled form with three text
+// sizes reads sloppy. Comb-spaced text and ✓/✗ glyphs are exempt.
+const isPlainTextEl = (c) => c.model && c.model.type === 'text' && !c.model.letterSpacing
+  && c.model.kind !== 'check' && c.model.kind !== 'cross';
+function docUniformSize() {
+  if (lastDet && lastDet.fields) {
+    const t = lastDet.fields.find((f) => f.type === 'text' && f.fontFrac);
+    if (t) return t.fontFrac;             // detection already normalized these
+  }
+  const sizes = overlay.getElements().filter(isPlainTextEl).map((c) => c.model.fontFrac).sort((a, b) => a - b);
+  return sizes.length ? sizes[Math.floor(sizes.length / 2)] : 0.016;
+}
+function uniformizeHandwriting(taggedOnly) {
+  const uni = docUniformSize();
+  let changed = 0;
+  overlay.getElements().forEach((c) => {
+    if (!isPlainTextEl(c)) return;
+    if (taggedOnly && !c.model.fieldKey) return;
+    if (Math.abs((c.model.fontFrac || 0) - uni) < 0.0005) return;
+    const oldW = c.model.fw;              // layout keeps this measured
+    c.model.fontFrac = uni;
+    c.layout();
+    // a right-aligned (Hebrew) value must keep its RIGHT edge planted
+    if (c.model.align === 'right' && isFinite(oldW)) { c.model.fx += (oldW - c.model.fw); c.layout(); }
+    changed++;
+  });
+  if (changed) { markDirty(); scheduleSnap(); }
+  return changed;
+}
+PFS.uniformizeHandwriting = uniformizeHandwriting;
+PFS.docUniformSize = docUniformSize;
 
 async function runDetection() {
   if (!pdfView.hasDoc()) return;
@@ -698,6 +733,7 @@ function activateTool(btn, tool) {
       if (tool === 'date') extra.text = new Date().toLocaleDateString('he-IL');
       // new text/date inherits the last-used style so the form stays consistent
       if ((tool === 'text' || tool === 'date') && lastTextStyle) Object.assign(extra, lastTextStyle);
+      else if (tool === 'text' || tool === 'date') extra.fontFrac = docUniformSize();
       const ctrl = overlay.addElementAt(TEXT_TOOLS[tool], pageIndex, fx, fy, extra);
       return null; // addElementAt already instantiated
     }
@@ -1150,6 +1186,9 @@ function renderExportCompanions() {
 }
 
 async function doExport(opts) {
+  // exported forms always leave with ONE handwriting — quietly normalize the
+  // machine-placed fills (manually styled free text is left alone)
+  try { uniformizeHandwriting(true); } catch (e) {}
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
   if (!models.length && !attachments.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }

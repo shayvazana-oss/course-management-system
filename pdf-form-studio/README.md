@@ -46,7 +46,7 @@ no file ever leaves your device.
 
 האפליקציה רצה בענן (GitHub Pages) — פתחו בכל דפדפן, מחשב או נייד:
 
-**https://shayvazana-oss.github.io/course-management-system/**
+**https://shayvazana-oss.github.io/fillo/**
 
 זו הגרסה המלאה (כולל OCR עברי לטפסים סרוקים), עם שמירה קבועה של חתימות,
 תבניות וכתב-יד בדפדפן. כל דחיפה לענף הפיתוח פורסת אוטומטית מחדש דרך

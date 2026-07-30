@@ -6999,7 +6999,8 @@ function updateUndoUI() {
   if (r) r.disabled = !redo.length;
 }
 function undo() {
-  if (history.length < 2) return;
+  snapshot();   // flush any debounce-pending state so redo can bring it back
+  if (history.length < 2) { PFS.toast('אין פעולה לביטול', 'ok', 1100); return; }
   redo.push(history.pop()); restoreState(history[history.length - 1]);
   PFS.toast('↩ הפעולה בוטלה', 'ok', 1100);
 }
@@ -8611,14 +8612,21 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.ctrlKey || e.metaKey) {
     const k0 = (e.key || '').toLowerCase();
+    const code = e.code || '';
     // undo/redo are GLOBAL — filling happens inside inputs, and that is
-    // exactly where a mistake needs Ctrl+Z to work
-    if (k0 === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
-    if ((k0 === 'z' && e.shiftKey) || k0 === 'y') { e.preventDefault(); redoAction(); return; }
+    // exactly where a mistake needs Ctrl+Z to work. Matched by PHYSICAL key
+    // (e.code): on a Hebrew layout Ctrl+Z arrives as e.key='ז', and matching
+    // the letter alone made undo silently dead for Hebrew typists.
+    const isZ = code === 'KeyZ' || k0 === 'z';
+    const isY = code === 'KeyY' || k0 === 'y';
+    if (isZ && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((isZ && e.shiftKey) || isY) { e.preventDefault(); redoAction(); return; }
   }
   if ((e.ctrlKey || e.metaKey) && !editing && !inField) {
     const k = (e.key || '').toLowerCase();
-    if (k === 'd') {
+    const code2 = e.code || '';
+    const is = (letter, keycode) => code2 === keycode || k === letter;
+    if (is('d', 'KeyD')) {
       // duplicate the selected element slightly offset — great for repeated
       // checks/labels down a table
       if (sel) {
@@ -8630,8 +8638,8 @@ document.addEventListener('keydown', (e) => {
         markDirty();
       }
     }
-    else if (k === 's') { e.preventDefault(); if (!$('exportBtn').disabled) doExport(); }
-    else if (k === 'o') { e.preventDefault(); $('pdfInput').click(); }
+    else if (is('s', 'KeyS')) { e.preventDefault(); if (!$('exportBtn').disabled) doExport(); }
+    else if (is('o', 'KeyO')) { e.preventDefault(); $('pdfInput').click(); }
   }
 });
 

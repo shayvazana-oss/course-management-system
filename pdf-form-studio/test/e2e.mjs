@@ -1173,6 +1173,35 @@ async function main() {
     }
   }
 
+  // ---- Ctrl+Z from a HEBREW keyboard layout (e.key='ז', not 'z') ----
+  {
+    const hebUndo = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'hz_a', label: 'הערות', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.setLastDet(det); T.fieldsPanel.show(det);
+      T.snapshotNow();
+      const row = document.querySelector('#fieldsBody input[type=text]');
+      row.value = 'טעות'; row.dispatchEvent(new Event('input', { bubbles: true }));
+      // no debounce wait — undo must flush the pending snapshot itself
+      row.focus();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ז', code: 'KeyZ', ctrlKey: true, bubbles: true }));
+      await wait(400);
+      const gone = !T.overlay.getElements().some((c) => c.model.fieldKey === 'hz_a');
+      // redo (Ctrl+Shift+ז) brings the typed state back
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ז', code: 'KeyZ', ctrlKey: true, shiftKey: true, bubbles: true }));
+      await wait(400);
+      const back = T.overlay.getElements().some((c) => c.model.fieldKey === 'hz_a' && c.model.text === 'טעות');
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { gone, back };
+    });
+    if (!(hebUndo.gone && hebUndo.back)) console.log('  [heb-undo debug]', JSON.stringify(hebUndo));
+    check('Ctrl+Z works from a Hebrew keyboard layout, redo recovers', hebUndo.gone && hebUndo.back);
+  }
+
   // ---- one handwriting: the uniformizer evens out every text size ----
   {
     const uniRes = await page.evaluate(async () => {

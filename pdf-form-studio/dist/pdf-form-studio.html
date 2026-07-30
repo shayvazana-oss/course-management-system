@@ -2082,12 +2082,17 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   // PERSON, section headings quote the institution too). For these canons a
   // substring hit only counts when the label is essentially the phrase itself.
   const TIGHT_CANONS = new Set(['institution_name', 'institution_phone', 'institution_address', 'contact_person']);
+  // the bare 'שם'/'name' synonyms are radioactive: as substrings they claim
+  // ANY "שם ה<something>" label — 'שם הקורס' got filled with the user's own
+  // name. They may only match when the label IS the word (plus punctuation).
+  const ULTRA_GENERIC = new Set([norm('שם'), 'name', norm('الاسم')]);
   function matchKey(label) {
     const n = norm(label);
     if (!n) return null;
     for (let i = 0; i < PAIRS.length; i++) {
       const [key, phrase] = PAIRS[i];
       if (n === phrase || n.indexOf(phrase) !== -1) {
+        if (ULTRA_GENERIC.has(phrase) && n.length > phrase.length + 2) continue;
         if (TIGHT_CANONS.has(key) && n.length > phrase.length + 8) continue;
         return key;
       }

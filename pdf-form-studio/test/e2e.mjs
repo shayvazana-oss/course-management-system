@@ -1173,6 +1173,29 @@ async function main() {
     }
   }
 
+  // ---- a person's name must NEVER land in "שם הקורס" (the screenshot bug) ----
+  {
+    const nameLeak = await page.evaluate(() => {
+      const V = window.PFS.vault;
+      // bare 'שם' only matches labels that ARE the word
+      const guards = V.matchKey('שם הקורס') === null
+        && V.matchKey('שם הקורס המבוקש') === null
+        && V.matchKey('שם') === 'full_name'
+        && V.matchKey('שם:') === 'full_name'
+        && V.matchKey('שם מלא') === 'full_name'
+        && V.matchKey('שם התלמיד') === 'full_name';
+      // end-to-end: a profile full name does not fill a course-name field
+      const det = [
+        { fieldKey: 'crs', label: 'שם הקורס', type: 'text' },
+        { fieldKey: 'nm', label: 'שם מלא', type: 'text' }
+      ];
+      const text = V.matchValues(det, { 'שם מלא': 'שלום וזאנה' }, []);
+      return { guards, courseEmpty: text.crs === undefined, nameFilled: text.nm === 'שלום וזאנה' };
+    });
+    if (!(nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled)) console.log('  [name-leak debug]', JSON.stringify(nameLeak));
+    check('bare-שם synonym never claims "שם הקורס"; real name fields still fill', nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled);
+  }
+
   // ---- the real form detects CLEAN: no heading-noise, reading order ----
   {
     const h3b64 = fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf')).toString('base64');

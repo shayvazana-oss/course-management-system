@@ -1192,8 +1192,11 @@ async function main() {
       els[1].model.fontFrac = 0.024; els[1].layout();
       const rightEdgeBefore = els[0].model.fx + els[0].model.fw;
       const n = T.uniformize(false);
-      const sizes = new Set(T.overlay.getElements().filter((c) => c.model.type === 'text').map((c) => c.model.fontFrac));
-      const uniform = sizes.size === 1 && [...sizes][0] === 0.016;
+      const list = T.overlay.getElements().filter((c) => c.model.type === 'text').map((c) => c.model.fontFrac);
+      // harmony band, not a hard flatten: outliers pulled within ±15% of the
+      // form size (a hard flatten oversized fills vs small-print lines)
+      const uniform = list.every((v) => v >= 0.016 * 0.85 - 1e-9 && v <= 0.016 * 1.15 + 1e-9)
+        && Math.max(...list) / Math.min(...list) <= 1.36;
       // the right-aligned value kept its right edge planted
       const rightEdgeAfter = els[0].model.fx + els[0].model.fw;
       const anchored = Math.abs(rightEdgeAfter - rightEdgeBefore) < 0.002;

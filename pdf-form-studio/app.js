@@ -335,9 +335,57 @@ function snapFieldsToInk(det) {
       // real text is at least a fifth of the text height tall
       const minBand = Math.max(2, Math.round(fhPx * 0.2));
       const fyRow = Math.round(fh * 0.5 * H);       // f.fy relative to yTop
-      // a printed label at/under the field's position (the thing we'd cover)
-      const nearGlyph = glyphBands.find((g) => (g.end - g.start + 1) >= minBand
-        && g.start >= 0 && g.start <= fyRow + fhPx * 2.5 && g.end >= fyRow - fhPx * 0.5);
+      // printed GLYPHS inside the value's own render span? Ruled/underscore
+      // lines don't count — a line inside the span is the anchor target, not
+      // a collision (the blank's underline sits at the text's own baseline).
+      const nearLineRow = (y) => isLine(y) || (y > 0 && isLine(y - 1)) || (y < bh - 1 && isLine(y + 1));
+      // the span ENDS at the first ruled line below — text lives ABOVE its
+      // underline, and on tightly-spaced forms the next line's ascenders
+      // otherwise leak into the window and read as a collision
+      let spanEnd = Math.min(bh, fyRow + Math.round(fhPx * 1.1));
+      for (let y = Math.max(0, fyRow); y < spanEnd; y++) { if (isLine(y)) { spanEnd = y; break; } }
+      let spanInk = false;
+      for (let y = Math.max(0, fyRow); y < spanEnd; y++) {
+        if (inkCov[y] > 0.05 && cov[y] <= 0.55 && !nearLineRow(y)) { spanInk = true; break; }
+      }
+      // UNDERLINE FIRST: a clean value span with a ruled line right below it
+      // is an inline blank ("תפקיד: ____") — anchor to that line and stop.
+      // An underscore run lives ONLY inside the blank; a table border runs on
+      // far beyond it — so test whether the line continues outside the band.
+      const lineExtends = (yRel) => {
+        const yAbs = yTop + yRel;
+        const probe = (px0, px1) => {
+          if (px1 - px0 < 8) return false;
+          try {
+            const row = ctx.getImageData(px0, yAbs, px1 - px0, 1).data;
+            let d = 0, n = 0;
+            for (let i = 0; i < px1 - px0; i += 2) {
+              const j = i * 4;
+              if (0.299 * row[j] + 0.587 * row[j + 1] + 0.114 * row[j + 2] < 130) d++;
+              n++;
+            }
+            return d / n > 0.6;
+          } catch (e) { return false; }
+        };
+        const reach = Math.round(fhPx * 3);
+        return probe(Math.max(0, x0 - reach), x0 - 4) || probe(x1 + 4, Math.min(W, x1 + reach));
+      };
+      let borderSeen = false;
+      if (!spanInk) {
+        for (let y = fyRow + Math.round(fhPx * 0.3); y < Math.min(bh, fyRow + Math.round(fhPx * 1.6)); y++) {
+          if (!isLine(y)) continue;
+          if (lineExtends(y)) { f.__snap = 'border@' + y; borderSeen = true; break; }   // table border
+          const newFy = (yTop + y) / H - fh - 2 / H;
+          f.__snap = 'underline@' + y;
+          if (newFy > 0 && Math.abs(newFy - f.fy) <= fh * 1.6 && Math.abs(newFy - f.fy) > 0.5 / H) { f.fy = newFy; snapped++; }
+          return;
+        }
+      }
+      // obstructed (printed glyphs in the span) or sitting on a table border:
+      // relocate to the FIRST white gap that can hold the text, searching from
+      // the value's own position downward — deterministic regardless of how
+      // the geometric guess drifted (glyph-band picking was one-row fragile)
+      const nearGlyph = spanInk || borderSeen;
 
       const gapAt = (from) => {
         // first run of rows below `from` that is line-free, glyph-free and
@@ -353,7 +401,8 @@ function snapFieldsToInk(det) {
       };
 
       if (nearGlyph) {
-        const gap = gapAt(nearGlyph.end + 1);
+        const gap = gapAt(fyRow);
+        f.__snap = (f.__snap || '') + '|cell gap' + (gap ? gap.top + '-' + gap.bot : 'none') + (spanInk ? ' spanInk' : '');
         if (!gap) return;
         const slack = (gap.bot - gap.top) - fhPx;
         const newFy = (yTop + gap.top + Math.max(1, Math.min(slack / 2, fhPx * 0.6))) / H;
@@ -411,9 +460,12 @@ function normalizeFontSizes(det) {
   const txt = det.fields.filter((f) => f.type === 'text' && f.fontFrac);
   if (txt.length < 2) return;
   const sizes = txt.map((f) => f.fontFrac).sort((a, b) => a - b);
-  const median = sizes[Math.floor(sizes.length / 2)];
-  const uni = Math.min(0.022, Math.max(0.011, median));
-  txt.forEach((f) => { f.fontFrac = uni; });
+  const median = Math.min(0.022, Math.max(0.011, sizes[Math.floor(sizes.length / 2)]));
+  // clamp to a ±15% band around the median: outliers get pulled into harmony
+  // but each value still respects ITS line's local metrics (a hard flatten
+  // rendered fills visibly larger than small-print sentences around them)
+  const lo = median * 0.85, hi = median * 1.15;
+  txt.forEach((f) => { f.fontFrac = Math.min(hi, Math.max(lo, f.fontFrac)); });
 }
 
 // ---- one handwriting across the whole document ----
@@ -433,13 +485,15 @@ function docUniformSize() {
 }
 function uniformizeHandwriting(taggedOnly) {
   const uni = docUniformSize();
+  const lo = uni * 0.85, hi = uni * 1.15;
   let changed = 0;
   overlay.getElements().forEach((c) => {
     if (!isPlainTextEl(c)) return;
     if (taggedOnly && !c.model.fieldKey) return;
-    if (Math.abs((c.model.fontFrac || 0) - uni) < 0.0005) return;
+    const target = Math.min(hi, Math.max(lo, c.model.fontFrac || uni));
+    if (Math.abs((c.model.fontFrac || 0) - target) < 0.0005) return;
     const oldW = c.model.fw;              // layout keeps this measured
-    c.model.fontFrac = uni;
+    c.model.fontFrac = target;
     c.layout();
     // a right-aligned (Hebrew) value must keep its RIGHT edge planted
     if (c.model.align === 'right' && isFinite(oldW)) { c.model.fx += (oldW - c.model.fw); c.layout(); }

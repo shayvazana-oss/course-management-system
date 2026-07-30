@@ -65,7 +65,12 @@
           // fragments still merge — they are the same label's continuation
           // (visual-order emitters deliver label pieces after its blank).
           const complete = /[:：׃]\s*[_.．…]{3,}\s*$/.test(prev.str) && isBlankRun(b.str);
-          if (!complete && gap < fh * 0.3 && gap > -fh * 1.2) {
+          // blank runs are STRUCTURAL (they mark where the answer goes) —
+          // never glue them onto letter fragments: '____'+'מו:' used to melt
+          // into one giant box and the blank's geometry was lost to the
+          // field-band logic. Blank↔blank still merges (dashed runs).
+          const mixed = isBlankRun(prev.str.trim()) !== isBlankRun(b.str.trim());
+          if (!complete && !mixed && gap < fh * 0.3 && gap > -fh * 1.2) {
             // Concatenation order is decided by GEOMETRY, not array order:
             // some exporters emit fragments logically, others visually
             // (left→right) — same document, different blocks. For Hebrew the
@@ -100,8 +105,26 @@
     const SQUARE = /[☐□◻◼⬜❏❑]/;
     const ROUND = /[○◯⚪◦〇]/;
     const CHECKBOX = /[☐□◻◼⬜❏❑○◯⚪◦〇]/;
+    // blank runs adjacent to a label get ADOPTED as that label's band; mark
+    // them so they don't also emit their own (duplicate) borrowed-label field
+    const adoptedBlanks = new Set();
     boxes.forEach((b) => {
       const label = b.str.trim();
+      if (!isLabel(label) || isBlankRun(label)) return;
+      const line = boxes.filter((o) => o !== b && Math.abs(o.yBase - b.yBase) < b.fontH * 0.7);
+      if (hasHebrew(label)) {
+        const left = line.filter((o) => (o.x + o.w) <= b.x + 2);
+        const nearest = left.length ? left.reduce((a, c) => ((a.x + a.w) > (c.x + c.w) ? a : c)) : null;
+        if (nearest && isBlankRun(nearest.str) && (b.x - (nearest.x + nearest.w)) < b.fontH * 3) adoptedBlanks.add(nearest);
+      } else {
+        const right = line.filter((o) => o.x >= b.x + b.w - 2);
+        const nearest = right.length ? right.reduce((a, c) => (a.x < c.x ? a : c)) : null;
+        if (nearest && isBlankRun(nearest.str) && (nearest.x - (b.x + b.w)) < b.fontH * 3) adoptedBlanks.add(nearest);
+      }
+    });
+    boxes.forEach((b) => {
+      const label = b.str.trim();
+      if (adoptedBlanks.has(b)) return;   // its label already owns this band
       // an empty checkbox glyph → a tickable field, labelled by the rest of
       // its text (or the nearest word on the same line). Common on Israeli
       // digital forms ("☐ תושב ישראל").
@@ -155,14 +178,26 @@
         // blank is to the LEFT of the label
         const labelLeft = b.x;
         const leftItems = sameLine.filter((o) => (o.x + o.w) <= labelLeft + 2);
-        const leftBound = leftItems.length ? Math.max(...leftItems.map((o) => o.x + o.w)) : Math.max(0, labelLeft - defW);
-        fx = leftBound / W; fw = Math.max(20, labelLeft - leftBound) / W;
+        // the form drew the answer line itself? an adjacent underscore run IS
+        // the field — adopt its exact extent (its own rect, not the gap to it)
+        const nearest = leftItems.length ? leftItems.reduce((a, c) => ((a.x + a.w) > (c.x + c.w) ? a : c)) : null;
+        if (nearest && isBlankRun(nearest.str) && (labelLeft - (nearest.x + nearest.w)) < b.fontH * 3) {
+          fx = nearest.x / W; fw = Math.max(20, nearest.w) / W;
+        } else {
+          const leftBound = leftItems.length ? Math.max(...leftItems.map((o) => o.x + o.w)) : Math.max(0, labelLeft - defW);
+          fx = leftBound / W; fw = Math.max(20, labelLeft - leftBound) / W;
+        }
       } else {
         // blank is to the RIGHT of the label
         const labelRight = b.x + b.w;
         const rightItems = sameLine.filter((o) => o.x >= labelRight - 2);
-        const rightBound = rightItems.length ? Math.min(...rightItems.map((o) => o.x)) : Math.min(W, labelRight + defW);
-        fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
+        const nearest = rightItems.length ? rightItems.reduce((a, c) => (a.x < c.x ? a : c)) : null;
+        if (nearest && isBlankRun(nearest.str) && (nearest.x - labelRight) < b.fontH * 3) {
+          fx = nearest.x / W; fw = Math.max(20, nearest.w) / W;
+        } else {
+          const rightBound = rightItems.length ? Math.min(...rightItems.map((o) => o.x)) : Math.min(W, labelRight + defW);
+          fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
+        }
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
       let fy = Math.max(0, b.top) / H;

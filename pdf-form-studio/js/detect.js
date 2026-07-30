@@ -223,6 +223,15 @@
       }
       // required marker: a '*' or "חובה" in/next to the label — a missing
       // required field is the usual reason a government form is bounced back
+      // NUMBERED long "labels" are section HEADINGS ("3. הצהרת מוסד ההכשרה
+      // המלמד קורס..."), not fields — a heading happily has empty space
+      // beside it, so band width can't tell them apart; the number + a
+      // sentence-length label can. RTL emitters write the number as '.3'
+      // (dot first) or as a SEPARATE same-line item — cover all three.
+      const numInLabel = /^\s*(?:\d+\s*[.)]|[.)]\s*\d+)/.test(displayLabel);
+      const numBeside = sameLine.some((o) => /^\s*[.)]?\s*\d+\s*[.)]?\s*$/.test(o.str)
+        && o.x >= b.x + b.w - b.fontH && (o.x - (b.x + b.w)) < b.fontH * 4);
+      if ((numInLabel || numBeside) && stripEnum(displayLabel).replace(/\s+/g, ' ').length >= 20) return;
       const reqMark = /[*＊]|\(?\s*חובה\s*\)?|required/i;
       const required = reqMark.test(displayLabel) || sameLine.some((o) => /^[*＊]$/.test((o.str || '').trim()));
       const cleanLabel = stripEnum(displayLabel).replace(/[*＊]/g, '').replace(/\(?\s*חובה\s*\)?/g, '').replace(/[:：׃]\s*$/, '').replace(/\s+/g, ' ').trim();
@@ -294,6 +303,10 @@
         });
       });
     });
+
+    // the reading order of the FORM is the filling order of the panel:
+    // top-to-bottom, and within a line right-to-left (RTL forms)
+    out.sort((a, c) => (a.page - c.page) || ((Math.abs(a.fy - c.fy) > 0.008) ? (a.fy - c.fy) : (c.fx - a.fx)));
 
     // radio grouping: round-bullet options sharing a line belong to one
     // question (e.g. "○ זכר   ○ נקבה") → mark them one mutually-exclusive group

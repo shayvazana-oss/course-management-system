@@ -1173,6 +1173,26 @@ async function main() {
     }
   }
 
+  // ---- the real form detects CLEAN: no heading-noise, reading order ----
+  {
+    const h3b64 = fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf')).toString('base64');
+    const cleanRes = await page.evaluate(async (b64) => {
+      const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
+      await window.PFS.__test.openPdfFile(new File([buf], 'clean.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 2200));
+      const d = await window.PFS.detect.detectFields(window.PFS.__test.pdfView.getDoc());
+      const keys = d.fields.map((f) => f.fieldKey);
+      const noHeadings = !keys.some((k) => /הצהרת|פרטי_מוסד_ההכשרה_והקורס/.test(k));
+      const idx = (rx) => keys.findIndex((k) => rx.test(k));
+      // reading order: institution table first, signature line last
+      const ordered = idx(/שם_מוסד_ההכשרה/) !== -1 && idx(/שם_מנהל/) !== -1
+        && idx(/שם_מוסד_ההכשרה/) < idx(/שם_מלא/) && idx(/שם_מלא/) < idx(/שם_מנהל/);
+      return { count: d.fields.length, noHeadings, ordered };
+    }, h3b64);
+    if (!(cleanRes.noHeadings && cleanRes.ordered)) console.log('  [clean debug]', JSON.stringify(cleanRes));
+    check('real form: no heading-noise fields, reading order', cleanRes.noHeadings && cleanRes.ordered);
+  }
+
   // ---- Ctrl+Z from a HEBREW keyboard layout (e.key='ז', not 'z') ----
   {
     const hebUndo = await page.evaluate(async () => {

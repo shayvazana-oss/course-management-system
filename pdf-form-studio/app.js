@@ -2109,6 +2109,63 @@ function renderCourseGrid(c) {
     if (await PFS.ui.confirm('הסרת תלמיד/ה', 'להסיר מהקורס כולל המעקב?')) { C.removeStudent(c.id, b.dataset.key); renderCourses(); }
   }));
 }
+/* extractPersonMap(text) — turn ANY pasted text (a WhatsApp message, a line
+ * from a list, free text) into Hebrew-keyed person values, ready to ride the
+ * same one-shot canon prefill students use. Combines the vault extractor
+ * (checksummed ת"ז, phones, names, emails) with the free-line heuristic. */
+const PASTE_KEY_LABEL = Object.assign({}, HEB_KEY_LABEL, {
+  email: 'דוא״ל', address: 'כתובת', city: 'עיר', gender: 'מין'
+});
+function extractPersonMap(text) {
+  const map = {};
+  try {
+    const vals = PFS.vault.extractFromText(text) || {};
+    Object.keys(vals).forEach((k) => { map[PASTE_KEY_LABEL[k] || k] = vals[k]; });
+  } catch (e) {}
+  // first+last without a full name → compose one (forms mostly ask שם מלא)
+  if (!map['שם מלא'] && (map['שם פרטי'] || map['שם משפחה'])) {
+    map['שם מלא'] = [map['שם פרטי'], map['שם משפחה']].filter(Boolean).join(' ');
+  }
+  // the row heuristic catches what the extractor missed (bare "שם 123456789")
+  try {
+    const rows = PFS.courses.parseStudentRows(text);
+    if (rows.length === 1) {
+      if (rows[0].name && !map['שם מלא']) map['שם מלא'] = rows[0].name;
+      if (rows[0].tz && !map['תעודת זהות']) map['תעודת זהות'] = rows[0].tz;
+      if (rows[0].phone && !map['טלפון']) map['טלפון'] = rows[0].phone;
+    }
+  } catch (e) {}
+  // the extractor's name heuristic can swallow the whole line — a NAME has
+  // no long digit runs, so strip numeric tokens (ת"ז, phones) out of it
+  ['שם מלא', 'שם פרטי', 'שם משפחה'].forEach((k) => {
+    if (!map[k]) return;
+    map[k] = String(map[k]).split(/\s+/)
+      .filter((t) => (t.replace(/\D/g, '').length < 3))
+      .join(' ').replace(/\s+/g, ' ').trim();
+    if (!map[k]) delete map[k];
+  });
+  Object.keys(map).forEach((k) => { if (!String(map[k] || '').trim()) delete map[k]; });
+  return map;
+}
+/* fillPersonMap(map) — one-shot fill of the OPEN form with a person's values
+ * (outranks the profile: this form is about THEM). Returns filled count. */
+function fillPersonMap(map) {
+  if (!lastDet || !lastDet.fields || !Object.keys(map).length) return 0;
+  pendingStudent = map;
+  const pre = vaultPrefill(lastDet);
+  pendingStudent = null;
+  if (!pre) return 0;
+  return fieldsPanel.show(lastDet, pre);
+}
+PFS.extractPersonMap = extractPersonMap;
+PFS.fillPersonMap = fillPersonMap;
+PFS.scanPersonPhoto = async (file) => {
+  const vals = await scanIdPhoto(file, () => {});
+  const map = {};
+  Object.keys(vals).forEach((k) => { map[PASTE_KEY_LABEL[k] || k] = vals[k]; });
+  return map;
+};
+
 /* Zero-form: produce finished PDFs for every student still missing a form —
  * no viewing, no per-student filling. Reuses the whole battle-tested stack:
  * library bytes → open+detect+ink-snap → per-student vaultPrefill (student

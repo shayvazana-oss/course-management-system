@@ -1196,6 +1196,40 @@ async function main() {
     check('bare-שם synonym never claims "שם הקורס"; real name fields still fill', nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled);
   }
 
+  // ---- paste-and-fill: a WhatsApp line fills the whole form ----
+  {
+    const pf = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const T = window.PFS.__test;
+      window.PFS.store.set('patterns', {});
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'pp_nm', label: 'שם התלמיד', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'pp_tz', label: 'ת.ז.', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'pp_ph', label: 'טלפון נייד', fx: 0.2, fy: 0.4, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.setLastDet(det); T.fieldsPanel.show(det);
+      // the fast-lane buttons exist in the panel
+      const btns = [...document.querySelectorAll('#fieldsBody button')].map((b) => b.textContent);
+      const hasPaste = btns.some((t) => /הדבק ומלא/.test(t));
+      const hasPhoto = btns.some((t) => /מלא מצילום/.test(t));
+      // the raw WhatsApp-style line → person map → form
+      const map = window.PFS.extractPersonMap('ישראל ישראלי 123456782 050-1234567');
+      const n = window.PFS.fillPersonMap(map);
+      await wait(150);
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      const val = (k) => (rows.find((i) => i.__fkey === k) || {}).value;
+      const filled = val('pp_nm') === 'ישראל ישראלי' && val('pp_tz') === '123456782' && /050/.test(val('pp_ph') || '');
+      const onForm = T.overlay.getElements().some((c) => c.model.fieldKey === 'pp_tz' && c.model.text === '123456782');
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      window.PFS.store.set('patterns', {});
+      return { hasPaste, hasPhoto, map, vals: { nm: val('pp_nm'), tz: val('pp_tz'), ph: val('pp_ph') }, n, filled, onForm };
+    });
+    if (!(pf.hasPaste && pf.hasPhoto && pf.filled && pf.onForm)) console.log('  [paste debug]', JSON.stringify(pf));
+    else console.log('  [paste ok]');
+    check('paste-and-fill: one WhatsApp line fills name/tz/phone on panel and form', pf.hasPaste && pf.hasPhoto && pf.filled && pf.onForm);
+  }
+
   // ---- zero-form: one click → finished PDFs for every missing student ----
   {
     const zfB64 = fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf')).toString('base64');

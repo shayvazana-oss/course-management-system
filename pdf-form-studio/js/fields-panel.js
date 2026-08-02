@@ -250,6 +250,59 @@
         ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
         ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
         body.appendChild(ivTop);
+        // the single-person fast lane: the person's details are already
+        // WRITTEN somewhere (a WhatsApp message, an ID photo) — paste or
+        // snap instead of retyping them field by field
+        const fastRow = document.createElement('div');
+        fastRow.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+        const pasteBtn = document.createElement('button');
+        pasteBtn.className = 'btn sm'; pasteBtn.style.flex = '1';
+        pasteBtn.textContent = '📋 הדבק ומלא';
+        pasteBtn.title = 'הדביקו הודעת וואטסאפ / שורה עם שם, ת״ז וטלפון — והטופס מתמלא';
+        const photoBtn = document.createElement('button');
+        photoBtn.className = 'btn sm'; photoBtn.style.flex = '1';
+        photoBtn.textContent = '📸 מלא מצילום';
+        photoBtn.title = 'צילום ת״ז/רישיון — הפרטים נקראים וממלאים את הטופס (הכול מקומי)';
+        fastRow.append(pasteBtn, photoBtn);
+        body.appendChild(fastRow);
+        const pasteBox = document.createElement('div');
+        pasteBox.className = 'hidden'; pasteBox.style.marginBottom = '8px';
+        pasteBox.innerHTML = '<textarea rows="3" placeholder="למשל: ישראל ישראלי 123456782 050-1234567" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--line);border-radius:8px"></textarea>' +
+          '<button type="button" class="btn sm primary block" style="margin-top:4px">מלא את הטופס</button>';
+        body.appendChild(pasteBox);
+        const runPaste = (text) => {
+          const map = PFS.extractPersonMap(text || '');
+          const found = Object.keys(map);
+          if (!found.length) { PFS.toast('לא זוהו פרטים בטקסט — צריך לפחות שם או ת״ז', 'err'); return; }
+          const n = PFS.fillPersonMap(map);
+          pasteBox.classList.add('hidden');
+          PFS.toast(`📋 זוהו ${found.join(', ')} — מולאו ${n} שדות`, 'ok', 5000);
+        };
+        pasteBtn.addEventListener('click', async () => {
+          // clipboard first (one click total); fall back to the paste box
+          try {
+            const txt = await navigator.clipboard.readText();
+            if (txt && Object.keys(PFS.extractPersonMap(txt)).length) { runPaste(txt); return; }
+          } catch (e) { /* permission denied → manual box */ }
+          pasteBox.classList.toggle('hidden');
+          if (!pasteBox.classList.contains('hidden')) pasteBox.querySelector('textarea').focus();
+        });
+        pasteBox.querySelector('button').addEventListener('click', () => runPaste(pasteBox.querySelector('textarea').value));
+        photoBtn.addEventListener('click', () => {
+          const inp = document.createElement('input');
+          inp.type = 'file'; inp.accept = 'image/*';
+          inp.onchange = async () => {
+            const f = inp.files[0]; if (!f) return;
+            PFS.toast('📸 קורא את התעודה… הכול מקומי במכשיר 🔒', 'ok', 4000);
+            try {
+              const map = await PFS.scanPersonPhoto(f);
+              if (!Object.keys(map).length) { PFS.toast('לא זוהו פרטים — נסו צילום ישר ומואר', 'err'); return; }
+              const n = PFS.fillPersonMap(map);
+              PFS.toast(`📸 זוהו ${Object.keys(map).join(', ')} — מולאו ${n} שדות`, 'ok', 5000);
+            } catch (e) { PFS.toast('קריאת הצילום נכשלה', 'err'); }
+          };
+          inp.click();
+        });
         // one handwriting, one click — evens out EVERYTHING on the form,
         // including manually-placed text and restored documents
         const uniBtn = document.createElement('button');

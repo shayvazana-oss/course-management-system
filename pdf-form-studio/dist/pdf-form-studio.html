@@ -6633,6 +6633,59 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
         ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
         body.appendChild(ivTop);
+        // the single-person fast lane: the person's details are already
+        // WRITTEN somewhere (a WhatsApp message, an ID photo) — paste or
+        // snap instead of retyping them field by field
+        const fastRow = document.createElement('div');
+        fastRow.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+        const pasteBtn = document.createElement('button');
+        pasteBtn.className = 'btn sm'; pasteBtn.style.flex = '1';
+        pasteBtn.textContent = '📋 הדבק ומלא';
+        pasteBtn.title = 'הדביקו הודעת וואטסאפ / שורה עם שם, ת״ז וטלפון — והטופס מתמלא';
+        const photoBtn = document.createElement('button');
+        photoBtn.className = 'btn sm'; photoBtn.style.flex = '1';
+        photoBtn.textContent = '📸 מלא מצילום';
+        photoBtn.title = 'צילום ת״ז/רישיון — הפרטים נקראים וממלאים את הטופס (הכול מקומי)';
+        fastRow.append(pasteBtn, photoBtn);
+        body.appendChild(fastRow);
+        const pasteBox = document.createElement('div');
+        pasteBox.className = 'hidden'; pasteBox.style.marginBottom = '8px';
+        pasteBox.innerHTML = '<textarea rows="3" placeholder="למשל: ישראל ישראלי 123456782 050-1234567" style="width:100%;font-size:12.5px;padding:8px;border:1px solid var(--line);border-radius:8px"></textarea>' +
+          '<button type="button" class="btn sm primary block" style="margin-top:4px">מלא את הטופס</button>';
+        body.appendChild(pasteBox);
+        const runPaste = (text) => {
+          const map = PFS.extractPersonMap(text || '');
+          const found = Object.keys(map);
+          if (!found.length) { PFS.toast('לא זוהו פרטים בטקסט — צריך לפחות שם או ת״ז', 'err'); return; }
+          const n = PFS.fillPersonMap(map);
+          pasteBox.classList.add('hidden');
+          PFS.toast(`📋 זוהו ${found.join(', ')} — מולאו ${n} שדות`, 'ok', 5000);
+        };
+        pasteBtn.addEventListener('click', async () => {
+          // clipboard first (one click total); fall back to the paste box
+          try {
+            const txt = await navigator.clipboard.readText();
+            if (txt && Object.keys(PFS.extractPersonMap(txt)).length) { runPaste(txt); return; }
+          } catch (e) { /* permission denied → manual box */ }
+          pasteBox.classList.toggle('hidden');
+          if (!pasteBox.classList.contains('hidden')) pasteBox.querySelector('textarea').focus();
+        });
+        pasteBox.querySelector('button').addEventListener('click', () => runPaste(pasteBox.querySelector('textarea').value));
+        photoBtn.addEventListener('click', () => {
+          const inp = document.createElement('input');
+          inp.type = 'file'; inp.accept = 'image/*';
+          inp.onchange = async () => {
+            const f = inp.files[0]; if (!f) return;
+            PFS.toast('📸 קורא את התעודה… הכול מקומי במכשיר 🔒', 'ok', 4000);
+            try {
+              const map = await PFS.scanPersonPhoto(f);
+              if (!Object.keys(map).length) { PFS.toast('לא זוהו פרטים — נסו צילום ישר ומואר', 'err'); return; }
+              const n = PFS.fillPersonMap(map);
+              PFS.toast(`📸 זוהו ${Object.keys(map).join(', ')} — מולאו ${n} שדות`, 'ok', 5000);
+            } catch (e) { PFS.toast('קריאת הצילום נכשלה', 'err'); }
+          };
+          inp.click();
+        });
         // one handwriting, one click — evens out EVERYTHING on the form,
         // including manually-placed text and restored documents
         const uniBtn = document.createElement('button');
@@ -9074,6 +9127,63 @@ function renderCourseGrid(c) {
     if (await PFS.ui.confirm('הסרת תלמיד/ה', 'להסיר מהקורס כולל המעקב?')) { C.removeStudent(c.id, b.dataset.key); renderCourses(); }
   }));
 }
+/* extractPersonMap(text) — turn ANY pasted text (a WhatsApp message, a line
+ * from a list, free text) into Hebrew-keyed person values, ready to ride the
+ * same one-shot canon prefill students use. Combines the vault extractor
+ * (checksummed ת"ז, phones, names, emails) with the free-line heuristic. */
+const PASTE_KEY_LABEL = Object.assign({}, HEB_KEY_LABEL, {
+  email: 'דוא״ל', address: 'כתובת', city: 'עיר', gender: 'מין'
+});
+function extractPersonMap(text) {
+  const map = {};
+  try {
+    const vals = PFS.vault.extractFromText(text) || {};
+    Object.keys(vals).forEach((k) => { map[PASTE_KEY_LABEL[k] || k] = vals[k]; });
+  } catch (e) {}
+  // first+last without a full name → compose one (forms mostly ask שם מלא)
+  if (!map['שם מלא'] && (map['שם פרטי'] || map['שם משפחה'])) {
+    map['שם מלא'] = [map['שם פרטי'], map['שם משפחה']].filter(Boolean).join(' ');
+  }
+  // the row heuristic catches what the extractor missed (bare "שם 123456789")
+  try {
+    const rows = PFS.courses.parseStudentRows(text);
+    if (rows.length === 1) {
+      if (rows[0].name && !map['שם מלא']) map['שם מלא'] = rows[0].name;
+      if (rows[0].tz && !map['תעודת זהות']) map['תעודת זהות'] = rows[0].tz;
+      if (rows[0].phone && !map['טלפון']) map['טלפון'] = rows[0].phone;
+    }
+  } catch (e) {}
+  // the extractor's name heuristic can swallow the whole line — a NAME has
+  // no long digit runs, so strip numeric tokens (ת"ז, phones) out of it
+  ['שם מלא', 'שם פרטי', 'שם משפחה'].forEach((k) => {
+    if (!map[k]) return;
+    map[k] = String(map[k]).split(/\s+/)
+      .filter((t) => (t.replace(/\D/g, '').length < 3))
+      .join(' ').replace(/\s+/g, ' ').trim();
+    if (!map[k]) delete map[k];
+  });
+  Object.keys(map).forEach((k) => { if (!String(map[k] || '').trim()) delete map[k]; });
+  return map;
+}
+/* fillPersonMap(map) — one-shot fill of the OPEN form with a person's values
+ * (outranks the profile: this form is about THEM). Returns filled count. */
+function fillPersonMap(map) {
+  if (!lastDet || !lastDet.fields || !Object.keys(map).length) return 0;
+  pendingStudent = map;
+  const pre = vaultPrefill(lastDet);
+  pendingStudent = null;
+  if (!pre) return 0;
+  return fieldsPanel.show(lastDet, pre);
+}
+PFS.extractPersonMap = extractPersonMap;
+PFS.fillPersonMap = fillPersonMap;
+PFS.scanPersonPhoto = async (file) => {
+  const vals = await scanIdPhoto(file, () => {});
+  const map = {};
+  Object.keys(vals).forEach((k) => { map[PASTE_KEY_LABEL[k] || k] = vals[k]; });
+  return map;
+};
+
 /* Zero-form: produce finished PDFs for every student still missing a form —
  * no viewing, no per-student filling. Reuses the whole battle-tested stack:
  * library bytes → open+detect+ink-snap → per-student vaultPrefill (student

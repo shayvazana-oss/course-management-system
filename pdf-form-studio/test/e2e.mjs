@@ -2306,6 +2306,37 @@ async function main() {
     return posOk && neg1Ok && neg2Ok;
   }));
 
+  // a label the document already ANSWERS (printed value beside/beneath it,
+  // as on a quote letter) must NOT get a field — no duplicate data on export
+  check('detect: labels with printed answers beside/beneath get no field', await page.evaluate(() => {
+    const H = 400, W = 460, fs = 16;
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    const texts = (arr) => arr.filter((f) => f.type === 'text').map((f) => f.label);
+    // (a) RTL: printed value right after the colon → answered, no field;
+    //     an identical label with nothing beside it stays fillable
+    const rtl = texts(window.PFS.detect.heuristicForPage([
+      item('תאריך התחלה:', 300, 60, 100), item('03.09.2026', 210, 60, 80),
+      item('תאריך סיום:', 300, 120, 90)
+    ], W, H, vp, 0));
+    const aOk = !rtl.some((l) => /התחלה/.test(l)) && rtl.some((l) => /סיום/.test(l));
+    // (b) RTL: the answer continues on the NEXT line, aligned with the label
+    //     ("סניפים:" then the address list) → answered; a next-line LABEL
+    //     ("שם:" above "כתובת:") is just the next question — both fillable
+    const below = texts(window.PFS.detect.heuristicForPage([
+      item('סניפים:', 380, 180, 60), item('האופה 7, אשקלון', 290, 198, 150),
+      item('שם:', 400, 260, 40), item('כתובת:', 390, 278, 50)
+    ], W, H, vp, 0));
+    const bOk = !below.some((l) => /סניפים/.test(l)) && below.some((l) => /שם/.test(l)) && below.some((l) => /כתובת/.test(l));
+    // (c) LTR mirror of (a)
+    const ltr = texts(window.PFS.detect.heuristicForPage([
+      item('Start date:', 40, 60, 80), item('03.09.2026', 128, 60, 80),
+      item('Name:', 40, 120, 50)
+    ], W, H, vp, 0));
+    const cOk = !ltr.some((l) => /Start date/.test(l)) && ltr.some((l) => /Name/.test(l));
+    return aOk && bOk && cOk;
+  }));
+
   check('vault: expanded synonyms + marital coverage map correctly', await page.evaluate(() => {
     const mk = window.PFS.vault.matchKey, cc = window.PFS.vault.classifyChoice;
     const synOk = mk('משלח יד') === 'occupation'      // Form 101 term for occupation

@@ -171,8 +171,16 @@
       }
       const rtl = hasHebrew(displayLabel);
       let fx, fw;
+      let drawnBlank = false;   // the form drew its own answer line (____/....)
       const defW = Math.min(0.34 * W, W * 0.5);
+      // real printed content (letters or digits) — as opposed to a blank run,
+      // a lone required-asterisk, or a checkbox glyph
+      const answerish = (s) => {
+        const t = (s || '').trim();
+        return (/[A-Za-z֐-׿؀-ۿ]|\d/.test(t)) && !/^[*＊]+$/.test(t) && !CHECKBOX.test(t) && !isBlankRun(t);
+      };
       if (isBlankRun(label)) {
+        drawnBlank = true;
         fx = b.x / W; fw = Math.max(b.w, 0.15 * W) / W;
       } else if (rtl) {
         // blank is to the LEFT of the label
@@ -182,8 +190,13 @@
         // the field — adopt its exact extent (its own rect, not the gap to it)
         const nearest = leftItems.length ? leftItems.reduce((a, c) => ((a.x + a.w) > (c.x + c.w) ? a : c)) : null;
         if (nearest && isBlankRun(nearest.str) && (labelLeft - (nearest.x + nearest.w)) < b.fontH * 3) {
+          drawnBlank = true;
           fx = nearest.x / W; fw = Math.max(20, nearest.w) / W;
         } else {
+          // ALREADY ANSWERED: printed text right after the colon ("תאריך
+          // התחלה: 03.09.2026" on a quote letter) — the document filled this
+          // in itself; a field here would duplicate the printed data
+          if (nearest && answerish(nearest.str) && (labelLeft - (nearest.x + nearest.w)) < b.fontH * 2) return;
           const leftBound = leftItems.length ? Math.max(...leftItems.map((o) => o.x + o.w)) : Math.max(0, labelLeft - defW);
           fx = leftBound / W; fw = Math.max(20, labelLeft - leftBound) / W;
         }
@@ -193,11 +206,28 @@
         const rightItems = sameLine.filter((o) => o.x >= labelRight - 2);
         const nearest = rightItems.length ? rightItems.reduce((a, c) => (a.x < c.x ? a : c)) : null;
         if (nearest && isBlankRun(nearest.str) && (nearest.x - labelRight) < b.fontH * 3) {
+          drawnBlank = true;
           fx = nearest.x / W; fw = Math.max(20, nearest.w) / W;
         } else {
+          if (nearest && answerish(nearest.str) && (nearest.x - labelRight) < b.fontH * 2) return;
           const rightBound = rightItems.length ? Math.min(...rightItems.map((o) => o.x)) : Math.min(W, labelRight + defW);
           fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
         }
+      }
+      // ANSWERED BELOW: a colon-label whose printed answer continues on the
+      // next line ("סניפים:" then the address list). Only prose ALIGNED with
+      // the label's reading edge counts — an answer continuation starts where
+      // the label starts; unrelated text elsewhere on the next line doesn't.
+      // Labels below are just the next question, drawn blanks stay fillable.
+      if (!drawnBlank) {
+        const alignedBelow = boxes.some((o) => {
+          if (o === b || !answerish(o.str) || isLabel(o.str.trim())) return false;
+          const dy = o.top - b.top;
+          if (dy < b.fontH * 0.7 || dy > b.fontH * 2.0) return false;
+          return rtl ? Math.abs((o.x + o.w) - (b.x + b.w)) < b.fontH * 1.5
+                     : Math.abs(o.x - b.x) < b.fontH * 1.5;
+        });
+        if (alignedBelow) return;
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
       let fy = Math.max(0, b.top) / H;

@@ -1196,6 +1196,48 @@ async function main() {
     check('bare-שם synonym never claims "שם הקורס"; real name fields still fill', nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled);
   }
 
+  // ---- quote → appendix: the PRINTED deal facts flow to the companion ----
+  {
+    const qm = await page.evaluate(() => {
+      // the literal shape of the office's price-quote letters
+      const text = [
+        'הנדון: הצעת מחיר לקורס אילוף כלבים',
+        'עבור טלי מכלוף  ת.ז. 038290177',
+        'תאריך התחלה: 03.09.2026',
+        'תאריך סיום משוער: 30/05/27',
+        'סניף: אשקלון',
+        'עלות: 10900 ש"ח - כולל מע"מ ודמי רישום.'
+      ].join('\n');
+      const m = window.PFS.extractQuoteMap(text);
+      return {
+        course: m['שם הקורס'], courseAlias: m['שם הקורס המבוקש'],
+        name: m['שם מלא'], tz: m['תעודת זהות'],
+        branch: m['סניף'], d1: m['תאריך תחילת הקורס'], d2: m['תאריך סיום הקורס']
+      };
+    });
+    if (!(qm.course === 'אילוף כלבים' && qm.name === 'טלי מכלוף' && qm.tz === '038290177')) console.log('  [quote debug]', JSON.stringify(qm));
+    check('quote text yields course, person (checksummed ת"ז), branch and period dates',
+      qm.course === 'אילוף כלבים' && qm.courseAlias === 'אילוף כלבים'
+      && qm.name === 'טלי מכלוף' && qm.tz === '038290177'
+      && qm.branch === 'אשקלון' && qm.d1 === '03.09.2026' && qm.d2 === '30/05/27');
+  }
+
+  // course-PERIOD dates carry to the appendix; bare dates still never do
+  {
+    const dc = await page.evaluate(() => {
+      const T = window.PFS.__test;
+      const det = { tier: 'text', fields: [
+        { fieldKey: 'q_start', label: 'תאריך תחילת הקורס', type: 'text', page: 0, fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02 },
+        { fieldKey: 'q_date', label: 'תאריך', type: 'text', page: 0, fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.03, fontFrac: 0.02 }
+      ] };
+      T.setCarry({ 'תאריך תחילת הקורס': '03.09.2026', 'תאריך': '22/7/26' });
+      const pre = T.vaultPrefillFor(det) || {};
+      return { start: pre.q_start, bare: pre.q_date };
+    });
+    if (!(dc.start === '03.09.2026' && dc.bare !== '22/7/26')) console.log('  [date-carry debug]', JSON.stringify(dc));
+    check('course-period dates carry; bare signature dates never do', dc.start === '03.09.2026' && dc.bare !== '22/7/26');
+  }
+
   // ---- paste-and-fill: a WhatsApp line fills the whole form ----
   {
     const pf = await page.evaluate(async () => {

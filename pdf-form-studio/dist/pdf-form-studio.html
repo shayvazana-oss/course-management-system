@@ -7287,9 +7287,13 @@ function vaultPrefill(det) {
     // different forms produces confident-looking wrong fills (e.g. an
     // institution name landing in a person's "שם מלא")
     const carryText = (carry && Object.keys(carry).length) ? PFS.vault.matchValues(det.fields, carry, skip, { labelOnly: true }) : {};
-    // dates are per-form variables — never carried between companion forms
+    // bare dates are per-form variables — never carried; course-PERIOD dates
+    // (תאריך תחילת/סיום הקורס) are deal facts and may flow
     det.fields.forEach((f) => {
-      if (carryText[f.fieldKey] != null && PFS.vault.matchKey(f.label) === 'date') delete carryText[f.fieldKey];
+      if (carryText[f.fieldKey] == null) return;
+      if (PFS.vault.matchKey(f.label) !== 'date') return;
+      if (/תחילת|התחלה|סיום/.test(f.label)) return;
+      delete carryText[f.fieldKey];
     });
     return Object.assign({}, patternAuto, text, checks, carryText);
   } catch (e) { return null; }
@@ -7640,8 +7644,24 @@ async function openCompanion(link) {
   try {
     const bytes = await PFS.companions.getBytes(link.id);
     if (!bytes) { PFS.toast('קובץ הנספח לא נמצא באחסון — קשרו אותו מחדש', 'err'); return; }
-    // capture what was typed here BEFORE the document switches
-    pendingCarry = overlay.currentValues();
+    // capture what was typed here BEFORE the document switches — and ALSO
+    // read the document's PRINTED text: a price quote arrives with the deal
+    // facts already in it (עבור פלוני ת"ז..., לקורס...), nothing typed
+    const typed = overlay.currentValues();
+    let extracted = {};
+    try {
+      const t = await readDocText();
+      const ea = extractQuoteMap(t.a), eb = extractQuoteMap(t.b);
+      extracted = Object.assign({}, eb, ea);   // content-order wins ties
+    } catch (e) {}
+    // the person rides canon matching (bridges any wording); the rest rides
+    // exact-label carry; anything the user TYPED beats what was printed
+    const person = {};
+    ['שם מלא', 'תעודת זהות', 'טלפון'].forEach((k) => { if (extracted[k]) person[k] = extracted[k]; });
+    pendingStudent = Object.keys(person).length ? person : null;
+    pendingCarry = Object.assign({}, extracted, typed);
+    const got = Object.keys(extracted);
+    if (got.length) PFS.toast('📖 נשאבו מהמסמך: ' + [...new Set(got)].slice(0, 5).join(', '), 'ok', 5000);
     await openPdfFile(new File([bytes], link.name + '.pdf', { type: 'application/pdf' }));
   } catch (e) {
     pendingCarry = null;
@@ -9183,6 +9203,58 @@ PFS.scanPersonPhoto = async (file) => {
   Object.keys(vals).forEach((k) => { map[PASTE_KEY_LABEL[k] || k] = vals[k]; });
   return map;
 };
+
+/* readDocText() — the printed text of the open PDF, in two assemblies:
+ * content order (usually logical) and per-line visual RTL order. Extraction
+ * runs on both — whichever reads coherently wins. */
+async function readDocText() {
+  const doc = pdfView.getDoc(); if (!doc) return { a: '', b: '' };
+  let a = '', b = '';
+  const n = Math.min(doc.numPages, 4);
+  for (let i = 1; i <= n; i++) {
+    const pg = await doc.getPage(i);
+    const tc = await pg.getTextContent();
+    a += tc.items.map((it) => it.str).join(' ') + '\n';
+    // group into lines by baseline, order each line right-to-left
+    const lines = [];
+    tc.items.forEach((it) => {
+      if (!it.str || !it.str.trim()) return;
+      const y = Math.round(it.transform[5]);
+      let ln = lines.find((L) => Math.abs(L.y - y) < 4);
+      if (!ln) { ln = { y, items: [] }; lines.push(ln); }
+      ln.items.push(it);
+    });
+    lines.sort((x, y2) => y2.y - x.y);
+    lines.forEach((ln) => {
+      ln.items.sort((x, y2) => (y2.transform[4] - x.transform[4]));
+      b += ln.items.map((it) => it.str).join('') + '\n';
+    });
+  }
+  return { a, b };
+}
+
+/* extractQuoteMap(text) — pull the DEAL facts out of a letter-style document
+ * (a price quote): person (via the vault extractor), course name, branch and
+ * course period dates. Values are keyed under the common label wordings so
+ * exact-label carry bridges the appendix's phrasing. */
+function extractQuoteMap(text) {
+  const map = extractPersonMap(text);
+  const grab = (rx) => { const m = text.match(rx); return m ? m[1].replace(/\s+/g, ' ').trim() : null; };
+  const course = grab(/לקורס\s+([א-ת][א-ת"'\s]{1,30}?)(?=\s+(?:עבור|ת\.?["']?ז|בתאריך|החל|מס)|[\n,.:]|$)/)
+    || grab(/(?:^|\n)\s*קורס\s*[:：]\s*([א-ת][א-ת"'\s]{1,30}?)(?=[\n,.]|$)/);
+  if (course) { map['שם הקורס'] = course; map['שם הקורס המבוקש'] = course; map['הקורס המבוקש'] = course; }
+  const forName = grab(/עבור\s+([א-ת][א-ת'\-\s]{1,25}?)(?=\s+ת\.?["']?\s*ז|\s+\d|[\n,.:]|$)/);
+  if (forName && !map['שם מלא']) map['שם מלא'] = forName;
+  const branch = grab(/סניף\s*[:：]?\s+([א-ת][א-ת\s]{1,20}?)(?=[\n,.]|$)/);
+  if (branch) map['סניף'] = branch;
+  const d1 = grab(/תאריך\s+התחלה\s*[:：]?\s*([\d./-]{6,10})/) || grab(/החל\s+מ?[־-]?\s*([\d./-]{6,10})/);
+  if (d1) { map['תאריך תחילת הקורס'] = d1; map['תאריך התחלה'] = d1; }
+  const d2 = grab(/תאריך\s+סיום(?:\s+משוער)?\s*[:：]?\s*([\d./-]{6,10})/);
+  if (d2) { map['תאריך סיום הקורס'] = d2; map['תאריך סיום'] = d2; }
+  Object.keys(map).forEach((k) => { if (!String(map[k] || '').trim()) delete map[k]; });
+  return map;
+}
+PFS.extractQuoteMap = extractQuoteMap;
 
 /* Zero-form: produce finished PDFs for every student still missing a form —
  * no viewing, no per-student filling. Reuses the whole battle-tested stack:

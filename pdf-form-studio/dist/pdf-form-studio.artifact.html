@@ -7650,6 +7650,19 @@ async function openCompanion(link) {
     const person = {};
     ['שם מלא', 'תעודת זהות', 'טלפון'].forEach((k) => { if (extracted[k]) person[k] = extracted[k]; });
     pendingStudent = Object.keys(person).length ? person : null;
+    // the quote names a BRANCH — pick the matching saved campus so the
+    // appendix's address is THIS deal's, not the most-used one
+    if (extracted['סניף']) {
+      const br = PFS.vault.norm(extracted['סניף']);
+      const camps = PFS.store.get('org_campuses', []) || [];
+      let addr = (camps.find((cp) => PFS.vault.norm(cp.name + ' ' + cp.address).includes(br)) || {}).address;
+      if (!addr && PFS.patterns) {
+        const opt = PFS.patterns.optionsFor({ label: 'כתובת מוסד ההכשרה', type: 'text' })
+          .find((o) => PFS.vault.norm(o.v).includes(br));
+        if (opt) addr = opt.v;
+      }
+      if (addr) { extracted['כתובת מוסד ההכשרה'] = addr; extracted['כתובת המוסד'] = addr; }
+    }
     pendingCarry = Object.assign({}, extracted, typed);
     const got = Object.keys(extracted);
     if (got.length) PFS.toast('📖 נשאבו מהמסמך: ' + [...new Set(got)].slice(0, 5).join(', '), 'ok', 5000);
@@ -9198,6 +9211,40 @@ PFS.scanPersonPhoto = async (file) => {
 /* readDocText() — the printed text of the open PDF, in two assemblies:
  * content order (usually logical) and per-line visual RTL order. Extraction
  * runs on both — whichever reads coherently wins. */
+/* assembleLineRTL(items) — reconstruct one visual line of a Hebrew PDF whose
+ * text layer is per-glyph fragments: sort right-to-left (visual RTL = logical
+ * Hebrew), join with a space only across real gaps, and flip maximal runs of
+ * digit/latin fragments back to left-to-right (they are LTR within RTL). */
+function assembleLineRTL(items) {
+  const sorted = items.slice().sort((x, y) => (y.transform[4] - x.transform[4]));
+  // un-reverse consecutive LTR fragments (digits, latin, ./-)
+  const isLTR = (t) => /^[\d\sA-Za-z./\-:]+$/.test(t) && /[\dA-Za-z]/.test(t);
+  const out = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (isLTR(sorted[i].str)) {
+      let j = i; while (j + 1 < sorted.length && isLTR(sorted[j + 1].str)) j++;
+      for (let k = j; k >= i; k--) out.push(sorted[k]);
+      i = j;
+    } else out.push(sorted[i]);
+  }
+  let line = '', prev = null;
+  out.forEach((it) => {
+    if (prev) {
+      const fh = Math.hypot(it.transform[2], it.transform[3]) || 10;
+      // the EDGE-to-EDGE gap between the two fragments' boxes — origin
+      // distance flags every mid-word split as a space
+      const aL = it.transform[4], aR = aL + (it.width || 0);
+      const bL = prev.transform[4], bR = bL + (prev.width || 0);
+      const gap = Math.max(aL - bR, bL - aR, 0);
+      if (gap > fh * 0.28 && !line.endsWith(' ')) line += ' ';
+    }
+    line += it.str;
+    prev = it;
+  });
+  return line.replace(/\s+/g, ' ').trim();
+}
+PFS.assembleLineRTL = assembleLineRTL;
+
 async function readDocText() {
   const doc = pdfView.getDoc(); if (!doc) return { a: '', b: '' };
   let a = '', b = '';
@@ -9206,7 +9253,6 @@ async function readDocText() {
     const pg = await doc.getPage(i);
     const tc = await pg.getTextContent();
     a += tc.items.map((it) => it.str).join(' ') + '\n';
-    // group into lines by baseline, order each line right-to-left
     const lines = [];
     tc.items.forEach((it) => {
       if (!it.str || !it.str.trim()) return;
@@ -9216,10 +9262,7 @@ async function readDocText() {
       ln.items.push(it);
     });
     lines.sort((x, y2) => y2.y - x.y);
-    lines.forEach((ln) => {
-      ln.items.sort((x, y2) => (y2.transform[4] - x.transform[4]));
-      b += ln.items.map((it) => it.str).join('') + '\n';
-    });
+    lines.forEach((ln) => { b += assembleLineRTL(ln.items) + '\n'; });
   }
   return { a, b };
 }

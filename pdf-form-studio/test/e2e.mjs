@@ -1196,6 +1196,40 @@ async function main() {
     check('bare-שם synonym never claims "שם הקורס"; real name fields still fill', nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled);
   }
 
+  // ---- per-glyph RTL lines reassemble into readable text (digits unflipped) ----
+  {
+    const asm = await page.evaluate(() => {
+      // 'עבור טלי מכלוף ת.ז. 038290177' emitted as visual fragments, digits LTR
+      const mk = (str, x) => ({ str, width: str.length * 6, transform: [12, 0, 0, 12, x, 500] });
+      const items = [
+        mk('038290177', 40),          // digits sit left, printed LTR
+        mk('ת.ז.', 100),
+        mk('וף', 130), mk('מכל', 142), // fragmented word
+        mk('טלי', 175),
+        mk('עבור', 205)
+      ];
+      return window.PFS.assembleLineRTL(items);
+    });
+    if (!/עבור טלי מכלוף ת\.ז\. 038290177/.test(asm)) console.log('  [asm debug]', JSON.stringify(asm));
+    check('per-glyph RTL line reassembles readably with digit runs unflipped', /עבור טלי מכלוף ת\.ז\. 038290177/.test(asm));
+  }
+
+  // branch in the quote picks the MATCHING saved campus for the appendix
+  {
+    const br = await page.evaluate(() => {
+      window.PFS.store.set('org_campuses', [
+        { name: 'קמפוס חיפה', address: 'ההסתדרות 25, חיפה' },
+        { name: 'קמפוס אשקלון', address: 'האופה 7, אשקלון' }
+      ]);
+      const camps = window.PFS.store.get('org_campuses', []);
+      const brN = window.PFS.vault.norm('אשקלון');
+      const hit = camps.find((cp) => window.PFS.vault.norm(cp.name + ' ' + cp.address).includes(brN));
+      window.PFS.store.set('org_campuses', []);
+      return hit ? hit.address : null;
+    });
+    check('a quoted branch resolves to its saved campus address', br === 'האופה 7, אשקלון');
+  }
+
   // ---- quote → appendix: the PRINTED deal facts flow to the companion ----
   {
     const qm = await page.evaluate(() => {

@@ -1196,6 +1196,46 @@ async function main() {
     check('bare-שם synonym never claims "שם הקורס"; real name fields still fill', nameLeak.guards && nameLeak.courseEmpty && nameLeak.nameFilled);
   }
 
+  // ---- zero-form: one click → finished PDFs for every missing student ----
+  {
+    const zfB64 = fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf')).toString('base64');
+    const zf = await page.evaluate(async (b64) => {
+      const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
+      const T = window.PFS.__test;
+      const C = window.PFS.courses;
+      window.PFS.store.set('courses', []); window.PFS.store.set('patterns', {});
+      // org constants come from the profile (as they would in real use)
+      window.PFS.store.set('profiles', [{ id: 'zp', name: 'אני', values: {
+        'שם מוסד ההכשרה': 'היחידה ללימודי חוץ', 'טלפון מוסד ההכשרה': '03-1234567'
+      } }]);
+      window.PFS.store.set('active_profile', 'zp');
+      const rec = await window.PFS.library.add('נספח-אפס', buf.slice(0));
+      const c = C.create('קורס אפס');
+      C.addStudents(c.id, [
+        { name: 'ישראל ישראלי', tz: '123456782', phone: '050-1111111' },
+        { name: 'דנה כהן', tz: '207105749', phone: '052-2222222' }
+      ]);
+      C.addForm(c.id, { name: 'נספח-אפס', fp: null, libId: rec.id });
+      const before = C.missingCount(C.get(c.id));
+      const res = await T.produceCourseForm(c.id, 'נספח-אפס', false);
+      if (res.error) return { error: res.error, before };
+      const after = C.missingCount(C.get(c.id));
+      // unzip and check per-student files exist and are real PDFs
+      const files = window.fflate.unzipSync(res.zip);
+      const names = Object.keys(files);
+      const pdfsOk = names.every((n) => {
+        const h = files[n].slice(0, 5); return String.fromCharCode(...h) === '%PDF-';
+      });
+      const sized = names.every((n) => files[n].length > 5000);
+      window.PFS.store.set('courses', []);
+      return { before, after, count: res.count, names, pdfsOk, sized };
+    }, zfB64);
+    if (zf.error || !(zf.count === 2 && zf.after === 0 && zf.pdfsOk && zf.sized)) console.log('  [zero-form debug]', JSON.stringify({ ...zf, names: (zf.names || []).join('|') }));
+    check('zero-form: 2 finished per-student PDFs from one call, cells auto-marked',
+      zf.count === 2 && zf.before === 2 && zf.after === 0 && zf.pdfsOk && zf.sized
+      && zf.names.some((n) => /ישראל/.test(n)) && zf.names.some((n) => /דנה/.test(n)));
+  }
+
   // ---- self-healing: stored person-name leaks are purged and swept ----
   {
     const healRes = await page.evaluate(() => {

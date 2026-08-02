@@ -7158,7 +7158,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -9012,7 +9012,9 @@ function renderCourseGrid(c) {
   tbl.style.cssText = 'border-collapse:collapse;width:100%;font-size:12.5px';
   let h = '<tr><th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);text-align:right">תלמיד/ה</th>';
   c.forms.forEach((f) => {
-    h += `<th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.name}">${f.name}
+    const missN = c.students.filter((st) => !C.isSubmitted(c, C.studentKey(st), f.name)).length;
+    h += `<th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.name}">${f.name}
+      ${missN && f.libId ? `<button class="btn sm cs-produce" data-form="${f.name}" style="border:0;background:none;color:var(--accent-600);padding:0 2px;cursor:pointer;font-weight:800" title="⚡ הפק PDF מוכן לכל ${missN} החסרים — בלי לפתוח את הטופס">⚡${missN}</button>` : ''}
       <button class="btn sm cs-form-del" data-form="${f.name}" style="border:0;background:none;color:var(--ink-4);padding:0 2px;cursor:pointer">✕</button></th>`;
   });
   h += '<th style="border:1px solid var(--line);padding:6px;background:var(--surface-2)"></th></tr>';
@@ -9041,6 +9043,20 @@ function renderCourseGrid(c) {
     closeModal('coursesModal');
     openFromLibrary(btn.dataset.lib);
   }));
+  tbl.querySelectorAll('.cs-produce').forEach((b) => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    b.disabled = true; const prev = b.textContent; b.textContent = '⏳';
+    PFS.toast('⚡ מפיק טפסים… זה לוקח כמה שניות', 'ok', 4000);
+    try {
+      const res = await produceCourseForm(c.id, b.dataset.form);
+      if (res.error) PFS.toast(res.error, 'err');
+      else {
+        PFS.toast(`⚡ הופקו ${res.count} טפסים מוכנים (${res.students.join(', ')}) — כולם סומנו ✓`, 'ok', 7000);
+        renderCourses();
+      }
+    } catch (err) { console.error(err); PFS.toast('ההפקה נכשלה: ' + (err.message || err), 'err'); }
+    finally { b.disabled = false; b.textContent = prev; }
+  }));
   tbl.querySelectorAll('.cs-form-del').forEach((b) => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (await PFS.ui.confirm('הסרת טופס', `להסיר את "${b.dataset.form}" מהקורס?`)) { C.removeForm(c.id, b.dataset.form); renderCourses(); }
@@ -9049,6 +9065,57 @@ function renderCourseGrid(c) {
     if (await PFS.ui.confirm('הסרת תלמיד/ה', 'להסיר מהקורס כולל המעקב?')) { C.removeStudent(c.id, b.dataset.key); renderCourses(); }
   }));
 }
+/* Zero-form: produce finished PDFs for every student still missing a form —
+ * no viewing, no per-student filling. Reuses the whole battle-tested stack:
+ * library bytes → open+detect+ink-snap → per-student vaultPrefill (student
+ * outranks profile, patterns fill the org constants) → the mail-merge engine
+ * renders one PDF per student → ZIP named per student → cells auto-mark ✓. */
+async function produceCourseForm(courseId, formName, deliver = true) {
+  const C = PFS.courses;
+  const c = C.get(courseId); if (!c) return { error: 'קורס לא נמצא' };
+  const form = c.forms.find((f) => f.name === formName);
+  if (!form) return { error: 'טופס לא נמצא' };
+  if (!form.libId) return { error: 'הטופס לא שמור במאגר — פתחו אותו והוסיפו לקורס מחדש' };
+  const missing = c.students.filter((s) => !C.isSubmitted(c, C.studentKey(s), formName));
+  if (!missing.length) return { error: 'כולם כבר הגישו את הטופס הזה ✓' };
+  await openFromLibrary(form.libId);
+  const t0 = Date.now();
+  while ((!lastDet || !lastDet.fields || !lastDet.fields.length) && Date.now() - t0 < 12000) {
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  if (!lastDet || !lastDet.fields || !lastDet.fields.length) return { error: 'זיהוי השדות נכשל' };
+  // start from a clean sheet: restored auto-memory must not leak stale values
+  overlay.clearElements(); fieldsPanel.clear();
+  // one value-map per student, through the full prefill stack
+  const maps = missing.map((st) => {
+    pendingStudent = { 'שם מלא': st.name, 'תעודת זהות': st.tz || '', 'טלפון': st.phone || '' };
+    const pre = vaultPrefill(lastDet) || {};
+    pendingStudent = null;
+    const txt = {};
+    Object.keys(pre).forEach((k) => { if (typeof pre[k] === 'string' && pre[k].trim()) txt[k] = pre[k]; });
+    return txt;
+  });
+  const keys = [...new Set(maps.flatMap((m) => Object.keys(m)))];
+  if (!keys.length) return { error: 'אין נתונים למילוי — מלאו את פרטי המכללה ופרטי התלמידים' };
+  // materialize placement ONCE (ensureCtrl does ink-snapped geometry, font
+  // fitting and right-edge anchoring); merge then swaps text per student
+  const unionMap = {};
+  keys.forEach((k) => { const src = maps.find((m) => m[k]); if (src) unionMap[k] = src[k]; });
+  fieldsPanel.show(lastDet, unionMap);
+  const baseModels = overlay.getElements().map((el) => el.model);
+  if (!baseModels.length) return { error: 'אין שדות למילוי' };
+  const records = maps.map((m, i) => {
+    const r = {}; keys.forEach((k) => { r[k] = m[k] || ''; });
+    r.__name = missing[i].name; return r;
+  });
+  const { zip, count } = await PFS.merge.runBatch({
+    originalBytes: pdfView.getBytes(), baseModels, records, nameField: '__name'
+  });
+  missing.forEach((st) => C.setSubmitted(c.id, C.studentKey(st), formName, true));
+  if (deliver) PFS.merge.downloadZip(zip, `${formName} - ${c.name}.zip`);
+  return { count, zip, students: missing.map((s) => s.name) };
+}
+
 // course binder: photograph an ID → a student row (confirmed before saving)
 let csPhotoInput = null;
 function addStudentFromPhoto(courseId) {

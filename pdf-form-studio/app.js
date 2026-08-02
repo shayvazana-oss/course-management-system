@@ -202,7 +202,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -778,6 +778,51 @@ function loadErrorMessage(e) {
   return 'טעינת ה-PDF נכשלה — ודאו שזהו קובץ PDF תקין';
 }
 let currentFileName = 'filled';
+
+// ---------- home: close the document, return to the start screen ----------
+// Closing is safe: the auto-memory (templates.autoSave per fingerprint) keeps
+// the filled layout, so reopening the SAME form restores everything.
+async function goHome() {
+  if (!pdfView.hasDoc()) return;
+  if (dirty) {
+    // flush the pending auto-save so the promise in the dialog is already true
+    try { clearTimeout(autoMemTimer); if (currentFp) templates.autoSave(currentFp, currentFileName); } catch (e) {}
+    const ok = await PFS.ui.confirm('חזרה לדף הבית 🏠',
+      'לסגור את "' + currentFileName + '"?\nמה שמילאתם נשמר אוטומטית — פתיחה חוזרת של אותו טופס תשחזר הכל.');
+    if (!ok) return;
+  }
+  loadGen++;                        // in-flight detection/ink-snap bails out
+  lastDet = null;
+  fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
+  attachments = [];
+  updateAttachBadge();
+  overlay.clearElements();
+  fieldsPanel.clear();
+  mergeParsed = null;
+  pendingCarry = null;
+  pendingStudent = null;
+  pdfView.unload();
+  currentFp = null;
+  currentFileName = 'filled';
+  dirty = false;
+  resetHistory();
+  $('docbar').classList.add('hidden');
+  $('fname').textContent = '—';
+  $('dropzone').style.display = '';
+  ['exportBtn', 'tmplBtn', 'mergeBtn', 'detectBtn', 'clearBtn', 'enhanceBtn',
+   'rotateBtn', 'attachBtn', 'deleteBtn', 'exportFlatBtn', 'fillAllBtn'
+  ].forEach((id) => { const b = $(id); if (b) b.disabled = true; });
+  buildPageNav();
+  buildThumbnails();
+}
+$('homeBtn') && $('homeBtn').addEventListener('click', goHome);
+// the logo is a home button too — the pattern every user already knows
+(function () {
+  const brand = document.querySelector('.brand');
+  if (!brand) return;
+  brand.title = 'דף הבית — סגירת המסמך וחזרה למסך הפתיחה';
+  brand.addEventListener('click', goHome);
+})();
 
 // html/body are overflow:hidden by design — the app is a fixed 100vh shell.
 // Browsers still let programmatic focus/scrollIntoView OFFSET them, and then

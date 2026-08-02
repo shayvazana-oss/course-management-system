@@ -1986,6 +1986,53 @@ async function main() {
     check('after download the app ASKS to fill the appendix; yes opens it filled', askRes.asked === true && askRes.opened === true && askRes.carried === true);
   }
 
+  // ---- 🏠 home: close the document, return to the start screen, open fresh ----
+  {
+    const homeRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      const $id = (i) => document.getElementById(i);
+      const before = {
+        hasDoc: T.pdfView.hasDoc(),
+        homeVisible: !!$id('homeBtn') && !$id('docbar').classList.contains('hidden')
+      };
+      $id('homeBtn').click();
+      await new Promise((r) => setTimeout(r, 300));
+      // dirty work → confirm dialog explains the auto-save; accept it
+      const dlg = $id('uiDialog');
+      if (dlg && dlg.classList.contains('show')) { $id('uiDlgOk').click(); await new Promise((r) => setTimeout(r, 300)); }
+      const closed = {
+        hasDoc: T.pdfView.hasDoc(),
+        dropzone: $id('dropzone').style.display !== 'none',
+        docbarHidden: $id('docbar').classList.contains('hidden'),
+        exportDisabled: $id('exportBtn').disabled,
+        fillDisabled: $id('fillAllBtn').disabled,
+        pagesEmpty: !document.querySelector('.page-wrap')
+      };
+      // and a FRESH document opens cleanly afterwards
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([400, 300]);
+      pg.drawRectangle({ x: 0, y: 0, width: 400, height: 300, color: rgb(1, 1, 1) });
+      const f = await d.embedFont(StandardFonts.Helvetica);
+      pg.drawText('Fresh doc', { x: 150, y: 270, size: 16, font: f, color: rgb(0, 0, 0) });
+      await T.openPdfFile(new File([await d.save()], 'fresh.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1200));
+      const reopened = {
+        hasDoc: T.pdfView.hasDoc(),
+        docbarShown: !$id('docbar').classList.contains('hidden'),
+        exportEnabled: !$id('exportBtn').disabled,
+        pageDrawn: !!document.querySelector('.page-wrap canvas.pdf')
+      };
+      return { before, closed, reopened };
+    });
+    if (!(homeRes.before.hasDoc && homeRes.closed.pagesEmpty && homeRes.reopened.hasDoc)) console.log('  [home debug]', JSON.stringify(homeRes));
+    check('🏠 returns to the start screen (doc closed, buttons disabled)',
+      homeRes.before.hasDoc && homeRes.before.homeVisible &&
+      !homeRes.closed.hasDoc && homeRes.closed.dropzone && homeRes.closed.docbarHidden &&
+      homeRes.closed.exportDisabled && homeRes.closed.fillDisabled && homeRes.closed.pagesEmpty);
+    check('a fresh document opens cleanly after going home',
+      homeRes.reopened.hasDoc && homeRes.reopened.docbarShown && homeRes.reopened.exportEnabled && homeRes.reopened.pageDrawn);
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

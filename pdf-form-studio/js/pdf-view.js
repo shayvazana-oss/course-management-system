@@ -175,6 +175,16 @@
       order = order.filter((i) => !views[i].deleted);
     }
     function visiblePageCount() { return views.filter((v) => !v.deleted).length; }
+    // close the current document: free pdf.js resources, drop page DOM and all
+    // per-doc state, so the app can return to the start screen (or load fresh)
+    function unload() {
+      try { if (pdfDoc && pdfDoc.destroy) pdfDoc.destroy(); } catch (e) {}
+      pdfDoc = null;
+      bytes = null;
+      views = [];
+      order = [];
+      pagesEl.innerHTML = '';
+    }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
@@ -227,7 +237,7 @@
       return '#' + [r, g, b].map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('');
     }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
+    return { load, unload, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
   }
 
   PFS.createPdfView = createPdfView;

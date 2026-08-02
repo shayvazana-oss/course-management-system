@@ -96,7 +96,8 @@ button, input, select, textarea { font-family: inherit; }
 .tb-center { justify-self: center; }
 .tb-left { justify-self: end; display: flex; align-items: center; gap: 8px; }
 
-.brand { display: flex; align-items: center; gap: 11px; }
+.brand { display: flex; align-items: center; gap: 11px; cursor: pointer; }
+.brand:active .logo { transform: scale(.94); }
 .brand .logo { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; box-shadow: 0 2px 8px rgba(14,110,120,.30); }
 .brand .logo svg path[fill="#fff"] { fill: #fff; }
 .brand .title { font-weight: 900; font-size: 16px; letter-spacing: .01em; line-height: 1.1; color: var(--ink-1); }

@@ -229,18 +229,22 @@
       }
       const detKeys = new Set(det.fields.map((f) => f.fieldKey));
       [...autoKeys].forEach((k) => { if (!detKeys.has(k)) autoKeys.delete(k); });
-      const head = document.createElement('div'); head.className = 'hint muted';
-      head.style.marginBottom = '4px';
-      head.textContent = det.tier === 'acroform'
-        ? `זוהו ${det.fields.length} שדות טופס — הקלידו כאן והם ימולאו על הטופס.`
-        : det.tier === 'ocr'
-        ? `OCR זיהה ${det.fields.length} שדות (טיוטה — בדקו ותקנו; אפשר לגרור). הקלידו למילוי.`
-        : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
-      body.appendChild(head);
+      // quiet chrome: the meter already says how many fields there are — the
+      // old paragraph of caveats lives on as its tooltip. Only OCR results
+      // (real drafts) still announce themselves.
+      if (det.tier === 'ocr') {
+        const head = document.createElement('div'); head.className = 'hint muted';
+        head.style.marginBottom = '4px';
+        head.textContent = `OCR זיהה ${det.fields.length} שדות — טיוטה, בדקו ותקנו (אפשר לגרור).`;
+        body.appendChild(head);
+      }
 
       // completeness meter: "מולאו X/Y" + bar, live-updated on every input
       const meter = document.createElement('div');
       meter.style.cssText = 'margin:2px 0 8px';
+      meter.title = det.tier === 'acroform'
+        ? 'הקלידו כאן — הערכים ימולאו על הטופס'
+        : 'זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור שדות לתיקון';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
       // interview mode entry — at the TOP where it's seen, it's the fast path
@@ -253,17 +257,27 @@
         // the single-person fast lane: the person's details are already
         // WRITTEN somewhere (a WhatsApp message, an ID photo) — paste or
         // snap instead of retyping them field by field
+        // ONE compact tool row instead of a stack of full-width buttons — the
+        // field list (the actual work) starts as high as possible
         const fastRow = document.createElement('div');
-        fastRow.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+        fastRow.className = 'fp-tools';
         const pasteBtn = document.createElement('button');
-        pasteBtn.className = 'btn sm'; pasteBtn.style.flex = '1';
+        pasteBtn.className = 'btn sm fp-tool';
         pasteBtn.textContent = '📋 הדבק ומלא';
         pasteBtn.title = 'הדביקו הודעת וואטסאפ / שורה עם שם, ת״ז וטלפון — והטופס מתמלא';
         const photoBtn = document.createElement('button');
-        photoBtn.className = 'btn sm'; photoBtn.style.flex = '1';
+        photoBtn.className = 'btn sm fp-tool';
         photoBtn.textContent = '📸 מלא מצילום';
         photoBtn.title = 'צילום ת״ז/רישיון — הפרטים נקראים וממלאים את הטופס (הכול מקומי)';
-        fastRow.append(pasteBtn, photoBtn);
+        const uniBtn = document.createElement('button');
+        uniBtn.className = 'btn sm fp-tool';
+        uniBtn.textContent = '✨ כתב אחיד';
+        uniBtn.title = 'משווה את גודל הכתב של כל הטקסטים על הטופס (Ctrl+Z מבטל)';
+        uniBtn.addEventListener('click', () => {
+          const n = PFS.uniformizeHandwriting ? PFS.uniformizeHandwriting(false) : 0;
+          PFS.toast(n ? `✨ ${n} טקסטים יושרו לגודל אחיד` : 'הכתב כבר אחיד ✓', 'ok');
+        });
+        fastRow.append(pasteBtn, photoBtn, uniBtn);
         body.appendChild(fastRow);
         const pasteBox = document.createElement('div');
         pasteBox.className = 'hidden'; pasteBox.style.marginBottom = '8px';
@@ -303,17 +317,6 @@
           };
           inp.click();
         });
-        // one handwriting, one click — evens out EVERYTHING on the form,
-        // including manually-placed text and restored documents
-        const uniBtn = document.createElement('button');
-        uniBtn.className = 'btn sm block';
-        uniBtn.textContent = '✨ כתב אחיד — יישר גודל בכל הטופס';
-        uniBtn.title = 'משווה את גודל הכתב של כל הטקסטים על הטופס (Ctrl+Z מבטל)';
-        uniBtn.addEventListener('click', () => {
-          const n = PFS.uniformizeHandwriting ? PFS.uniformizeHandwriting(false) : 0;
-          PFS.toast(n ? `✨ ${n} טקסטים יושרו לגודל אחיד` : 'הכתב כבר אחיד ✓', 'ok');
-        });
-        body.appendChild(uniBtn);
       }
       // amber hints over empty detected fields (cleared as they fill)
       if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);

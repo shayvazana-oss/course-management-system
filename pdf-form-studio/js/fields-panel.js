@@ -247,7 +247,7 @@
       if (det.fields.some((f) => f.type !== 'check')) {
         const ivTop = document.createElement('button');
         ivTop.className = 'btn sm primary block'; ivTop.style.marginBottom = '8px';
-        ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
+        ivTop.textContent = '🎯 מילוי מודרך — רק מה שחסר, שדה־שדה (Enter)';
         ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
         body.appendChild(ivTop);
         // the single-person fast lane: the person's details are already
@@ -589,33 +589,96 @@
       return autoFilled;
     }
 
+    /* guided fill — Typeform-inspired, stripped to the essence: ONE big
+     * question on a floating card, a hairline progress bar, Enter to advance.
+     * Iterates only the fields still EMPTY (auto-fill already did the rest);
+     * learned options (branches, addresses) appear as one-tap chips. */
     let ivBar = null;
     function startInterview(fields, controls) {
-      let i = 0;
-      if (!ivBar) {
-        ivBar = document.createElement('div');
-        ivBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:80;background:var(--surface);border-top:2px solid var(--brand);box-shadow:0 -6px 24px rgba(19,28,43,.18);padding:12px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-        ivBar.innerHTML = '<div style="flex:1;min-width:180px"><div id="ivLbl" style="font-weight:800;font-size:14px"></div><div class="hint muted" id="ivProg"></div></div><input id="ivIn" type="text" dir="auto" style="flex:2;min-width:160px;padding:10px;font-size:15px" placeholder="הקלידו ו-Enter…"/><button class="btn sm" id="ivSkip">דלג</button><button class="btn sm primary" id="ivNext">הבא ⏎</button><button class="btn sm ghost" id="ivEnd">סיום</button>';
-        document.body.appendChild(ivBar);
-      }
-      ivBar.style.display = 'flex';
-      const lbl = ivBar.querySelector('#ivLbl'), prog = ivBar.querySelector('#ivProg'), inp = ivBar.querySelector('#ivIn');
-      const textIdx = fields.map((f, j) => f.type !== 'check' ? j : -1).filter((j) => j >= 0);
-      let pos = 0;
+      const idx = fields.map((f, j) => (f.type !== 'check' && !controls[j].value.trim()) ? j : -1).filter((j) => j >= 0);
+      if (!idx.length) { PFS.toast('אין שדות ריקים — הכול כבר מלא ✓', 'ok'); return; }
+      if (ivBar) ivBar.remove();
+      ivBar = document.createElement('div');
+      ivBar.className = 'gd-card';
+      ivBar.innerHTML =
+        '<div class="gd-progwrap"><div class="gd-prog" id="gdProg"></div></div>' +
+        '<button type="button" class="gd-x" id="gdEnd" title="סגירה (Esc)" aria-label="סגירת המילוי המודרך">✕</button>' +
+        '<div class="gd-count" id="gdCount"></div>' +
+        '<div class="gd-q" id="gdQ"></div>' +
+        '<div class="gd-chips" id="gdChips"></div>' +
+        '<input class="gd-in" id="gdIn" type="text" dir="auto" placeholder="הקלידו תשובה…"/>' +
+        '<div class="gd-err" id="gdErr"></div>' +
+        '<div class="gd-foot">' +
+          '<button type="button" class="btn primary" id="gdNext">הבא ⏎</button>' +
+          '<button type="button" class="btn ghost sm" id="gdSkip">דלג</button>' +
+          '<span style="flex:1"></span>' +
+          '<button type="button" class="btn ghost sm" id="gdPrev" title="חזרה לשדה הקודם">‹ הקודם</button>' +
+        '</div>';
+      document.body.appendChild(ivBar);
+      const $g = (id) => ivBar.querySelector('#' + id);
+      const q = $g('gdQ'), count = $g('gdCount'), inp = $g('gdIn'), chips = $g('gdChips'),
+            err = $g('gdErr'), progEl = $g('gdProg'), nextBtn = $g('gdNext');
+      let pos = 0, forceVal = null;
       function showCur() {
-        if (pos >= textIdx.length) { end(); PFS.toast('🎉 סיימתם את כל השדות!', 'ok'); return; }
-        const j = textIdx[pos]; const f = fields[j];
-        lbl.textContent = f.label; prog.textContent = 'שדה ' + (pos + 1) + ' מתוך ' + textIdx.length;
+        if (pos >= idx.length) { cleanup(); PFS.toast('🎉 כל השדות הושלמו', 'ok'); return; }
+        const j = idx[pos], f = fields[j];
+        q.textContent = f.label + (f.required ? ' *' : '');
+        count.textContent = (pos + 1) + ' / ' + idx.length + (f.page ? ' · עמוד ' + (f.page + 1) : '');
         inp.value = controls[j].value || '';
-        const c = ctrlByKey[f.fieldKey]; if (c) PFS.scrollToEl(c.node, 'center');
+        err.textContent = '';
+        forceVal = null;
+        nextBtn.textContent = pos === idx.length - 1 ? 'סיום ✓' : 'הבא ⏎';
+        progEl.style.width = Math.round(pos / idx.length * 100) + '%';
+        // one-tap chips from the learning engine (branches, addresses…)
+        chips.innerHTML = '';
+        (optionsOf(f) || []).slice(0, 4).forEach((o) => {
+          const ch = document.createElement('button');
+          ch.type = 'button'; ch.className = 'gd-chip'; ch.textContent = o.v;
+          ch.addEventListener('click', () => { inp.value = o.v; advance(); });
+          chips.appendChild(ch);
+        });
+        chips.style.display = chips.children.length ? '' : 'none';
+        // light the spot on the document — you always see WHERE this lands
+        if (overlay.setFieldActive) overlay.setFieldActive(f.fieldKey);
+        const c = ctrlByKey[f.fieldKey];
+        const mk = c ? c.node : document.querySelector('.field-marker[data-key="' + CSS.escape(f.fieldKey) + '"]');
+        if (mk) PFS.scrollToEl(mk, 'center');
         inp.focus({ preventScroll: true });
       }
-      function commit() { const j = textIdx[pos]; controls[j].value = inp.value; controls[j].dispatchEvent(new Event('input')); }
-      function end() { ivBar.style.display = 'none'; }
-      ivBar.querySelector('#ivNext').onclick = () => { commit(); pos++; showCur(); };
-      ivBar.querySelector('#ivSkip').onclick = () => { pos++; showCur(); };
-      ivBar.querySelector('#ivEnd').onclick = () => { commit(); end(); };
-      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); pos++; showCur(); } if (e.key === 'Escape') end(); };
+      function commit() {
+        const j = idx[pos];
+        controls[j].value = inp.value;
+        controls[j].dispatchEvent(new Event('input'));
+        controls[j].dispatchEvent(new Event('change'));   // feeds the learning engine
+      }
+      function advance() {
+        const v = inp.value.trim();
+        if (v) {
+          // inline validation — a typo is cheapest to fix while you're here.
+          // A deliberate value passes on the SECOND Enter (never a dead end).
+          const canon = controls[idx[pos]].__canon;
+          const r = canon && PFS.validate ? PFS.validate.field(canon, v) : { ok: true };
+          if (!r.ok && forceVal !== v) {
+            err.textContent = (r.msg || 'הערך נראה שגוי') + ' — Enter שוב כדי להמשיך בכל זאת';
+            forceVal = v;
+            return;
+          }
+          commit();
+        }
+        pos++; showCur();
+      }
+      function cleanup() {
+        if (overlay.setFieldActive) overlay.setFieldActive(null);
+        document.removeEventListener('keydown', escClose, true);
+        if (ivBar) { ivBar.remove(); ivBar = null; }
+      }
+      const escClose = (e) => { if (e.key === 'Escape') { e.stopPropagation(); cleanup(); } };
+      document.addEventListener('keydown', escClose, true);
+      nextBtn.onclick = advance;
+      $g('gdSkip').onclick = () => { pos++; showCur(); };
+      $g('gdPrev').onclick = () => { if (pos > 0) { pos--; showCur(); } };
+      $g('gdEnd').onclick = cleanup;
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); advance(); } };
       showCur();
     }
 

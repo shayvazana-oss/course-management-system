@@ -2033,6 +2033,58 @@ async function main() {
       homeRes.reopened.hasDoc && homeRes.reopened.docbarShown && homeRes.reopened.exportEnabled && homeRes.reopened.pageDrawn);
   }
 
+  // ---- guided fill: one question at a time, empty fields only, Enter advances ----
+  {
+    const gdRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      const det = { tier: 'text', fields: [
+        { page: 0, fieldKey: 'gd_a', label: 'הערה ראשונה', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.02, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'gd_b', label: 'הערה שנייה', fx: 0.2, fy: 0.3, fw: 0.2, fh: 0.02, fontFrac: 0.02, type: 'text' },
+        { page: 0, fieldKey: 'gd_c', label: 'הערה שלישית', fx: 0.2, fy: 0.4, fw: 0.2, fh: 0.02, fontFrac: 0.02, type: 'text' }
+      ] };
+      T.overlay.clearElements();
+      T.fieldsPanel.show(det, { gd_b: 'כבר מלא' });   // one pre-filled → guided must skip it
+      const launcher = [...document.querySelectorAll('#fieldsBody button')].find((b) => /מילוי מודרך/.test(b.textContent));
+      if (!launcher) return { fail: 'no launcher' };
+      launcher.click();
+      await new Promise((r) => setTimeout(r, 150));
+      const card = document.querySelector('.gd-card');
+      if (!card) return { fail: 'no card' };
+      const count1 = card.querySelector('#gdCount').textContent;
+      const q1 = card.querySelector('#gdQ').textContent;
+      const inp = card.querySelector('#gdIn');
+      const enter = () => inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      inp.value = 'תשובה אחת'; enter();
+      await new Promise((r) => setTimeout(r, 100));
+      const q2 = document.querySelector('.gd-card #gdQ').textContent;
+      inp.value = 'תשובה שתיים'; enter();
+      await new Promise((r) => setTimeout(r, 150));
+      const closed = !document.querySelector('.gd-card');
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      const vals = {}; rows.forEach((r) => { if (r.__fkey) vals[r.__fkey] = r.value; });
+      const els = T.overlay.getElements().map((e) => e.model.text);
+      // Esc closes a fresh session (empty a field first — a fully-filled form
+      // correctly refuses to open the guided card at all)
+      const rowA = rows.find((r) => r.__fkey === 'gd_a');
+      rowA.value = ''; rowA.dispatchEvent(new Event('input'));
+      launcher.click(); await new Promise((r) => setTimeout(r, 100));
+      const reopened = !!document.querySelector('.gd-card');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await new Promise((r) => setTimeout(r, 100));
+      const escClosed = !document.querySelector('.gd-card');
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { count1, q1, q2, closed, vals, els, reopened, escClosed };
+    });
+    if (gdRes.fail || !gdRes.closed) console.log('  [guided debug]', JSON.stringify(gdRes));
+    check('guided fill iterates only EMPTY fields, one question at a time',
+      !gdRes.fail && gdRes.count1 === '1 / 2' && /ראשונה/.test(gdRes.q1) && /שלישית/.test(gdRes.q2));
+    check('guided fill commits values to panel + form; Enter/Esc flow works',
+      !gdRes.fail && gdRes.closed
+      && gdRes.vals.gd_a === 'תשובה אחת' && gdRes.vals.gd_b === 'כבר מלא' && gdRes.vals.gd_c === 'תשובה שתיים'
+      && gdRes.els.includes('תשובה אחת') && gdRes.els.includes('תשובה שתיים')
+      && gdRes.reopened && gdRes.escClosed);
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

@@ -75,6 +75,7 @@
       </div>
       <div class="rail-group">
         <div class="rail-head">מחיקה והחלפה</div>
+        <button class="rail-btn tool" data-tool="clip" title="העתקת אזור — גררו מעל חלק קיים במסמך (חתימה, חותמת, בלוק שמולא בכתב יד) והדביקו אותו במקום אחר, בכל עמוד"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><span class="lbl">העתק אזור</span></button>
         <button class="rail-btn tool" data-tool="replace" title="החלפת נתון — גררו מעל טקסט קיים: הישן מכוסה בצבע הרקע ותיבה חדשה נפתחת להקלדה"><svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3M4 8l3 3"/><path d="M20 16H8l3 3M20 16l-3-3"/></svg><span class="lbl">החלפה</span></button>
         <button class="rail-btn tool" data-tool="whiteout" title="כיסוי — גררו לצייר אזור; הצבע מותאם אוטומטית לרקע כדי למחוק בצורה חלקה"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי חלק</span></button>
         <button class="rail-btn tool" data-tool="redact" title="השחרה — גררו כדי להסתיר מידע רגיש בשחור"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
@@ -221,6 +222,13 @@
               <div class="asset-grid" id="stampGrid"></div>
               <button class="btn sm" id="upStampBtn">⬆️ העלה חותמת</button>
               <div class="hint muted">רקע לבן מוסר אוטומטית כדי שהחותמת תשב נקי.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>📋 קטעים שהועתקו</h3>
+            <div class="body-p">
+              <div class="asset-grid" id="clipGrid"></div>
+              <div class="hint muted">גררו עם הכלי "העתק אזור" מעל חלק במסמך — חתימה, חותמת או בלוק שכבר מולא — ולחצו כאן כדי להדביק אותו שוב, בכל עמוד.</div>
             </div>
           </div>
           <div class="card">

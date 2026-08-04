@@ -2187,6 +2187,44 @@ async function main() {
     return docId === 'times' && adopted && keptOk && domOk;
   }));
 
+  // ---- copy a region of the PAGE and stamp it elsewhere ----
+  // On a scan the useful content is pixels (a signature, a filled block that
+  // repeats): lifting one and re-placing it beats recreating it by hand.
+  check('copy-region lifts page pixels, keeps its size, and re-places anywhere', await page.evaluate(async () => {
+    const T = window.PFS.__test;
+    const ov = T.overlay;
+    ov.clearElements();
+    window.PFS.store.remove('clips');
+    // paint a recognisable mark on the page, then copy exactly that area
+    const c = document.querySelector('canvas.pdf'), cx = c.getContext('2d');
+    cx.fillStyle = '#fff'; cx.fillRect(0.10 * c.width, 0.10 * c.height, 0.30 * c.width, 0.10 * c.height);
+    cx.fillStyle = '#1160aa'; cx.fillRect(0.14 * c.width, 0.13 * c.height, 0.18 * c.width, 0.04 * c.height);
+    const src = { fx: 0.12, fy: 0.12, fw: 0.22, fh: 0.06 };
+    T.copyRegion(0, src.fx, src.fy, src.fw, src.fh);
+    // it is armed for placing and saved to the library
+    const armed = ov.isPlacing();
+    const clips = window.PFS.store.get('clips', []);
+    const savedOk = clips.length === 1 && /^data:image\/png/.test(clips[0].url)
+      && Math.abs(clips[0].fw - src.fw) < 1e-9 && Math.abs(clips[0].fh - src.fh) < 1e-9;
+    // click on the page → the copy lands at the SAME size, on that spot
+    const overlayEl = document.querySelector('.page-wrap .overlay');
+    const r = overlayEl.getBoundingClientRect();
+    overlayEl.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true,
+      clientX: r.left + r.width * 0.5, clientY: r.top + r.height * 0.5 }));
+    const img = ov.getElements().find((e) => e.model.type === 'image');
+    const placedOk = img && img.model.kind === 'clip'
+      && Math.abs(img.model.fw - src.fw) < 1e-6 && Math.abs(img.model.fh - src.fh) < 1e-6
+      && /^data:image\/png/.test(img.model.imgUrl || '');
+    // and it survives serialize → apply, so templates/auto-memory keep it
+    const ser = ov.serialize();
+    ov.clearElements();
+    ov.applyModels(ser);
+    const keptOk = ov.getElements().some((e) => e.model.kind === 'clip' && e.model.imgUrl);
+    ov.clearElements();
+    window.PFS.store.remove('clips');
+    return armed && savedOk && placedOk && keptOk;
+  }));
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

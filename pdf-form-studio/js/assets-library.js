@@ -10,10 +10,13 @@
     const store = PFS.store;
     const grids = {
       signature: document.getElementById('sigGrid'),
-      stamp: document.getElementById('stampGrid')
+      stamp: document.getElementById('stampGrid'),
+      // 'clip' = a piece lifted off a scanned page (a filled block, a wet
+      // signature, a stamp impression) — reusable like any other asset
+      clip: document.getElementById('clipGrid')
     };
-    const KEY = { signature: 'signatures', stamp: 'stamps' };
-    const DEF = { signature: 'default_signature', stamp: 'default_stamp' };
+    const KEY = { signature: 'signatures', stamp: 'stamps', clip: 'clips' };
+    const DEF = { signature: 'default_signature', stamp: 'default_stamp', clip: 'default_clip' };
 
     let SEQ = 1;
     const uid = () => 'as' + (SEQ++) + '_' + Math.floor(performance.now());
@@ -30,9 +33,14 @@
 
     function add(kind, obj) {
       const arr = list(kind);
+      // fw/fh (page fractions) are kept when the caller knows the real size the
+      // asset occupied — a clip re-placed later then matches its original
       const item = { id: uid(), url: obj.url, w: obj.w, h: obj.h, aspect: (obj.w && obj.h) ? obj.w / obj.h : 1, ts: Date.now() };
+      if (obj.fw && obj.fh) { item.fw = obj.fw; item.fh = obj.fh; }
       arr.unshift(item);
-      save(kind, arr.slice(0, 24)); // cap
+      // clips are full-resolution page crops — far heavier than a signature,
+      // so they get a tighter cap to stay inside the localStorage budget
+      save(kind, arr.slice(0, kind === 'clip' ? 8 : 24));
       if (!defaultId(kind)) store.set(DEF[kind], item.id); // first one becomes default
       render(kind);
       return item;
@@ -53,6 +61,8 @@
         empty.className = 'asset empty';
         empty.textContent = kind === 'signature'
           ? 'אין חתימות שמורות — צייר או העלה כדי להוסיף.'
+          : kind === 'clip'
+          ? 'אין קטעים שמורים — בחרו "העתק אזור" בסרגל וגררו מעל חלק במסמך.'
           : 'אין חותמות שמורות — העלה כדי להוסיף.';
         grid.appendChild(empty);
         return;
@@ -67,17 +77,21 @@
         del.className = 'del'; del.textContent = '✕'; del.title = 'מחק';
         del.addEventListener('click', function (e) { e.stopPropagation(); remove(kind, item.id); });
         cell.appendChild(del);
-        const star = document.createElement('button');
-        star.className = 'star'; star.textContent = item.id === def ? '★' : '☆';
-        star.title = 'קבע כברירת מחדל';
-        star.addEventListener('click', function (e) { e.stopPropagation(); setDefault(kind, item.id); });
-        cell.appendChild(star);
+        // ⭐ marks what Fill-All reaches for; clips are placed by hand, so the
+        // star would be a control with nothing to control
+        if (kind !== 'clip') {
+          const star = document.createElement('button');
+          star.className = 'star'; star.textContent = item.id === def ? '★' : '☆';
+          star.title = 'קבע כברירת מחדל';
+          star.addEventListener('click', function (e) { e.stopPropagation(); setDefault(kind, item.id); });
+          cell.appendChild(star);
+        }
         cell.addEventListener('click', function () { opts.onPick && opts.onPick(kind, item); });
         grid.appendChild(cell);
       });
     }
 
-    function renderAll() { render('signature'); render('stamp'); }
+    function renderAll() { render('signature'); render('stamp'); render('clip'); }
     renderAll();
 
     return { add, remove, list, render, renderAll, getDefault, setDefault };

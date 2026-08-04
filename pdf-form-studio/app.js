@@ -202,7 +202,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -561,7 +561,19 @@ async function runDetection() {
     lastDet = det;
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
-    if (det.tier === 'scanned') PFS.toast('טופס סרוק — זיהוי אוטומטי לא זמין', 'err');
+    if (det.tier === 'scanned') {
+      // A scan has no text layer, so the normal detector finds nothing — but
+      // OCR can read it. Waiting for the user to discover a button left whole
+      // documents looking unreadable ("הוא לא קורא את העמוד השני"), so run it
+      // now. Short forms only: OCR costs a few seconds a page, and on a long
+      // scan the button (still there) is the better offer.
+      if (PFS.ocr && PFS.ocr.available() && pdfView.numPages() <= 6) {
+        PFS.toast('טופס סרוק — קורא אותו עם OCR, רגע…', 'ok', 4000);
+        await runOcr();
+      } else {
+        PFS.toast('טופס סרוק — לחצו "קרא עם OCR" בפאנל כדי לזהות שדות', 'err', 5000);
+      }
+    }
     else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');
     else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
     else PFS.toast('לא זוהו שדות אוטומטית', 'err');
@@ -885,10 +897,11 @@ function activateTool(btn, tool) {
   // rect covers + replace: drag over the page to draw the exact area. Whiteout
   // and replace auto-match the paper colour underneath so the cover is seamless;
   // replace also drops a fresh text box in place, ready to type the new value.
-  if (RECT_TOOLS[tool] || tool === 'replace') {
+  if (RECT_TOOLS[tool] || tool === 'replace' || tool === 'clip') {
     overlay.setPlacing({
       rect: true, sticky: stickyTools, defW: 0.2, defH: 0.03,
       createRect: (pageIndex, fx, fy, fw, fh) => {
+        if (tool === 'clip') { copyRegion(pageIndex, fx, fy, fw, fh); return; }
         if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
         const extra = { fx, fy, fw, fh };
         // whiteout is a background-matched erase: remember that, so the export
@@ -1053,14 +1066,55 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
   } catch (e) { /* scanned page / race with unload — the pixel estimate stands */ }
 }
 
+/* copyRegion — lift a piece of the PAGE ITSELF and make it placeable.
+ *
+ * On a scanned form the useful content is pixels, not text: a signature, a
+ * stamp, a handwritten date, a whole approval block that repeats three times
+ * down the page. Re-creating those by hand is the slow part. Dragging over one
+ * captures it at full render resolution and arms it for placing — click
+ * anywhere (any page) to stamp an exact copy, Ctrl+D duplicates it again. It
+ * also lands in the asset library, so it survives to the next document.
+ */
+function copyRegion(pageIndex, fx, fy, fw, fh) {
+  const v = pdfView.viewList()[pageIndex];
+  if (!v || !v.canvas || !v.canvas.width) { PFS.toast('לא ניתן להעתיק מהעמוד הזה', 'err'); return; }
+  const cw = v.canvas.width, ch = v.canvas.height;
+  const sx = Math.max(0, Math.round(fx * cw)), sy = Math.max(0, Math.round(fy * ch));
+  const sw = Math.min(cw - sx, Math.round(fw * cw)), sh = Math.min(ch - sy, Math.round(fh * ch));
+  if (sw < 6 || sh < 6) { PFS.toast('סמנו אזור גדול יותר להעתקה', 'err'); return; }
+  let url;
+  try {
+    const out = document.createElement('canvas');
+    out.width = sw; out.height = sh;
+    out.getContext('2d').drawImage(v.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    url = out.toDataURL('image/png');
+  } catch (e) { PFS.toast('העתקת האזור נכשלה', 'err'); return; }
+  assets.add('clip', { url, w: sw, h: sh, fw, fh });
+  // place at the SAME size it was copied at, so a stamped copy matches the
+  // original exactly instead of being scaled to a generic default
+  overlay.setPlacing({
+    sticky: stickyTools,
+    create: (pi, px, py) => {
+      overlay.addElementAt('image', pi, px, py, {
+        imgUrl: url, aspect: sw / sh, fw, fh, kind: 'clip'
+      });
+      return null;
+    }
+  });
+  PFS.toast('📋 האזור הועתק — לחצו על המקום שאליו להדביק (Ctrl+D משכפל שוב)', 'ok', 6000);
+}
+
 function armImagePlacement(kind, item) {
   if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
   overlay.setPlacing({
     sticky: false,
     create: (pageIndex, fx, fy) => {
+      const asp = item.aspect || (item.w / item.h) || 1;
+      // a clip remembers the size it was lifted at — re-placing it must match
+      const fw = item.fw || 0.22;
       overlay.addElementAt('image', pageIndex, fx, fy, {
-        imgUrl: item.url, aspect: item.aspect || (item.w / item.h) || 1,
-        fw: 0.22, fh: 0.22 / (item.aspect || (item.w / item.h) || 1), kind
+        imgUrl: item.url, aspect: asp,
+        fw, fh: item.fh || (fw / asp), kind
       });
       return null;
     }

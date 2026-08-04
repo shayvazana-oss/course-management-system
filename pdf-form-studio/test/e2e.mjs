@@ -2136,6 +2136,57 @@ async function main() {
     return ok;
   }));
 
+  // ---- typeface matching: written values adopt the DOCUMENT's font ----
+  check('fontmatch maps embedded font names (and generics) to real stacks', await page.evaluate(() => {
+    const fm = window.PFS.fontmatch;
+    const nameOk = fm.familyOf('ABCDEF+ArialMT') === 'arial'         // subset prefix stripped
+      && fm.familyOf('David-Bold') === 'david'
+      && fm.familyOf('FrankRuehl') === 'frank'                        // beats a bare 'david' rule
+      && fm.familyOf('TimesNewRomanPSMT') === 'times'
+      && fm.familyOf('Tahoma') === 'tahoma'
+      && fm.familyOf('CourierNew') === 'mono'
+      && fm.familyOf('Arimo') === 'arial'                             // metric clone of Arial
+      && fm.familyOf('SomeUnknownFace') === null;                     // unknown → keep the app font
+    // no real name available → pdf.js's serif/sans classification decides
+    const genOk = fm.familyOf('', 'serif') === 'times' && fm.familyOf('', 'monospace') === 'mono'
+      && fm.familyOf('', 'sans-serif') === null;
+    // every stack must end in a font that HAS Hebrew glyphs, or a Hebrew value
+    // would render as boxes on a machine lacking the exact face
+    const stacksOk = Object.keys(fm.FAMILIES).filter((k) => k !== 'mono')
+      .every((k) => /Heebo/.test(fm.FAMILIES[k].css));
+    return nameOk && genOk && stacksOk;
+  }));
+
+  check('opening a PDF learns its typeface; new text is written in it', await page.evaluate(async () => {
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const d = await PDFDocument.create(); const pg = d.addPage([400, 300]);
+    pg.drawRectangle({ x: 0, y: 0, width: 400, height: 300, color: rgb(1, 1, 1) });
+    // a document set in Times — plenty of body text so it wins the weighting
+    const f = await d.embedFont(StandardFonts.TimesRoman);
+    for (let i = 0; i < 5; i++) {
+      pg.drawText('Form body text line ' + i, { x: 30, y: 250 - i * 30, size: 12, font: f, color: rgb(0, 0, 0) });
+    }
+    const T = window.PFS.__test;
+    await T.openPdfFile(new File([await d.save()], 'times.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    const docId = window.PFS.fontmatch.docId();
+    const ov = T.overlay;
+    ov.clearElements();
+    const ctrl = ov.addElementAt('text', 0, 0.3, 0.3, { text: 'ערך', noEdit: true });
+    const m = ctrl.model;
+    const adopted = /Times New Roman/.test(m.font || '');
+    // ...and it survives serialize → apply (templates / auto-memory)
+    const ser = ov.serialize();
+    ov.clearElements();
+    ov.applyModels(ser);
+    const restored = ov.getElements()[0];
+    const keptOk = restored && restored.model.font === m.font;
+    // ...and reaches the DOM, so the editor shows what the export will draw
+    const domOk = /Times New Roman/.test(restored.node.querySelector('.txt').style.fontFamily || '');
+    ov.clearElements();
+    return docId === 'times' && adopted && keptOk && domOk;
+  }));
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

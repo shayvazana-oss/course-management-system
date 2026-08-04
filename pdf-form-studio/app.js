@@ -491,14 +491,19 @@ function docUniformSize() {
 function uniformizeHandwriting(taggedOnly) {
   const uni = docUniformSize();
   const lo = uni * 0.85, hi = uni * 1.15;
+  // the document's own typeface, so "uniform" means uniform with the FORM —
+  // not merely consistent among the values Fillo added
+  const docCss = PFS.fontmatch ? PFS.fontmatch.docCss() : null;
   let changed = 0;
   overlay.getElements().forEach((c) => {
     if (!isPlainTextEl(c)) return;
     if (taggedOnly && !c.model.fieldKey) return;
     const target = Math.min(hi, Math.max(lo, c.model.fontFrac || uni));
-    if (Math.abs((c.model.fontFrac || 0) - target) < 0.0005) return;
+    const fontOff = docCss && c.model.font !== docCss;
+    if (Math.abs((c.model.fontFrac || 0) - target) < 0.0005 && !fontOff) return;
     const oldW = c.model.fw;              // layout keeps this measured
     c.model.fontFrac = target;
+    if (fontOff) c.model.font = docCss;
     c.layout();
     // a right-aligned (Hebrew) value must keep its RIGHT edge planted
     if (c.model.align === 'right' && isFinite(oldW)) { c.model.fx += (oldW - c.model.fw); c.layout(); }
@@ -737,6 +742,12 @@ async function openPdfFile(file) {
     buildThumbnails();
     updateHwStatus();
     currentFp = null;
+    // learn the document's typeface BEFORE anything is placed, so detected
+    // fields and restored templates are written in the form's own font
+    if (PFS.fontmatch) {
+      PFS.fontmatch.reset();
+      try { await PFS.fontmatch.scanDoc(pdfView.getDoc()); } catch (e) {}
+    }
     try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
     renderCompanions();
     // a recognised form with a linked appendix announces itself right away
@@ -801,6 +812,7 @@ async function goHome() {
   mergeParsed = null;
   pendingCarry = null;
   pendingStudent = null;
+  PFS.fontmatch && PFS.fontmatch.reset();
   pdfView.unload();
   currentFp = null;
   currentFileName = 'filled';
@@ -1011,6 +1023,7 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
     const page = await doc.getPage(pageIndex + 1);
     const vp = page.getViewport({ scale: 1, rotation: page.rotate });
     const tc = await page.getTextContent();
+    const resolveFont = PFS.fontmatch ? PFS.fontmatch.resolverFor(page, tc) : () => null;
     const W = vp.width, H = vp.height;
     const x0 = fx * W, x1 = (fx + fw) * W, y0 = fy * H, y1 = (fy + fh) * H;
     let best = null;
@@ -1024,7 +1037,7 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
       const oy = Math.min(y1, tx[5]) - Math.max(y0, top);
       if (ox <= 0 || oy <= 0) return;
       const score = ox * oy;
-      if (!best || score > best.score) best = { score, fontH, top };
+      if (!best || score > best.score) best = { score, fontH, top, fontName: it.fontName };
     });
     if (!best) return;
     const ff = PFS.clamp((best.fontH * 0.95) / H, 0.006, 0.08);
@@ -1032,6 +1045,10 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
     ctrl.model.fontFrac = ff;
     ctrl.model.fh = (best.fontH * 1.2) / H;
     ctrl.model.fy = PFS.clamp(best.top / H, 0, 1 - ctrl.model.fh);
+    // and the covered run's own typeface — the last thing that gave a
+    // replacement away once size, line and colour already matched
+    const fm = resolveFont(best.fontName);
+    if (fm && fm.css) { ctrl.model.font = fm.css; ctrl.model.bold = fm.bold || ctrl.model.bold; }
     ctrl.layout();
   } catch (e) { /* scanned page / race with unload — the pixel estimate stands */ }
 }

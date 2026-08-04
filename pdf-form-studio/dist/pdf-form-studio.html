@@ -136,7 +136,8 @@ button, input, select, textarea { font-family: inherit; }
 .tb-center { justify-self: center; }
 .tb-left { justify-self: end; display: flex; align-items: center; gap: 8px; }
 
-.brand { display: flex; align-items: center; gap: 11px; }
+.brand { display: flex; align-items: center; gap: 11px; cursor: pointer; }
+.brand:active .logo { transform: scale(.94); }
 .brand .logo { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 800; box-shadow: 0 2px 8px rgba(14,110,120,.30); }
 .brand .logo svg path[fill="#fff"] { fill: #fff; }
 .brand .title { font-weight: 900; font-size: 16px; letter-spacing: .01em; line-height: 1.1; color: var(--ink-1); }
@@ -570,6 +571,38 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .fp-pick.empty { opacity: .45; }
 .fp-pick.empty:hover { opacity: 1; }
 
+/* ===== Guided fill (Typeform-inspired, minimal) ===== */
+.gd-card { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 90;
+  width: min(560px, calc(100vw - 24px)); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: 0 18px 48px rgba(19,28,43,.28); padding: 20px 22px 14px;
+  direction: rtl; overflow: hidden; animation: gdIn .22s ease-out; }
+@keyframes gdIn { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.gd-progwrap { position: absolute; top: 0; right: 0; left: 0; height: 3px; background: var(--surface-3); }
+.gd-prog { height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), #2E6DB4); transition: width .3s; }
+.gd-x { position: absolute; top: 10px; left: 12px; border: 0; background: none; color: var(--ink-3);
+  font-size: 15px; cursor: pointer; padding: 4px; line-height: 1; }
+.gd-x:hover { color: var(--ink-1); }
+.gd-count { font-size: 11.5px; font-weight: 700; color: var(--ink-3); margin-bottom: 2px; }
+.gd-q { font-size: 19px; font-weight: 800; color: var(--ink-1); line-height: 1.35; margin-bottom: 8px; }
+.gd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+.gd-chip { border: 1.5px solid var(--brand); color: var(--brand); background: var(--brand-soft);
+  border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 700; cursor: pointer;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-chip:hover { background: var(--brand); color: #fff; }
+.gd-in { width: 100%; border: none; border-bottom: 2px solid var(--line-2); background: transparent;
+  font-size: 17px; padding: 8px 2px; outline: none; color: var(--ink-1); border-radius: 0; }
+.gd-in:focus { border-bottom-color: var(--brand); }
+.gd-err { color: var(--danger); font-size: 12px; font-weight: 600; margin-top: 5px; min-height: 15px; }
+.gd-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+@media (max-width: 640px) {
+  .gd-card { bottom: 0; width: 100vw; max-width: 100vw; border-radius: 16px 16px 0 0; border-bottom: 0;
+    padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+
+/* compact panel tool row — quiet chrome, the field list starts high */
+.fp-tools { display: flex; gap: 5px; margin-bottom: 8px; }
+.fp-tool { flex: 1; padding: 6px 2px; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 </style>
 <meta name="theme-color" content="#FFFFFF" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -593,6 +626,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     </div>
     <div class="tb-center">
       <div class="docbar hidden" id="docbar">
+        <button class="btn ghost" id="homeBtn" title="דף הבית — סגירת המסמך וחזרה למסך הפתיחה (לפתיחת מסמך חדש)" aria-label="דף הבית"><span class="ic">🏠</span></button>
         <span class="fname" id="fname">—</span>
         <span id="savedInd" style="font-size:11px;font-weight:700;color:var(--ok);opacity:0;transition:opacity .4s">✓ נשמר</span>
         <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);font-size:12px;font-weight:700"></select>
@@ -4251,6 +4285,145 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 </script>
 <script>
+/* fontmatch.js — write in the document's own typeface.
+ *
+ * Everything Fillo places is drawn in Heebo. On a form printed in David or
+ * Arial that reads as a patch: right size, right line, wrong letterforms. This
+ * module reads which font the PDF actually uses and hands back a CSS stack to
+ * match it, so filled values look like part of the page.
+ *
+ * Two levels of knowledge, both honest about their limits:
+ *   - the embedded font's NAME (ABCDEF+ArialMT → Arial) when pdf.js has
+ *     resolved the font object; the subset prefix is stripped first.
+ *   - failing that, pdf.js's own serif/sans/mono classification.
+ * Neither can conjure a font the viewer doesn't have, so every mapping is a
+ * STACK ending in Heebo: an exact match where the system has one, a close
+ * relative otherwise, never a missing-glyph box.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  const HEEBO = "Heebo, 'Segoe UI', Arial, sans-serif";
+
+  // family id → CSS stack. Hebrew faces first, then their closest Latin
+  // relatives, then Heebo — so a Hebrew string always finds a real glyph.
+  const FAMILIES = {
+    david:   { css: "David, 'David Libre', 'Frank Ruehl CLM', 'Times New Roman', " + HEEBO, label: 'דויד' },
+    frank:   { css: "'Frank Ruehl CLM', 'Frank Ruehl', David, 'Times New Roman', " + HEEBO, label: 'פרנק-ריהל' },
+    times:   { css: "'Times New Roman', Times, David, 'Frank Ruehl CLM', serif, " + HEEBO, label: 'Times' },
+    arial:   { css: "Arial, Helvetica, 'Liberation Sans', 'Nimbus Sans', " + HEEBO, label: 'אריאל' },
+    tahoma:  { css: "Tahoma, Verdana, 'Segoe UI', " + HEEBO, label: 'תהומה' },
+    narkis:  { css: "Narkisim, 'Narkis Tam', Arial, " + HEEBO, label: 'נרקיסים' },
+    miriam:  { css: "Miriam, 'Miriam Libre', Arial, " + HEEBO, label: 'מרים' },
+    mono:    { css: "'Courier New', Courier, ui-monospace, monospace", label: 'רוחב קבוע' }
+  };
+
+  // name → family. Ordered: the first hit wins, so specific names (Arimo, a
+  // metric clone of Arial) are tested before the generic words they contain.
+  const NAME_RULES = [
+    [/frank\s*ru|frankruehl|frank_ru/i, 'frank'],
+    [/david/i, 'david'],
+    [/narkis/i, 'narkis'],
+    [/miriam/i, 'miriam'],
+    [/courier|mono(space)?$|consolas/i, 'mono'],
+    [/times|timesnewroman|tinos|liberationserif|nimbusroman|georgia|garamond|serif$/i, 'times'],
+    [/tahoma|verdana|segoe|dejavusans/i, 'tahoma'],
+    [/arial|helvetica|arimo|liberationsans|nimbussans|calibri|opensans|roboto|guttman/i, 'arial']
+  ];
+
+  /* pdf.js's generic classification, when the real name is unavailable.
+   * Order matters and 'sans-serif' must be ruled out BEFORE 'serif' — it
+   * contains it as a substring, and sans is the app font's own category
+   * (nothing to change), while serif means the page is set in David/Times. */
+  function genericFamily(g) {
+    if (/mono/.test(g)) return 'mono';
+    if (/sans/.test(g)) return null;
+    if (/serif/.test(g)) return 'times';
+    return null;
+  }
+
+  /* familyOf(rawFontName, genericFamily) → family id | null (= keep Heebo) */
+  function familyOf(rawName, generic) {
+    const n = String(rawName || '').replace(/^[A-Z]{6}\+/, '').replace(/[\s_-]+/g, '');
+    for (const [re, id] of NAME_RULES) if (re.test(n)) return id;
+    return genericFamily(String(generic || '').toLowerCase());
+  }
+  const cssOf = (id) => (id && FAMILIES[id]) ? FAMILIES[id].css : null;
+  const labelOf = (id) => (id && FAMILIES[id]) ? FAMILIES[id].label : 'ברירת מחדל';
+
+  /* resolverFor(page, textContent) → (fontName) => { family, css, bold }
+   * pdf.js hands text items an internal font id; the real name lives in the
+   * page's common objects once that font has loaded (our pages are all
+   * rendered, so it usually has). styles[] is the always-available fallback. */
+  function resolverFor(page, tc) {
+    const cache = new Map();
+    const styles = (tc && tc.styles) || {};
+    return function (fontName) {
+      if (!fontName) return null;
+      if (cache.has(fontName)) return cache.get(fontName);
+      let raw = '', generic = '';
+      try {
+        const co = page && page.commonObjs;
+        if (co && (!co.has || co.has(fontName))) {
+          const obj = co.get(fontName);
+          if (obj) { raw = obj.name || obj.loadedName || ''; }
+        }
+      } catch (e) { /* font object not resolved — fall back to styles */ }
+      const st = styles[fontName];
+      if (st) { generic = st.fontFamily || ''; if (!raw && st.fontFamily) raw = st.fontFamily; }
+      const family = familyOf(raw, generic);
+      const out = family ? { family, css: cssOf(family), bold: /bold|black|heavy|[-_]b$/i.test(raw) } : null;
+      cache.set(fontName, out);
+      return out;
+    };
+  }
+
+  // ---- document-level: which face is this form actually printed in? ----
+  let docFamily = null;   // family id of the dominant body font
+
+  /* scanDoc(pdfDoc) — weigh every text run by how many characters it sets;
+   * the heaviest family is the document's voice. Headings and page numbers
+   * lose to body text by construction. Scans the first pages only: forms are
+   * typographically uniform, and a full scan on a 40-page PDF is wasted work. */
+  async function scanDoc(pdfDoc, maxPages = 3) {
+    docFamily = null;
+    if (!pdfDoc) return null;
+    const weight = Object.create(null);
+    const n = Math.min(pdfDoc.numPages, maxPages);
+    for (let i = 1; i <= n; i++) {
+      try {
+        const page = await pdfDoc.getPage(i);
+        const tc = await page.getTextContent();
+        const resolve = resolverFor(page, tc);
+        tc.items.forEach((it) => {
+          const s = (it.str || '').trim();
+          if (!s) return;
+          const f = resolve(it.fontName);
+          if (!f) return;
+          weight[f.family] = (weight[f.family] || 0) + s.length;
+        });
+      } catch (e) { /* skip unreadable page */ }
+    }
+    const best = Object.keys(weight).sort((a, b) => weight[b] - weight[a])[0];
+    docFamily = best || null;
+    return docFamily;
+  }
+
+  const docCss = () => cssOf(docFamily);
+  const docLabel = () => labelOf(docFamily);
+  const docId = () => docFamily;
+  function setDoc(id) { docFamily = FAMILIES[id] ? id : null; return docFamily; }
+  function reset() { docFamily = null; }
+
+  PFS.fontmatch = {
+    FAMILIES, familyOf, cssOf, labelOf, resolverFor,
+    scanDoc, docCss, docLabel, docId, setDoc, reset, HEEBO
+  };
+})(window);
+
+</script>
+<script>
 /* element.js — a single free-floating overlay item (text or image).
  * Geometry is stored as page fractions (fx,fy,fw,fh,fontFrac); the same
  * fractions drive both on-screen layout and the exported raster, so what you
@@ -4288,7 +4461,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       text: '', imgUrl: null, aspect: 1, fieldKey: ''
     };
     if (DEFAULTS[type]) Object.assign(base, DEFAULTS[type]);
-    return Object.assign(base, partial || {});
+    const model = Object.assign(base, partial || {});
+    // written text defaults to the DOCUMENT's typeface, not the app's — a value
+    // set in the form's own font stops reading as a patch (resolved at creation
+    // time: fontmatch learns the face only after the PDF loads)
+    if (model.type === 'text' && model.font === undefined && PFS.fontmatch) {
+      const css = PFS.fontmatch.docCss();
+      if (css) model.font = css;
+    }
+    return model;
   }
 
   /* createElement(model, ctx)
@@ -4342,6 +4523,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         const fontPx = model.fontFrac * H;
         inner.style.fontSize = fontPx + 'px';
         inner.style.color = model.color;
+        inner.style.fontFamily = model.font || '';   // '' = inherit the app font
         inner.style.fontWeight = model.bold ? '700' : '400';
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes
@@ -4660,7 +4842,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           fx: round(m.fx), fy: round(m.fy), fw: round(m.fw), fh: round(m.fh),
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
-          opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0
+          opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0,
+          font: m.font || undefined
         };
       });
     }
@@ -4890,6 +5073,16 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       order = order.filter((i) => !views[i].deleted);
     }
     function visiblePageCount() { return views.filter((v) => !v.deleted).length; }
+    // close the current document: free pdf.js resources, drop page DOM and all
+    // per-doc state, so the app can return to the start screen (or load fresh)
+    function unload() {
+      try { if (pdfDoc && pdfDoc.destroy) pdfDoc.destroy(); } catch (e) {}
+      pdfDoc = null;
+      bytes = null;
+      views = [];
+      order = [];
+      pagesEl.innerHTML = '';
+    }
     function getBytes() { return bytes; }
     function getDoc() { return pdfDoc; }
     function hasDoc() { return !!pdfDoc; }
@@ -4942,7 +5135,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return '#' + [r, g, b].map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('');
     }
 
-    return { load, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
+    return { load, unload, setScale, zoomIn, zoomOut, fit, getScale, rotatePage, getRotations, setRotations, deletePage, getRemovedPages, setRemovedPages, movePage, getPageOrder, isReordered, setPageOrder, getPageState, setPageState, visiblePageCount, getBytes, getDoc, hasDoc, numPages, viewList, sampleBg };
   }
 
   PFS.createPdfView = createPdfView;
@@ -5332,7 +5525,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     ctx.direction = 'rtl';
     ctx.textBaseline = 'top';
     ctx.fillStyle = m.color || '#111';
-    ctx.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px Heebo, sans-serif';
+    // the element's own face when it adopted the document's (fontmatch), else
+    // the app font — the exported raster must match what the editor showed
+    ctx.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px ' + (m.font || 'Heebo, sans-serif');
     // letter-spacing (aligns typed text to per-character boxes) — supported in
     // modern Chromium/Safari; older engines ignore it (text still exports).
     try { ctx.letterSpacing = m.letterSpacing ? (m.letterSpacing * fontPx) + 'px' : '0px'; } catch (e) {}
@@ -6009,8 +6204,16 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       }
       const rtl = hasHebrew(displayLabel);
       let fx, fw;
+      let drawnBlank = false;   // the form drew its own answer line (____/....)
       const defW = Math.min(0.34 * W, W * 0.5);
+      // real printed content (letters or digits) — as opposed to a blank run,
+      // a lone required-asterisk, or a checkbox glyph
+      const answerish = (s) => {
+        const t = (s || '').trim();
+        return (/[A-Za-z֐-׿؀-ۿ]|\d/.test(t)) && !/^[*＊]+$/.test(t) && !CHECKBOX.test(t) && !isBlankRun(t);
+      };
       if (isBlankRun(label)) {
+        drawnBlank = true;
         fx = b.x / W; fw = Math.max(b.w, 0.15 * W) / W;
       } else if (rtl) {
         // blank is to the LEFT of the label
@@ -6020,8 +6223,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         // the field — adopt its exact extent (its own rect, not the gap to it)
         const nearest = leftItems.length ? leftItems.reduce((a, c) => ((a.x + a.w) > (c.x + c.w) ? a : c)) : null;
         if (nearest && isBlankRun(nearest.str) && (labelLeft - (nearest.x + nearest.w)) < b.fontH * 3) {
+          drawnBlank = true;
           fx = nearest.x / W; fw = Math.max(20, nearest.w) / W;
         } else {
+          // ALREADY ANSWERED: printed text right after the colon ("תאריך
+          // התחלה: 03.09.2026" on a quote letter) — the document filled this
+          // in itself; a field here would duplicate the printed data
+          if (nearest && answerish(nearest.str) && (labelLeft - (nearest.x + nearest.w)) < b.fontH * 2) return;
           const leftBound = leftItems.length ? Math.max(...leftItems.map((o) => o.x + o.w)) : Math.max(0, labelLeft - defW);
           fx = leftBound / W; fw = Math.max(20, labelLeft - leftBound) / W;
         }
@@ -6031,11 +6239,28 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         const rightItems = sameLine.filter((o) => o.x >= labelRight - 2);
         const nearest = rightItems.length ? rightItems.reduce((a, c) => (a.x < c.x ? a : c)) : null;
         if (nearest && isBlankRun(nearest.str) && (nearest.x - labelRight) < b.fontH * 3) {
+          drawnBlank = true;
           fx = nearest.x / W; fw = Math.max(20, nearest.w) / W;
         } else {
+          if (nearest && answerish(nearest.str) && (nearest.x - labelRight) < b.fontH * 2) return;
           const rightBound = rightItems.length ? Math.min(...rightItems.map((o) => o.x)) : Math.min(W, labelRight + defW);
           fx = labelRight / W; fw = Math.max(20, rightBound - labelRight) / W;
         }
+      }
+      // ANSWERED BELOW: a colon-label whose printed answer continues on the
+      // next line ("סניפים:" then the address list). Only prose ALIGNED with
+      // the label's reading edge counts — an answer continuation starts where
+      // the label starts; unrelated text elsewhere on the next line doesn't.
+      // Labels below are just the next question, drawn blanks stay fillable.
+      if (!drawnBlank) {
+        const alignedBelow = boxes.some((o) => {
+          if (o === b || !answerish(o.str) || isLabel(o.str.trim())) return false;
+          const dy = o.top - b.top;
+          if (dy < b.fontH * 0.7 || dy > b.fontH * 2.0) return false;
+          return rtl ? Math.abs((o.x + o.w) - (b.x + b.w)) < b.fontH * 1.5
+                     : Math.abs(o.x - b.x) < b.fontH * 1.5;
+        });
+        if (alignedBelow) return;
       }
       const fontFrac = Math.min(0.03, (b.fontH * 0.95) / H);
       let fy = Math.max(0, b.top) / H;
@@ -6612,41 +6837,55 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       }
       const detKeys = new Set(det.fields.map((f) => f.fieldKey));
       [...autoKeys].forEach((k) => { if (!detKeys.has(k)) autoKeys.delete(k); });
-      const head = document.createElement('div'); head.className = 'hint muted';
-      head.style.marginBottom = '4px';
-      head.textContent = det.tier === 'acroform'
-        ? `זוהו ${det.fields.length} שדות טופס — הקלידו כאן והם ימולאו על הטופס.`
-        : det.tier === 'ocr'
-        ? `OCR זיהה ${det.fields.length} שדות (טיוטה — בדקו ותקנו; אפשר לגרור). הקלידו למילוי.`
-        : `זוהו ${det.fields.length} שדות (זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור לתיקון). הקלידו למילוי.`;
-      body.appendChild(head);
+      // quiet chrome: the meter already says how many fields there are — the
+      // old paragraph of caveats lives on as its tooltip. Only OCR results
+      // (real drafts) still announce themselves.
+      if (det.tier === 'ocr') {
+        const head = document.createElement('div'); head.className = 'hint muted';
+        head.style.marginBottom = '4px';
+        head.textContent = `OCR זיהה ${det.fields.length} שדות — טיוטה, בדקו ותקנו (אפשר לגרור).`;
+        body.appendChild(head);
+      }
 
       // completeness meter: "מולאו X/Y" + bar, live-updated on every input
       const meter = document.createElement('div');
       meter.style.cssText = 'margin:2px 0 8px';
+      meter.title = det.tier === 'acroform'
+        ? 'הקלידו כאן — הערכים ימולאו על הטופס'
+        : 'זיהוי חכם — ייתכנו אי-דיוקים; אפשר לגרור שדות לתיקון';
       meter.innerHTML = '<div class="hint" style="display:flex;justify-content:space-between"><span id="fpMeterTxt"></span></div><div style="height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:4px"><div id="fpMeterBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),#2E6DB4);border-radius:99px;transition:width .25s"></div></div>';
       body.appendChild(meter);
       // interview mode entry — at the TOP where it's seen, it's the fast path
       if (det.fields.some((f) => f.type !== 'check')) {
         const ivTop = document.createElement('button');
         ivTop.className = 'btn sm primary block'; ivTop.style.marginBottom = '8px';
-        ivTop.textContent = '🎯 מילוי מהיר — שדה אחרי שדה (Enter מתקדם)';
+        ivTop.textContent = '🎯 מילוי מודרך — רק מה שחסר, שדה־שדה (Enter)';
         ivTop.addEventListener('click', () => startInterview(fieldMeta, controls));
         body.appendChild(ivTop);
         // the single-person fast lane: the person's details are already
         // WRITTEN somewhere (a WhatsApp message, an ID photo) — paste or
         // snap instead of retyping them field by field
+        // ONE compact tool row instead of a stack of full-width buttons — the
+        // field list (the actual work) starts as high as possible
         const fastRow = document.createElement('div');
-        fastRow.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+        fastRow.className = 'fp-tools';
         const pasteBtn = document.createElement('button');
-        pasteBtn.className = 'btn sm'; pasteBtn.style.flex = '1';
+        pasteBtn.className = 'btn sm fp-tool';
         pasteBtn.textContent = '📋 הדבק ומלא';
         pasteBtn.title = 'הדביקו הודעת וואטסאפ / שורה עם שם, ת״ז וטלפון — והטופס מתמלא';
         const photoBtn = document.createElement('button');
-        photoBtn.className = 'btn sm'; photoBtn.style.flex = '1';
+        photoBtn.className = 'btn sm fp-tool';
         photoBtn.textContent = '📸 מלא מצילום';
         photoBtn.title = 'צילום ת״ז/רישיון — הפרטים נקראים וממלאים את הטופס (הכול מקומי)';
-        fastRow.append(pasteBtn, photoBtn);
+        const uniBtn = document.createElement('button');
+        uniBtn.className = 'btn sm fp-tool';
+        uniBtn.textContent = '✨ כתב אחיד';
+        uniBtn.title = 'משווה את גודל הכתב של כל הטקסטים על הטופס (Ctrl+Z מבטל)';
+        uniBtn.addEventListener('click', () => {
+          const n = PFS.uniformizeHandwriting ? PFS.uniformizeHandwriting(false) : 0;
+          PFS.toast(n ? `✨ ${n} טקסטים יושרו לגודל אחיד` : 'הכתב כבר אחיד ✓', 'ok');
+        });
+        fastRow.append(pasteBtn, photoBtn, uniBtn);
         body.appendChild(fastRow);
         const pasteBox = document.createElement('div');
         pasteBox.className = 'hidden'; pasteBox.style.marginBottom = '8px';
@@ -6686,17 +6925,6 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           };
           inp.click();
         });
-        // one handwriting, one click — evens out EVERYTHING on the form,
-        // including manually-placed text and restored documents
-        const uniBtn = document.createElement('button');
-        uniBtn.className = 'btn sm block';
-        uniBtn.textContent = '✨ כתב אחיד — יישר גודל בכל הטופס';
-        uniBtn.title = 'משווה את גודל הכתב של כל הטקסטים על הטופס (Ctrl+Z מבטל)';
-        uniBtn.addEventListener('click', () => {
-          const n = PFS.uniformizeHandwriting ? PFS.uniformizeHandwriting(false) : 0;
-          PFS.toast(n ? `✨ ${n} טקסטים יושרו לגודל אחיד` : 'הכתב כבר אחיד ✓', 'ok');
-        });
-        body.appendChild(uniBtn);
       }
       // amber hints over empty detected fields (cleared as they fill)
       if (overlay.setFieldMarkers) overlay.setFieldMarkers(det.fields);
@@ -6972,33 +7200,96 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       return autoFilled;
     }
 
+    /* guided fill — Typeform-inspired, stripped to the essence: ONE big
+     * question on a floating card, a hairline progress bar, Enter to advance.
+     * Iterates only the fields still EMPTY (auto-fill already did the rest);
+     * learned options (branches, addresses) appear as one-tap chips. */
     let ivBar = null;
     function startInterview(fields, controls) {
-      let i = 0;
-      if (!ivBar) {
-        ivBar = document.createElement('div');
-        ivBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:80;background:var(--surface);border-top:2px solid var(--brand);box-shadow:0 -6px 24px rgba(19,28,43,.18);padding:12px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
-        ivBar.innerHTML = '<div style="flex:1;min-width:180px"><div id="ivLbl" style="font-weight:800;font-size:14px"></div><div class="hint muted" id="ivProg"></div></div><input id="ivIn" type="text" dir="auto" style="flex:2;min-width:160px;padding:10px;font-size:15px" placeholder="הקלידו ו-Enter…"/><button class="btn sm" id="ivSkip">דלג</button><button class="btn sm primary" id="ivNext">הבא ⏎</button><button class="btn sm ghost" id="ivEnd">סיום</button>';
-        document.body.appendChild(ivBar);
-      }
-      ivBar.style.display = 'flex';
-      const lbl = ivBar.querySelector('#ivLbl'), prog = ivBar.querySelector('#ivProg'), inp = ivBar.querySelector('#ivIn');
-      const textIdx = fields.map((f, j) => f.type !== 'check' ? j : -1).filter((j) => j >= 0);
-      let pos = 0;
+      const idx = fields.map((f, j) => (f.type !== 'check' && !controls[j].value.trim()) ? j : -1).filter((j) => j >= 0);
+      if (!idx.length) { PFS.toast('אין שדות ריקים — הכול כבר מלא ✓', 'ok'); return; }
+      if (ivBar) ivBar.remove();
+      ivBar = document.createElement('div');
+      ivBar.className = 'gd-card';
+      ivBar.innerHTML =
+        '<div class="gd-progwrap"><div class="gd-prog" id="gdProg"></div></div>' +
+        '<button type="button" class="gd-x" id="gdEnd" title="סגירה (Esc)" aria-label="סגירת המילוי המודרך">✕</button>' +
+        '<div class="gd-count" id="gdCount"></div>' +
+        '<div class="gd-q" id="gdQ"></div>' +
+        '<div class="gd-chips" id="gdChips"></div>' +
+        '<input class="gd-in" id="gdIn" type="text" dir="auto" placeholder="הקלידו תשובה…"/>' +
+        '<div class="gd-err" id="gdErr"></div>' +
+        '<div class="gd-foot">' +
+          '<button type="button" class="btn primary" id="gdNext">הבא ⏎</button>' +
+          '<button type="button" class="btn ghost sm" id="gdSkip">דלג</button>' +
+          '<span style="flex:1"></span>' +
+          '<button type="button" class="btn ghost sm" id="gdPrev" title="חזרה לשדה הקודם">‹ הקודם</button>' +
+        '</div>';
+      document.body.appendChild(ivBar);
+      const $g = (id) => ivBar.querySelector('#' + id);
+      const q = $g('gdQ'), count = $g('gdCount'), inp = $g('gdIn'), chips = $g('gdChips'),
+            err = $g('gdErr'), progEl = $g('gdProg'), nextBtn = $g('gdNext');
+      let pos = 0, forceVal = null;
       function showCur() {
-        if (pos >= textIdx.length) { end(); PFS.toast('🎉 סיימתם את כל השדות!', 'ok'); return; }
-        const j = textIdx[pos]; const f = fields[j];
-        lbl.textContent = f.label; prog.textContent = 'שדה ' + (pos + 1) + ' מתוך ' + textIdx.length;
+        if (pos >= idx.length) { cleanup(); PFS.toast('🎉 כל השדות הושלמו', 'ok'); return; }
+        const j = idx[pos], f = fields[j];
+        q.textContent = f.label + (f.required ? ' *' : '');
+        count.textContent = (pos + 1) + ' / ' + idx.length + (f.page ? ' · עמוד ' + (f.page + 1) : '');
         inp.value = controls[j].value || '';
-        const c = ctrlByKey[f.fieldKey]; if (c) PFS.scrollToEl(c.node, 'center');
+        err.textContent = '';
+        forceVal = null;
+        nextBtn.textContent = pos === idx.length - 1 ? 'סיום ✓' : 'הבא ⏎';
+        progEl.style.width = Math.round(pos / idx.length * 100) + '%';
+        // one-tap chips from the learning engine (branches, addresses…)
+        chips.innerHTML = '';
+        (optionsOf(f) || []).slice(0, 4).forEach((o) => {
+          const ch = document.createElement('button');
+          ch.type = 'button'; ch.className = 'gd-chip'; ch.textContent = o.v;
+          ch.addEventListener('click', () => { inp.value = o.v; advance(); });
+          chips.appendChild(ch);
+        });
+        chips.style.display = chips.children.length ? '' : 'none';
+        // light the spot on the document — you always see WHERE this lands
+        if (overlay.setFieldActive) overlay.setFieldActive(f.fieldKey);
+        const c = ctrlByKey[f.fieldKey];
+        const mk = c ? c.node : document.querySelector('.field-marker[data-key="' + CSS.escape(f.fieldKey) + '"]');
+        if (mk) PFS.scrollToEl(mk, 'center');
         inp.focus({ preventScroll: true });
       }
-      function commit() { const j = textIdx[pos]; controls[j].value = inp.value; controls[j].dispatchEvent(new Event('input')); }
-      function end() { ivBar.style.display = 'none'; }
-      ivBar.querySelector('#ivNext').onclick = () => { commit(); pos++; showCur(); };
-      ivBar.querySelector('#ivSkip').onclick = () => { pos++; showCur(); };
-      ivBar.querySelector('#ivEnd').onclick = () => { commit(); end(); };
-      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); pos++; showCur(); } if (e.key === 'Escape') end(); };
+      function commit() {
+        const j = idx[pos];
+        controls[j].value = inp.value;
+        controls[j].dispatchEvent(new Event('input'));
+        controls[j].dispatchEvent(new Event('change'));   // feeds the learning engine
+      }
+      function advance() {
+        const v = inp.value.trim();
+        if (v) {
+          // inline validation — a typo is cheapest to fix while you're here.
+          // A deliberate value passes on the SECOND Enter (never a dead end).
+          const canon = controls[idx[pos]].__canon;
+          const r = canon && PFS.validate ? PFS.validate.field(canon, v) : { ok: true };
+          if (!r.ok && forceVal !== v) {
+            err.textContent = (r.msg || 'הערך נראה שגוי') + ' — Enter שוב כדי להמשיך בכל זאת';
+            forceVal = v;
+            return;
+          }
+          commit();
+        }
+        pos++; showCur();
+      }
+      function cleanup() {
+        if (overlay.setFieldActive) overlay.setFieldActive(null);
+        document.removeEventListener('keydown', escClose, true);
+        if (ivBar) { ivBar.remove(); ivBar = null; }
+      }
+      const escClose = (e) => { if (e.key === 'Escape') { e.stopPropagation(); cleanup(); } };
+      document.addEventListener('keydown', escClose, true);
+      nextBtn.onclick = advance;
+      $g('gdSkip').onclick = () => { pos++; showCur(); };
+      $g('gdPrev').onclick = () => { if (pos > 0) { pos--; showCur(); } };
+      $g('gdEnd').onclick = cleanup;
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); advance(); } };
       showCur();
     }
 
@@ -7220,7 +7511,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -7509,14 +7800,19 @@ function docUniformSize() {
 function uniformizeHandwriting(taggedOnly) {
   const uni = docUniformSize();
   const lo = uni * 0.85, hi = uni * 1.15;
+  // the document's own typeface, so "uniform" means uniform with the FORM —
+  // not merely consistent among the values Fillo added
+  const docCss = PFS.fontmatch ? PFS.fontmatch.docCss() : null;
   let changed = 0;
   overlay.getElements().forEach((c) => {
     if (!isPlainTextEl(c)) return;
     if (taggedOnly && !c.model.fieldKey) return;
     const target = Math.min(hi, Math.max(lo, c.model.fontFrac || uni));
-    if (Math.abs((c.model.fontFrac || 0) - target) < 0.0005) return;
+    const fontOff = docCss && c.model.font !== docCss;
+    if (Math.abs((c.model.fontFrac || 0) - target) < 0.0005 && !fontOff) return;
     const oldW = c.model.fw;              // layout keeps this measured
     c.model.fontFrac = target;
+    if (fontOff) c.model.font = docCss;
     c.layout();
     // a right-aligned (Hebrew) value must keep its RIGHT edge planted
     if (c.model.align === 'right' && isFinite(oldW)) { c.model.fx += (oldW - c.model.fw); c.layout(); }
@@ -7755,6 +8051,12 @@ async function openPdfFile(file) {
     buildThumbnails();
     updateHwStatus();
     currentFp = null;
+    // learn the document's typeface BEFORE anything is placed, so detected
+    // fields and restored templates are written in the form's own font
+    if (PFS.fontmatch) {
+      PFS.fontmatch.reset();
+      try { await PFS.fontmatch.scanDoc(pdfView.getDoc()); } catch (e) {}
+    }
     try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
     renderCompanions();
     // a recognised form with a linked appendix announces itself right away
@@ -7796,6 +8098,52 @@ function loadErrorMessage(e) {
   return 'טעינת ה-PDF נכשלה — ודאו שזהו קובץ PDF תקין';
 }
 let currentFileName = 'filled';
+
+// ---------- home: close the document, return to the start screen ----------
+// Closing is safe: the auto-memory (templates.autoSave per fingerprint) keeps
+// the filled layout, so reopening the SAME form restores everything.
+async function goHome() {
+  if (!pdfView.hasDoc()) return;
+  if (dirty) {
+    // flush the pending auto-save so the promise in the dialog is already true
+    try { clearTimeout(autoMemTimer); if (currentFp) templates.autoSave(currentFp, currentFileName); } catch (e) {}
+    const ok = await PFS.ui.confirm('חזרה לדף הבית 🏠',
+      'לסגור את "' + currentFileName + '"?\nמה שמילאתם נשמר אוטומטית — פתיחה חוזרת של אותו טופס תשחזר הכל.');
+    if (!ok) return;
+  }
+  loadGen++;                        // in-flight detection/ink-snap bails out
+  lastDet = null;
+  fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
+  attachments = [];
+  updateAttachBadge();
+  overlay.clearElements();
+  fieldsPanel.clear();
+  mergeParsed = null;
+  pendingCarry = null;
+  pendingStudent = null;
+  PFS.fontmatch && PFS.fontmatch.reset();
+  pdfView.unload();
+  currentFp = null;
+  currentFileName = 'filled';
+  dirty = false;
+  resetHistory();
+  $('docbar').classList.add('hidden');
+  $('fname').textContent = '—';
+  $('dropzone').style.display = '';
+  ['exportBtn', 'tmplBtn', 'mergeBtn', 'detectBtn', 'clearBtn', 'enhanceBtn',
+   'rotateBtn', 'attachBtn', 'deleteBtn', 'exportFlatBtn', 'fillAllBtn'
+  ].forEach((id) => { const b = $(id); if (b) b.disabled = true; });
+  buildPageNav();
+  buildThumbnails();
+}
+$('homeBtn') && $('homeBtn').addEventListener('click', goHome);
+// the logo is a home button too — the pattern every user already knows
+(function () {
+  const brand = document.querySelector('.brand');
+  if (!brand) return;
+  brand.title = 'דף הבית — סגירת המסמך וחזרה למסך הפתיחה';
+  brand.addEventListener('click', goHome);
+})();
 
 // html/body are overflow:hidden by design — the app is a fixed 100vh shell.
 // Browsers still let programmatic focus/scrollIntoView OFFSET them, and then
@@ -7880,22 +8228,138 @@ function activateTool(btn, tool) {
   });
 }
 
+// Measure the INK being replaced (before it's covered): the glyph band's
+// height, its vertical position, colour and stroke weight. The drag rectangle
+// is sloppy; the print underneath is not — matching the print is what makes a
+// replacement read as "edited in place" instead of a patch in the wrong size.
+function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
+  const v = pdfView.viewList()[pageIndex];
+  if (!v || !v.canvas || !v.canvas.width) return null;
+  const cw = v.canvas.width, chh = v.canvas.height;
+  const x0 = Math.max(0, Math.round(fx * cw)), y0 = Math.max(0, Math.round(fy * chh));
+  const w = Math.min(cw - x0, Math.round(fw * cw)), h = Math.min(chh - y0, Math.round(fh * chh));
+  if (w < 4 || h < 4) return null;
+  let data;
+  try { data = v.canvas.getContext('2d').getImageData(x0, y0, w, h).data; } catch (e) { return null; }
+  const rows = new Array(h).fill(0);
+  // colour comes from the DARKEST pixels only — anti-alias edges are the ink
+  // blended with paper, and averaging them in reads a black print as mid-grey
+  let rS = 0, gS = 0, bS = 0, inkN = 0, rL = 0, gL = 0, bL = 0, looseN = 0;
+  const runs = [];
+  for (let y = 0; y < h; y++) {
+    let run = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const dark = data[i + 3] > 200 && lum < 185;
+      if (dark) {
+        rows[y]++; run++;
+        if (lum < 100) { rS += data[i]; gS += data[i + 1]; bS += data[i + 2]; inkN++; }
+        else { rL += data[i]; gL += data[i + 1]; bL += data[i + 2]; looseN++; }
+      } else if (run) { runs.push(run); run = 0; }
+    }
+    if (run && run < w) runs.push(run);
+  }
+  // glyph rows: some ink, but not a solid rule/border row
+  const glyph = [];
+  rows.forEach((n, y) => { if (n > 1 && n < w * 0.9) glyph.push(y); });
+  if (!glyph.length) return null;
+  // the ink-heaviest contiguous row-run (tolerating anti-alias gaps) — so a
+  // drag that caught two lines still measures ONE line, not a giant band
+  let best = null, cur = [glyph[0]];
+  for (let k = 1; k <= glyph.length; k++) {
+    if (k < glyph.length && glyph[k] - glyph[k - 1] <= 2) { cur.push(glyph[k]); continue; }
+    const ink = cur.reduce((a, y) => a + rows[y], 0);
+    if (!best || ink > best.ink) best = { top: cur[0], bot: cur[cur.length - 1], ink };
+    cur = [glyph[k]];
+  }
+  const bandPx = best.bot - best.top + 1;
+  if (bandPx < 4) return null;
+  // stroke weight ≈ median horizontal dark-run → regular vs bold
+  runs.sort((a, b) => a - b);
+  const stroke = runs.length ? runs[Math.floor(runs.length / 2)] : 0;
+  const n = inkN || looseN;
+  const sums = inkN ? [rS, gS, bS] : [rL, gL, bL];
+  const color = n
+    ? '#' + sums.map((s) => Math.max(0, Math.min(255, Math.round(s / n))).toString(16).padStart(2, '0')).join('')
+    : null;
+  return {
+    bandTopFrac: (y0 + best.top) / chh,
+    bandFrac: bandPx / chh,
+    color,
+    bold: stroke / bandPx > 0.17
+  };
+}
+
 // "Replace" — one gesture over existing content: cover it with a paper-matched
 // box (seamless erase), then drop an empty text box in the same spot, focused so
 // the new value can be typed immediately. The result reads like edited-in-place.
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
+  const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);   // before covering
   const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
   overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg, auto: true });
-  // size the text to the covered box, vertically centred within it
-  const fontFrac = clamp(fh * 0.62, 0.01, 0.06);
-  const textH = fontFrac * 1.2;
-  const extra = {
-    fx, fy: clamp(fy + (fh - textH) / 2, 0, 1 - textH),
-    fw, fh: textH, fontFrac, align: 'right'
-  };
-  if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
-  overlay.addModelAt('text', pageIndex, extra, true);
+  let fontFrac, textH, ty;
+  if (ink) {
+    // match the print that was just covered: same glyph size (a Hebrew/digit
+    // band is ~0.66 of the em square), centred on the SAME line, same colour
+    // and weight — not the size of the drag box or the last-used style
+    fontFrac = clamp(ink.bandFrac / 0.66, 0.008, 0.05);
+    textH = fontFrac * 1.2;
+    ty = clamp(ink.bandTopFrac + ink.bandFrac / 2 - textH / 2,
+               fy - 0.004, Math.max(fy - 0.004, fy + fh - textH + 0.004));
+  } else {
+    // nothing measurable under the box → size to the box, as before
+    fontFrac = clamp(fh * 0.62, 0.01, 0.06);
+    textH = fontFrac * 1.2;
+    ty = clamp(fy + (fh - textH) / 2, 0, 1 - textH);
+  }
+  const extra = { fx, fy: ty, fw, fh: textH, fontFrac, align: 'right' };
+  if (ink) {
+    if (ink.color) extra.color = ink.color;
+    extra.bold = ink.bold;
+  } else if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
+  const ctrl = overlay.addModelAt('text', pageIndex, extra, true);
+  // digital PDFs know better than pixels: the text layer carries the covered
+  // run's EXACT em size and baseline — refine the estimate the moment it loads
+  refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh);
+}
+
+async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
+  try {
+    const doc = pdfView.getDoc();
+    if (!doc || !ctrl) return;
+    const page = await doc.getPage(pageIndex + 1);
+    const vp = page.getViewport({ scale: 1, rotation: page.rotate });
+    const tc = await page.getTextContent();
+    const resolveFont = PFS.fontmatch ? PFS.fontmatch.resolverFor(page, tc) : () => null;
+    const W = vp.width, H = vp.height;
+    const x0 = fx * W, x1 = (fx + fw) * W, y0 = fy * H, y1 = (fy + fh) * H;
+    let best = null;
+    tc.items.forEach((it) => {
+      if (!it.str || !it.str.trim()) return;
+      const tx = pdfjsLib.Util.transform(vp.transform, it.transform);
+      const fontH = Math.hypot(tx[2], tx[3]) || Math.abs(tx[3]) || 0;
+      if (!fontH) return;
+      const left = tx[4], top = tx[5] - fontH, w = (it.width || 0);
+      const ox = Math.min(x1, left + w) - Math.max(x0, left);
+      const oy = Math.min(y1, tx[5]) - Math.max(y0, top);
+      if (ox <= 0 || oy <= 0) return;
+      const score = ox * oy;
+      if (!best || score > best.score) best = { score, fontH, top, fontName: it.fontName };
+    });
+    if (!best) return;
+    const ff = PFS.clamp((best.fontH * 0.95) / H, 0.006, 0.08);
+    // same top/size convention as detected fields — exports land on the line
+    ctrl.model.fontFrac = ff;
+    ctrl.model.fh = (best.fontH * 1.2) / H;
+    ctrl.model.fy = PFS.clamp(best.top / H, 0, 1 - ctrl.model.fh);
+    // and the covered run's own typeface — the last thing that gave a
+    // replacement away once size, line and colour already matched
+    const fm = resolveFont(best.fontName);
+    if (fm && fm.css) { ctrl.model.font = fm.css; ctrl.model.bold = fm.bold || ctrl.model.bold; }
+    ctrl.layout();
+  } catch (e) { /* scanned page / race with unload — the pixel estimate stands */ }
 }
 
 function armImagePlacement(kind, item) {

@@ -35,7 +35,15 @@
       text: '', imgUrl: null, aspect: 1, fieldKey: ''
     };
     if (DEFAULTS[type]) Object.assign(base, DEFAULTS[type]);
-    return Object.assign(base, partial || {});
+    const model = Object.assign(base, partial || {});
+    // written text defaults to the DOCUMENT's typeface, not the app's — a value
+    // set in the form's own font stops reading as a patch (resolved at creation
+    // time: fontmatch learns the face only after the PDF loads)
+    if (model.type === 'text' && model.font === undefined && PFS.fontmatch) {
+      const css = PFS.fontmatch.docCss();
+      if (css) model.font = css;
+    }
+    return model;
   }
 
   /* createElement(model, ctx)
@@ -89,6 +97,7 @@
         const fontPx = model.fontFrac * H;
         inner.style.fontSize = fontPx + 'px';
         inner.style.color = model.color;
+        inner.style.fontFamily = model.font || '';   // '' = inherit the app font
         inner.style.fontWeight = model.bold ? '700' : '400';
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes

@@ -99,7 +99,9 @@
     ctx.direction = 'rtl';
     ctx.textBaseline = 'top';
     ctx.fillStyle = m.color || '#111';
-    ctx.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px Heebo, sans-serif';
+    // the element's own face when it adopted the document's (fontmatch), else
+    // the app font — the exported raster must match what the editor showed
+    ctx.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px ' + (m.font || 'Heebo, sans-serif');
     // letter-spacing (aligns typed text to per-character boxes) — supported in
     // modern Chromium/Safari; older engines ignore it (text still exports).
     try { ctx.letterSpacing = m.letterSpacing ? (m.letterSpacing * fontPx) + 'px' : '0px'; } catch (e) {}

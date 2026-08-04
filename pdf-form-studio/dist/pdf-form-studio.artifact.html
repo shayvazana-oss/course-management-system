@@ -3416,14 +3416,19 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     // ---- pass 1: what is paper here, and what is ink? ----
     const allLum = [];
     const scan = (band) => {
-      if (!band) return;
+      if (!band) return null;
       const { d } = band;
+      const own = [];
       for (let i = 0; i < d.length; i += 4) {
         if (d[i + 3] < 8) continue;
-        allLum.push(lumOf(d[i], d[i + 1], d[i + 2]));
+        const lu = lumOf(d[i], d[i + 1], d[i + 2]);
+        allLum.push(lu); own.push(lu);
       }
+      if (!own.length) return null;
+      own.sort((a, b) => a - b);
+      return own[own.length >> 1];              // this band's median tone
     };
-    scan(tBand); scan(bBand); scan(lBand); scan(rBand);
+    const medT = scan(tBand), medB = scan(bBand), medL = scan(lBand), medR = scan(rBand);
     if (!allLum.length) return null;
     allLum.sort((a, b) => a - b);
     const q = (p) => allLum[clampi(Math.floor(allLum.length * p), 0, allLum.length - 1)];
@@ -3528,6 +3533,109 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     let seed = 0x2f6e2b1 ^ (w * 73856093) ^ (h * 19349663);
     const rnd = () => { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff - 0.5; };
 
+    // ---- textured background (photo, artwork): reconstruct TEXTURE ----
+    // Two triggers, two failure modes of a smooth fill:
+    //  - CROSSING: opposite edge bands disagree strongly (the cover straddles a
+    //    photo↔paper boundary). One whole side then classifies as "content",
+    //    and the smooth fill flooded the strip with the other side's tone —
+    //    the grey smear band on the exported flyer.
+    //  - TEXTURE: sigma (spread of background pixels alone) is high — a photo,
+    //    where an interpolated fill reads as a plastic smudge and the rule
+    //    carrier streaks the patch.
+    // Both fill by mirroring real pixel strips inward instead. A crossing keeps
+    // each side pure and confines the blend to the middle third.
+    const dV = (medT != null && medB != null) ? Math.abs(medT - medB) : 0;
+    const dH = (medL != null && medR != null) ? Math.abs(medL - medR) : 0;
+    const crossing = Math.max(dV, dH) > 45;
+    if (opts.debug) Object.assign(opts.debug, { medT, medB, medL, medR, dV, dH, crossing, sigma, bgLum, tol, w, h });
+    if (crossing || sigma > 10) {
+      const vertical = crossing ? dV >= dH : w >= h;
+      const nearBand = vertical ? tBand : lBand;
+      const farBand = vertical ? bBand : rBand;
+      if (nearBand || farBand) {
+        const thick = (band) => band ? (vertical ? band.gh : band.gw) : 0;
+        const reflect = (k, n) => {
+          if (n <= 1) return 0;
+          const m = k % (2 * n);
+          return m < n ? m : (2 * n - 1 - m);
+        };
+        const px = (band, alongPos, depth) => {   // depth 0 = touching the region
+          const n = thick(band);
+          const dpt = reflect(depth, n);
+          let bx, by;
+          if (vertical) {
+            bx = clampi(alongPos - band.ox, 0, band.gw - 1);
+            by = band === tBand ? clampi(band.gh - 1 - dpt, 0, band.gh - 1) : clampi(dpt, 0, band.gh - 1);
+          } else {
+            by = clampi(alongPos - band.oy, 0, band.gh - 1);
+            bx = band === lBand ? clampi(band.gw - 1 - dpt, 0, band.gw - 1) : clampi(dpt, 0, band.gw - 1);
+          }
+          return (by * band.gw + bx) * 4;
+        };
+        const span = vertical ? h : w, breadth = vertical ? w : h;
+        // Across a boundary, find the ACTUAL boundary offset from the side
+        // bands (they cross the same edge) and cut there, sharp with a 2px
+        // feather — a centred blend leaves a soft smoke edge the eye catches.
+        let boundary = -1;
+        if (crossing) {
+          const mid = vertical ? (medT + medB) / 2 : (medL + medR) / 2;
+          const firstIsDark = (vertical ? medT : medL) < mid;
+          const prof = new Float32Array(span), cnt = new Float32Array(span);
+          const addProf = (band) => {
+            if (!band) return;
+            const { d, gw, gh } = band;
+            for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) {
+              const o = (yy * gw + xx) * 4;
+              if (d[o + 3] < 8) continue;
+              const pos = vertical ? (yy + band.oy) : (xx + band.ox);
+              if (pos < 0 || pos >= span) continue;
+              prof[pos] += lumOf(d[o], d[o + 1], d[o + 2]); cnt[pos]++;
+            }
+          };
+          addProf(vertical ? lBand : tBand); addProf(vertical ? rBand : bBand);
+          // best step split: maximise (first-tone before b) + (second-tone after b)
+          const preF = new Int32Array(span + 1), preS = new Int32Array(span + 1);
+          for (let s2 = 0; s2 < span; s2++) {
+            let f = 0, sec = 0;
+            if (cnt[s2]) {
+              const lu = prof[s2] / cnt[s2];
+              const isFirst = firstIsDark ? (lu < mid) : (lu > mid);
+              if (isFirst) f = 1; else sec = 1;
+            }
+            preF[s2 + 1] = preF[s2] + f; preS[s2 + 1] = preS[s2] + sec;
+          }
+          let best = -1;
+          for (let b2 = 0; b2 <= span; b2++) {
+            const score = preF[b2] + (preS[span] - preS[b2]);
+            if (score > best) { best = score; boundary = b2; }
+          }
+        }
+        for (let s = 0; s < span; s++) {
+          let t = (s + 0.5) / span;             // blend factor near→far
+          if (crossing) {
+            t = boundary >= 0
+              ? (s < boundary - 1 ? 0 : s > boundary ? 1 : 0.5)   // sharp cut + 2px feather
+              : (t < 0.35 ? 0 : t > 0.65 ? 1 : (t - 0.35) / 0.3); // sides unreadable → middle hand-off
+          }
+          const jitterN = nearBand ? Math.round(rnd() * 4) : 0;
+          const jitterF = farBand ? Math.round(rnd() * 4) : 0;
+          for (let p = 0; p < breadth; p++) {
+            const o = vertical ? ((s * w + p) * 4) : ((p * w + s) * 4);
+            for (let c = 0; c < 3; c++) {
+              let vNear = null, vFar = null;
+              if (nearBand) vNear = nearBand.d[px(nearBand, p + jitterN, s) + c];
+              if (farBand) vFar = farBand.d[px(farBand, p + jitterF, span - 1 - s) + c];
+              const v = vNear == null ? vFar : vFar == null ? vNear : vNear * (1 - t) + vFar * t;
+              img.data[o + c] = clampi(Math.round(v), 0, 255);
+            }
+            img.data[o + 3] = 255;
+          }
+        }
+        octx.putImageData(img, 0, 0);
+        return out;                              // no rule-carrying on texture
+      }
+    }
+
     for (let j = 0; j < h; j++) {
       const dT = j + 1, dB = h - j;
       for (let i = 0; i < w; i++) {
@@ -3559,9 +3667,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const maxBand = (n) => Math.max(3, Math.round(n * 0.22));  // a rule, not a block
 
     // horizontal rules: strong content on the left AND right edge at the same
-    // row (inkLum now measures distance from the background tone)
+    // row (inkLum now measures distance from the background tone). A genuine
+    // rule shows the SAME colour at both ends; and if half the rows look like
+    // "lines", that's texture bleeding through the detector — carry nothing.
+    const sameInk = (A, B, p) => (Math.abs(A.ink[p * 3] - B.ink[p * 3]) + Math.abs(A.ink[p * 3 + 1] - B.ink[p * 3 + 1]) + Math.abs(A.ink[p * 3 + 2] - B.ink[p * 3 + 2])) < 160;
     const rowMask = new Uint8Array(h);
-    for (let j = 0; j < h; j++) rowMask[j] = (L.inkLum[j] > tol && R.inkLum[j] > tol) ? 1 : 0;
+    let rowsOn = 0;
+    for (let j = 0; j < h; j++) { rowMask[j] = (L.inkLum[j] > tol && R.inkLum[j] > tol && sameInk(L, R, j)) ? 1 : 0; rowsOn += rowMask[j]; }
+    if (rowsOn > h * 0.5) rowMask.fill(0);
     runsOf(rowMask, h).forEach(([a, b]) => {
       if (b - a + 1 > maxBand(h)) return;
       for (let j = a; j <= b; j++) {
@@ -3577,7 +3690,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     });
     // vertical rules: strong content on the top AND bottom edge at the same column
     const colMask = new Uint8Array(w);
-    for (let i = 0; i < w; i++) colMask[i] = (T.inkLum[i] > tol && B.inkLum[i] > tol) ? 1 : 0;
+    let colsOn = 0;
+    for (let i = 0; i < w; i++) { colMask[i] = (T.inkLum[i] > tol && B.inkLum[i] > tol && sameInk(T, B, i)) ? 1 : 0; colsOn += colMask[i]; }
+    if (colsOn > w * 0.5) colMask.fill(0);
     runsOf(colMask, w).forEach(([a, b]) => {
       if (b - a + 1 > maxBand(w)) return;
       for (let i = a; i <= b; i++) {

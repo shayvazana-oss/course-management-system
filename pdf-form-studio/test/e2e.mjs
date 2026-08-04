@@ -790,6 +790,47 @@ async function main() {
     return mean < 70;      // dark like the banner (was ~200+ when it grabbed the light text)
   }));
 
+  // textured backgrounds (photos): the cover must keep TEXTURE and respect a
+  // dark↔light boundary it crosses — not smear one mid-grey band with streaks
+  check('cover crossing a photo boundary keeps each side, no smear band', await page.evaluate(() => {
+    const src = document.createElement('canvas');
+    src.width = 320; src.height = 160;
+    const cx = src.getContext('2d');
+    // noisy dark "photo" top half, noisy light paper bottom half
+    const im = cx.createImageData(320, 160);
+    let seed = 12345;
+    const rnd = () => { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let y = 0; y < 160; y++) {
+      for (let x = 0; x < 320; x++) {
+        const o = (y * 320 + x) * 4;
+        const dark = y < 80;
+        const base = dark ? 40 : 235;
+        const n = (rnd() - 0.5) * (dark ? 46 : 24);
+        im.data[o] = Math.max(0, Math.min(255, base + n));
+        im.data[o + 1] = Math.max(0, Math.min(255, base + n * 0.9));
+        im.data[o + 2] = Math.max(0, Math.min(255, base + n * 1.1));
+        im.data[o + 3] = 255;
+      }
+    }
+    cx.putImageData(im, 0, 0);
+    // a wide strip crossing the boundary — the user's failing shape
+    const patch = window.PFS.inpaint.patch(src, 40, 60, 240, 40);
+    if (!patch) return false;
+    const d = patch.getContext('2d').getImageData(0, 0, patch.width, patch.height).data;
+    const rowMean = (j) => {
+      let s = 0;
+      for (let i = 0; i < patch.width; i++) { const o = (j * patch.width + i) * 4; s += 0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]; }
+      return s / patch.width;
+    };
+    const top = (rowMean(1) + rowMean(3)) / 2;         // rows near the dark side
+    const bot = (rowMean(patch.height - 2) + rowMean(patch.height - 4)) / 2;
+    // texture preserved: row variance not zero (mirrored pixels, not flat fill)
+    let varSum = 0, n0 = 0;
+    for (let i = 0; i < patch.width; i++) { const o = (1 * patch.width + i) * 4; const l = 0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]; varSum += (l - top) * (l - top); n0++; }
+    const rowSigma = Math.sqrt(varSum / n0);
+    return top < 100 && bot > 175 && (bot - top) > 60 && rowSigma > 4;
+  }));
+
   // THE seamlessness test: on a real form the paper is rarely pure white, so a
   // flat-colour cover shows up as an obvious rectangle in the exported file even
   // though it looked fine on screen. An `auto` cover must reconstruct the

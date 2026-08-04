@@ -2289,6 +2289,33 @@ async function main() {
     return docId === 'times' && adopted && keptOk && domOk;
   }));
 
+  // the REAL user path: rail button → marquee drag → paste click. The direct-
+  // API test below passed while this exact flow was broken (the marquee's
+  // disarm ran AFTER copyRegion armed the paste) — never again.
+  check('copy-region works through the real rail-button → drag → click flow', await page.evaluate(async () => {
+    const T = window.PFS.__test, ov = T.overlay;
+    ov.clearElements();
+    window.PFS.store.remove('clips');
+    const c = document.querySelector('canvas.pdf'), cx = c.getContext('2d');
+    cx.fillStyle = '#fff'; cx.fillRect(0.1 * c.width, 0.1 * c.height, 0.3 * c.width, 0.1 * c.height);
+    cx.fillStyle = '#1160aa'; cx.fillRect(0.14 * c.width, 0.13 * c.height, 0.18 * c.width, 0.04 * c.height);
+    document.querySelector('.rail-btn[data-tool="clip"]').click();
+    const overlayEl = document.querySelector('.page-wrap .overlay');
+    const r = overlayEl.getBoundingClientRect();
+    const pd = (x, y) => overlayEl.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: r.left + r.width * x, clientY: r.top + r.height * y }));
+    const wm = (x, y) => window.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + r.width * x, clientY: r.top + r.height * y }));
+    pd(0.12, 0.12); wm(0.22, 0.16); wm(0.34, 0.19);
+    window.dispatchEvent(new PointerEvent('pointerup', {}));
+    await new Promise((s) => setTimeout(s, 120));
+    const armedAfterDrag = ov.isPlacing();     // THE regression: this was wiped
+    pd(0.5, 0.5);                              // paste click
+    const img = ov.getElements().find((e) => e.model.kind === 'clip');
+    ov.clearElements();
+    window.PFS.store.remove('clips');
+    ov.setPlacing(null);
+    return armedAfterDrag && !!img && /^data:image\/png/.test(img.model.imgUrl || '');
+  }));
+
   // ---- copy a region of the PAGE and stamp it elsewhere ----
   // On a scan the useful content is pixels (a signature, a filled block that
   // repeats): lifting one and re-placing it beats recreating it by hand.

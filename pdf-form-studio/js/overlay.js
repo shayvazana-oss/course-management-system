@@ -67,8 +67,11 @@
         } else {
           fx = PFS.clamp(fx, 0, 1 - fw); fy = PFS.clamp(fy, 0, 1 - fh);
         }
-        if (cb) cb(index, fx, fy, fw, fh);
+        // disarm BEFORE the callback: a callback may arm a NEW placement of its
+        // own (copy-region arms paste-on-click) — disarming after silently
+        // wiped it, so the paste click did nothing
         if (!sticky) setPlacing(null);
+        if (cb) cb(index, fx, fy, fw, fh);
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);

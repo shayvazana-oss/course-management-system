@@ -1096,7 +1096,7 @@ function tuneReplacementToInk(ctrl) {
   const cx = __tuneCanvas.getContext('2d');
   const meas = (px) => {
     cx.font = (m.bold ? '700 ' : '400 ') + px.toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
-    cx.textBaseline = 'top';
+    cx.textBaseline = 'alphabetic';
     return cx.measureText(text);
   };
   let px = m.fontFrac * REF;
@@ -1108,12 +1108,14 @@ function tuneReplacementToInk(ctrl) {
   tm = meas(px);
   m.fontFrac = px / REF;
   m.fh = m.fontFrac * 1.2;
-  // exporter anchors textBaseline='top' at fy: glyph top = fy − ascent (ascent
-  // is negative under a top baseline — glyphs hang below the anchor). Solve fy
-  // so the typed band lands exactly on the original's; tolerate engines that
-  // report alphabetic-relative ascents by clamping to a sane correction.
-  const corr = PFS.clamp((tm.actualBoundingBoxAscent <= 0 ? tm.actualBoundingBoxAscent : -tm.actualBoundingBoxAscent) / REF, -0.012, 0.004);
-  m.fy = PFS.clamp(tgt.top + corr, 0, 0.98);
+  // editor AND exporter place text as the same CSS line box (line-height 1.15,
+  // baseline at half-leading + font ascent). The typed ink's top inside that
+  // box is halfLead + ascent − actualAscent; solve fy so it lands exactly on
+  // the original band.
+  const fba = isFinite(tm.fontBoundingBoxAscent) && tm.fontBoundingBoxAscent > 0 ? tm.fontBoundingBoxAscent : px * 0.95;
+  const fbd = isFinite(tm.fontBoundingBoxDescent) && tm.fontBoundingBoxDescent >= 0 ? tm.fontBoundingBoxDescent : px * 0.25;
+  const glyphTopInBox = (px * 1.15 - (fba + fbd)) / 2 + fba - tm.actualBoundingBoxAscent;
+  m.fy = PFS.clamp(tgt.top - glyphTopInBox / REF, 0, 0.98);
   m.__tuned = true;
   ctrl.layout();
   return true;

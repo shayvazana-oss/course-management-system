@@ -105,8 +105,10 @@
         node.style.width = 'auto';
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)
-        model.fw = node.offsetWidth / W;
-        model.fh = node.offsetHeight / H;
+        // minus the 2×1px selection border, which is chrome, not content — the
+        // exporter right-anchors at fx+fw, so fw must be the CONTENT width
+        model.fw = Math.max(0, node.offsetWidth - 2) / W;
+        model.fh = Math.max(0, node.offsetHeight - 2) / H;
       }
     }
 

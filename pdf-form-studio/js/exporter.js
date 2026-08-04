@@ -97,7 +97,6 @@
     const fontPx = m.fontFrac * ch;
     const boxW = m.fw * cw;
     ctx.direction = 'rtl';
-    ctx.textBaseline = 'top';
     ctx.fillStyle = m.color || '#111';
     // the element's own face when it adopted the document's (fontmatch), else
     // the app font — the exported raster must match what the editor showed
@@ -112,7 +111,23 @@
     ctx.textAlign = align;
     const lines = String(m.text ?? '').split('\n');
     const lineH = fontPx * 1.15;
-    lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + i * lineH));
+    // Draw EXACTLY where the editor showed the text. The editor is a CSS line
+    // box (line-height 1.15): baseline = half-leading + font ascent from the
+    // box top. `textBaseline:'top'` uses a different origin — with fonts whose
+    // ascent+descent exceed 1.15em (Heebo: ~1.42) the export drifted ~0.14em
+    // below the on-screen position: "בעורך תקין, בייצוא הבאג נראה לעין".
+    let probe = null;
+    try { probe = ctx.measureText('אAg1'); } catch (e) {}
+    if (probe && isFinite(probe.fontBoundingBoxAscent) && probe.fontBoundingBoxAscent > 0) {
+      const asc = probe.fontBoundingBoxAscent, desc = probe.fontBoundingBoxDescent || 0;
+      const halfLead = (lineH - (asc + desc)) / 2;
+      ctx.textBaseline = 'alphabetic';
+      lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + halfLead + asc + i * lineH));
+    } else {
+      // engine without font-box metrics — the historical convention
+      ctx.textBaseline = 'top';
+      lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + i * lineH));
+    }
   }
 
   // Crop the overlay to the elements' bounding box (padded), so an un-rotated

@@ -708,6 +708,47 @@ async function main() {
     return ok;
   }));
 
+  // editor↔export parity: the exported raster must place glyph ink exactly
+  // where the editor's CSS line box shows it ("בעורך תקין, בייצוא הבאג נראה")
+  check('exported text lands exactly where the editor showed it', await page.evaluate(async () => {
+    const { PDFDocument, rgb } = window.PDFLib;
+    const W = 400, H = 500;
+    const d = await PDFDocument.create();
+    d.addPage([W, H]).drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
+    const bytes = await d.save();
+    const fy = 0.3, fontFrac = 0.04, text = 'Tg160';
+    const models = [{ type: 'text', kind: 'text', page: 0, fx: 0.2, fy, fw: 0.3, fh: 0.05,
+      fontFrac, color: '#000000', bold: false, align: 'left', text }];
+    const out = await window.PFS.exporter.exportPdf(bytes, models, {});
+    const doc = await window.pdfjsLib.getDocument({ data: new Uint8Array(out), disableFontFace: true }).promise;
+    const p1 = await doc.getPage(1);
+    const vp = p1.getViewport({ scale: 2 });
+    const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    const cx2 = c.getContext('2d');
+    await p1.render({ canvasContext: cx2, viewport: vp }).promise;
+    // find the ink's top row in the raster
+    const data = cx2.getImageData(0, 0, c.width, c.height).data;
+    let inkTop = -1;
+    for (let y = 0; y < c.height && inkTop < 0; y++) {
+      for (let x = 0; x < c.width; x++) {
+        const i = (y * c.width + x) * 4;
+        if (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] < 128) { inkTop = y; break; }
+      }
+    }
+    if (inkTop < 0) return 'no-ink';   // fontless env — cannot judge
+    // the CSS expectation: box top + halfLead + ascent − actualAscent
+    const fontPx = fontFrac * c.height;
+    const probe = document.createElement('canvas').getContext('2d');
+    probe.font = '400 ' + fontPx + 'px Heebo, sans-serif';
+    probe.textBaseline = 'alphabetic';
+    const tm = probe.measureText(text);
+    if (!(tm.fontBoundingBoxAscent > 0)) return 'no-metrics';
+    const expTop = fy * c.height
+      + (fontPx * 1.15 - (tm.fontBoundingBoxAscent + tm.fontBoundingBoxDescent)) / 2
+      + tm.fontBoundingBoxAscent - tm.actualBoundingBoxAscent;
+    return Math.abs(inkTop - expTop) <= 2.5 ? true : 'off-by-' + (inkTop - expTop).toFixed(1);
+  }) === true);
+
   // a hand-drawn drag routinely clips half a digit; the cover must finish the
   // token it touched (no surviving sliver) yet stop at the next word
   check('replace cover finishes a half-covered token and stops at word gaps', await page.evaluate(() => {

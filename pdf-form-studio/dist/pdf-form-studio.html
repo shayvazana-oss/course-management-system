@@ -323,7 +323,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .el { position: absolute; box-sizing: border-box; cursor: move; border: 1px dashed transparent; border-radius: 3px; user-select: none; touch-action: none; }
 .el:hover { border-color: rgba(30,78,140,.4); z-index: 6; }
 .el.selected { border-color: var(--brand); border-style: solid; box-shadow: 0 0 0 2px rgba(30,78,140,.14); }
-.el.text { display: flex; align-items: flex-start; white-space: pre; line-height: 1.15; padding: 0; }
+/* margin -1px cancels the 1px selection border: the CONTENT (what exports)
+ * sits exactly at (fx,fy), so editor and exported PDF agree to the pixel */
+.el.text { display: flex; align-items: flex-start; white-space: pre; line-height: 1.15; padding: 0; margin: -1px; }
 .el.text .txt { outline: none; width: 100%; min-width: 6px; background: transparent; direction: rtl; unicode-bidi: plaintext; white-space: pre; overflow: visible; caret-color: var(--brand); }
 .el.text .txt:empty:before { content: 'טקסט…'; color: var(--ink-4); }
 .el.image img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
@@ -4539,8 +4541,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         node.style.width = 'auto';
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)
-        model.fw = node.offsetWidth / W;
-        model.fh = node.offsetHeight / H;
+        // minus the 2×1px selection border, which is chrome, not content — the
+        // exporter right-anchors at fx+fw, so fw must be the CONTENT width
+        model.fw = Math.max(0, node.offsetWidth - 2) / W;
+        model.fh = Math.max(0, node.offsetHeight - 2) / H;
       }
     }
 
@@ -5545,7 +5549,6 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const fontPx = m.fontFrac * ch;
     const boxW = m.fw * cw;
     ctx.direction = 'rtl';
-    ctx.textBaseline = 'top';
     ctx.fillStyle = m.color || '#111';
     // the element's own face when it adopted the document's (fontmatch), else
     // the app font — the exported raster must match what the editor showed
@@ -5560,7 +5563,23 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     ctx.textAlign = align;
     const lines = String(m.text ?? '').split('\n');
     const lineH = fontPx * 1.15;
-    lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + i * lineH));
+    // Draw EXACTLY where the editor showed the text. The editor is a CSS line
+    // box (line-height 1.15): baseline = half-leading + font ascent from the
+    // box top. `textBaseline:'top'` uses a different origin — with fonts whose
+    // ascent+descent exceed 1.15em (Heebo: ~1.42) the export drifted ~0.14em
+    // below the on-screen position: "בעורך תקין, בייצוא הבאג נראה לעין".
+    let probe = null;
+    try { probe = ctx.measureText('אAg1'); } catch (e) {}
+    if (probe && isFinite(probe.fontBoundingBoxAscent) && probe.fontBoundingBoxAscent > 0) {
+      const asc = probe.fontBoundingBoxAscent, desc = probe.fontBoundingBoxDescent || 0;
+      const halfLead = (lineH - (asc + desc)) / 2;
+      ctx.textBaseline = 'alphabetic';
+      lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + halfLead + asc + i * lineH));
+    } else {
+      // engine without font-box metrics — the historical convention
+      ctx.textBaseline = 'top';
+      lines.forEach((ln, i) => ctx.fillText(ln, anchorX, y + i * lineH));
+    }
   }
 
   // Crop the overlay to the elements' bounding box (padded), so an un-rotated
@@ -8427,7 +8446,7 @@ function tuneReplacementToInk(ctrl) {
   const cx = __tuneCanvas.getContext('2d');
   const meas = (px) => {
     cx.font = (m.bold ? '700 ' : '400 ') + px.toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
-    cx.textBaseline = 'top';
+    cx.textBaseline = 'alphabetic';
     return cx.measureText(text);
   };
   let px = m.fontFrac * REF;
@@ -8439,12 +8458,14 @@ function tuneReplacementToInk(ctrl) {
   tm = meas(px);
   m.fontFrac = px / REF;
   m.fh = m.fontFrac * 1.2;
-  // exporter anchors textBaseline='top' at fy: glyph top = fy − ascent (ascent
-  // is negative under a top baseline — glyphs hang below the anchor). Solve fy
-  // so the typed band lands exactly on the original's; tolerate engines that
-  // report alphabetic-relative ascents by clamping to a sane correction.
-  const corr = PFS.clamp((tm.actualBoundingBoxAscent <= 0 ? tm.actualBoundingBoxAscent : -tm.actualBoundingBoxAscent) / REF, -0.012, 0.004);
-  m.fy = PFS.clamp(tgt.top + corr, 0, 0.98);
+  // editor AND exporter place text as the same CSS line box (line-height 1.15,
+  // baseline at half-leading + font ascent). The typed ink's top inside that
+  // box is halfLead + ascent − actualAscent; solve fy so it lands exactly on
+  // the original band.
+  const fba = isFinite(tm.fontBoundingBoxAscent) && tm.fontBoundingBoxAscent > 0 ? tm.fontBoundingBoxAscent : px * 0.95;
+  const fbd = isFinite(tm.fontBoundingBoxDescent) && tm.fontBoundingBoxDescent >= 0 ? tm.fontBoundingBoxDescent : px * 0.25;
+  const glyphTopInBox = (px * 1.15 - (fba + fbd)) / 2 + fba - tm.actualBoundingBoxAscent;
+  m.fy = PFS.clamp(tgt.top - glyphTopInBox / REF, 0, 0.98);
   m.__tuned = true;
   ctrl.layout();
   return true;

@@ -669,6 +669,67 @@ async function main() {
     return sizeOk && lineOk && colOk;
   }));
 
+  // closed loop: once text is TYPED, its rendered ink is measured in the
+  // element's own font and scaled/anchored onto the original band — measured,
+  // not guessed ("זה עדיין יוצא לא אחיד")
+  check('replacement self-tunes typed ink onto the original band', await page.evaluate(() => {
+    const T = window.PFS.__test, ov = T.overlay;
+    ov.clearElements();
+    const c = document.querySelector('canvas.pdf'), cx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    cx.fillStyle = '#fff'; cx.fillRect(0.30 * W, 0.60 * H, 0.30 * W, 0.08 * H);
+    const bandTop = Math.round(0.63 * H), bandH = 13;
+    cx.fillStyle = '#333333';
+    for (let x = Math.round(0.34 * W); x < 0.52 * W; x += 6) cx.fillRect(x, bandTop, 2, bandH);
+    T.placeReplacement(0, 0.32, 0.61, 0.24, 0.06);
+    const txt = ov.getElements().find((e) => e.model.type === 'text');
+    if (!txt) return false;
+    // capability probe: do canvas text metrics work in this environment?
+    const probe = document.createElement('canvas').getContext('2d');
+    probe.textBaseline = 'top';
+    probe.font = '400 100px Heebo, sans-serif';
+    const ptm = probe.measureText('160');
+    const capable = ptm.width > 10 && (ptm.actualBoundingBoxAscent + ptm.actualBoundingBoxDescent) > 20;
+    txt.model.text = '160';
+    const tuned = T.tuneReplacement(txt);
+    let ok;
+    if (!capable) {
+      ok = tuned === false;              // degenerate metrics → estimate stands
+    } else {
+      const px = txt.model.fontFrac * 1000;
+      probe.font = '400 ' + px.toFixed(2) + 'px ' + (txt.model.font || 'Heebo, sans-serif');
+      const tm2 = probe.measureText('160');
+      const got = (tm2.actualBoundingBoxAscent + tm2.actualBoundingBoxDescent) / 1000;
+      const want = bandH / H;            // typed ink height == original ink height
+      ok = tuned === true && Math.abs(got - want) / want < 0.06
+        && Math.abs(txt.model.fy - bandTop / H) < 0.013;
+    }
+    ov.clearElements();
+    return ok;
+  }));
+
+  // a hand-drawn drag routinely clips half a digit; the cover must finish the
+  // token it touched (no surviving sliver) yet stop at the next word
+  check('replace cover finishes a half-covered token and stops at word gaps', await page.evaluate(() => {
+    const T = window.PFS.__test, ov = T.overlay;
+    ov.clearElements();
+    const c = document.querySelector('canvas.pdf'), cx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    cx.fillStyle = '#fff'; cx.fillRect(0.26 * W, 0.70 * H, 0.45 * W, 0.08 * H);
+    const bandTop = Math.round(0.73 * H), bandH = 13;
+    cx.fillStyle = '#333333';
+    for (let x = Math.round(0.30 * W); x < 0.50 * W; x += 4) cx.fillRect(x, bandTop, 2, bandH); // token A
+    for (let x = Math.round(0.56 * W); x < 0.64 * W; x += 4) cx.fillRect(x, bandTop, 2, bandH); // token B, one word-gap away
+    T.placeReplacement(0, 0.32, 0.71, 0.08, 0.055);   // drag grazes only PART of token A
+    const cover = ov.getElements().find((e) => e.model.kind === 'whiteout');
+    const ok = cover
+      && cover.model.fx <= 0.302 && cover.model.fx >= 0.27           // finished A leftward
+      && (cover.model.fx + cover.model.fw) >= 0.497                  // finished A rightward
+      && (cover.model.fx + cover.model.fw) <= 0.545;                 // never ate token B
+    ov.clearElements();
+    return ok;
+  }));
+
   // THE seamlessness test: on a real form the paper is rarely pure white, so a
   // flat-colour cover shows up as an obvious rectangle in the exported file even
   // though it looked fine on screen. An `auto` cover must reconstruct the

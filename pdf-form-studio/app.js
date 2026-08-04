@@ -202,7 +202,7 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -947,7 +947,9 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
   try { data = v.canvas.getContext('2d').getImageData(x0, y0, w, h).data; } catch (e) { return null; }
   const rows = new Array(h).fill(0);
   // colour comes from the DARKEST pixels only — anti-alias edges are the ink
-  // blended with paper, and averaging them in reads a black print as mid-grey
+  // blended with paper, and averaging them in reads a black print as mid-grey.
+  // Stroke runs use the same strict cut: the AA halo widens every stem by a
+  // pixel each side, which at small sizes made REGULAR text measure as bold.
   let rS = 0, gS = 0, bS = 0, inkN = 0, rL = 0, gL = 0, bL = 0, looseN = 0;
   const runs = [];
   for (let y = 0; y < h; y++) {
@@ -956,11 +958,14 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
       const i = (y * w + x) * 4;
       const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
       const dark = data[i + 3] > 200 && lum < 185;
+      const core = dark && lum < 120;
       if (dark) {
-        rows[y]++; run++;
+        rows[y]++;
         if (lum < 100) { rS += data[i]; gS += data[i + 1]; bS += data[i + 2]; inkN++; }
         else { rL += data[i]; gL += data[i + 1]; bL += data[i + 2]; looseN++; }
-      } else if (run) { runs.push(run); run = 0; }
+      }
+      if (core) run++;
+      else if (run) { runs.push(run); run = 0; }
     }
     if (run && run < w) runs.push(run);
   }
@@ -991,8 +996,48 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
     bandTopFrac: (y0 + best.top) / chh,
     bandFrac: bandPx / chh,
     color,
-    bold: stroke / bandPx > 0.17
+    // bold needs resolution to be judged: under ~10px of glyph height a single
+    // AA'd stem already spans a quarter of the band. When unsure, regular —
+    // a light value in a bold line whispers; a bold one in a light line shouts.
+    bold: bandPx >= 10 && stroke / bandPx > 0.2
   };
+}
+
+/* extendCoverToInk — finish the token the drag touched.
+ * A hand-drawn rectangle over "320" routinely clips half a digit; the sliver
+ * that survives the cover is what screams "edited". Walk outward from the drag
+ * edges along the measured glyph band and keep extending over ink until a real
+ * inter-word gap (or a sane cap), so a partially-covered word/number is always
+ * erased whole. Returns {fx, fw} for the cover. */
+function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
+  const v = pdfView.viewList()[pageIndex];
+  if (!v || !v.canvas || !v.canvas.width) return { fx, fw };
+  const cw = v.canvas.width, chh = v.canvas.height;
+  let data, gx0, gw;
+  const bandTop = Math.max(0, Math.round(band.top * chh) - 1);
+  const bandH = Math.max(3, Math.round(band.h * chh) + 2);
+  const maxExt = Math.round(cw * 0.25);            // never run away across the page
+  gx0 = Math.max(0, Math.round(fx * cw) - maxExt);
+  gw = Math.min(cw - gx0, Math.round(fw * cw) + 2 * maxExt);
+  try { data = v.canvas.getContext('2d').getImageData(gx0, bandTop, gw, bandH).data; } catch (e) { return { fx, fw }; }
+  const colInk = (x) => {                          // x relative to gx0
+    for (let y = 0; y < bandH; y++) {
+      const i = (y * gw + x) * 4;
+      if (data[i + 3] > 200 && (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) < 160) return true;
+    }
+    return false;
+  };
+  // the inter-word space is ~0.3 of the glyph height; inter-letter air is well
+  // under it (same ratio the RTL line assembler uses to decide where words end)
+  const gapPx = Math.max(3, Math.round(band.h * chh * 0.30));
+  let left = Math.round(fx * cw), right = Math.round((fx + fw) * cw);
+  for (let x = left - 1, white = 0; x >= gx0 && left - x <= maxExt && white < gapPx; x--) {
+    if (colInk(x - gx0)) { left = x; white = 0; } else white++;
+  }
+  for (let x = right + 1, white = 0; x < gx0 + gw && x - right <= maxExt && white < gapPx; x++) {
+    if (colInk(x - gx0)) { right = x + 1; white = 0; } else white++;
+  }
+  return { fx: Math.max(0, left - 2) / cw, fw: Math.min(cw, right + 2 - left + 4) / cw };
 }
 
 // "Replace" — one gesture over existing content: cover it with a paper-matched
@@ -1001,8 +1046,10 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
   const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);   // before covering
-  const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
-  overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg, auto: true });
+  // the cover finishes any token the drag only grazed — no surviving slivers
+  const cover = ink ? extendCoverToInk(pageIndex, fx, fy, fw, fh, { top: ink.bandTopFrac, h: ink.bandFrac }) : { fx, fw };
+  const bg = pdfView.sampleBg(pageIndex, cover.fx, fy, cover.fw, fh) || '#ffffff';
+  overlay.addModelAt('whiteout', pageIndex, { fx: cover.fx, fy, fw: cover.fw, fh, color: bg, auto: true });
   let fontFrac, textH, ty;
   if (ink) {
     // match the print that was just covered: same glyph size (a Hebrew/digit
@@ -1022,11 +1069,67 @@ function placeReplacement(pageIndex, fx, fy, fw, fh) {
   if (ink) {
     if (ink.color) extra.color = ink.color;
     extra.bold = ink.bold;
+    // the measured band of the ORIGINAL print — the visual truth the typed
+    // replacement must land on (the closed-loop tuner below aims at it)
+    extra.__band = { top: ink.bandTopFrac, h: ink.bandFrac };
   } else if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
   const ctrl = overlay.addModelAt('text', pageIndex, extra, true);
   // digital PDFs know better than pixels: the text layer carries the covered
   // run's EXACT em size and baseline — refine the estimate the moment it loads
   refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh);
+  if (ctrl && extra.__band) attachReplacementTuner(ctrl);
+}
+
+/* Closed-loop match: predictions (em size, family metrics) still leave a
+ * visible off-by-a-bit — Heebo's digits fill the em differently than the
+ * form's font. So once actual text exists, MEASURE it: canvas TextMetrics of
+ * the typed string in the element's own font, scaled until its ink band equals
+ * the original's, then anchored so the bands coincide. Measured, not guessed. */
+let __tuneCanvas = null;
+function tuneReplacementToInk(ctrl) {
+  const m = ctrl.model, tgt = m.__band;
+  if (!tgt || !(tgt.h > 0)) return false;
+  const text = String(m.text || '').trim();
+  if (!text) return false;
+  const REF = 1000;                       // fractions are linear — any ref height works
+  __tuneCanvas = __tuneCanvas || document.createElement('canvas');
+  const cx = __tuneCanvas.getContext('2d');
+  const meas = (px) => {
+    cx.font = (m.bold ? '700 ' : '400 ') + px.toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
+    cx.textBaseline = 'top';
+    return cx.measureText(text);
+  };
+  let px = m.fontFrac * REF;
+  let tm = meas(px);
+  let bandH = tm.actualBoundingBoxAscent + tm.actualBoundingBoxDescent;
+  // degenerate metrics (fontless headless, exotic engines) → keep the estimate
+  if (!(tm.width > 0) || !(bandH > px * 0.2)) return false;
+  px = Math.max(5, Math.min(REF * 0.08, px * (tgt.h * REF) / bandH));
+  tm = meas(px);
+  m.fontFrac = px / REF;
+  m.fh = m.fontFrac * 1.2;
+  // exporter anchors textBaseline='top' at fy: glyph top = fy − ascent (ascent
+  // is negative under a top baseline — glyphs hang below the anchor). Solve fy
+  // so the typed band lands exactly on the original's; tolerate engines that
+  // report alphabetic-relative ascents by clamping to a sane correction.
+  const corr = PFS.clamp((tm.actualBoundingBoxAscent <= 0 ? tm.actualBoundingBoxAscent : -tm.actualBoundingBoxAscent) / REF, -0.012, 0.004);
+  m.fy = PFS.clamp(tgt.top + corr, 0, 0.98);
+  m.__tuned = true;
+  ctrl.layout();
+  return true;
+}
+function attachReplacementTuner(ctrl) {
+  const txtEl = ctrl.node && ctrl.node.querySelector('.txt');
+  if (!txtEl || typeof MutationObserver === 'undefined') return;
+  let t = null;
+  const obs = new MutationObserver(() => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      if (!ctrl.node.isConnected) { obs.disconnect(); return; }
+      tuneReplacementToInk(ctrl);
+    }, 250);
+  });
+  obs.observe(txtEl, { characterData: true, childList: true, subtree: true });
 }
 
 async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
@@ -1054,10 +1157,13 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
     });
     if (!best) return;
     const ff = PFS.clamp((best.fontH * 0.95) / H, 0.006, 0.08);
-    // same top/size convention as detected fields — exports land on the line
-    ctrl.model.fontFrac = ff;
-    ctrl.model.fh = (best.fontH * 1.2) / H;
-    ctrl.model.fy = PFS.clamp(best.top / H, 0, 1 - ctrl.model.fh);
+    // same top/size convention as detected fields — exports land on the line.
+    // Never clobber a closed-loop tune that already ran (user typed fast).
+    if (!ctrl.model.__tuned) {
+      ctrl.model.fontFrac = ff;
+      ctrl.model.fh = (best.fontH * 1.2) / H;
+      ctrl.model.fy = PFS.clamp(best.top / H, 0, 1 - ctrl.model.fh);
+    }
     // and the covered run's own typeface — the last thing that gave a
     // replacement away once size, line and colour already matched
     const fm = resolveFont(best.fontName);

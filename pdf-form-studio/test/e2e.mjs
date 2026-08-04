@@ -629,6 +629,9 @@ async function main() {
   check('replace covers the old data and drops an editable text box in place', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;
     ov.clearElements();
+    // blank paper under the drag → the box-sized fallback path (deterministic)
+    const c0 = document.querySelector('canvas.pdf'), cx0 = c0.getContext('2d');
+    cx0.fillStyle = '#fff'; cx0.fillRect(0.33 * c0.width, 0.38 * c0.height, 0.26 * c0.width, 0.09 * c0.height);
     window.PFS.__test.placeReplacement(0, 0.35, 0.4, 0.22, 0.045);
     const els = ov.getElements();
     const cover = els.find((e) => e.model.kind === 'whiteout');
@@ -640,6 +643,30 @@ async function main() {
       && txt.model.fy >= cover.model.fy - 1e-6 && (txt.model.fy + txt.model.fh) <= (cover.model.fy + cover.model.fh) + 1e-3;
     ov.clearElements();
     return coverOk && txtOk;
+  }));
+
+  // replacement must MATCH THE PRINT it covers — size, line, colour, weight —
+  // not the sloppy drag box ("שיניתי נתון וזה נראה לעין שזה לא אותו פונט")
+  check('replace matches the size, line and colour of the print it covers', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    ov.clearElements();
+    const c = document.querySelector('canvas.pdf'), cx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    // a printed value: dark-grey glyph dashes, 13px tall, on white paper
+    cx.fillStyle = '#fff'; cx.fillRect(0.30 * W, 0.60 * H, 0.30 * W, 0.08 * H);
+    const bandTop = Math.round(0.63 * H), bandH = 13;
+    cx.fillStyle = '#444444';
+    for (let x = Math.round(0.34 * W); x < 0.52 * W; x += 6) cx.fillRect(x, bandTop, 2, bandH);
+    window.PFS.__test.placeReplacement(0, 0.32, 0.61, 0.24, 0.06);   // sloppy drag around it
+    const txt = ov.getElements().find((e) => e.model.type === 'text');
+    const expFont = (bandH / H) / 0.66;
+    const bandCy = (bandTop + bandH / 2) / H;
+    const sizeOk = txt && Math.abs(txt.model.fontFrac - expFont) / expFont < 0.25;   // print size, not box size (box → 0.037)
+    const lineOk = txt && Math.abs((txt.model.fy + txt.model.fh / 2) - bandCy) < 0.012;
+    const col = txt && txt.model.color ? parseInt(txt.model.color.slice(1, 3), 16) : 0;
+    const colOk = col > 30 && col < 130 && !txt.model.bold;   // dark grey like the print — not black, not bold
+    ov.clearElements();
+    return sizeOk && lineOk && colOk;
   }));
 
   // THE seamlessness test: on a real form the paper is rarely pure white, so a
@@ -2084,6 +2111,30 @@ async function main() {
       && gdRes.els.includes('תשובה אחת') && gdRes.els.includes('תשובה שתיים')
       && gdRes.reopened && gdRes.escClosed);
   }
+
+  // on a DIGITAL pdf, replace reads the covered run's exact em + baseline from
+  // the text layer — pixel guessing is only the scanned-page fallback
+  check("replace on a digital PDF adopts the covered text's exact em size", await page.evaluate(async () => {
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const d = await PDFDocument.create(); const pg = d.addPage([595, 842]);
+    pg.drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+    const f = await d.embedFont(StandardFonts.Helvetica);
+    pg.drawText('Academic hours: 320', { x: 60, y: 620, size: 13, font: f, color: rgb(0, 0, 0) });
+    const T = window.PFS.__test;
+    await T.openPdfFile(new File([await d.save()], 'em.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 2000));
+    const ov = T.overlay;
+    ov.clearElements();
+    T.placeReplacement(0, 158 / 595, (842 - 636) / 842, 50 / 595, 24 / 842);
+    await new Promise((r) => setTimeout(r, 800));   // async text-layer refine
+    const txt = ov.getElements().find((e) => e.model.type === 'text');
+    const expFF = (13 * 0.95) / 842;                 // the run was drawn at 13pt
+    const expTop = (842 - 620 - 13) / 842;           // its top line
+    const ok = txt && Math.abs(txt.model.fontFrac - expFF) / expFF < 0.08
+      && Math.abs(txt.model.fy - expTop) < 0.008;
+    ov.clearElements();
+    return ok;
+  }));
 
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {

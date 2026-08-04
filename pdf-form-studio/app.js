@@ -907,22 +907,133 @@ function activateTool(btn, tool) {
   });
 }
 
+// Measure the INK being replaced (before it's covered): the glyph band's
+// height, its vertical position, colour and stroke weight. The drag rectangle
+// is sloppy; the print underneath is not — matching the print is what makes a
+// replacement read as "edited in place" instead of a patch in the wrong size.
+function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
+  const v = pdfView.viewList()[pageIndex];
+  if (!v || !v.canvas || !v.canvas.width) return null;
+  const cw = v.canvas.width, chh = v.canvas.height;
+  const x0 = Math.max(0, Math.round(fx * cw)), y0 = Math.max(0, Math.round(fy * chh));
+  const w = Math.min(cw - x0, Math.round(fw * cw)), h = Math.min(chh - y0, Math.round(fh * chh));
+  if (w < 4 || h < 4) return null;
+  let data;
+  try { data = v.canvas.getContext('2d').getImageData(x0, y0, w, h).data; } catch (e) { return null; }
+  const rows = new Array(h).fill(0);
+  // colour comes from the DARKEST pixels only — anti-alias edges are the ink
+  // blended with paper, and averaging them in reads a black print as mid-grey
+  let rS = 0, gS = 0, bS = 0, inkN = 0, rL = 0, gL = 0, bL = 0, looseN = 0;
+  const runs = [];
+  for (let y = 0; y < h; y++) {
+    let run = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const dark = data[i + 3] > 200 && lum < 185;
+      if (dark) {
+        rows[y]++; run++;
+        if (lum < 100) { rS += data[i]; gS += data[i + 1]; bS += data[i + 2]; inkN++; }
+        else { rL += data[i]; gL += data[i + 1]; bL += data[i + 2]; looseN++; }
+      } else if (run) { runs.push(run); run = 0; }
+    }
+    if (run && run < w) runs.push(run);
+  }
+  // glyph rows: some ink, but not a solid rule/border row
+  const glyph = [];
+  rows.forEach((n, y) => { if (n > 1 && n < w * 0.9) glyph.push(y); });
+  if (!glyph.length) return null;
+  // the ink-heaviest contiguous row-run (tolerating anti-alias gaps) — so a
+  // drag that caught two lines still measures ONE line, not a giant band
+  let best = null, cur = [glyph[0]];
+  for (let k = 1; k <= glyph.length; k++) {
+    if (k < glyph.length && glyph[k] - glyph[k - 1] <= 2) { cur.push(glyph[k]); continue; }
+    const ink = cur.reduce((a, y) => a + rows[y], 0);
+    if (!best || ink > best.ink) best = { top: cur[0], bot: cur[cur.length - 1], ink };
+    cur = [glyph[k]];
+  }
+  const bandPx = best.bot - best.top + 1;
+  if (bandPx < 4) return null;
+  // stroke weight ≈ median horizontal dark-run → regular vs bold
+  runs.sort((a, b) => a - b);
+  const stroke = runs.length ? runs[Math.floor(runs.length / 2)] : 0;
+  const n = inkN || looseN;
+  const sums = inkN ? [rS, gS, bS] : [rL, gL, bL];
+  const color = n
+    ? '#' + sums.map((s) => Math.max(0, Math.min(255, Math.round(s / n))).toString(16).padStart(2, '0')).join('')
+    : null;
+  return {
+    bandTopFrac: (y0 + best.top) / chh,
+    bandFrac: bandPx / chh,
+    color,
+    bold: stroke / bandPx > 0.17
+  };
+}
+
 // "Replace" — one gesture over existing content: cover it with a paper-matched
 // box (seamless erase), then drop an empty text box in the same spot, focused so
 // the new value can be typed immediately. The result reads like edited-in-place.
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
+  const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);   // before covering
   const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh) || '#ffffff';
   overlay.addModelAt('whiteout', pageIndex, { fx, fy, fw, fh, color: bg, auto: true });
-  // size the text to the covered box, vertically centred within it
-  const fontFrac = clamp(fh * 0.62, 0.01, 0.06);
-  const textH = fontFrac * 1.2;
-  const extra = {
-    fx, fy: clamp(fy + (fh - textH) / 2, 0, 1 - textH),
-    fw, fh: textH, fontFrac, align: 'right'
-  };
-  if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
-  overlay.addModelAt('text', pageIndex, extra, true);
+  let fontFrac, textH, ty;
+  if (ink) {
+    // match the print that was just covered: same glyph size (a Hebrew/digit
+    // band is ~0.66 of the em square), centred on the SAME line, same colour
+    // and weight — not the size of the drag box or the last-used style
+    fontFrac = clamp(ink.bandFrac / 0.66, 0.008, 0.05);
+    textH = fontFrac * 1.2;
+    ty = clamp(ink.bandTopFrac + ink.bandFrac / 2 - textH / 2,
+               fy - 0.004, Math.max(fy - 0.004, fy + fh - textH + 0.004));
+  } else {
+    // nothing measurable under the box → size to the box, as before
+    fontFrac = clamp(fh * 0.62, 0.01, 0.06);
+    textH = fontFrac * 1.2;
+    ty = clamp(fy + (fh - textH) / 2, 0, 1 - textH);
+  }
+  const extra = { fx, fy: ty, fw, fh: textH, fontFrac, align: 'right' };
+  if (ink) {
+    if (ink.color) extra.color = ink.color;
+    extra.bold = ink.bold;
+  } else if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
+  const ctrl = overlay.addModelAt('text', pageIndex, extra, true);
+  // digital PDFs know better than pixels: the text layer carries the covered
+  // run's EXACT em size and baseline — refine the estimate the moment it loads
+  refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh);
+}
+
+async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
+  try {
+    const doc = pdfView.getDoc();
+    if (!doc || !ctrl) return;
+    const page = await doc.getPage(pageIndex + 1);
+    const vp = page.getViewport({ scale: 1, rotation: page.rotate });
+    const tc = await page.getTextContent();
+    const W = vp.width, H = vp.height;
+    const x0 = fx * W, x1 = (fx + fw) * W, y0 = fy * H, y1 = (fy + fh) * H;
+    let best = null;
+    tc.items.forEach((it) => {
+      if (!it.str || !it.str.trim()) return;
+      const tx = pdfjsLib.Util.transform(vp.transform, it.transform);
+      const fontH = Math.hypot(tx[2], tx[3]) || Math.abs(tx[3]) || 0;
+      if (!fontH) return;
+      const left = tx[4], top = tx[5] - fontH, w = (it.width || 0);
+      const ox = Math.min(x1, left + w) - Math.max(x0, left);
+      const oy = Math.min(y1, tx[5]) - Math.max(y0, top);
+      if (ox <= 0 || oy <= 0) return;
+      const score = ox * oy;
+      if (!best || score > best.score) best = { score, fontH, top };
+    });
+    if (!best) return;
+    const ff = PFS.clamp((best.fontH * 0.95) / H, 0.006, 0.08);
+    // same top/size convention as detected fields — exports land on the line
+    ctrl.model.fontFrac = ff;
+    ctrl.model.fh = (best.fontH * 1.2) / H;
+    ctrl.model.fy = PFS.clamp(best.top / H, 0, 1 - ctrl.model.fh);
+    ctrl.layout();
+  } catch (e) { /* scanned page / race with unload — the pixel estimate stands */ }
 }
 
 function armImagePlacement(kind, item) {

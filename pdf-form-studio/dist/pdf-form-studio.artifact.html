@@ -3427,10 +3427,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     if (!allLum.length) return null;
     allLum.sort((a, b) => a - b);
     const q = (p) => allLum[clampi(Math.floor(allLum.length * p), 0, allLum.length - 1)];
-    const paperLum = q(0.75);                 // paper dominates the light end
-    const darkLum = q(0.02);
-    // anything this much darker than paper is ink (a glyph or a rule line)
-    const inkCut = paperLum - Math.max(26, (paperLum - darkLum) * 0.35);
+    // The background is the MAJORITY tone, not the light tone. Classic paper is
+    // light-with-dark-ink, but a dark banner carries LIGHT text — assuming
+    // "paper is bright" filled those covers with the white of the letters and
+    // stamped a glowing patch on the dark area. Median = background either way;
+    // content is whatever sits far from it, in either direction.
+    const bgLum = q(0.5);
+    const spread = Math.max(1, q(0.9) - q(0.1));
+    const tol = Math.max(26, spread * 0.35);
+    const isBg = (lu) => Math.abs(lu - bgLum) < tol;
 
     // per-position: the average of PAPER pixels, and the darkest pixel (ink probe)
     const mkArrays = (len) => ({
@@ -3456,7 +3461,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const { d, gw, gh, ox, oy } = band;
       const steps = axis ? gw : gh;           // thickness of the ring
       for (let p = 0; p < len; p++) {
-        let r = 0, g = 0, b = 0, n = 0, minL = 1e9, mr = 0, mg = 0, mb = 0;
+        let r = 0, g = 0, b = 0, n = 0, bestD = -1, mr = 0, mg = 0, mb = 0;
         for (let k = 0; k < steps; k++) {
           const px = axis ? k : (p - ox), py = axis ? (p - oy) : k;
           if (px < 0 || py < 0 || px >= gw || py >= gh) continue;
@@ -3464,15 +3469,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           if (d[o + 3] < 8) continue;
           const lu = lumOf(d[o], d[o + 1], d[o + 2]);
           const depth = innerLast ? (steps - 1 - k) : k;   // distance from the region
-          if (depth < probeDepth && lu < minL) { minL = lu; mr = d[o]; mg = d[o + 1]; mb = d[o + 2]; }
-          if (lu > inkCut) {                  // paper — feeds the interpolation
+          // content probe: the pixel most DISTANT from the background tone —
+          // dark ink on paper, light lettering on a dark banner, either way
+          const dist = Math.abs(lu - bgLum);
+          if (depth < probeDepth && dist > bestD) { bestD = dist; mr = d[o]; mg = d[o + 1]; mb = d[o + 2]; }
+          if (isBg(lu)) {                     // background — feeds the interpolation
             r += d[o]; g += d[o + 1]; b += d[o + 2]; n++;
             gpr += d[o]; gpg += d[o + 1]; gpb += d[o + 2]; gpn++;
             gsum += lu; gsum2 += lu * lu;
           }
         }
         if (n) { out.paper[p * 3] = r / n; out.paper[p * 3 + 1] = g / n; out.paper[p * 3 + 2] = b / n; out.hasPaper[p] = 1; }
-        out.inkLum[p] = minL === 1e9 ? 255 : minL;
+        out.inkLum[p] = bestD < 0 ? 0 : bestD;   // now a DISTANCE from background
         out.ink[p * 3] = mr; out.ink[p * 3 + 1] = mg; out.ink[p * 3 + 2] = mb;
       }
     };
@@ -3550,9 +3558,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     };
     const maxBand = (n) => Math.max(3, Math.round(n * 0.22));  // a rule, not a block
 
-    // horizontal rules: dark on the left AND right edge at the same row
+    // horizontal rules: strong content on the left AND right edge at the same
+    // row (inkLum now measures distance from the background tone)
     const rowMask = new Uint8Array(h);
-    for (let j = 0; j < h; j++) rowMask[j] = (L.inkLum[j] < inkCut && R.inkLum[j] < inkCut) ? 1 : 0;
+    for (let j = 0; j < h; j++) rowMask[j] = (L.inkLum[j] > tol && R.inkLum[j] > tol) ? 1 : 0;
     runsOf(rowMask, h).forEach(([a, b]) => {
       if (b - a + 1 > maxBand(h)) return;
       for (let j = a; j <= b; j++) {
@@ -3566,9 +3575,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         }
       }
     });
-    // vertical rules: dark on the top AND bottom edge at the same column
+    // vertical rules: strong content on the top AND bottom edge at the same column
     const colMask = new Uint8Array(w);
-    for (let i = 0; i < w; i++) colMask[i] = (T.inkLum[i] < inkCut && B.inkLum[i] < inkCut) ? 1 : 0;
+    for (let i = 0; i < w; i++) colMask[i] = (T.inkLum[i] > tol && B.inkLum[i] > tol) ? 1 : 0;
     runsOf(colMask, w).forEach(([a, b]) => {
       if (b - a + 1 > maxBand(w)) return;
       for (let i = a; i <= b; i++) {

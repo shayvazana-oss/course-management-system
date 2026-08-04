@@ -771,6 +771,25 @@ async function main() {
     return ok;
   }));
 
+  // inpaint polarity: on a DARK banner with light lettering, the cover must
+  // fill with the dark background — not with the white of the letters
+  // ("ככה זה נראה שאני מייצא": a glowing wedge on the dark header)
+  check('cover on a dark banner fills dark, not with the light lettering', await page.evaluate(() => {
+    const src = document.createElement('canvas');
+    src.width = 300; src.height = 120;
+    const cx = src.getContext('2d');
+    cx.fillStyle = '#1c1e22'; cx.fillRect(0, 0, 300, 120);          // dark banner
+    cx.fillStyle = '#f2f2f2';                                        // light "lettering" around the region
+    for (let x = 20; x < 280; x += 14) { cx.fillRect(x, 30, 8, 10); cx.fillRect(x, 80, 8, 10); }
+    const patch = window.PFS.inpaint.patch(src, 100, 45, 80, 28);
+    if (!patch) return false;
+    const d = patch.getContext('2d').getImageData(0, 0, patch.width, patch.height).data;
+    let sum = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; n++; }
+    const mean = sum / n;
+    return mean < 70;      // dark like the banner (was ~200+ when it grabbed the light text)
+  }));
+
   // THE seamlessness test: on a real form the paper is rarely pure white, so a
   // flat-colour cover shows up as an obvious rectangle in the exported file even
   // though it looked fine on screen. An `auto` cover must reconstruct the

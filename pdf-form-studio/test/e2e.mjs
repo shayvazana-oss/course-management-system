@@ -2718,6 +2718,24 @@ async function main() {
     return aOk && bOk && cOk;
   }));
 
+  // fills are HANDWRITING, not print: a 7pt government form must not dictate a
+  // 7pt fill ("לכתחילה הטקסט לא צריך להיות כל כך קטן")
+  check('tiny-print forms still get a readable fill size (handwriting floor)', await page.evaluate(() => {
+    const H = 800, W = 600, fs = 7;    // 7px print on an 800px page — dense gov form
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    const det = { tier: 'text', fields: window.PFS.detect.heuristicForPage([
+      item('שם מלא:', 500, 100, 60), item('טלפון:', 500, 140, 50), item('כתובת:', 500, 180, 55)
+    ], W, H, vp, 0) };
+    const before = det.fields.map((f) => f.fontFrac);
+    window.PFS.__test.normalizeFontSizes(det);
+    const MIN = 0.0122;
+    return det.fields.length === 3
+      && before.every((v) => v < MIN)                              // the raw print really was tiny
+      && det.fields.every((f) => f.fontFrac >= MIN - 1e-9)         // …and the fill is not
+      && new Set(det.fields.map((f) => f.fontFrac)).size === 1;    // still one uniform hand
+  }));
+
   check('vault: expanded synonyms + marital coverage map correctly', await page.evaluate(() => {
     const mk = window.PFS.vault.matchKey, cc = window.PFS.vault.classifyChoice;
     const synOk = mk('משלח יד') === 'occupation'      // Form 101 term for occupation

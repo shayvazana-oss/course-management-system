@@ -179,13 +179,21 @@
       try { W = overlay.overlaySizeFor(field.page).w; } catch (e) { return; }
       if (!W) return;
       const maxW = field.fw * W * 1.02;
-      // shrink-to-fit is capped at 75% of the form's size — a tiny value next
-      // to full-size neighbours reads worse than a slight overflow (cells have
-      // padding, and ink-snap already widened the field to the cell borders)
-      const floor = Math.max(0.009, (field.fontFrac || 0.016) * 0.75);
+      // start clean: a value that shrank/wrapped before may fit plainly now
+      if (ctrl.model.wrapW) { ctrl.model.wrapW = null; ctrl.layout(); }
+      // shrink-to-fit down to ~70% of the form's size — a much smaller value
+      // next to full-size neighbours reads worse than the next resort
+      const floor = Math.max(0.009, (field.fontFrac || 0.016) * 0.7);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.9;
+        ctrl.layout();
+      }
+      // still too wide → WRAP inside the cell instead of crossing its borders
+      // ("הטקסט לא מתאים את עצמו לגודל החלל") — the editor and the exporter
+      // both lay wrapped text as the same fixed-width line box
+      if (ctrl.node.offsetWidth > maxW) {
+        ctrl.model.wrapW = field.fw;
         ctrl.layout();
       }
     }

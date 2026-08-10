@@ -4679,12 +4679,22 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes
         inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';
-        node.style.width = 'auto';
+        // wrapped mode: the box IS the cell — fixed width, browser line-breaks
+        // inside it (the exporter word-wraps to the same width)
+        if (model.wrapW) {
+          node.style.width = (model.wrapW * W + 2) + 'px';
+          inner.style.whiteSpace = 'pre-wrap';
+          inner.style.wordBreak = 'break-word';
+        } else {
+          node.style.width = 'auto';
+          inner.style.whiteSpace = '';
+          inner.style.wordBreak = '';
+        }
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)
         // minus the 2×1px selection border, which is chrome, not content — the
         // exporter right-anchors at fx+fw, so fw must be the CONTENT width
-        model.fw = Math.max(0, node.offsetWidth - 2) / W;
+        model.fw = model.wrapW || Math.max(0, node.offsetWidth - 2) / W;
         model.fh = Math.max(0, node.offsetHeight - 2) / H;
       }
     }
@@ -4999,7 +5009,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
           opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0,
-          font: m.font || undefined
+          font: m.font || undefined, wrapW: m.wrapW || undefined
         };
       });
     }
@@ -5705,7 +5715,24 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     else if (m.align === 'left') { anchorX = x; align = 'left'; }
     else { anchorX = x + boxW; align = 'right'; }   // default RTL: right edge
     ctx.textAlign = align;
-    const lines = String(m.text ?? '').split('\n');
+    let lines = String(m.text ?? '').split('\n');
+    // wrapped cell: word-wrap to the SAME fixed width the editor showed
+    if (m.wrapW) {
+      const limit = m.wrapW * cw;
+      const wrapped = [];
+      lines.forEach((ln) => {
+        const words = ln.split(/\s+/).filter(Boolean);
+        if (!words.length) { wrapped.push(''); return; }
+        let cur = words[0];
+        for (let i = 1; i < words.length; i++) {
+          const cand = cur + ' ' + words[i];
+          if (ctx.measureText(cand).width <= limit) cur = cand;
+          else { wrapped.push(cur); cur = words[i]; }
+        }
+        wrapped.push(cur);
+      });
+      lines = wrapped;
+    }
     const lineH = fontPx * 1.15;
     // Draw EXACTLY where the editor showed the text. The editor is a CSS line
     // box (line-height 1.15): baseline = half-leading + font ascent from the
@@ -5978,7 +6005,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
-  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale, isDocumentLikeCanvas };
+  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale, isDocumentLikeCanvas, drawElement };
 })(window);
 
 </script>
@@ -6972,13 +6999,21 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       try { W = overlay.overlaySizeFor(field.page).w; } catch (e) { return; }
       if (!W) return;
       const maxW = field.fw * W * 1.02;
-      // shrink-to-fit is capped at 75% of the form's size — a tiny value next
-      // to full-size neighbours reads worse than a slight overflow (cells have
-      // padding, and ink-snap already widened the field to the cell borders)
-      const floor = Math.max(0.009, (field.fontFrac || 0.016) * 0.75);
+      // start clean: a value that shrank/wrapped before may fit plainly now
+      if (ctrl.model.wrapW) { ctrl.model.wrapW = null; ctrl.layout(); }
+      // shrink-to-fit down to ~70% of the form's size — a much smaller value
+      // next to full-size neighbours reads worse than the next resort
+      const floor = Math.max(0.009, (field.fontFrac || 0.016) * 0.7);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.9;
+        ctrl.layout();
+      }
+      // still too wide → WRAP inside the cell instead of crossing its borders
+      // ("הטקסט לא מתאים את עצמו לגודל החלל") — the editor and the exporter
+      // both lay wrapped text as the same fixed-width line box
+      if (ctrl.node.offsetWidth > maxW) {
+        ctrl.model.wrapW = field.fw;
         ctrl.layout();
       }
     }
@@ -8685,7 +8720,7 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
  * anywhere (any page) to stamp an exact copy, Ctrl+D duplicates it again. It
  * also lands in the asset library, so it survives to the next document.
  */
-function copyRegion(pageIndex, fx, fy, fw, fh) {
+async function copyRegion(pageIndex, fx, fy, fw, fh) {
   const v = pdfView.viewList()[pageIndex];
   if (!v || !v.canvas || !v.canvas.width) { PFS.toast('לא ניתן להעתיק מהעמוד הזה', 'err'); return; }
   const cw = v.canvas.width, ch = v.canvas.height;
@@ -8696,7 +8731,30 @@ function copyRegion(pageIndex, fx, fy, fw, fh) {
   try {
     const out = document.createElement('canvas');
     out.width = sw; out.height = sh;
-    out.getContext('2d').drawImage(v.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    const octx = out.getContext('2d');
+    octx.drawImage(v.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    // WHAT YOU SEE is what copies. The page canvas holds only the ORIGINAL
+    // document — everything filled in Fillo (text, covers, signatures) lives
+    // in the overlay. Copying a block you filled here used to capture the
+    // form's empty ruled lines instead of your values ("מדביק שורות לבנות") —
+    // so composite the overlay elements of the region into the clip.
+    const models = overlay.getElements().map((c) => c.model).filter((m) =>
+      m.page === pageIndex
+      && m.fx < fx + fw && (m.fx + (m.fw || 0)) > fx
+      && m.fy < fy + fh && (m.fy + (m.fh || 0)) > fy);
+    const imgMap = new Map();
+    await Promise.all(models.filter((m) => m.type === 'image' && m.imgUrl).map((m) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => { imgMap.set(m.imgUrl, im); res(); };
+      im.onerror = () => res();
+      im.src = m.imgUrl;
+    })));
+    octx.save();
+    octx.translate(-sx, -sy);
+    models.forEach((m) => {
+      try { PFS.exporter.drawElement(octx, m, cw, ch, imgMap, v.canvas); } catch (e) {}
+    });
+    octx.restore();
     url = out.toDataURL('image/png');
   } catch (e) { PFS.toast('העתקת האזור נכשלה', 'err'); return; }
   assets.add('clip', { url, w: sw, h: sh, fw, fh });

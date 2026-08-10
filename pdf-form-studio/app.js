@@ -1191,7 +1191,7 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
  * anywhere (any page) to stamp an exact copy, Ctrl+D duplicates it again. It
  * also lands in the asset library, so it survives to the next document.
  */
-function copyRegion(pageIndex, fx, fy, fw, fh) {
+async function copyRegion(pageIndex, fx, fy, fw, fh) {
   const v = pdfView.viewList()[pageIndex];
   if (!v || !v.canvas || !v.canvas.width) { PFS.toast('לא ניתן להעתיק מהעמוד הזה', 'err'); return; }
   const cw = v.canvas.width, ch = v.canvas.height;
@@ -1202,7 +1202,30 @@ function copyRegion(pageIndex, fx, fy, fw, fh) {
   try {
     const out = document.createElement('canvas');
     out.width = sw; out.height = sh;
-    out.getContext('2d').drawImage(v.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    const octx = out.getContext('2d');
+    octx.drawImage(v.canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    // WHAT YOU SEE is what copies. The page canvas holds only the ORIGINAL
+    // document — everything filled in Fillo (text, covers, signatures) lives
+    // in the overlay. Copying a block you filled here used to capture the
+    // form's empty ruled lines instead of your values ("מדביק שורות לבנות") —
+    // so composite the overlay elements of the region into the clip.
+    const models = overlay.getElements().map((c) => c.model).filter((m) =>
+      m.page === pageIndex
+      && m.fx < fx + fw && (m.fx + (m.fw || 0)) > fx
+      && m.fy < fy + fh && (m.fy + (m.fh || 0)) > fy);
+    const imgMap = new Map();
+    await Promise.all(models.filter((m) => m.type === 'image' && m.imgUrl).map((m) => new Promise((res) => {
+      const im = new Image();
+      im.onload = () => { imgMap.set(m.imgUrl, im); res(); };
+      im.onerror = () => res();
+      im.src = m.imgUrl;
+    })));
+    octx.save();
+    octx.translate(-sx, -sy);
+    models.forEach((m) => {
+      try { PFS.exporter.drawElement(octx, m, cw, ch, imgMap, v.canvas); } catch (e) {}
+    });
+    octx.restore();
     url = out.toDataURL('image/png');
   } catch (e) { PFS.toast('העתקת האזור נכשלה', 'err'); return; }
   assets.add('clip', { url, w: sw, h: sh, fw, fh });

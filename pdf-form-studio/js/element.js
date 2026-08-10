@@ -102,12 +102,22 @@
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes
         inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';
-        node.style.width = 'auto';
+        // wrapped mode: the box IS the cell — fixed width, browser line-breaks
+        // inside it (the exporter word-wraps to the same width)
+        if (model.wrapW) {
+          node.style.width = (model.wrapW * W + 2) + 'px';
+          inner.style.whiteSpace = 'pre-wrap';
+          inner.style.wordBreak = 'break-word';
+        } else {
+          node.style.width = 'auto';
+          inner.style.whiteSpace = '';
+          inner.style.wordBreak = '';
+        }
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)
         // minus the 2×1px selection border, which is chrome, not content — the
         // exporter right-anchors at fx+fw, so fw must be the CONTENT width
-        model.fw = Math.max(0, node.offsetWidth - 2) / W;
+        model.fw = model.wrapW || Math.max(0, node.offsetWidth - 2) / W;
         model.fh = Math.max(0, node.offsetHeight - 2) / H;
       }
     }

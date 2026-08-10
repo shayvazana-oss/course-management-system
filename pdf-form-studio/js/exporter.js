@@ -109,7 +109,24 @@
     else if (m.align === 'left') { anchorX = x; align = 'left'; }
     else { anchorX = x + boxW; align = 'right'; }   // default RTL: right edge
     ctx.textAlign = align;
-    const lines = String(m.text ?? '').split('\n');
+    let lines = String(m.text ?? '').split('\n');
+    // wrapped cell: word-wrap to the SAME fixed width the editor showed
+    if (m.wrapW) {
+      const limit = m.wrapW * cw;
+      const wrapped = [];
+      lines.forEach((ln) => {
+        const words = ln.split(/\s+/).filter(Boolean);
+        if (!words.length) { wrapped.push(''); return; }
+        let cur = words[0];
+        for (let i = 1; i < words.length; i++) {
+          const cand = cur + ' ' + words[i];
+          if (ctx.measureText(cand).width <= limit) cur = cand;
+          else { wrapped.push(cur); cur = words[i]; }
+        }
+        wrapped.push(cur);
+      });
+      lines = wrapped;
+    }
     const lineH = fontPx * 1.15;
     // Draw EXACTLY where the editor showed the text. The editor is a CSS line
     // box (line-height 1.15): baseline = half-leading + font ascent from the
@@ -382,5 +399,5 @@
     PFS.deliver.file(bytes, filename || 'filled.pdf', 'application/pdf');
   }
 
-  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale, isDocumentLikeCanvas };
+  PFS.exporter = { exportPdf, exportFlattenedPdf, downloadBytes, QUALITY, resolveScale, isDocumentLikeCanvas, drawElement };
 })(window);

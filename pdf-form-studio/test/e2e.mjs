@@ -2405,7 +2405,7 @@ async function main() {
   // ---- copy a region of the PAGE and stamp it elsewhere ----
   // On a scan the useful content is pixels (a signature, a filled block that
   // repeats): lifting one and re-placing it beats recreating it by hand.
-  check('copy-region lifts page pixels, keeps its size, and re-places anywhere', await page.evaluate(async () => {
+  const cprRes = await page.evaluate(async () => {
     const T = window.PFS.__test;
     const ov = T.overlay;
     ov.clearElements();
@@ -2415,12 +2415,28 @@ async function main() {
     cx.fillStyle = '#fff'; cx.fillRect(0.10 * c.width, 0.10 * c.height, 0.30 * c.width, 0.10 * c.height);
     cx.fillStyle = '#1160aa'; cx.fillRect(0.14 * c.width, 0.13 * c.height, 0.18 * c.width, 0.04 * c.height);
     const src = { fx: 0.12, fy: 0.12, fw: 0.22, fh: 0.06 };
-    T.copyRegion(0, src.fx, src.fy, src.fw, src.fh);
+    // a value FILLED IN FILLO inside the region — the clip must carry it
+    // (it lives in the overlay, not the page canvas: "מדביק שורות לבנות")
+    ov.addModelAt('text', 0, { fx: src.fx + 0.02, fy: src.fy + 0.01, text: 'AAA', color: '#e02020', fontFrac: 0.03, noEdit: true });
+    await T.copyRegion(0, src.fx, src.fy, src.fw, src.fh);
     // it is armed for placing and saved to the library
     const armed = ov.isPlacing();
     const clips = window.PFS.store.get('clips', []);
     const savedOk = clips.length === 1 && /^data:image\/png/.test(clips[0].url)
       && Math.abs(clips[0].fw - src.fw) < 1e-9 && Math.abs(clips[0].fh - src.fh) < 1e-9;
+    // decode the clip: the red value typed in Fillo must be IN the pixels
+    const redIn = await new Promise((res) => {
+      const im = new Image();
+      im.onload = () => {
+        const cc = document.createElement('canvas'); cc.width = im.width; cc.height = im.height;
+        const c2 = cc.getContext('2d'); c2.drawImage(im, 0, 0);
+        const dd = c2.getImageData(0, 0, cc.width, cc.height).data;
+        for (let i = 0; i < dd.length; i += 4) { if (dd[i] > 150 && dd[i + 1] < 110 && dd[i + 2] < 110) { res(true); return; } }
+        res(false);
+      };
+      im.onerror = () => res(false);
+      im.src = clips[0].url;
+    });
     // click on the page → the copy lands at the SAME size, on that spot
     const overlayEl = document.querySelector('.page-wrap .overlay');
     const r = overlayEl.getBoundingClientRect();
@@ -2437,8 +2453,55 @@ async function main() {
     const keptOk = ov.getElements().some((e) => e.model.kind === 'clip' && e.model.imgUrl);
     ov.clearElements();
     window.PFS.store.remove('clips');
-    return armed && savedOk && placedOk && keptOk;
-  }));
+    return JSON.stringify({ armed, savedOk, redIn, placedOk: !!placedOk, keptOk, clips: clips.length });
+  });
+  if (JSON.parse(cprRes) && Object.values(JSON.parse(cprRes)).some((v) => v === false)) console.log('  [copy debug]', cprRes);
+  check('copy-region lifts page pixels, keeps its size, and re-places anywhere', (() => { const o = JSON.parse(cprRes); return o.armed && o.savedOk && o.redIn && o.placedOk && o.keptOk; })());
+
+  // a long value in a narrow table cell must stay INSIDE the cell: shrink a
+  // bit, then wrap — never cross the borders ("הוא חוצה גבולות")
+  const wrapCellRes = await page.evaluate(async () => {
+    const { PDFDocument, rgb } = window.PDFLib;
+    const d = await PDFDocument.create();
+    d.addPage([595, 842]).drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+    const T = window.PFS.__test;
+    await T.openPdfFile(new File([await d.save()], 'wrapcell.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'cell1', label: 'שם הקורס', fx: 0.30, fy: 0.35, fw: 0.12, fh: 0.02, fontFrac: 0.014, type: 'text' }
+    ] };
+    T.overlay.clearElements();
+    T.fieldsPanel.show(det);
+    const row = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((r) => r.__fkey === 'cell1');
+    row.value = 'הטמעת טכנולוגיות וחדשנות בתחום הבנייה';
+    row.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 120));
+    const el = T.overlay.getElements().find((e) => e.model.fieldKey === 'cell1');
+    if (!el) return 'no-el';
+    const m = el.model;
+    const W = el.node.closest('.overlay').getBoundingClientRect().width;
+    const contained = el.node.offsetWidth <= 0.12 * W + 6;      // box = the cell, not wider
+    const wrapped = m.wrapW === 0.12;
+    const dispLines = Math.round(m.fh / (m.fontFrac * 1.15));
+    // the exporter wraps with the same greedy break — its line count must agree
+    const probe = document.createElement('canvas').getContext('2d');
+    probe.font = '400 ' + (m.fontFrac * 1000).toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
+    const limit = 0.12 * 1000;
+    const words = m.text.split(/\s+/).filter(Boolean);
+    let cur = words[0], expLines = 1;
+    for (let i = 1; i < words.length; i++) {
+      const cand = cur + ' ' + words[i];
+      if (probe.measureText(cand).width <= limit) cur = cand;
+      else { expLines++; cur = words[i]; }
+    }
+    const serOk = T.overlay.serialize().some((s2) => s2.fieldKey === 'cell1' && s2.wrapW === 0.12);
+    const verdict = contained && wrapped && expLines >= 2 && Math.abs(dispLines - expLines) <= 1 && serOk;
+    const dbg = JSON.stringify({ contained, wrapped, dispLines, expLines, serOk, nodeW: el.node.offsetWidth, W });
+    T.overlay.clearElements(); T.fieldsPanel.clear();
+    return verdict ? true : dbg;
+  });
+  if (wrapCellRes !== true) console.log('  [wrap-cell debug]', wrapCellRes);
+  check('long text in a narrow cell shrinks then wraps inside it', wrapCellRes === true);
 
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {

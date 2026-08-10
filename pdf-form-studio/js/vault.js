@@ -28,7 +28,7 @@
   const SYN = {
     last_name:  ['שם משפחה', 'שם המשפחה', 'משפחה', 'שם משפחה באנגלית', 'last name', 'surname', 'family name', 'اسم العائلة', 'العائلة', 'اسم العائله'],
     first_name: ['שם פרטי', 'השם הפרטי', 'פרטי', 'first name', 'given name', 'الاسم الشخصي', 'الاسم الأول', 'الاسم'],
-    full_name:  ['שם מלא', 'שם משפחה ושם פרטי', 'שם פרטי ומשפחה', 'שם המבקש', 'שם המבוטח', 'שם העובד', 'שם הלקוח', 'שם התלמיד', 'שם ההורה', 'שם וחתימה', 'full name', 'name', 'שם', 'الاسم الكامل', 'الاسم الرباعي'],
+    full_name:  ['שם מלא', 'שם משפחה ושם פרטי', 'שם פרטי ומשפחה', 'שם המבקש', 'שם המבוטח', 'שם העובד', 'שם הלקוח', 'שם התלמיד', 'שם המשתתף', 'שם משתתף', 'שם המועמד', 'שם הנרשם', 'שם הסטודנט', 'שם ההורה', 'שם וחתימה', 'full name', 'name', 'שם', 'الاسم الكامل', 'الاسم الرباعي'],
     id:         ['תעודת זהות', 'מספר תעודת זהות', 'מספר זהות', 'מס תעודת זהות', 'ת ז', 'תז', 'ת.ז', 'מס זהות', 'מספר ת ז', 'זהות', 'מספר זיהוי', 'id number', 'national id', 'id', 'رقم الهوية', 'الهوية', 'رقم هوية', 'بطاقة الهوية'],
     birth_date: ['תאריך לידה', 'ת לידה', 'שנת לידה', 'תאריך הלידה', 'date of birth', 'birth date', 'dob', 'تاريخ الميلاد', 'تاريخ الولادة', 'الميلاد'],
     phone:      ['טלפון נייד', 'מספר טלפון', 'מס טלפון', 'טלפון', 'נייד', 'סלולרי', 'סלולארי', 'פלאפון', 'מספר נייד', 'טל', 'phone', 'mobile', 'cell', 'tel', 'رقم الهاتف', 'الهاتف', 'الجوال', 'هاتف نقال', 'موبايل'],
@@ -53,6 +53,11 @@
     institution_phone:   ['טלפון מוסד ההכשרה', 'טלפון המוסד', 'טלפון המכללה', 'טלפון מוסד', 'טלפון בית הספר', 'institution phone'],
     institution_address: ['כתובת מוסד ההכשרה', 'כתובת המוסד', 'כתובת המכללה', 'כתובת מוסד', 'כתובת בית הספר', 'institution address'],
     contact_person:      ['שם איש קשר', 'איש קשר', 'איש הקשר', 'פרטי איש קשר', 'שם איש הקשר', 'contact person', 'contact name'],
+    // deal facts that flow from a price quote into its appendixes — the two
+    // documents word them differently ('שם הקורס' ↔ 'שם התכנית'), so the
+    // carry-over needs a shared meaning, not just shared wording
+    course_name: ['שם הקורס המבוקש', 'הקורס המבוקש', 'קורס מבוקש', 'שם הקורס', 'שם קורס', 'שם התכנית', 'שם התוכנית', 'שם ההכשרה', 'שם המגמה', 'נושא הקורס', 'course name'],
+    branch:      ['סניף', 'קמפוס', 'branch', 'campus'],
     marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
     health_fund: ['קופת חולים', 'קופ״ח', 'קופח', 'קופה', 'health fund', 'hmo', 'صندوق المرضى'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']
@@ -144,6 +149,10 @@
    * (both sides run through matchKey). `skipKeys` avoids refilling elements
    * that already exist (e.g. restored from the form's auto-memory).
    */
+  // canons allowed to bridge wording in labelOnly (carry) mode — deal facts
+  // and org constants; person canons deliberately excluded
+  const CARRY_CANONS = new Set(['course_name', 'branch', 'institution_name', 'institution_phone', 'institution_address', 'business_id', 'business_name']);
+
   function matchValues(fields, values, skipKeys, opts) {
     const out = {};
     if (!fields || !fields.length || !values) return out;
@@ -192,7 +201,24 @@
       // substring matching can misread an institution name as a person's)
       const nv = normVal[norm(f.label)] !== undefined ? normVal[norm(f.label)] : normVal[norm(f.fieldKey)];
       if (nv !== undefined) { out[f.fieldKey] = nv; return; }
-      if (opts && opts.labelOnly) return;   // carry-over: no synonym guessing
+      if (opts && opts.labelOnly) {
+        // carry-over allows NO person-synonym guessing (the historical wrong-
+        // person fills), but DEAL FACTS must bridge wording: the quote says
+        // 'שם הקורס', נספח ו says 'שם התכנית' — same meaning, same value.
+        // Only these tightly-scoped canons may bridge; dates bridge only with
+        // a matching DIRECTION (a start date never lands in an end field).
+        const c2 = matchKey(f.label) || matchKey(f.fieldKey);
+        if (!c2) return;
+        if (c2 === 'date') {
+          const dir = /סיום/.test(f.label) ? /סיום/ : (/תחילת|התחלה/.test(f.label) ? /תחילת|התחלה/ : null);
+          if (!dir) return;
+          const k = Object.keys(values).find((kk) => dir.test(kk) && String(values[kk] || '').trim());
+          if (k) out[f.fieldKey] = values[k];
+          return;
+        }
+        if (CARRY_CANONS.has(c2) && canonVal[c2] !== undefined) out[f.fieldKey] = canonVal[c2];
+        return;
+      }
       const c = matchKey(f.label) || matchKey(f.fieldKey);
       if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
     });

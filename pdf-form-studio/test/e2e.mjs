@@ -1148,6 +1148,30 @@ async function main() {
     check('real נספח ה3: carry fills course name, never leaks into שם מלא', h3res.carryOk === true);
   }
 
+  // carry must BRIDGE WORDING for deal facts (quote 'שם הקורס' → appendix
+  // 'שם התכנית'), keep dates directional, know 'שם המשתתף' as a person, and
+  // still never guess a person from a synonym ("זה לא באמת שואב את הנתונים")
+  check('quote → appendix carry bridges different wording, tightly', await page.evaluate(() => {
+    const V = window.PFS.vault;
+    const F = (l) => ({ label: l, fieldKey: l, type: 'text' });
+    const fields = [F('שם התכנית'), F('קמפוס'), F('תאריך סיום הלימודים'), F('תאריך התחלה צפוי'),
+                    F('מספר קורס'), F('שם מלא'), F('שם המשתתף'), F('תאריך')];
+    const carry = { 'שם הקורס': 'אילוף כלבים', 'סניף': 'אשקלון',
+                    'תאריך תחילת הקורס': '01/09/26', 'תאריך סיום הקורס': '30/05/27', 'שם מלא': 'טלי מכלוף' };
+    const out = V.matchValues(fields, carry, [], { labelOnly: true });
+    const bridged = out['שם התכנית'] === 'אילוף כלבים'      // course by meaning
+      && out['קמפוס'] === 'אשקלון'                            // branch by meaning
+      && out['תאריך סיום הלימודים'] === '30/05/27'            // END date → end field
+      && out['תאריך התחלה צפוי'] === '01/09/26';              // START date → start field
+    const tight = out['מספר קורס'] === undefined              // a number is not a name
+      && out['שם מלא'] === 'טלי מכלוף'                        // exact wording still works
+      && out['שם המשתתף'] === undefined                       // person NEVER bridges in carry
+      && out['תאריך'] === undefined;                          // bare date never carried
+    // the person DOES reach 'שם המשתתף' — via the student path (full canon)
+    const stu = V.matchValues([F('שם המשתתף')], { 'שם מלא': 'טלי מכלוף' }, []);
+    return bridged && tight && stu['שם המשתתף'] === 'טלי מכלוף';
+  }));
+
   // ---- linked companions: quote → appendix chain ----
   // Linking an appendix to a form teaches the pair; opening the companion
   // carries the just-typed values across by MEANING (different labels on the
@@ -1367,8 +1391,10 @@ async function main() {
     const nameLeak = await page.evaluate(() => {
       const V = window.PFS.vault;
       // bare 'שם' only matches labels that ARE the word
-      const guards = V.matchKey('שם הקורס') === null
-        && V.matchKey('שם הקורס המבוקש') === null
+      // course labels now have their own canon — the guard's real intent is
+      // that they are NOT person canons (a name must never land there)
+      const guards = V.matchKey('שם הקורס') === 'course_name'
+        && V.matchKey('שם הקורס המבוקש') === 'course_name'
         && V.matchKey('שם') === 'full_name'
         && V.matchKey('שם:') === 'full_name'
         && V.matchKey('שם מלא') === 'full_name'

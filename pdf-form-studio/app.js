@@ -2613,7 +2613,8 @@ function extractQuoteMap(text) {
   if (course) { map['שם הקורס'] = course; map['שם הקורס המבוקש'] = course; map['הקורס המבוקש'] = course; }
   const forName = grab(/עבור\s+([א-ת][א-ת'\-\s]{1,25}?)(?=\s+ת\.?["']?\s*ז|\s+\d|[\n,.:]|$)/);
   if (forName && !map['שם מלא']) map['שם מלא'] = forName;
-  const branch = grab(/סניף\s*[:：]?\s+([א-ת][א-ת\s]{1,20}?)(?=[\n,.]|$)/);
+  const branch = grab(/סניף\s*[:：]?\s+([א-ת][א-ת\s]{1,20}?)(?=[\n,.]|$)/)
+    || grab(/קמפוס\s*[:：]?\s+([א-ת][א-ת\s]{1,20}?)(?=[\n,.]|$)/);
   if (branch) map['סניף'] = branch;
   const d1 = grab(/תאריך\s+התחלה\s*[:：]?\s*([\d./-]{6,10})/) || grab(/החל\s+מ?[־-]?\s*([\d./-]{6,10})/);
   if (d1) { map['תאריך תחילת הקורס'] = d1; map['תאריך התחלה'] = d1; }

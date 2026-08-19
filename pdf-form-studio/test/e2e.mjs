@@ -2503,6 +2503,74 @@ async function main() {
   if (wrapCellRes !== true) console.log('  [wrap-cell debug]', wrapCellRes);
   check('long text in a narrow cell shrinks then wraps inside it', wrapCellRes === true);
 
+  // ===== the course CASE FILE: deal facts learned per course, filled by meaning =====
+  {
+    const cfRes = await page.evaluate(async () => {
+      const T = window.PFS.__test, C = window.PFS.courses;
+      const out = {};
+      // -- resolution: which labels are deal facts --
+      out.keys = C.factKeyFor('שם הקורס') === 'course_name'
+        && C.factKeyFor('שם התכנית') === 'course_name'
+        && C.factKeyFor('סניף') === 'branch'
+        && C.factKeyFor('שעות אקדמיות') === 'course_hours'
+        && C.factKeyFor('תאריך תחילת הקורס') === 'course_start'
+        && C.factKeyFor('מועד סיום הלימודים') === 'course_end'
+        && C.factKeyFor('תאריך') === null            // bare date is per-form
+        && C.factKeyFor('שם מלא') === null;          // people are never course facts
+      // -- harvest from an export, twice → n counts confirmations --
+      const c = C.create('קורס בדיקה — תיק');
+      const F = (l) => ({ label: l, fieldKey: l, type: 'text' });
+      const fields = [F('שם הקורס'), F('סניף'), F('שעות אקדמיות'), F('עלות'), F('תאריך תחילת הקורס'), F('תאריך סיום משוער'), F('תאריך'), F('שם מלא')];
+      const vals = { 'שם הקורס': 'אילוף כלבים', 'סניף': 'אשקלון', 'שעות אקדמיות': '320',
+        'עלות': '10,900 ש"ח', 'תאריך תחילת הקורס': '03/09/26', 'תאריך סיום משוער': '30/05/27',
+        'תאריך': '19/08/26', 'שם מלא': 'טלי מכלוף' };
+      C.harvestFacts(c.id, fields, vals);
+      C.harvestFacts(c.id, fields, vals);
+      const facts = C.getFacts(c.id);
+      out.harvest = facts.course_name && facts.course_name.v === 'אילוף כלבים' && facts.course_name.n === 2
+        && facts.branch && facts.branch.v === 'אשקלון'
+        && facts.course_hours && facts.course_hours.v === '320'
+        && facts.amount && facts.course_start && facts.course_start.v === '03/09/26'
+        && facts.course_end && facts.course_end.v === '30/05/27'
+        && !Object.keys(facts).some((k) => facts[k].v === '19/08/26')    // bare date never absorbed
+        && !Object.keys(facts).some((k) => facts[k].v === 'טלי מכלוף'); // people never absorbed
+      // -- fill a NEVER-SEEN form worded differently, through the real prefill --
+      T.setActiveCourse(c.id);
+      const det = { tier: 'text', fields: [
+        F('שם התכנית'), F('קמפוס'), F('היקף שעות'), F('סכום במילים'),
+        F('מועד תחילת הלימודים'), F('תאריך סיום הלימודים'), F('תאריך')
+      ] };
+      const pre = T.vaultPrefillFor(det) || {};
+      out.fill = pre['שם התכנית'] === 'אילוף כלבים'
+        && pre['קמפוס'] === 'אשקלון'
+        && pre['היקף שעות'] === '320'
+        && /עשרת אלפים|תשע מאות/.test(pre['סכום במילים'] || '')          // derived from the price
+        && pre['מועד תחילת הלימודים'] === '03/09/26'
+        && pre['תאריך סיום הלימודים'] === '30/05/27'
+        && pre['תאריך'] !== '03/09/26' && pre['תאריך'] !== '30/05/27';   // bare date stays "today"
+      // -- an explicit quote carry still outranks the ledger --
+      T.setCarry({ 'סניף': 'חיפה' });
+      const pre2 = T.vaultPrefillFor({ tier: 'text', fields: [F('קמפוס')] }) || {};
+      out.carryWins = pre2['קמפוס'] === 'חיפה';
+      // -- the chip renders in the panel and reflects the active course --
+      T.fieldsPanel.show(det);
+      const chip = document.getElementById('courseChip');
+      out.chip = !!chip && chip.classList.contains('on') && /תיק|קורס בדיקה/.test(chip.textContent);
+      // -- removing a fact forgets it --
+      C.removeFact(c.id, 'branch');
+      out.forget = !C.getFacts(c.id).branch;
+      // cleanup
+      T.setActiveCourse(null);
+      C.remove(c.id);
+      T.fieldsPanel.clear();
+      return out;
+    });
+    if (Object.values(cfRes).some((v) => v !== true)) console.log('  [casefile debug]', JSON.stringify(cfRes));
+    check('case file: labels resolve to deal facts; people and bare dates never', cfRes.keys === true && cfRes.harvest === true);
+    check('case file: a never-seen form fills from the ledger by meaning', cfRes.fill === true && cfRes.carryWins === true);
+    check('case file: active-course chip renders; facts are forgettable', cfRes.chip === true && cfRes.forget === true);
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

@@ -93,6 +93,95 @@
     return n;
   }
 
+  /* ===== the course CASE FILE: deal-level facts ledger =====
+   *
+   * patterns.js deliberately refuses to learn dates, amounts and course names
+   * GLOBALLY — one course's start date poisons the next course's forms. But
+   * inside a single course those exact values are constants, retyped dozens of
+   * times a week. The ledger scopes them to the course: harvested passively
+   * from every export made in a course context, consumed by prefill for ANY
+   * form — including forms never seen before, because resolution is by
+   * MEANING (vault canons + date direction), not by template.
+   *
+   * course.facts = { factKey: { v, n, last } }
+   * factKey ∈ course_name | branch | course_hours | amount |
+   *           course_start | course_end   (bare 'date' fields never touch it)
+   */
+  const FACT_CANONS = new Set(['course_name', 'branch', 'course_hours', 'amount']);
+
+  /* factKeyFor(labelOrField) → ledger key | null */
+  function factKeyFor(field) {
+    const label = typeof field === 'string' ? field : (field.label || field.fieldKey || '');
+    const V = PFS.vault;
+    const canon = V.matchKey(label);
+    if (canon && FACT_CANONS.has(canon)) return canon;
+    // period dates are deal facts; a bare "תאריך" is a per-form variable.
+    // Forms word these as תאריך or מועד ("מועד סיום הלימודים", "תאריך פתיחה")
+    if (canon === 'date' || /תאריך|מועד/.test(label)) {
+      if (/סיום/.test(label)) return 'course_end';
+      if (/תחילת|התחלה|פתיחה/.test(label)) return 'course_start';
+    }
+    return null;
+  }
+
+  function setFact(courseId, factKey, value) {
+    const c = get(courseId); if (!c) return false;
+    const v = String(value == null ? '' : value).trim();
+    if (!v) return false;
+    c.facts = c.facts || {};
+    const cur = c.facts[factKey];
+    if (cur && norm(cur.v) === norm(v)) { cur.v = v; cur.n++; cur.last = Date.now(); }
+    else c.facts[factKey] = { v, n: 1, last: Date.now() };
+    update(c);
+    return true;
+  }
+  function removeFact(courseId, factKey) {
+    const c = get(courseId); if (!c || !c.facts) return;
+    delete c.facts[factKey];
+    update(c);
+  }
+  function getFacts(courseId) {
+    const c = get(courseId);
+    return (c && c.facts) || {};
+  }
+
+  /* harvestFacts(courseId, fields, valuesMap) — the passive population hook:
+   * runs on every export made while this course is active. Any filled value
+   * whose label resolves to a fact key is written into the ledger (freshest
+   * spelling wins, n counts confirmations). Returns how many were absorbed. */
+  function harvestFacts(courseId, fields, valuesMap) {
+    if (!courseId || !fields || !valuesMap) return 0;
+    let n = 0;
+    fields.forEach((f) => {
+      if (!f || f.type === 'check') return;
+      const val = valuesMap[f.fieldKey];
+      if (val == null || !String(val).trim()) return;
+      const k = factKeyFor(f);
+      if (k && setFact(courseId, k, val)) n++;
+    });
+    return n;
+  }
+
+  /* factFill(courseId, fields) → { fieldKey: value } for the prefill pass:
+   * resolves every detected field by meaning against this course's ledger.
+   * amount_words fields derive from the course price via numwords. */
+  function factFill(courseId, fields) {
+    const out = {};
+    const facts = getFacts(courseId);
+    if (!fields || !Object.keys(facts).length) return out;
+    const V = PFS.vault;
+    fields.forEach((f) => {
+      if (!f || f.type === 'check') return;
+      const k = factKeyFor(f);
+      if (k && facts[k]) { out[f.fieldKey] = facts[k].v; return; }
+      if (facts.amount && V.matchKey(f.label) === 'amount_words' && PFS.numwords) {
+        const num = parseFloat(String(facts.amount.v).replace(/[^\d.]/g, ''));
+        if (isFinite(num)) out[f.fieldKey] = PFS.numwords.shekels(num);
+      }
+    });
+    return out;
+  }
+
   /* recordExport(fp, values) — called after every successful export.
    * Finds courses containing a form with this fingerprint, then looks for a
    * registered student inside the filled values (ת"ז beats name — 9 digits
@@ -161,6 +250,7 @@
     all, get, create, remove, update,
     addStudents, removeStudent, addForm, removeForm,
     setSubmitted, isSubmitted, missingCount, recordExport,
-    parseStudentRows, studentKey
+    parseStudentRows, studentKey,
+    factKeyFor, setFact, removeFact, getFacts, harvestFacts, factFill
   };
 })(window);

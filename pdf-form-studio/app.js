@@ -201,8 +201,80 @@ const fieldsPanel = PFS.createFieldsPanel({
   onPlaceSignature: (f) => placeAssetAtField('signature', f),
   onPlaceStamp: (f) => placeAssetAtField('stamp', f)
 });
+// ===== the ACTIVE COURSE (case file) =====
+// Deal facts — dates, price, hours, course name — are constants INSIDE a
+// course and poison ACROSS courses (why patterns.js blocklists them). The
+// active course scopes them: every export harvests facts into ITS ledger,
+// and every form opened while it is active fills from that ledger — including
+// forms Fillo has never seen, because resolution is by meaning.
+function activeCourseId() {
+  const id = PFS.store.get('active_course', null);
+  return (id && PFS.courses && PFS.courses.get(id)) ? id : null;
+}
+function setActiveCourse(id) {
+  PFS.store.set('active_course', id || null);
+  renderCourseChip();
+}
+function renderCourseChip() {
+  const body = document.getElementById('fieldsBody');
+  if (!body) return;
+  const old = document.getElementById('courseChip');
+  if (old) old.remove();
+  if (!PFS.courses || !PFS.courses.all().length || !pdfView.hasDoc()) return;
+  const ac = activeCourseId();
+  const c = ac && PFS.courses.get(ac);
+  const chip = document.createElement('button');
+  chip.id = 'courseChip'; chip.type = 'button'; chip.className = 'course-chip' + (c ? ' on' : '');
+  const nFacts = c ? Object.keys(c.facts || {}).length : 0;
+  chip.textContent = c
+    ? '🗂️ ' + c.name + (nFacts ? ' · ' + nFacts + ' עובדות' : '')
+    : '🗂️ ללא קורס פעיל';
+  const arrow = document.createElement('span');
+  arrow.className = 'cc-arrow'; arrow.textContent = '▾';
+  chip.appendChild(arrow);
+  chip.title = c
+    ? 'טפסים מתמלאים מעובדות הקורס הזה — לחצו להחלפה'
+    : 'בחרו קורס פעיל — כל טופס יתמלא מעובדות הקורס שלו';
+  chip.addEventListener('click', openCoursePicker);
+  body.insertBefore(chip, body.firstChild);
+}
+function openCoursePicker(e) {
+  document.querySelectorAll('.pat-dd').forEach((d) => d.remove());
+  const dd = document.createElement('div');
+  dd.className = 'pat-dd';
+  const r = e.currentTarget.getBoundingClientRect();
+  dd.style.top = (r.bottom + 4) + 'px';
+  dd.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+  const item = (label, on, act) => {
+    const it = document.createElement('div');
+    it.className = 'pat-dd-item' + (on ? ' free' : '');
+    const v = document.createElement('span'); v.className = 'v'; v.textContent = label;
+    it.appendChild(v);
+    it.addEventListener('click', () => { dd.remove(); act(); });
+    dd.appendChild(it);
+  };
+  const ac = activeCourseId();
+  PFS.courses.all().forEach((c) => {
+    const nf = Object.keys(c.facts || {}).length;
+    item((c.id === ac ? '✓ ' : '') + c.name + (nf ? ' · ' + nf + ' עובדות' : ''), false, () => setActiveCourse(c.id));
+  });
+  item('ללא קורס (מילוי רגיל)', true, () => setActiveCourse(null));
+  document.body.appendChild(dd);
+  const close = (ev) => { if (!dd.contains(ev.target)) { dd.remove(); document.removeEventListener('pointerdown', close, true); } };
+  setTimeout(() => document.addEventListener('pointerdown', close, true), 0);
+}
+// the chip lives at the top of the fields panel — re-attach on every rebuild
+{
+  const _show = fieldsPanel.show.bind(fieldsPanel);
+  fieldsPanel.show = (det, prefill) => {
+    const r = _show(det, prefill);
+    try { renderCourseChip(); } catch (e) {}
+    return r;
+  };
+}
+
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -258,8 +330,17 @@ function vaultPrefill(det) {
         if (sg && sg.mode === 'auto') patternAuto[f.fieldKey] = sg.value;
       });
     }
+    // the ACTIVE COURSE's facts ledger — resolved early so a fresh install
+    // with an empty profile still fills from what the course already learned
+    let courseText = {};
+    try {
+      const ac = activeCourseId();
+      if (ac && PFS.courses.factFill) {
+        courseText = PFS.courses.factFill(ac, det.fields.filter((f) => !skip.has(f.fieldKey)));
+      }
+    } catch (e) {}
     if (!Object.keys(base).length && !(carry && Object.keys(carry).length)
-        && !Object.keys(patternAuto).length) return null;
+        && !Object.keys(patternAuto).length && !Object.keys(courseText).length) return null;
     // profile/remembered fill first — then values carried from a linked form
     // (הצעת מחיר → נספח) override them: the appendix must mirror what was just
     // typed, not what the profile happens to say for the same meaning.
@@ -277,7 +358,10 @@ function vaultPrefill(det) {
       if (/תחילת|התחלה|סיום/.test(f.label)) return;
       delete carryText[f.fieldKey];
     });
-    return Object.assign({}, patternAuto, text, checks, carryText);
+    // priority: patterns < profile < course facts < explicit carry — this
+    // form is being filled FOR the active course, so its ledger outranks
+    // generic memory; a just-extracted quote carry stays freshest of all
+    return Object.assign({}, patternAuto, text, checks, courseText, carryText);
   } catch (e) { return null; }
 }
 
@@ -680,6 +764,17 @@ async function openCompanion(link) {
       if (addr) { extracted['כתובת מוסד ההכשרה'] = addr; extracted['כתובת המוסד'] = addr; }
     }
     pendingCarry = Object.assign({}, extracted, typed);
+    // the quote's printed deal facts seed the ACTIVE course's ledger too —
+    // extraction happens once; from then on the ledger fills every form
+    try {
+      const ac = activeCourseId();
+      if (ac && PFS.courses.factKeyFor) {
+        Object.keys(extracted).forEach((k) => {
+          const fk = PFS.courses.factKeyFor(k);
+          if (fk) PFS.courses.setFact(ac, fk, extracted[k]);
+        });
+      }
+    } catch (e) {}
     const got = Object.keys(extracted);
     if (got.length) PFS.toast('📖 נשאבו מהמסמך: ' + [...new Set(got)].slice(0, 5).join(', '), 'ok', 5000);
     await openPdfFile(new File([bytes], link.name + '.pdf', { type: 'application/pdf' }));
@@ -770,6 +865,17 @@ async function openPdfFile(file) {
     }
     try { currentFp = await PFS.fingerprint.compute(pdfView.getDoc()); } catch (e) {}
     renderCompanions();
+    // opening a form that belongs to a course IS the context signal: its
+    // ledger should fill this document — activate the course automatically
+    try {
+      if (currentFp && PFS.courses) {
+        const owner = PFS.courses.all().find((c) => c.forms.some((f) => f.fp === currentFp));
+        if (owner && activeCourseId() !== owner.id) {
+          setActiveCourse(owner.id);
+          PFS.toast('🗂️ קורס פעיל: ' + owner.name + ' — הטופס יתמלא מעובדות הקורס', 'ok', 3500);
+        }
+      }
+    } catch (e) {}
     // a recognised form with a linked appendix announces itself right away
     if (loadGen === myGen && PFS.companions && currentFp) {
       const links = PFS.companions.listFor(currentFp);
@@ -1729,8 +1835,23 @@ async function exDeliver(preferShare) {
     if (PFS.courses && currentFp) {
       const marks = PFS.courses.recordExport(currentFp, overlay.currentValues());
       marks.forEach((m) => PFS.toast(`🗂 סומן: ${m.student.name} הגיש/ה "${m.form.name}" (${m.course.name})`, 'ok', 5000));
+      // exporting a course's form IS the context signal — follow it
+      if (marks.length && activeCourseId() !== marks[0].course.id) setActiveCourse(marks[0].course.id);
     }
   } catch (e) { console.warn('[courses] mark failed', e); }
+  // case file: a successful export CONFIRMS the deal facts on the page —
+  // absorb them into the active course's ledger (dates, price, hours, course
+  // name, branch), so the next form of this course opens already filled
+  try {
+    const ac = activeCourseId();
+    if (ac && lastDet && lastDet.fields && PFS.courses.harvestFacts) {
+      const nf = PFS.courses.harvestFacts(ac, lastDet.fields, overlay.currentValues());
+      if (nf) {
+        renderCourseChip();
+        console.info('[casefile] absorbed', nf, 'facts into course', ac);
+      }
+    }
+  } catch (e) { console.warn('[casefile] harvest failed', e); }
   offerCompanions();
 }
 
@@ -2409,6 +2530,37 @@ function renderCourseGrid(c) {
   body.appendChild(head);
   head.querySelector('#csBack').addEventListener('click', () => { coursesView = null; renderCourses(); });
 
+  // ===== the case file: this course's learned deal facts =====
+  const FACT_LABELS = { course_name: 'שם הקורס', branch: 'סניף', course_hours: 'שעות אקדמיות', amount: 'מחיר', course_start: 'תאריך התחלה', course_end: 'תאריך סיום' };
+  const facts = c.facts || {};
+  const fkeys = Object.keys(facts);
+  const factsCard = document.createElement('div');
+  factsCard.className = 'card'; factsCard.style.cssText = 'margin-bottom:10px;padding:10px 12px';
+  const fHead = document.createElement('div');
+  fHead.style.cssText = 'font-weight:800;font-size:13px;margin-bottom:6px';
+  fHead.textContent = '🗂️ תיק הקורס — עובדות שנלמדו' + (fkeys.length ? '' : ' (עוד ריק)');
+  factsCard.appendChild(fHead);
+  if (!fkeys.length) {
+    const hint = document.createElement('div'); hint.className = 'hint muted';
+    hint.textContent = 'מלאו וייצאו את המסמך הראשון של הקורס (למשל הצעת המחיר) — התאריכים, המחיר והשעות ייקלטו לכאן, ומכאן ימלאו כל טופס של הקורס אוטומטית.';
+    factsCard.appendChild(hint);
+  } else {
+    fkeys.forEach((k) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0';
+      const lab = document.createElement('span'); lab.style.cssText = 'color:var(--ink-3);flex:none;min-width:92px'; lab.textContent = FACT_LABELS[k] || k;
+      const val = document.createElement('b'); val.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'; val.textContent = facts[k].v;
+      const nTag = document.createElement('span'); nTag.className = 'hint muted'; nTag.style.flex = 'none'; nTag.textContent = '×' + facts[k].n;
+      nTag.title = 'אושר ב-' + facts[k].n + ' ייצואים';
+      const del = document.createElement('button'); del.className = 'btn sm ghost'; del.style.cssText = 'color:var(--danger);flex:none;padding:2px 6px'; del.textContent = '✕';
+      del.title = 'הסרת העובדה — תילמד מחדש מהייצוא הבא';
+      del.addEventListener('click', () => { C.removeFact(c.id, k); renderCourses(); renderCourseChip(); });
+      row.append(lab, val, nTag, del);
+      factsCard.appendChild(row);
+    });
+  }
+  body.appendChild(factsCard);
+
   // paste area (hidden until asked)
   const pasteWrap = document.createElement('div');
   pasteWrap.className = 'hidden'; pasteWrap.style.marginBottom = '10px';
@@ -2661,6 +2813,7 @@ async function produceCourseForm(courseId, formName, deliver = true) {
   if (!form.libId) return { error: 'הטופס לא שמור במאגר — פתחו אותו והוסיפו לקורס מחדש' };
   const missing = c.students.filter((s) => !C.isSubmitted(c, C.studentKey(s), formName));
   if (!missing.length) return { error: 'כולם כבר הגישו את הטופס הזה ✓' };
+  try { setActiveCourse(courseId); } catch (e) {}   // the batch fills from THIS course's ledger
   await openFromLibrary(form.libId);
   const t0 = Date.now();
   while ((!lastDet || !lastDet.fields || !lastDet.fields.length) && Date.now() - t0 < 12000) {

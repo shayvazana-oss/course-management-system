@@ -42,7 +42,7 @@
     gender:     ['מין', 'מגדר', 'sex', 'gender', 'الجنس'],
     // amount_words must out-rank amount (longer phrase wins in matchKey)
     amount_words: ['סכום במילים', 'סכום במלים', 'הסכום במילים', 'amount in words', 'sum in words'],
-    amount:     ['סכום בשח', 'סכום', 'סך הכל', 'סך הכול', 'סה״כ', 'סהכ', 'amount', 'total', 'sum', 'المبلغ', 'المجموع'],
+    amount:     ['סכום בשח', 'שכר לימוד', 'עלות הקורס', 'סכום', 'עלות', 'מחיר', 'סך הכל', 'סך הכול', 'סה״כ', 'סהכ', 'amount', 'total', 'sum', 'المبلغ', 'المجموع'],
     // Israeli business/tax forms (101, VAT): company / dealer numbers use the
     // SAME 9-digit checksum as ת.ז, so they can be validated the same way.
     business_id:   ['מספר עוסק מורשה', 'עוסק מורשה', 'עוסק פטור', 'מספר עוסק', 'מספר חברה', 'מספר תאגיד', 'ח.פ', 'ח״פ', 'חפ', 'company number', 'vat number', 'business number', 'business id'],
@@ -58,6 +58,7 @@
     // carry-over needs a shared meaning, not just shared wording
     course_name: ['שם הקורס המבוקש', 'הקורס המבוקש', 'קורס מבוקש', 'שם הקורס', 'שם קורס', 'שם התכנית', 'שם התוכנית', 'שם ההכשרה', 'שם המגמה', 'נושא הקורס', 'course name'],
     branch:      ['סניף', 'קמפוס', 'branch', 'campus'],
+    course_hours: ['שעות אקדמיות', 'שעות לימוד אקדמיות', 'היקף שעות', 'מספר שעות לימוד', 'סך שעות', 'היקף הקורס בשעות', 'academic hours'],
     marital_status: ['מצב משפחתי', 'מצב אישי', 'marital status', 'الحالة الاجتماعية'],
     health_fund: ['קופת חולים', 'קופ״ח', 'קופח', 'קופה', 'health fund', 'hmo', 'صندوق المرضى'],
     date:       ['תאריך חתימה', 'תאריך מילוי', 'תאריך הבקשה', 'תאריך', 'date', 'today', 'التاريخ', 'تاريخ']

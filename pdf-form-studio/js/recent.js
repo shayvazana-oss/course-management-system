@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
-  const DB = 'fillo-docs', STORE = 'docs', CAP = 10;
+  const DB = 'fillo-docs', STORE = 'docs', CAP = 30;
 
   function open() {
     return new Promise((res, rej) => {
@@ -54,5 +54,13 @@
     } catch (e) { return null; }
   }
 
-  PFS.recent = { save, list, get };
+  async function remove(id) {
+    try {
+      const db = await open();
+      await tx(db, 'readwrite', (st) => st.delete(id));
+      db.close(); return true;
+    } catch (e) { return false; }
+  }
+
+  PFS.recent = { save, list, get, remove };
 })(window);

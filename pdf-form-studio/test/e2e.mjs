@@ -2571,6 +2571,50 @@ async function main() {
     check('case file: active-course chip renders; facts are forgettable', cfRes.chip === true && cfRes.forget === true);
   }
 
+  // ---- document history: every opened PDF is listed on home, reopenable ----
+  {
+    const histRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      const { PDFDocument, rgb } = window.PDFLib;
+      const mk = async (name) => {
+        const d = await PDFDocument.create();
+        d.addPage([300, 200]).drawRectangle({ x: 0, y: 0, width: 300, height: 200, color: rgb(1, 1, 1) });
+        return new File([await d.save()], name, { type: 'application/pdf' });
+      };
+      await T.openPdfFile(await mk('היסטוריה-א.pdf'));
+      await new Promise((r) => setTimeout(r, 900));
+      await T.openPdfFile(await mk('היסטוריה-ב.pdf'));
+      await new Promise((r) => setTimeout(r, 900));
+      T.goHome();
+      await new Promise((r) => setTimeout(r, 500));
+      const wrap = document.getElementById('recentWrap');
+      const rows = [...document.querySelectorAll('#recentList .tmpl-item')];
+      const visible = wrap && wrap.style.display !== 'none';
+      const hasA = rows.some((r) => /היסטוריה-א/.test(r.textContent));
+      const hasB = rows.some((r) => /היסטוריה-ב/.test(r.textContent));
+      // delete from history removes the row
+      const rowA = rows.find((r) => /היסטוריה-א/.test(r.textContent));
+      let deleted = false;
+      if (rowA) {
+        rowA.querySelector('button').click();
+        await new Promise((r) => setTimeout(r, 400));
+        deleted = ![...document.querySelectorAll('#recentList .tmpl-item')].some((r) => /היסטוריה-א/.test(r.textContent));
+      }
+      // clicking a row REOPENS the document
+      const rowB = [...document.querySelectorAll('#recentList .tmpl-item')].find((r) => /היסטוריה-ב/.test(r.textContent));
+      let reopened = false;
+      if (rowB) {
+        rowB.click();
+        await new Promise((r) => setTimeout(r, 2000));
+        reopened = T.pdfView.hasDoc() && /היסטוריה-ב/.test(document.getElementById('fname').textContent);
+      }
+      return { visible, hasA, hasB, deleted, reopened };
+    });
+    if (Object.values(histRes).some((v) => v !== true)) console.log('  [history debug]', JSON.stringify(histRes));
+    check('document history lists opened PDFs on home; delete removes', histRes.visible && histRes.hasA && histRes.hasB && histRes.deleted);
+    check('a history row reopens the document in one click', histRes.reopened === true);
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

@@ -1450,7 +1450,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 (function (root) {
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
-  const DB = 'fillo-docs', STORE = 'docs', CAP = 10;
+  const DB = 'fillo-docs', STORE = 'docs', CAP = 30;
 
   function open() {
     return new Promise((res, rej) => {
@@ -1498,7 +1498,15 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     } catch (e) { return null; }
   }
 
-  PFS.recent = { save, list, get };
+  async function remove(id) {
+    try {
+      const db = await open();
+      await tx(db, 'readwrite', (st) => st.delete(id));
+      db.close(); return true;
+    } catch (e) { return false; }
+  }
+
+  PFS.recent = { save, list, get, remove };
 })(window);
 
 </script>
@@ -8478,7 +8486,7 @@ async function openPdfFile(file) {
     $('exportFlatBtn') && ($('exportFlatBtn').disabled = false);
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
-    PFS.recent && PFS.recent.save(file.name, buf.slice(0));
+    PFS.recent && PFS.recent.save(file.name, buf.slice(0)).then(() => renderRecent());
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     // page navigator: only worth showing on multi-page docs
     buildPageNav();
@@ -8575,6 +8583,7 @@ async function goHome() {
   $('docbar').classList.add('hidden');
   $('fname').textContent = '—';
   $('dropzone').style.display = '';
+  try { renderRecent(); } catch (e) {}   // the history strip greets the return home
   ['exportBtn', 'tmplBtn', 'mergeBtn', 'detectBtn', 'clearBtn', 'enhanceBtn',
    'rotateBtn', 'attachBtn', 'deleteBtn', 'exportFlatBtn', 'fillAllBtn'
   ].forEach((id) => { const b = $(id); if (b) b.disabled = true; });
@@ -11219,9 +11228,19 @@ $('orgSave') && $('orgSave').addEventListener('click', () => {
   PFS.toast(n ? `פרטי הארגון נשמרו ✓ — ${n} שדות מולאו בטופס` : 'פרטי הארגון נשמרו ✓', 'ok');
 });
 
-// recent-documents strip on the empty state: one click reopens (auto-memory
-// then restores everything that was filled)
-async function renderRecent() {
+// Document HISTORY on the home screen: every opened PDF is kept (bytes and
+// all, capped at 30) and reopens with one click — auto-memory then restores
+// everything that was filled. Collapsed: the 5 freshest. Expanded: the full
+// history with search and per-item delete.
+let recentExpanded = false;
+function relDate(ts) {
+  const d = new Date(ts), now = new Date();
+  const days = Math.floor((now - d) / 86400000);
+  if (d.toDateString() === now.toDateString()) return 'היום ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  if (days < 2 && new Date(now - 86400000).toDateString() === d.toDateString()) return 'אתמול';
+  return d.toLocaleDateString('he-IL');
+}
+async function renderRecent(filter) {
   if (!PFS.recent) return;
   const wrap = $('recentWrap'), list = $('recentList');
   if (!wrap || !list) return;
@@ -11229,15 +11248,44 @@ async function renderRecent() {
   if (!docs.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
   list.innerHTML = '';
-  docs.slice(0, 5).forEach((d) => {
+  const q = PFS.vault ? PFS.vault.norm(filter || '') : String(filter || '').trim();
+  const pool = q ? docs.filter((d) => (PFS.vault ? PFS.vault.norm(d.name) : d.name).includes(q)) : docs;
+  const shown = recentExpanded ? pool : pool.slice(0, 5);
+  // search box — worth its pixels only once the history is real
+  if (recentExpanded && docs.length > 8) {
+    const s = document.createElement('input');
+    s.type = 'search'; s.id = 'recentSearch'; s.placeholder = '🔎 חיפוש בהיסטוריה…'; s.value = filter || '';
+    s.style.cssText = 'width:100%;margin-bottom:6px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px';
+    s.addEventListener('input', () => renderRecent(s.value).then(() => { const el = $('recentSearch'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }));
+    list.appendChild(s);
+  }
+  shown.forEach((d) => {
     const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
-    row.innerHTML = '<div class="nm">📄 ' + d.name + '</div><span class="pill">' + new Date(d.ts).toLocaleDateString('he-IL') + '</span>';
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = '📄 ' + d.name;
+    const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = relDate(d.ts);
+    const del = document.createElement('button');
+    del.className = 'btn sm ghost'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
+    del.style.cssText = 'color:var(--danger);flex:none;padding:2px 7px';
+    del.addEventListener('click', async (e) => { e.stopPropagation(); await PFS.recent.remove(d.id); renderRecent(filter); });
+    row.append(nm, pill, del);
     row.addEventListener('click', async () => {
       const doc = await PFS.recent.get(d.id);
       if (doc && doc.bytes) openPdfFile(new File([doc.bytes], doc.name, { type: 'application/pdf' }));
     });
     list.appendChild(row);
   });
+  if (q && !pool.length) {
+    const none = document.createElement('div'); none.className = 'hint muted'; none.textContent = 'אין תוצאות ל"' + filter + '"';
+    list.appendChild(none);
+  }
+  if (docs.length > 5) {
+    const more = document.createElement('button');
+    more.className = 'btn sm block';
+    more.style.marginTop = '4px';
+    more.textContent = recentExpanded ? 'הצג פחות' : '🕘 כל ההיסטוריה (' + docs.length + ')';
+    more.addEventListener('click', () => { recentExpanded = !recentExpanded; renderRecent(); });
+    list.appendChild(more);
+  }
 }
 renderRecent();
 

@@ -747,8 +747,18 @@ async function openCompanion(link) {
     } catch (e) {}
     // the person rides canon matching (bridges any wording); the rest rides
     // exact-label carry; anything the user TYPED beats what was printed
+    // the person may be TYPED into the quote rather than printed in it —
+    // either way they must ride to the appendix ("לא מעתיק את פרטי הסטודנט").
+    // Typed values are resolved by MEANING (any person-worded field counts)
+    // and outrank the printed extraction, which fills the gaps.
     const person = {};
-    ['שם מלא', 'תעודת זהות', 'טלפון'].forEach((k) => { if (extracted[k]) person[k] = extracted[k]; });
+    const PKEYS = { full_name: 'שם מלא', id: 'תעודת זהות', phone: 'טלפון' };
+    Object.keys(typed).forEach((k) => {
+      const c = PFS.vault.matchKey(k);
+      const std = c && PKEYS[c];
+      if (std && String(typed[k] || '').trim() && !person[std]) person[std] = typed[k];
+    });
+    ['שם מלא', 'תעודת זהות', 'טלפון'].forEach((k) => { if (extracted[k] && !person[k]) person[k] = extracted[k]; });
     pendingStudent = Object.keys(person).length ? person : null;
     // the quote names a BRANCH — pick the matching saved campus so the
     // appendix's address is THIS deal's, not the most-used one
@@ -2787,7 +2797,8 @@ function extractQuoteMap(text) {
   const course = grab(/לקורס\s+([א-ת][א-ת"'\s]{1,30}?)(?=\s+(?:עבור|ת\.?["']?ז|בתאריך|החל|מס)|[\n,.:]|$)/)
     || grab(/(?:^|\n)\s*קורס\s*[:：]\s*([א-ת][א-ת"'\s]{1,30}?)(?=[\n,.]|$)/);
   if (course) { map['שם הקורס'] = course; map['שם הקורס המבוקש'] = course; map['הקורס המבוקש'] = course; }
-  const forName = grab(/עבור\s+([א-ת][א-ת'\-\s]{1,25}?)(?=\s+ת\.?["']?\s*ז|\s+\d|[\n,.:]|$)/);
+  const forName = grab(/עבור\s+([א-ת][א-ת'\-\s]{1,25}?)(?=\s+ת\.?["']?\s*ז|\s+\d|[\n,.:]|$)/)
+    || grab(/לכבוד\s*[:：]?\s+([א-ת][א-ת'\-\s]{1,25}?)(?=\s+ת\.?["']?\s*ז|\s+\d|[\n,.]|$)/);
   if (forName && !map['שם מלא']) map['שם מלא'] = forName;
   const branch = grab(/סניף\s*[:：]?\s+([א-ת][א-ת\s]{1,20}?)(?=[\n,.]|$)/)
     || grab(/קמפוס\s*[:：]?\s+([א-ת][א-ת\s]{1,20}?)(?=[\n,.]|$)/);

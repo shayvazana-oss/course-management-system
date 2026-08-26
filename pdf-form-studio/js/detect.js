@@ -322,8 +322,26 @@
           && Math.abs((o.top + o.fontH / 2) - belowMid) < anchor.fontH * 0.9
           && o.x < b.x + b.w + b.fontH && (o.x + o.w) > b.x - b.fontH);
         if (conflict || (belowTop + anchor.fontH * 1.2) / H > 1) return;
-        const fw = Math.min((b.w * 1.5 + b.fontH) / W, 0.45);
         const rtl = hasHebrew(b.str);
+        // the answer band under a header must stay INSIDE ITS COLUMN — the
+        // sibling headers on the same row mark the column boundaries. Sizing
+        // by the header's own width alone let a long value's box cross into
+        // the neighbour cell ("הטקסט כל הזמן גולש החוצה"), and even the
+        // shrink-then-wrap fitter then wrapped at the WRONG width.
+        let fw = Math.min((b.w * 1.5 + b.fontH) / W, 0.45);
+        if (rtl) {
+          const leftEdges = heads.filter((o) => o !== b && (o.x + o.w) <= b.x + 1).map((o) => o.x + o.w);
+          if (leftEdges.length) {
+            const bound = Math.max(...leftEdges) + b.fontH * 0.5;   // the next column's edge + a gutter
+            fw = Math.min(fw, Math.max(b.fontH * 2, ((b.x + b.w) - bound)) / W);
+          }
+        } else {
+          const rightEdges = heads.filter((o) => o !== b && o.x >= b.x + b.w - 1).map((o) => o.x);
+          if (rightEdges.length) {
+            const bound = Math.min(...rightEdges) - b.fontH * 0.5;
+            fw = Math.min(fw, Math.max(b.fontH * 2, (bound - b.x)) / W);
+          }
+        }
         // RTL: the answer grows leftward from the label's right edge
         const fx = rtl ? Math.max(0, (b.x + b.w) / W - fw) : b.x / W;
         out.push({

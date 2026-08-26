@@ -2172,10 +2172,12 @@ async function main() {
       await T.openPdfFile(await mkForm('Quote-B', ['Course name:']));
       await new Promise((r) => setTimeout(r, 1300));
       const fpA = T.getFp();
-      const fileB = await mkForm('Appendix-B', ['Course name:']);
+      const fileB = await mkForm('Appendix-B', ['Course name:', 'Full name:']);
       const rec = await window.PFS.companions.add({ ownerFp: fpA, ownerName: 'Quote-B', name: 'נספח בדיקה', bytes: await fileB.arrayBuffer() });
       T.overlay.clearElements();
       T.overlay.addElementAt('text', 0, 0.3, 0.3, { text: 'קורס נגרות', fieldKey: 'Course name', noEdit: true });
+      // the student TYPED on the quote (not printed in it) must ride too
+      T.overlay.addElementAt('text', 0, 0.3, 0.5, { text: 'טלי מכלוף', fieldKey: 'Full name', noEdit: true });
       // open the export review — the linked companion must be visible in it
       document.getElementById('exportBtn').click();
       await new Promise((r) => setTimeout(r, 300));
@@ -2193,12 +2195,15 @@ async function main() {
       await new Promise((r) => setTimeout(r, 1800));
       const opened = document.getElementById('fname').textContent.indexOf('נספח בדיקה') !== -1;
       const carried = T.overlay.getElements().some((e) => e.model.text === 'קורס נגרות');
+      // typed person outranks the profile ('ישראל ישראלי') on the appendix
+      const person = T.overlay.getElements().some((e) => e.model.text === 'טלי מכלוף');
       await window.PFS.companions.remove(rec.id);
-      return { shownInModal, asked, opened, carried };
+      return { shownInModal, asked, opened, carried, person };
     });
     if (!(askRes.shownInModal && askRes.asked && askRes.opened && askRes.carried)) console.log('  [ask debug]', JSON.stringify(askRes));
     check('export modal shows the linked appendix', askRes.shownInModal === true);
     check('after download the app ASKS to fill the appendix; yes opens it filled', askRes.asked === true && askRes.opened === true && askRes.carried === true);
+    check('a person TYPED on the quote rides to the appendix (student path)', askRes.person === true);
   }
 
   // ---- 🏠 home: close the document, return to the start screen, open fresh ----
@@ -2570,6 +2575,24 @@ async function main() {
     check('case file: a never-seen form fills from the ledger by meaning', cfRes.fill === true && cfRes.carryWins === true);
     check('case file: active-course chip renders; facts are forgettable', cfRes.chip === true && cfRes.forget === true);
   }
+
+  // a table-header answer band must stay INSIDE its own column — sizing by
+  // the header alone let long values cross into the neighbour cell
+  check('table-header field width is clamped to its column', await page.evaluate(() => {
+    const H = 320, W = 460, fs = 16;
+    const vp = { transform: [1, 0, 0, -1, 0, H], width: W, height: H };
+    const item = (str, x, top, width) => ({ str, width, transform: [fs, 0, 0, fs, x, H - (top + fs)] });
+    const det = window.PFS.detect.heuristicForPage([
+      item('שם הקורס', 300, 60, 60),          // rightmost column (RTL)
+      item('שם מוסד ההכשרה', 180, 60, 110)     // neighbour ends at x=290
+    ], W, H, vp, 0);
+    const crs = det.find((f) => f.label === 'שם הקורס');
+    const inst = det.find((f) => /מוסד/.test(f.label));
+    if (!crs || !inst) return 'missing';
+    // the course band may not cross the boundary at 290 (+half-em gutter)
+    const leftEdge = crs.fx * W;
+    return leftEdge >= 290 + fs * 0.5 - 1 && (crs.fx + crs.fw) * W <= 362 ? true : 'fx=' + leftEdge.toFixed(1);
+  }) === true);
 
   // ---- document history: every opened PDF is listed on home, reopenable ----
   {

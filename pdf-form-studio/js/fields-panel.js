@@ -450,6 +450,24 @@
             if (next) { next.focus({ preventScroll: true }); next.select && next.select(); PFS.scrollToEl(next, 'center'); const ct = ctrlByKey[next.__fkey]; if (ct) PFS.scrollToEl(ct.node, 'center'); }
             else control.blur();
           });
+          // ADOPT a value already on the form. Auto-memory restore, Fill-All
+          // and earlier sessions place elements the panel never created; the
+          // prefill skip-set then leaves this row EMPTY, so typing into it
+          // added a SECOND value on top of the first — two values stacked in
+          // one cell. Bind the existing element to this row instead.
+          if (!ctrlByKey[f.fieldKey]) {
+            const inBand = (m) => m.page === f.page && f.fw && f.fh
+              && (m.fx + (m.fw || 0) / 2) > f.fx - f.fw * 0.15
+              && (m.fx + (m.fw || 0) / 2) < f.fx + f.fw * 1.15
+              && Math.abs((m.fy + (m.fh || 0) / 2) - (f.fy + f.fh / 2)) < Math.max(f.fh, 0.012);
+            const own = overlay.getElements().find((c) => c.model.type === 'text'
+              && (c.model.fieldKey === f.fieldKey || (!c.model.fieldKey && inBand(c.model))));
+            if (own) {
+              ctrlByKey[f.fieldKey] = own;
+              if (!own.model.fieldKey) own.model.fieldKey = f.fieldKey;
+              if (String(own.model.text || '').trim()) control.value = own.model.text;
+            }
+          }
           const pv = prefill && prefill[f.fieldKey];
           if (pv != null && String(pv).trim()) {
             control.value = pv;

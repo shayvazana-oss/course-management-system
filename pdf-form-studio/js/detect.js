@@ -95,6 +95,47 @@
     return out;
   }
 
+
+  /* splitSharedBands(fields) — one cell, one field.
+   * Two labels on the same table row can end up sharing ONE band: each
+   * claims the gap beside it, and the ink-snap expansion then grows both to
+   * the same cell run. Both get filled and the values stack in one cell —
+   * that is what "מאוד מבולגן" looks like on paper. Where bands on a row
+   * overlap, re-partition the row by the LABELS' own positions: each field
+   * takes the column under/beside its label, bounded at the midpoints to its
+   * neighbours. Deterministic, and it never invents space.
+   * Runs inside detection AND again after ink-snap (which can re-widen). */
+  function splitSharedBands(out) {
+    const texts = (out || []).filter((f) => f.type === 'text' && f._lx != null);
+    const rows = [];
+    texts.forEach((f) => {
+      const r = rows.find((x) => x.page === f.page && Math.abs(x.fy - f.fy) < 0.012);
+      if (r) r.items.push(f); else rows.push({ page: f.page, fy: f.fy, items: [f] });
+    });
+    let fixed = 0;
+    rows.forEach((r) => {
+      if (r.items.length < 2) return;
+      const clash = r.items.some((a, i) => r.items.some((b2, j) => {
+        if (j <= i) return false;
+        const ix = Math.min(a.fx + a.fw, b2.fx + b2.fw) - Math.max(a.fx, b2.fx);
+        return ix > 0.3 * Math.min(a.fw, b2.fw);
+      }));
+      if (!clash) return;
+      const span = {
+        lo: Math.min(...r.items.map((f) => Math.min(f.fx, f._lx))),
+        hi: Math.max(...r.items.map((f) => Math.max(f.fx + f.fw, f._lx + f._lw)))
+      };
+      const byLabel = r.items.slice().sort((a, b2) => (a._lx + a._lw / 2) - (b2._lx + b2._lw / 2));
+      byLabel.forEach((f, i) => {
+        const prev = byLabel[i - 1], next = byLabel[i + 1];
+        const lo = prev ? (prev._lx + prev._lw + f._lx) / 2 : span.lo;
+        const hi = next ? (f._lx + f._lw + next._lx) / 2 : span.hi;
+        if (hi - lo > 0.02) { f.fx = lo; f.fw = hi - lo; fixed++; }
+      });
+    });
+    return fixed;
+  }
+
   function heuristicForPage(items, W, H, vp, startIndex) {
     const boxes = mergeFragments(items.filter((it) => it.str && it.str.trim()).map((it) => itemBox(it, vp)));
     const out = [];
@@ -268,7 +309,8 @@
       out.push({
         page: startIndex, fieldKey: slug(cleanLabel || displayLabel, out.length),
         label: cleanLabel || 'שדה',
-        fx, fy, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
+        fx, fy, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required,
+        _lx: b.x / W, _lw: b.w / W          // the label's own span (for band splitting)
       });
     });
     // ---- table cells: header row above an empty input row ----
@@ -347,10 +389,22 @@
         out.push({
           page: startIndex, fieldKey: slug(label, out.length), label,
           fx, fy: belowTop / H, fw, fh: (b.fontH * 1.1) / H,
-          fontFrac: Math.min(0.03, (b.fontH * 0.95) / H), type: 'text'
+          fontFrac: Math.min(0.03, (b.fontH * 0.95) / H), type: 'text',
+          _lx: b.x / W, _lw: b.w / W
         });
       });
     });
+
+    /* ---- one cell, one field ----
+     * Two labels on the same table row can each claim the SAME wide band
+     * (their own answer span is unknown, so each grabs the gap beside it) —
+     * then both get filled and the values stack in one cell, which is what
+     * "השורות עולות אחת על השנייה / מאוד מבולגן" looks like. Where bands on a
+     * row overlap, re-partition the whole row by the LABELS' positions: each
+     * field takes the column under/beside its own label, bounded at the
+     * midpoints to its neighbours. Deterministic, and it never invents space.
+     */
+    splitSharedBands(out);
 
     // the reading order of the FORM is the filling order of the panel:
     // top-to-bottom, and within a line right-to-left (RTL forms)
@@ -367,7 +421,7 @@
       const line = radios.filter((o) => Math.abs(o._cy - f._cy) < (f._rowH || 10) * 0.8);
       if (line.length >= 2) { gid++; const g = startIndex + '_r' + gid; line.forEach((o) => { o.group = g; }); }
     });
-    out.forEach((f) => { delete f._cy; delete f._rowH; });
+    out.forEach((f) => { delete f._cy; delete f._rowH; });   // _lx/_lw survive for the post-snap split
     return out;
   }
 
@@ -432,5 +486,5 @@
   // heuristicForPage is exposed for the e2e suite (synthetic text items →
   // fields) so checkbox/label heuristics can be tested without a real PDF whose
   // embedded font carries glyphs the standard PDF fonts can't encode (e.g. ○).
-  PFS.detect = { detectFields, heuristicForPage };
+  PFS.detect = { detectFields, heuristicForPage, splitSharedBands };
 })(window);

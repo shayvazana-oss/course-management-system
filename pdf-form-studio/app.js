@@ -274,7 +274,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -664,6 +664,15 @@ async function runDetection() {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
+    // ink-snap expands a field until it meets a border — on a table row that
+    // can swallow the neighbouring columns, leaving several fields sharing one
+    // cell and their values stacked on top of each other. Re-partition by the
+    // labels' own positions AFTER the expansion, then drop the label spans.
+    try {
+      const nSplit = PFS.detect.splitSharedBands(det.fields);
+      if (nSplit) console.info('[split] re-partitioned', nSplit, 'shared cells');
+    } catch (e) {}
+    det.fields.forEach((f) => { delete f._lx; delete f._lw; });
     normalizeFontSizes(det);
     lastDet = det;
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}

@@ -2594,6 +2594,60 @@ async function main() {
     return leftEdge >= 290 + fs * 0.5 - 1 && (crs.fx + crs.fw) * W <= 362 ? true : 'fx=' + leftEdge.toFixed(1);
   }) === true);
 
+  // ---- one cell, one field: no two values may stack in the same table cell ----
+  // (the real נספח ה3, filled end to end: ink-snap used to expand several
+  // fields onto the SAME cell run and their values piled up — "מאוד מבולגן")
+  {
+    const stackRes = await page.evaluate(async (bytes) => {
+      const T = window.PFS.__test;
+      const buf = new Uint8Array(bytes).buffer;
+      await T.openPdfFile(new File([buf], 'nispach-h3.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 3500));
+      const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
+      rows.forEach((r, i) => { if (!r.value) { r.value = 'ערך' + (i + 1); r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); } });
+      await new Promise((r) => setTimeout(r, 500));
+      const els = T.overlay.getElements()
+        .filter((e) => e.model.type === 'text')
+        .map((e) => ({ t: e.model.text || '', fx: e.model.fx, fy: e.model.fy, fw: e.model.fw, fh: e.model.fh }));
+      let worst = 0;
+      for (let i = 0; i < els.length; i++) for (let j = i + 1; j < els.length; j++) {
+        const a = els[i], b = els[j];
+        const ix = Math.min(a.fx + a.fw, b.fx + b.fw) - Math.max(a.fx, b.fx);
+        const iy = Math.min(a.fy + a.fh, b.fy + b.fh) - Math.max(a.fy, b.fy);
+        if (ix > 0 && iy > 0) {
+          const small = Math.min(a.fw * a.fh, b.fw * b.fh);
+          if (small > 0) worst = Math.max(worst, (ix * iy) / small);
+        }
+      }
+      // detected bands must not share a row either
+      const det = T.getLastDet();
+      let bandClash = 0;
+      const F = det.fields.filter((f) => f.type === 'text');
+      for (let i = 0; i < F.length; i++) for (let j = i + 1; j < F.length; j++) {
+        const a = F[i], b = F[j];
+        if (a.page !== b.page || Math.abs(a.fy - b.fy) > 0.012) continue;
+        const ix = Math.min(a.fx + a.fw, b.fx + b.fw) - Math.max(a.fx, b.fx);
+        if (ix > 0.3 * Math.min(a.fw, b.fw)) bandClash++;
+      }
+      const ghosts = T.overlay.getElements().filter((e) => e.model.type === 'text' && !String(e.model.text || '').trim()).length;
+      return { n: els.length, worst: +worst.toFixed(2), bandClash, ghosts };
+    }, Array.from(fs.readFileSync(path.join(HERE, 'fixtures', 'nispach-h3.pdf'))));
+    if (stackRes.worst > 0.2 || stackRes.bandClash) console.log('  [stack debug]', JSON.stringify(stackRes));
+    check('real נספח ה3 filled: no two values stack in one cell', stackRes.n >= 8 && stackRes.worst <= 0.2 && stackRes.bandClash === 0);
+    check('no empty "טקסט…" ghosts are left on the form', stackRes.ghosts === 0);
+  }
+
+  // an empty text element is never persisted (it would restore as a ghost)
+  check('empty text elements are never serialized', await page.evaluate(() => {
+    const ov = window.PFS.__test.overlay;
+    ov.clearElements();
+    ov.addModelAt('text', 0, { fx: 0.2, fy: 0.2, text: '', noEdit: true });
+    ov.addModelAt('text', 0, { fx: 0.2, fy: 0.4, text: 'ערך', noEdit: true });
+    const ser = ov.serialize();
+    ov.clearElements();
+    return ser.filter((m) => m.type === 'text').length === 1 && ser.some((m) => m.text === 'ערך');
+  }));
+
   // ---- document history: every opened PDF is listed on home, reopenable ----
   {
     const histRes = await page.evaluate(async () => {

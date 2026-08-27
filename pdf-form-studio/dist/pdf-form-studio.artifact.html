@@ -5114,7 +5114,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
     // ---- serialization (templates) ----
     function serialize() {
-      return elements.map((c) => {
+      // an EMPTY text element is a ghost: it renders the 'טקסט…' placeholder
+      // on screen and nothing on paper. Never persist one — otherwise every
+      // template/auto-memory restore litters the form with placeholders.
+      return elements.filter((c) => !(c.model.type === 'text' && !String(c.model.text || '').trim())).map((c) => {
         const m = c.model;
         return {
           type: m.type, kind: m.kind, page: m.page,
@@ -6453,6 +6456,47 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return out;
   }
 
+
+  /* splitSharedBands(fields) — one cell, one field.
+   * Two labels on the same table row can end up sharing ONE band: each
+   * claims the gap beside it, and the ink-snap expansion then grows both to
+   * the same cell run. Both get filled and the values stack in one cell —
+   * that is what "מאוד מבולגן" looks like on paper. Where bands on a row
+   * overlap, re-partition the row by the LABELS' own positions: each field
+   * takes the column under/beside its label, bounded at the midpoints to its
+   * neighbours. Deterministic, and it never invents space.
+   * Runs inside detection AND again after ink-snap (which can re-widen). */
+  function splitSharedBands(out) {
+    const texts = (out || []).filter((f) => f.type === 'text' && f._lx != null);
+    const rows = [];
+    texts.forEach((f) => {
+      const r = rows.find((x) => x.page === f.page && Math.abs(x.fy - f.fy) < 0.012);
+      if (r) r.items.push(f); else rows.push({ page: f.page, fy: f.fy, items: [f] });
+    });
+    let fixed = 0;
+    rows.forEach((r) => {
+      if (r.items.length < 2) return;
+      const clash = r.items.some((a, i) => r.items.some((b2, j) => {
+        if (j <= i) return false;
+        const ix = Math.min(a.fx + a.fw, b2.fx + b2.fw) - Math.max(a.fx, b2.fx);
+        return ix > 0.3 * Math.min(a.fw, b2.fw);
+      }));
+      if (!clash) return;
+      const span = {
+        lo: Math.min(...r.items.map((f) => Math.min(f.fx, f._lx))),
+        hi: Math.max(...r.items.map((f) => Math.max(f.fx + f.fw, f._lx + f._lw)))
+      };
+      const byLabel = r.items.slice().sort((a, b2) => (a._lx + a._lw / 2) - (b2._lx + b2._lw / 2));
+      byLabel.forEach((f, i) => {
+        const prev = byLabel[i - 1], next = byLabel[i + 1];
+        const lo = prev ? (prev._lx + prev._lw + f._lx) / 2 : span.lo;
+        const hi = next ? (f._lx + f._lw + next._lx) / 2 : span.hi;
+        if (hi - lo > 0.02) { f.fx = lo; f.fw = hi - lo; fixed++; }
+      });
+    });
+    return fixed;
+  }
+
   function heuristicForPage(items, W, H, vp, startIndex) {
     const boxes = mergeFragments(items.filter((it) => it.str && it.str.trim()).map((it) => itemBox(it, vp)));
     const out = [];
@@ -6626,7 +6670,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       out.push({
         page: startIndex, fieldKey: slug(cleanLabel || displayLabel, out.length),
         label: cleanLabel || 'שדה',
-        fx, fy, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required
+        fx, fy, fw, fh: b.fontH / H, fontFrac, type: 'text', best: true, required,
+        _lx: b.x / W, _lw: b.w / W          // the label's own span (for band splitting)
       });
     });
     // ---- table cells: header row above an empty input row ----
@@ -6705,10 +6750,22 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         out.push({
           page: startIndex, fieldKey: slug(label, out.length), label,
           fx, fy: belowTop / H, fw, fh: (b.fontH * 1.1) / H,
-          fontFrac: Math.min(0.03, (b.fontH * 0.95) / H), type: 'text'
+          fontFrac: Math.min(0.03, (b.fontH * 0.95) / H), type: 'text',
+          _lx: b.x / W, _lw: b.w / W
         });
       });
     });
+
+    /* ---- one cell, one field ----
+     * Two labels on the same table row can each claim the SAME wide band
+     * (their own answer span is unknown, so each grabs the gap beside it) —
+     * then both get filled and the values stack in one cell, which is what
+     * "השורות עולות אחת על השנייה / מאוד מבולגן" looks like. Where bands on a
+     * row overlap, re-partition the whole row by the LABELS' positions: each
+     * field takes the column under/beside its own label, bounded at the
+     * midpoints to its neighbours. Deterministic, and it never invents space.
+     */
+    splitSharedBands(out);
 
     // the reading order of the FORM is the filling order of the panel:
     // top-to-bottom, and within a line right-to-left (RTL forms)
@@ -6725,7 +6782,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const line = radios.filter((o) => Math.abs(o._cy - f._cy) < (f._rowH || 10) * 0.8);
       if (line.length >= 2) { gid++; const g = startIndex + '_r' + gid; line.forEach((o) => { o.group = g; }); }
     });
-    out.forEach((f) => { delete f._cy; delete f._rowH; });
+    out.forEach((f) => { delete f._cy; delete f._rowH; });   // _lx/_lw survive for the post-snap split
     return out;
   }
 
@@ -6790,7 +6847,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   // heuristicForPage is exposed for the e2e suite (synthetic text items →
   // fields) so checkbox/label heuristics can be tested without a real PDF whose
   // embedded font carries glyphs the standard PDF fonts can't encode (e.g. ○).
-  PFS.detect = { detectFields, heuristicForPage };
+  PFS.detect = { detectFields, heuristicForPage, splitSharedBands };
 })(window);
 
 </script>
@@ -7401,6 +7458,24 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             if (next) { next.focus({ preventScroll: true }); next.select && next.select(); PFS.scrollToEl(next, 'center'); const ct = ctrlByKey[next.__fkey]; if (ct) PFS.scrollToEl(ct.node, 'center'); }
             else control.blur();
           });
+          // ADOPT a value already on the form. Auto-memory restore, Fill-All
+          // and earlier sessions place elements the panel never created; the
+          // prefill skip-set then leaves this row EMPTY, so typing into it
+          // added a SECOND value on top of the first — two values stacked in
+          // one cell. Bind the existing element to this row instead.
+          if (!ctrlByKey[f.fieldKey]) {
+            const inBand = (m) => m.page === f.page && f.fw && f.fh
+              && (m.fx + (m.fw || 0) / 2) > f.fx - f.fw * 0.15
+              && (m.fx + (m.fw || 0) / 2) < f.fx + f.fw * 1.15
+              && Math.abs((m.fy + (m.fh || 0) / 2) - (f.fy + f.fh / 2)) < Math.max(f.fh, 0.012);
+            const own = overlay.getElements().find((c) => c.model.type === 'text'
+              && (c.model.fieldKey === f.fieldKey || (!c.model.fieldKey && inBand(c.model))));
+            if (own) {
+              ctrlByKey[f.fieldKey] = own;
+              if (!own.model.fieldKey) own.model.fieldKey = f.fieldKey;
+              if (String(own.model.text || '').trim()) control.value = own.model.text;
+            }
+          }
           const pv = prefill && prefill[f.fieldKey];
           if (pv != null && String(pv).trim()) {
             control.value = pv;
@@ -7934,7 +8009,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -8324,6 +8399,15 @@ async function runDetection() {
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
+    // ink-snap expands a field until it meets a border — on a table row that
+    // can swallow the neighbouring columns, leaving several fields sharing one
+    // cell and their values stacked on top of each other. Re-partition by the
+    // labels' own positions AFTER the expansion, then drop the label spans.
+    try {
+      const nSplit = PFS.detect.splitSharedBands(det.fields);
+      if (nSplit) console.info('[split] re-partitioned', nSplit, 'shared cells');
+    } catch (e) {}
+    det.fields.forEach((f) => { delete f._lx; delete f._lw; });
     normalizeFontSizes(det);
     lastDet = det;
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}

@@ -235,7 +235,10 @@
 
     // ---- serialization (templates) ----
     function serialize() {
-      return elements.map((c) => {
+      // an EMPTY text element is a ghost: it renders the 'טקסט…' placeholder
+      // on screen and nothing on paper. Never persist one — otherwise every
+      // template/auto-memory restore litters the form with placeholders.
+      return elements.filter((c) => !(c.model.type === 'text' && !String(c.model.text || '').trim())).map((c) => {
         const m = c.model;
         return {
           type: m.type, kind: m.kind, page: m.page,

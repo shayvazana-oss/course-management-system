@@ -274,7 +274,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -730,6 +730,56 @@ function renderCompanions() {
   });
 }
 
+/* buildPersonAndCarry(keyed, freeText, printed) — ONE assembly of what a
+ * source document tells us, from all three places values actually live:
+ *   keyed   — panel-filled fields (fieldKey → text)
+ *   freeText — values typed with the free TEXT tool (no fieldKey — previously
+ *              invisible to the carry, which is how "typed it, didn't carry"
+ *              reports kept coming back)
+ *   printed — facts extracted from the document's own printed text
+ * Free-typed text is mined with the same extractors as printed text; typed
+ * beats printed. The person is separated for the student path (canon
+ * matching); everything rides the carry. */
+function buildPersonAndCarry(keyed, freeText, printed) {
+  let mined = {};
+  try { if (freeText && freeText.trim()) mined = extractQuoteMap(freeText); } catch (e) {}
+  const extracted = Object.assign({}, printed || {}, mined);
+  const person = {};
+  const PKEYS = { full_name: 'שם מלא', id: 'תעודת זהות', phone: 'טלפון' };
+  Object.keys(keyed || {}).forEach((k) => {
+    const c = PFS.vault.matchKey(k);
+    const std = c && PKEYS[c];
+    if (std && String(keyed[k] || '').trim() && !person[std]) person[std] = keyed[k];
+  });
+  ['שם מלא', 'תעודת זהות', 'טלפון'].forEach((k) => { if (extracted[k] && !person[k]) person[k] = extracted[k]; });
+  return { person, carry: Object.assign({}, extracted, keyed || {}), extracted };
+}
+
+/* findOwnerForCompanion(fp) — is the OPENED document itself a linked
+ * appendix? Users open the appendix directly (history, file picker) at least
+ * as often as through "מלא עכשיו" — the pull must work from that side too.
+ * Companion fingerprints are computed lazily and cached on the record. */
+async function findOwnerForCompanion(fp) {
+  if (!fp || !PFS.companions || !PFS.companions.all) return null;
+  for (const r of PFS.companions.all()) {
+    if (r.compFp === undefined || r.compFp === null) {
+      let computed = '';
+      try {
+        const bytes = await PFS.companions.getBytes(r.id);
+        if (bytes) {
+          const doc = await pdfjsLib.getDocument({ data: new Uint8Array(bytes.slice(0)) }).promise;
+          computed = await PFS.fingerprint.compute(doc);
+          try { doc.destroy(); } catch (e) {}
+        }
+      } catch (e) {}
+      r.compFp = computed || '';
+      try { PFS.companions.patch(r.id, { compFp: r.compFp }); } catch (e) {}
+    }
+    try { if (r.compFp && PFS.fingerprint.score(fp, r.compFp) >= 0.85) return r; } catch (e) {}
+  }
+  return null;
+}
+
 // open a linked companion pre-filled with the CURRENT form's values
 async function openCompanion(link) {
   try {
@@ -739,27 +789,18 @@ async function openCompanion(link) {
     // read the document's PRINTED text: a price quote arrives with the deal
     // facts already in it (עבור פלוני ת"ז..., לקורס...), nothing typed
     const typed = overlay.currentValues();
-    let extracted = {};
+    // values placed with the free TEXT tool have no fieldKey — mine them too
+    const freeTyped = overlay.getElements()
+      .filter((c) => c.model.type === 'text' && !c.model.fieldKey && String(c.model.text || '').trim())
+      .map((c) => c.model.text).join('\n');
+    let printed = {};
     try {
       const t = await readDocText();
-      const ea = extractQuoteMap(t.a), eb = extractQuoteMap(t.b);
-      extracted = Object.assign({}, eb, ea);   // content-order wins ties
+      printed = Object.assign({}, extractQuoteMap(t.b), extractQuoteMap(t.a));   // content-order wins ties
     } catch (e) {}
-    // the person rides canon matching (bridges any wording); the rest rides
-    // exact-label carry; anything the user TYPED beats what was printed
-    // the person may be TYPED into the quote rather than printed in it —
-    // either way they must ride to the appendix ("לא מעתיק את פרטי הסטודנט").
-    // Typed values are resolved by MEANING (any person-worded field counts)
-    // and outrank the printed extraction, which fills the gaps.
-    const person = {};
-    const PKEYS = { full_name: 'שם מלא', id: 'תעודת זהות', phone: 'טלפון' };
-    Object.keys(typed).forEach((k) => {
-      const c = PFS.vault.matchKey(k);
-      const std = c && PKEYS[c];
-      if (std && String(typed[k] || '').trim() && !person[std]) person[std] = typed[k];
-    });
-    ['שם מלא', 'תעודת זהות', 'טלפון'].forEach((k) => { if (extracted[k] && !person[k]) person[k] = extracted[k]; });
-    pendingStudent = Object.keys(person).length ? person : null;
+    const built = buildPersonAndCarry(typed, freeTyped, printed);
+    const extracted = built.extracted;
+    pendingStudent = Object.keys(built.person).length ? built.person : null;
     // the quote names a BRANCH — pick the matching saved campus so the
     // appendix's address is THIS deal's, not the most-used one
     if (extracted['סניף']) {
@@ -771,9 +812,9 @@ async function openCompanion(link) {
           .find((o) => PFS.vault.norm(o.v).includes(br));
         if (opt) addr = opt.v;
       }
-      if (addr) { extracted['כתובת מוסד ההכשרה'] = addr; extracted['כתובת המוסד'] = addr; }
+      if (addr) { built.carry['כתובת מוסד ההכשרה'] = addr; built.carry['כתובת המוסד'] = addr; }
     }
-    pendingCarry = Object.assign({}, extracted, typed);
+    pendingCarry = Object.assign({}, built.carry);
     // the quote's printed deal facts seed the ACTIVE course's ledger too —
     // extraction happens once; from then on the ledger fills every form
     try {
@@ -890,6 +931,28 @@ async function openPdfFile(file) {
     if (loadGen === myGen && PFS.companions && currentFp) {
       const links = PFS.companions.listFor(currentFp);
       if (links.length) PFS.toast('🔗 מקושר לטופס זה: "' + links[0].name + '" — אציע למלא אותו אחרי הייצוא', 'ok', 5000);
+    }
+    // REVERSE PULL: the opened document may itself BE a linked appendix,
+    // opened directly (history / file picker) instead of through "מלא עכשיו".
+    // Find its owner and pull the owner's remembered fill across.
+    if (loadGen === myGen && currentFp && !pendingCarry && !pendingStudent) {
+      try {
+        const ownerRec = await findOwnerForCompanion(currentFp);
+        const tm = ownerRec && templates.findMatch(ownerRec.ownerFp);
+        if (tm && tm.tpl && Array.isArray(tm.tpl.elements)) {
+          const keyed = {}; const free = [];
+          tm.tpl.elements.forEach((m) => {
+            if (m.type !== 'text' || !String(m.text || '').trim()) return;
+            if (m.fieldKey) keyed[m.fieldKey] = m.text; else free.push(m.text);
+          });
+          const built2 = buildPersonAndCarry(keyed, free.join('\n'), {});
+          if (Object.keys(built2.person).length) pendingStudent = built2.person;
+          if (Object.keys(built2.carry).length) {
+            pendingCarry = built2.carry;
+            PFS.toast('🔗 זוהה נספח מקושר — נמשכו נתונים מ"' + (ownerRec.ownerName || 'הטופס המקושר') + '"', 'ok', 4500);
+          }
+        }
+      } catch (e) {}
     }
     const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp);
     if (match) {

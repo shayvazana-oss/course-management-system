@@ -88,5 +88,11 @@
     });
   }
 
-  PFS.companions = { add, remove, listFor, all, getBytes: readBytes };
+  // patch(id, obj) — merge metadata onto a record (e.g. caching the
+  // companion's own fingerprint for the reverse owner lookup)
+  function patch(id, obj) {
+    save(all().map((r) => (r.id === id ? Object.assign({}, r, obj) : r)));
+  }
+
+  PFS.companions = { add, remove, listFor, all, patch, getBytes: readBytes };
 })(window);

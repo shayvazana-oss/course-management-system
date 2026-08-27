@@ -2638,6 +2638,51 @@ async function main() {
     check('a history row reopens the document in one click', histRes.reopened === true);
   }
 
+  // ---- REVERSE PULL: opening the APPENDIX directly must still pull from the
+  // quote it is linked to ("משיכת הנתונים לא עובדת" — the user's actual path)
+  {
+    const revRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const mkForm = async (title, labels) => {
+        const d = await PDFDocument.create(); const pg = d.addPage([420, 340]);
+        pg.drawRectangle({ x: 0, y: 0, width: 420, height: 340, color: rgb(1, 1, 1) });
+        const f = await d.embedFont(StandardFonts.Helvetica);
+        pg.drawText(title, { x: 150, y: 315, size: 15, font: f, color: rgb(0, 0, 0) });
+        labels.forEach((lb, i) => pg.drawText(lb, { x: 250, y: 270 - i * 40, size: 12, font: f, color: rgb(0.1, 0.1, 0.1) }));
+        return new File([await d.save()], title + '.pdf', { type: 'application/pdf' });
+      };
+      // 1) fill the QUOTE: one panel field + one FREE-TEXT value (no fieldKey)
+      await T.openPdfFile(await mkForm('RevQuote', ['Course name:']));
+      await new Promise((r) => setTimeout(r, 2200));
+      const row = [...document.querySelectorAll('#fieldsBody input[type=text]')]
+        .find((x) => { const lab = x.closest('.field'); return lab && /Course name/.test(lab.querySelector('label').textContent); });
+      if (!row) return { err: 'no quote field' };
+      row.value = 'אילוף כלבים'; row.dispatchEvent(new Event('input')); row.dispatchEvent(new Event('change'));
+      T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.6, text: 'עבור טלי מכלוף ת.ז 038290177', noEdit: true });
+      T.autoSaveNow();                                        // the quote's fill is remembered
+      const quoteFp = T.getFp();
+      // 2) link the appendix while the quote is open
+      const fileB = await mkForm('RevAppendix', ['Course name:', 'Full name:']);
+      await window.PFS.companions.add({ ownerFp: quoteFp, ownerName: 'RevQuote', name: 'נספח הפוך', bytes: await fileB.arrayBuffer() });
+      // 3) go home, then open the APPENDIX FILE DIRECTLY — no "מלא עכשיו"
+      T.goHome();
+      await new Promise((r) => setTimeout(r, 400));
+      await T.openPdfFile(await mkForm('RevAppendix', ['Course name:', 'Full name:']));
+      await new Promise((r) => setTimeout(r, 3000));
+      const els = T.overlay.getElements().map((e) => e.model.text);
+      const rec = window.PFS.companions.all().find((r2) => r2.ownerName === 'RevQuote');
+      if (rec) await window.PFS.companions.remove(rec.id);
+      return {
+        course: els.includes('אילוף כלבים'),                  // panel value pulled
+        person: els.includes('טלי מכלוף')                     // FREE-TEXT person mined + pulled
+      };
+    });
+    if (Object.values(revRes).some((v) => v !== true)) console.log('  [reverse debug]', JSON.stringify(revRes));
+    check('opening a linked appendix DIRECTLY pulls the quote values (reverse)', revRes.course === true);
+    check('a person typed as FREE TEXT on the quote is mined and pulled', revRes.person === true);
+  }
+
   // repeat mode: a sticky tool stays armed across placements; non-sticky disarms
   check('repeat mode keeps a tool armed for multiple placements', await page.evaluate(() => {
     const ov = window.PFS.__test.overlay;

@@ -3005,6 +3005,25 @@ async function main() {
       && new Set(det.fields.map((f) => f.fontFrac)).size === 1;    // still one uniform hand
   }));
 
+  // the readable floor must respect DENSE rows: a value taller than its row
+  // piles onto the next one ("השורות עולות אחת על השנייה")
+  check('dense table rows cap the fill size; spacious rows keep the floor', await page.evaluate(() => {
+    const F = (fy, fx) => ({ type: 'text', fieldKey: 'f' + fy + (fx || 0), label: 'x', fx: fx || 0.3, fy, fw: 0.2, fh: 0.012, fontFrac: 0.0095 });
+    // dense: stacked rows 0.013 apart (≈11pt on A4)
+    const dense = { fields: [F(0.30), F(0.313), F(0.326)] };
+    window.PFS.__test.normalizeFontSizes(dense);
+    const denseOk = dense.fields.slice(0, 2).every((f) => f.fontFrac <= 0.013 * 0.62 + 1e-9 && f.fontFrac >= 0.008 - 1e-9);
+    // spacious: rows far apart keep the readable floor
+    const sparse = { fields: [F(0.30), F(0.36), F(0.42)] };
+    window.PFS.__test.normalizeFontSizes(sparse);
+    const sparseOk = sparse.fields.every((f) => f.fontFrac >= 0.0122 - 1e-9);
+    // side-by-side columns (same line) never cap each other
+    const cols = { fields: [F(0.30, 0.1), F(0.30, 0.6), F(0.36, 0.1)] };
+    window.PFS.__test.normalizeFontSizes(cols);
+    const colsOk = cols.fields[1].fontFrac >= 0.0122 - 1e-9;   // nothing below it in ITS column
+    return denseOk && sparseOk && colsOk;
+  }));
+
   check('vault: expanded synonyms + marital coverage map correctly', await page.evaluate(() => {
     const mk = window.PFS.vault.matchKey, cc = window.PFS.vault.classifyChoice;
     const synOk = mk('משלח יד') === 'occupation'      // Form 101 term for occupation

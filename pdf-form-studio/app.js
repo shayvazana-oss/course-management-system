@@ -562,7 +562,22 @@ function normalizeFontSizes(det) {
   // The band's floor never dips below the readable minimum — a ±15% band
   // around a floored median used to leak the tiny print size back in.
   const lo = Math.max(MIN_FILL_FRAC, median * 0.85), hi = median * 1.15;
-  txt.forEach((f) => { f.fontFrac = Math.min(hi, Math.max(lo, f.fontFrac)); });
+  txt.forEach((f) => {
+    let v = Math.min(hi, Math.max(lo, f.fontFrac));
+    // DENSE ROWS: the readable floor must never make a value taller than its
+    // own row — stacked table rows then pile onto each other and become
+    // uneditable ("השורות עולות אחת על השנייה"). The vertical pitch to the
+    // nearest field below in the same column caps the size; spacious forms
+    // (pitch ≥ 0.028 of the page) keep the full readable floor.
+    let pitch = Infinity;
+    txt.forEach((o) => {
+      if (o === f) return;
+      const dy = o.fy - f.fy;
+      if (dy > 0.004 && dy < pitch && o.fx < f.fx + (f.fw || 0) && o.fx + (o.fw || 0) > f.fx) pitch = dy;
+    });
+    if (pitch < 0.028) v = Math.max(0.008, Math.min(v, pitch * 0.62));
+    f.fontFrac = v;
+  });
 }
 
 // ---- one handwriting across the whole document ----

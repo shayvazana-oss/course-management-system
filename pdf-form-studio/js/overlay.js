@@ -246,7 +246,8 @@
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
           opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0,
-          font: m.font || undefined, wrapW: m.wrapW || undefined
+          font: m.font || undefined, wrapW: m.wrapW || undefined, cellW: m.cellW || undefined,
+          cellX: m.cellX != null ? round(m.cellX) : undefined
         };
       });
     }

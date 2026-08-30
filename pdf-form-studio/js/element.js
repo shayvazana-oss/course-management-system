@@ -102,6 +102,22 @@
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes
         inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';
+        // cell-bound text: cellW is the detected cell's width and acts as a
+        // HARD WALL. Whenever the value outgrows it — typing on the form, the
+        // size slider, the resize drag — it breaks into lines INSIDE the cell
+        // ("שורה מתחת לשורה") instead of stretching past the border. The
+        // decision lives here in layout so every mutation path obeys it.
+        if (model.cellW) {
+          node.style.width = 'auto';
+          inner.style.whiteSpace = 'pre';
+          inner.style.wordBreak = '';
+          const wasWrapped = !!model.wrapW;
+          model.wrapW = (node.offsetWidth - 2) > model.cellW * W + 1 ? model.cellW : null;
+          // the moment a right-anchored value STARTS wrapping, plant the box
+          // at the cell's start so it fills the cell instead of spilling past
+          // its right edge (a later drag of the wrapped box is respected)
+          if (model.wrapW && !wasWrapped && model.cellX != null) model.fx = model.cellX;
+        }
         // wrapped mode: the box IS the cell — fixed width, browser line-breaks
         // inside it (the exporter word-wraps to the same width)
         if (model.wrapW) {
@@ -110,7 +126,7 @@
           inner.style.wordBreak = 'break-word';
         } else {
           node.style.width = 'auto';
-          inner.style.whiteSpace = '';
+          inner.style.whiteSpace = model.cellW ? 'pre' : '';
           inner.style.wordBreak = '';
         }
         node.style.height = 'auto';

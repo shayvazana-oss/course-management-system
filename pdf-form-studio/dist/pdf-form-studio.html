@@ -4801,6 +4801,22 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes
         inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';
+        // cell-bound text: cellW is the detected cell's width and acts as a
+        // HARD WALL. Whenever the value outgrows it — typing on the form, the
+        // size slider, the resize drag — it breaks into lines INSIDE the cell
+        // ("שורה מתחת לשורה") instead of stretching past the border. The
+        // decision lives here in layout so every mutation path obeys it.
+        if (model.cellW) {
+          node.style.width = 'auto';
+          inner.style.whiteSpace = 'pre';
+          inner.style.wordBreak = '';
+          const wasWrapped = !!model.wrapW;
+          model.wrapW = (node.offsetWidth - 2) > model.cellW * W + 1 ? model.cellW : null;
+          // the moment a right-anchored value STARTS wrapping, plant the box
+          // at the cell's start so it fills the cell instead of spilling past
+          // its right edge (a later drag of the wrapped box is respected)
+          if (model.wrapW && !wasWrapped && model.cellX != null) model.fx = model.cellX;
+        }
         // wrapped mode: the box IS the cell — fixed width, browser line-breaks
         // inside it (the exporter word-wraps to the same width)
         if (model.wrapW) {
@@ -4809,7 +4825,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           inner.style.wordBreak = 'break-word';
         } else {
           node.style.width = 'auto';
-          inner.style.whiteSpace = '';
+          inner.style.whiteSpace = model.cellW ? 'pre' : '';
           inner.style.wordBreak = '';
         }
         node.style.height = 'auto';
@@ -5134,7 +5150,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           fontFrac: round(m.fontFrac), color: m.color, bold: m.bold, align: m.align,
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
           opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0,
-          font: m.font || undefined, wrapW: m.wrapW || undefined
+          font: m.font || undefined, wrapW: m.wrapW || undefined, cellW: m.cellW || undefined,
+          cellX: m.cellX != null ? round(m.cellX) : undefined
         };
       });
     }
@@ -7196,26 +7213,24 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       try { W = overlay.overlaySizeFor(field.page).w; } catch (e) { return; }
       if (!W) return;
       const maxW = field.fw * W * 1.02;
-      // start clean: a value that shrank/wrapped before may fit plainly now
-      if (ctrl.model.wrapW) { ctrl.model.wrapW = null; ctrl.layout(); }
-      // shrink-to-fit down to ~85% of the form's size only — a smaller value
-      // next to full-size neighbours is exactly what read as "חלק מהמקומות הם
-      // גדולים ובחלק מאוד קטנים"; past that the resort is WRAPPING, which
-      // keeps the letters full-size
-      const floor = Math.max(0.0115, (field.fontFrac || 0.016) * 0.85);
+      const base = ctrl.model.fontFrac || 0.016;
+      // start clean: measure the natural single-line width at full size
+      ctrl.model.cellW = null; ctrl.model.wrapW = null; ctrl.layout();
+      // a SMALL shrink (≤15%) that keeps the value on one line beats a line
+      // break; past that the value WRAPS at FULL size — "שורה מתחת לשורה"
+      // inside the cell, never stretched past its border and never tiny
+      const floor = Math.max(0.0115, base * 0.85);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.95;
         ctrl.layout();
       }
-      if (ctrl.model.fontFrac < floor) { ctrl.model.fontFrac = floor; ctrl.layout(); }
-      // still too wide → WRAP inside the cell instead of crossing its borders
-      // ("הטקסט לא מתאים את עצמו לגודל החלל") — the editor and the exporter
-      // both lay wrapped text as the same fixed-width line box
-      if (ctrl.node.offsetWidth > maxW) {
-        ctrl.model.wrapW = field.fw;
-        ctrl.layout();
-      }
+      if (ctrl.node.offsetWidth > maxW) ctrl.model.fontFrac = base;  // wrapping anyway → full-size lines
+      // the cell is a hard wall from here on: layout() re-decides the wrap on
+      // EVERY later mutation (typing on the form, size slider, resize drag)
+      ctrl.model.cellW = field.fw;
+      ctrl.model.cellX = field.fx;
+      ctrl.layout();
     }
 
     function ensureCheck(field, on) {
@@ -7485,6 +7500,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
             if (own) {
               ctrlByKey[f.fieldKey] = own;
               if (!own.model.fieldKey) own.model.fieldKey = f.fieldKey;
+              // adopted elements obey the cell wall too (wrap, never stretch)
+              if (f.fw && !own.model.cellW) { own.model.cellW = f.fw; own.model.cellX = f.fx; own.layout(); }
               if (String(own.model.text || '').trim()) control.value = own.model.text;
             }
           }

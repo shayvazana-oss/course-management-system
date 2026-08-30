@@ -179,26 +179,24 @@
       try { W = overlay.overlaySizeFor(field.page).w; } catch (e) { return; }
       if (!W) return;
       const maxW = field.fw * W * 1.02;
-      // start clean: a value that shrank/wrapped before may fit plainly now
-      if (ctrl.model.wrapW) { ctrl.model.wrapW = null; ctrl.layout(); }
-      // shrink-to-fit down to ~85% of the form's size only — a smaller value
-      // next to full-size neighbours is exactly what read as "חלק מהמקומות הם
-      // גדולים ובחלק מאוד קטנים"; past that the resort is WRAPPING, which
-      // keeps the letters full-size
-      const floor = Math.max(0.0115, (field.fontFrac || 0.016) * 0.85);
+      const base = ctrl.model.fontFrac || 0.016;
+      // start clean: measure the natural single-line width at full size
+      ctrl.model.cellW = null; ctrl.model.wrapW = null; ctrl.layout();
+      // a SMALL shrink (≤15%) that keeps the value on one line beats a line
+      // break; past that the value WRAPS at FULL size — "שורה מתחת לשורה"
+      // inside the cell, never stretched past its border and never tiny
+      const floor = Math.max(0.0115, base * 0.85);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.95;
         ctrl.layout();
       }
-      if (ctrl.model.fontFrac < floor) { ctrl.model.fontFrac = floor; ctrl.layout(); }
-      // still too wide → WRAP inside the cell instead of crossing its borders
-      // ("הטקסט לא מתאים את עצמו לגודל החלל") — the editor and the exporter
-      // both lay wrapped text as the same fixed-width line box
-      if (ctrl.node.offsetWidth > maxW) {
-        ctrl.model.wrapW = field.fw;
-        ctrl.layout();
-      }
+      if (ctrl.node.offsetWidth > maxW) ctrl.model.fontFrac = base;  // wrapping anyway → full-size lines
+      // the cell is a hard wall from here on: layout() re-decides the wrap on
+      // EVERY later mutation (typing on the form, size slider, resize drag)
+      ctrl.model.cellW = field.fw;
+      ctrl.model.cellX = field.fx;
+      ctrl.layout();
     }
 
     function ensureCheck(field, on) {
@@ -468,6 +466,8 @@
             if (own) {
               ctrlByKey[f.fieldKey] = own;
               if (!own.model.fieldKey) own.model.fieldKey = f.fieldKey;
+              // adopted elements obey the cell wall too (wrap, never stretch)
+              if (f.fw && !own.model.cellW) { own.model.cellW = f.fw; own.model.cellX = f.fx; own.layout(); }
               if (String(own.model.text || '').trim()) control.value = own.model.text;
             }
           }

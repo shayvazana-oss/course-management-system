@@ -3109,6 +3109,48 @@ async function main() {
     return denseOk && sparseOk && colsOk;
   }));
 
+  // "מה הבעיה שזה יירד שורה מתחת לשורה? למה זה חייב להימתח לרוחב?" — the cell
+  // is a hard wall: ANY mutation (enlarging, typing on the form) wraps the
+  // value line-under-line inside the cell instead of stretching past it
+  check('cell wall: enlarging or typing wraps inside the cell, never stretches past it', await page.evaluate(async () => {
+    const T = window.PFS.__test;
+    // self-contained on a fresh A4 page — fractions are page-relative, so an
+    // ambient doc left open by earlier tests skews every px expectation
+    const { PDFDocument, rgb } = window.PDFLib;
+    const d = await PDFDocument.create();
+    d.addPage([595, 842]).drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+    await T.openPdfFile(new File([await d.save()], 'cellwall.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    T.overlay.clearElements(); T.fieldsPanel.clear();
+    const det = { tier: 'text', fields: [
+      { page: 0, fieldKey: 'cw_a', label: 'שם מוסד', fx: 0.30, fy: 0.30, fw: 0.15, fh: 0.03, fontFrac: 0.0135, type: 'text' }
+    ] };
+    T.setLastDet(det); T.fieldsPanel.show(det);
+    const row = document.querySelector('#fieldsBody input[type=text]');
+    row.value = 'לימודי חוץ'; row.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 80));
+    const el = T.overlay.getElements().find((c) => c.model.fieldKey === 'cw_a');
+    if (!el) return false;
+    const fitsPlain = !el.model.wrapW && el.model.cellW === 0.15;       // short value: one plain line
+    // the user enlarges the value (size slider path): wrap, keep the size
+    el.model.fontFrac = 0.028; el.layout();
+    const grewWrapped = el.model.wrapW === 0.15 && Math.abs(el.model.fontFrac - 0.028) < 1e-9
+      && el.model.fx <= 0.30 + 1e-6 && el.model.fx + el.model.fw <= 0.30 + 0.15 + 0.01;
+    // shrink back: the wrap lets go on its own
+    el.model.fontFrac = 0.0135; el.layout();
+    const shrankPlain = !el.model.wrapW;
+    // typing more text ON THE FORM (inline edit path) re-wraps
+    const inner = el.node.querySelector('.txt');
+    inner.textContent = 'היחידה ללימודי חוץ ולימודי המשך על יד המכללה';
+    inner.dispatchEvent(new Event('input', { bubbles: true }));
+    const typedWrapped = el.model.wrapW === 0.15 && Math.abs(el.model.fontFrac - 0.0135) < 1e-9;
+    // and the wrap state survives serialize→restore
+    const ser = T.overlay.serialize().find((m) => m.fieldKey === 'cw_a');
+    const serOk = ser && ser.cellW === 0.15 && ser.wrapW === 0.15 && Math.abs(ser.cellX - 0.30) < 1e-4;
+    T.overlay.clearElements(); T.fieldsPanel.clear(); T.setLastDet(null);
+    return fitsPlain && grewWrapped && shrankPlain && typedWrapped && !!serOk;
+  }));
+
   // "הפונטים מאוד קטנים.. חלק מהמקומות הם גדולים ובחלק מאוד קטנים" — one FLAT
   // large size for the whole form: mixed print sizes must not leak into the
   // fill, and fitting a long value into a narrow cell must WRAP, not shrink

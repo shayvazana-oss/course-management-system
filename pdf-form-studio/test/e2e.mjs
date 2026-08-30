@@ -1113,6 +1113,31 @@ async function main() {
     });
     await page.waitForTimeout(400);
     check('cancel closes the review without exporting', await page.evaluate(() => !document.getElementById('exportModal').classList.contains('show')));
+
+    // WYSIWYG: opening the export must not touch any element's size — it used
+    // to re-run the uniformizer and visibly shrink the fills ("כשאני מייצא
+    // הוא מקטין מייד את הפונטים")
+    await page.evaluate(() => {
+      const T = window.PFS.__test;
+      T.overlay.clearElements();
+      T.setLastDet({ tier: 'text', uniFontFrac: 0.0135, fields: [
+        { page: 0, fieldKey: 'wys_a', label: 'שם', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.0135, type: 'text' }
+      ] });
+      T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.2, fw: 0.2, fontFrac: 0.02, fieldKey: 'wys_a', text: 'ערך שהוגדל', noEdit: true });
+      T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.5, fw: 0.2, fontFrac: 0.019, text: 'טקסט חופשי', noEdit: true });
+      T.overlay.deselectAll();
+      document.getElementById('exportBtn').click();
+    });
+    await waitBuild();
+    check('export is WYSIWYG: opening it never shrinks the fill sizes', await page.evaluate(() => {
+      const sizes = window.PFS.__test.overlay.getElements()
+        .filter((c) => c.model.type === 'text').map((c) => c.model.fontFrac).sort((a, b) => a - b);
+      document.getElementById('exCancel').click();
+      window.PFS.__test.overlay.clearElements();
+      window.PFS.__test.setLastDet(null);
+      return sizes.length === 2 && Math.abs(sizes[0] - 0.019) < 1e-9 && Math.abs(sizes[1] - 0.02) < 1e-9;
+    }));
+    await page.waitForTimeout(300);
   }
 
   // ---- real government form: נספח ה3 (משרד העבודה) ----

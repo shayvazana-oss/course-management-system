@@ -9639,9 +9639,11 @@ function renderExportCompanions() {
 }
 
 async function doExport(opts) {
-  // exported forms always leave with ONE handwriting — quietly normalize the
-  // machine-placed fills (manually styled free text is left alone)
-  try { uniformizeHandwriting(true); } catch (e) {}
+  // The export is WYSIWYG: it bakes EXACTLY what the editor shows. This used
+  // to quietly re-run the handwriting uniformizer, which shrank every value
+  // back to the detected document size the moment export opened ("כשאני מייצא
+  // הוא מקטין מייד את הפונטים"). Sizes are normalized at creation; evening
+  // them later is only ever the explicit "כתב אחיד" button.
   if (!pdfView.hasDoc()) return;
   const models = overlay.getElements().map((c) => c.model);
   if (!models.length && !attachments.length) { PFS.toast('לא נוספו שדות לטופס', 'err'); return; }

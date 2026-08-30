@@ -181,14 +181,17 @@
       const maxW = field.fw * W * 1.02;
       // start clean: a value that shrank/wrapped before may fit plainly now
       if (ctrl.model.wrapW) { ctrl.model.wrapW = null; ctrl.layout(); }
-      // shrink-to-fit down to ~70% of the form's size — a much smaller value
-      // next to full-size neighbours reads worse than the next resort
-      const floor = Math.max(0.009, (field.fontFrac || 0.016) * 0.7);
+      // shrink-to-fit down to ~85% of the form's size only — a smaller value
+      // next to full-size neighbours is exactly what read as "חלק מהמקומות הם
+      // גדולים ובחלק מאוד קטנים"; past that the resort is WRAPPING, which
+      // keeps the letters full-size
+      const floor = Math.max(0.0115, (field.fontFrac || 0.016) * 0.85);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
-        ctrl.model.fontFrac *= 0.9;
+        ctrl.model.fontFrac *= 0.95;
         ctrl.layout();
       }
+      if (ctrl.model.fontFrac < floor) { ctrl.model.fontFrac = floor; ctrl.layout(); }
       // still too wide → WRAP inside the cell instead of crossing its borders
       // ("הטקסט לא מתאים את עצמו לגודל החלל") — the editor and the exporter
       // both lay wrapped text as the same fixed-width line box

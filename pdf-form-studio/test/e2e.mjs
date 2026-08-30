@@ -2489,9 +2489,11 @@ async function main() {
     const wrapped = m.wrapW === 0.12;
     const dispLines = Math.round(m.fh / (m.fontFrac * 1.15));
     // the exporter wraps with the same greedy break — its line count must agree
+    // probe at the page's REAL aspect (A4 595×842): font scales with the page
+    // HEIGHT, the cell with its WIDTH — a square probe under-counts lines
     const probe = document.createElement('canvas').getContext('2d');
-    probe.font = '400 ' + (m.fontFrac * 1000).toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
-    const limit = 0.12 * 1000;
+    probe.font = '400 ' + (m.fontFrac * 842).toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
+    const limit = 0.12 * 595;
     const words = m.text.split(/\s+/).filter(Boolean);
     let cur = words[0], expLines = 1;
     for (let i = 1; i < words.length; i++) {
@@ -3066,16 +3068,51 @@ async function main() {
     // dense: stacked rows 0.013 apart (≈11pt on A4)
     const dense = { fields: [F(0.30), F(0.313), F(0.326)] };
     window.PFS.__test.normalizeFontSizes(dense);
-    const denseOk = dense.fields.slice(0, 2).every((f) => f.fontFrac <= 0.013 * 0.62 + 1e-9 && f.fontFrac >= 0.008 - 1e-9);
+    // cap = 80% of the pitch (largest size whose 1.15 line box clears the next
+    // row) — large-as-possible, never piling
+    const denseOk = dense.fields.slice(0, 2).every((f) =>
+      f.fontFrac <= 0.013 * 0.8 + 1e-9 && f.fontFrac >= 0.0095 - 1e-9
+      && f.fontFrac * 1.15 <= 0.013 + 1e-9);
     // spacious: rows far apart keep the readable floor
     const sparse = { fields: [F(0.30), F(0.36), F(0.42)] };
     window.PFS.__test.normalizeFontSizes(sparse);
-    const sparseOk = sparse.fields.every((f) => f.fontFrac >= 0.0122 - 1e-9);
+    const sparseOk = sparse.fields.every((f) => f.fontFrac >= 0.0135 - 1e-9);
     // side-by-side columns (same line) never cap each other
     const cols = { fields: [F(0.30, 0.1), F(0.30, 0.6), F(0.36, 0.1)] };
     window.PFS.__test.normalizeFontSizes(cols);
-    const colsOk = cols.fields[1].fontFrac >= 0.0122 - 1e-9;   // nothing below it in ITS column
+    const colsOk = cols.fields[1].fontFrac >= 0.0135 - 1e-9;   // nothing below it in ITS column
     return denseOk && sparseOk && colsOk;
+  }));
+
+  // "הפונטים מאוד קטנים.. חלק מהמקומות הם גדולים ובחלק מאוד קטנים" — one FLAT
+  // large size for the whole form: mixed print sizes must not leak into the
+  // fill, and fitting a long value into a narrow cell must WRAP, not shrink
+  // far below the document hand.
+  check('fill sizes are flat and large: mixed print flattens, long values wrap not shrink', await page.evaluate(() => {
+    const T = window.PFS.__test;
+    const F = (k, fy, ff) => ({ type: 'text', fieldKey: k, label: 'שדה ' + k, fx: 0.3, fy, fw: 0.2, fh: 0.03, fontFrac: ff, page: 0 });
+    // mixed print: 8pt-ish next to 18pt-ish labels, spacious rows
+    const det = { tier: 'text', fields: [F('fl_a', 0.2, 0.010), F('fl_b', 0.3, 0.021), F('fl_c', 0.4, 0.016)] };
+    T.normalizeFontSizes(det);
+    const flat = new Set(det.fields.map((f) => f.fontFrac));
+    const flatOk = flat.size === 1 && det.fields[0].fontFrac >= 0.0135 - 1e-9
+      && det.uniFontFrac === det.fields[0].fontFrac;
+    // a pitch-capped sibling must not drag docUniformSize down
+    const det2 = { tier: 'text', fields: [F('fl_d', 0.2, 0.016), F('fl_e', 0.216, 0.016), F('fl_f', 0.5, 0.016)] };
+    T.normalizeFontSizes(det2);
+    T.setLastDet(det2);
+    const uniOk = Math.abs(window.PFS.docUniformSize() - det2.uniFontFrac) < 1e-9
+      && det2.fields[0].fontFrac < det2.uniFontFrac;             // the dense one really was capped
+    // long value in a narrow cell: stays ≥85% of the hand and wraps instead
+    T.overlay.clearElements(); T.fieldsPanel.clear();
+    const det3 = { tier: 'text', fields: [{ page: 0, fieldKey: 'fl_w', label: 'שם מוסד', fx: 0.3, fy: 0.3, fw: 0.12, fh: 0.03, fontFrac: 0.016, type: 'text' }] };
+    T.setLastDet(det3); T.fieldsPanel.show(det3);
+    const row = document.querySelector('#fieldsBody input[type=text]');
+    row.value = 'היחידה ללימודי חוץ ולימודי המשך אס איי'; row.dispatchEvent(new Event('input', { bubbles: true }));
+    const el = T.overlay.getElements().find((c) => c.model.fieldKey === 'fl_w');
+    const wrapOk = el && el.model.fontFrac >= 0.016 * 0.85 - 1e-6 && el.model.wrapW === 0.12;
+    T.overlay.clearElements(); T.fieldsPanel.clear(); T.setLastDet(null);
+    return flatOk && uniOk && !!wrapOk;
   }));
 
   check('vault: expanded synonyms + marital coverage map correctly', await page.evaluate(() => {

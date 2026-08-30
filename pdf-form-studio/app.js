@@ -550,32 +550,34 @@ function snapFieldsToInk(det) {
 // fill size from the label's print made dense government forms come out
 // unreadably small ("לכתחילה הטקסט לא צריך להיות כל כך קטן") — so the fill
 // floor is a readable ~10.5pt on A4, independent of how tiny the print is.
-const MIN_FILL_FRAC = 0.0122;
+const MIN_FILL_FRAC = 0.0135;
 function normalizeFontSizes(det) {
   const txt = det.fields.filter((f) => f.type === 'text' && f.fontFrac);
-  if (txt.length < 2) return;
+  if (!txt.length) return;
   const sizes = txt.map((f) => f.fontFrac).sort((a, b) => a - b);
-  const median = Math.min(0.022, Math.max(0.013, sizes[Math.floor(sizes.length / 2)]));
-  // clamp to a ±15% band around the median: outliers get pulled into harmony
-  // but each value still respects ITS line's local metrics (a hard flatten
-  // rendered fills visibly larger than small-print sentences around them).
-  // The band's floor never dips below the readable minimum — a ±15% band
-  // around a floored median used to leak the tiny print size back in.
-  const lo = Math.max(MIN_FILL_FRAC, median * 0.85), hi = median * 1.15;
+  const median = sizes[Math.floor(sizes.length / 2)];
+  // ONE flat size for the whole form. The old ±15% harmony band let each
+  // line's local print metrics leak through — a label set in 8pt sat beside a
+  // label set in 14pt and the fills came out visibly mismatched ("חלק מהמקומות
+  // הם גדולים ובחלק מאוד קטנים"). The same hand writes every answer: flatten.
+  const uni = Math.min(0.02, Math.max(MIN_FILL_FRAC, median));
+  det.uniFontFrac = uni;
   txt.forEach((f) => {
-    let v = Math.min(hi, Math.max(lo, f.fontFrac));
+    let v = uni;
     // DENSE ROWS: the readable floor must never make a value taller than its
     // own row — stacked table rows then pile onto each other and become
     // uneditable ("השורות עולות אחת על השנייה"). The vertical pitch to the
-    // nearest field below in the same column caps the size; spacious forms
-    // (pitch ≥ 0.028 of the page) keep the full readable floor.
+    // nearest field below in the same column caps the size at 80% of the
+    // pitch — the largest size whose 1.15 line box still clears the next row.
+    // (The old 62% cap made dense tables unreadably small.) Spacious forms
+    // (pitch ≥ 0.028 of the page) keep the full size.
     let pitch = Infinity;
     txt.forEach((o) => {
       if (o === f) return;
       const dy = o.fy - f.fy;
       if (dy > 0.004 && dy < pitch && o.fx < f.fx + (f.fw || 0) && o.fx + (o.fw || 0) > f.fx) pitch = dy;
     });
-    if (pitch < 0.028) v = Math.max(0.008, Math.min(v, pitch * 0.62));
+    if (pitch < 0.028) v = Math.min(v, Math.max(0.0095, pitch * 0.8));
     f.fontFrac = v;
   });
 }
@@ -588,9 +590,12 @@ function normalizeFontSizes(det) {
 const isPlainTextEl = (c) => c.model && c.model.type === 'text' && !c.model.letterSpacing
   && c.model.kind !== 'check' && c.model.kind !== 'cross';
 function docUniformSize() {
+  if (lastDet && lastDet.uniFontFrac) return lastDet.uniFontFrac;
   if (lastDet && lastDet.fields) {
-    const t = lastDet.fields.find((f) => f.type === 'text' && f.fontFrac);
-    if (t) return t.fontFrac;             // detection already normalized these
+    // MAX, not first: a dense-row field carries a pitch-capped (smaller) size,
+    // and picking it up here would shrink the whole document's handwriting
+    const t = lastDet.fields.filter((f) => f.type === 'text' && f.fontFrac);
+    if (t.length) return Math.max(...t.map((f) => f.fontFrac));
   }
   const sizes = overlay.getElements().filter(isPlainTextEl).map((c) => c.model.fontFrac).sort((a, b) => a - b);
   return sizes.length ? sizes[Math.floor(sizes.length / 2)] : 0.016;
@@ -601,11 +606,20 @@ function uniformizeHandwriting(taggedOnly) {
   // the document's own typeface, so "uniform" means uniform with the FORM —
   // not merely consistent among the values Fillo added
   const docCss = PFS.fontmatch ? PFS.fontmatch.docCss() : null;
+  // a dense-row (pitch-capped) field's own size is a HARD ceiling for its
+  // value — evening it up to the document size would pile the row back onto
+  // its neighbour ("השורות עולות אחת על השנייה")
+  const fieldFF = {};
+  if (lastDet && lastDet.fields) lastDet.fields.forEach((f) => {
+    if (f.type === 'text' && f.fieldKey && f.fontFrac) fieldFF[f.fieldKey] = f.fontFrac;
+  });
   let changed = 0;
   overlay.getElements().forEach((c) => {
     if (!isPlainTextEl(c)) return;
     if (taggedOnly && !c.model.fieldKey) return;
-    const target = Math.min(hi, Math.max(lo, c.model.fontFrac || uni));
+    const cap = c.model.fieldKey && fieldFF[c.model.fieldKey]
+      ? Math.min(hi, fieldFF[c.model.fieldKey]) : hi;
+    const target = Math.min(cap, Math.max(lo, c.model.fontFrac || uni));
     const fontOff = docCss && c.model.font !== docCss;
     if (Math.abs((c.model.fontFrac || 0) - target) < 0.0005 && !fontOff) return;
     const oldW = c.model.fw;              // layout keeps this measured

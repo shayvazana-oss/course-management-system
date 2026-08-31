@@ -3109,6 +3109,69 @@ async function main() {
     return denseOk && sparseOk && colsOk;
   }));
 
+  // ---- instant open: the 41st open of a known form skips detection ----
+  {
+    const icRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create();
+      const pg = d.addPage([595, 842]);
+      pg.drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+      const font = await d.embedFont(StandardFonts.Helvetica);
+      pg.drawText('Full name: ____________', { x: 60, y: 700, size: 12, font });
+      pg.drawText('Phone: ____________', { x: 60, y: 660, size: 12, font });
+      pg.drawText('Address: ____________', { x: 60, y: 620, size: 12, font });
+      const bytes = await d.save();
+      window.PFS.store.set('det_cache', {});             // clean slate
+      await T.openPdfFile(new File([bytes.slice(0)], 'known-form.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 2500));
+      const firstCached = T.wasDetCached();
+      const det1 = T.getLastDet();
+      const n1 = det1 && det1.fields.filter((f) => f.type === 'text').length;
+      const fp = T.getFp();
+      const stored = !!T.detCacheGet(fp);
+      // SECOND open of the same bytes — must come from the cache, same fields
+      await T.openPdfFile(new File([bytes.slice(0)], 'known-form.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 2500));
+      const secondCached = T.wasDetCached();
+      const det2 = T.getLastDet();
+      const n2 = det2 && det2.fields.filter((f) => f.type === 'text').length;
+      // the button forces a FRESH run
+      await T.runDetection(true);
+      const forcedFresh = !T.wasDetCached();
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { firstCached, n1, stored, secondCached, n2, forcedFresh };
+    });
+    if (!(icRes.stored && icRes.secondCached && !icRes.firstCached)) console.log('  [instant debug]', JSON.stringify(icRes));
+    check('instant open: reopening a known form replays cached detection; button forces fresh',
+      icRes.firstCached === false && icRes.n1 >= 2 && icRes.stored && icRes.secondCached === true
+      && icRes.n2 === icRes.n1 && icRes.forcedFresh);
+  }
+
+  // ---- the export names itself: form - course - student ----
+  check('auto filename: export is named form - course - student, sanitized', await page.evaluate(() => {
+    const T = window.PFS.__test;
+    T.overlay.clearElements();
+    const c = window.PFS.courses.create('חשמלאות מוסמכים');
+    window.PFS.courses.setFact(c.id, 'course_name', 'חשמלאות מוסמכים');
+    T.setActiveCourse(c.id);
+    T.setFileName('נספח ו');
+    T.overlay.addModelAt('text', 0, { fx: 0.3, fy: 0.3, text: 'ישראל ישראלי', fieldKey: 'שם מלא', noEdit: true });
+    const full = T.exFileName();
+    // course chip off + no student → falls back to the old -filled name
+    T.overlay.clearElements();
+    T.setActiveCourse(null);
+    const bare = T.exFileName();
+    // illegal filename characters are scrubbed
+    T.setFileName('נספח: ו/2026');
+    const clean = T.autoExportName();
+    window.PFS.courses.remove(c.id);
+    T.setFileName('filled');
+    return full === 'נספח ו - חשמלאות מוסמכים - ישראל ישראלי.pdf'
+      && bare === 'נספח ו-filled.pdf'
+      && !/[\\/:*?"<>|]/.test(clean);
+  }));
+
   // "מה הבעיה שזה יירד שורה מתחת לשורה? למה זה חייב להימתח לרוחב?" — the cell
   // is a hard wall: ANY mutation (enlarging, typing on the form) wraps the
   // value line-under-line inside the cell instead of stretching past it

@@ -274,7 +274,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; } };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -293,6 +293,7 @@ async function runOcr() {
       return;
     }
     lastDet = det;
+    detCachePut(currentFp, det);   // scans win the most: no OCR wait next time
     const nOcr = fieldsPanel.show(det, vaultPrefill(det));
     PFS.toast(nOcr ? `OCR זיהה ${det.fields.length} שדות — ${nOcr} מולאו אוטומטית מהפרטים שלך 🪄` : `OCR זיהה ${det.fields.length} שדות`, 'ok');
   } catch (e) {
@@ -669,12 +670,60 @@ function sweepNameLeaks() {
   return removed;
 }
 
-async function runDetection() {
+// ---- instant open: the detection cache ----
+// The 41st open of the same government form must not re-run field detection —
+// and on scans, not re-run OCR (seconds per page). The FINISHED detection
+// (ink-snapped, split, size-normalized, or OCR-produced) is stored per
+// document fingerprint and replayed instantly on the next open. The "זהה
+// שדות" button always forces a fresh run and overwrites the cache.
+const DET_CACHE_V = 1;
+let lastDetFromCache = false;
+// currentFp is an OBJECT ({pages,w,h,textHash,ahash}) — flatten it to a
+// string key, or every document would share the "[object Object]" slot
+function fpCacheKey(fp) {
+  if (!fp || typeof fp !== 'object') return null;
+  const id = fp.textHash || (fp.ahash ? 'a:' + fp.ahash : null);
+  return id ? [fp.pages, fp.w, fp.h, id].join('|') : null;
+}
+function detCacheGet(fp) {
+  fp = fpCacheKey(fp);
+  if (!fp) return null;
+  try {
+    const e = (PFS.store.get('det_cache', {}) || {})[fp];
+    if (!e || e.v !== DET_CACHE_V || !e.det || !Array.isArray(e.det.fields) || !e.det.fields.length) return null;
+    return JSON.parse(JSON.stringify(e.det));
+  } catch (e) { return null; }
+}
+function detCachePut(fp, det) {
+  fp = fpCacheKey(fp);
+  if (!fp || !det || !Array.isArray(det.fields) || !det.fields.length) return;
+  try {
+    const all = PFS.store.get('det_cache', {}) || {};
+    all[fp] = { v: DET_CACHE_V, t: Date.now(), det: JSON.parse(JSON.stringify({ tier: det.tier, fields: det.fields, uniFontFrac: det.uniFontFrac })) };
+    const keys = Object.keys(all);
+    if (keys.length > 40) keys.sort((a, b) => (all[a].t || 0) - (all[b].t || 0)).slice(0, keys.length - 40).forEach((k) => delete all[k]);
+    PFS.store.set('det_cache', all);
+  } catch (e) {}
+}
+
+async function runDetection(force) {
   if (!pdfView.hasDoc()) return;
   const gen = loadGen;
   const btn = $('detectBtn'); const prev = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="ic">⏳</span> מזהה…';
+  lastDetFromCache = false;
   try {
+    const cached = force === true ? null : detCacheGet(currentFp);
+    if (cached) {
+      lastDet = cached;
+      lastDetFromCache = true;
+      try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
+      const nCa = fieldsPanel.show(cached, vaultPrefill(cached));
+      PFS.toast(nCa
+        ? `⚡ טופס מוכר — נפתח מיידית, ${nCa} שדות מולאו אוטומטית`
+        : '⚡ טופס מוכר — נפתח מיידית (זיהוי מהזיכרון)', 'ok');
+      return;
+    }
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
@@ -689,6 +738,7 @@ async function runDetection() {
     det.fields.forEach((f) => { delete f._lx; delete f._lw; });
     normalizeFontSizes(det);
     lastDet = det;
+    detCachePut(currentFp, det);   // next open of this form is instant
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     if (det.tier === 'scanned') {
@@ -1861,9 +1911,36 @@ function exRenderSummary(models) {
     el.appendChild(r);
   });
 }
+// "נספח ו - חשמלאות מוסמכים - ישראל ישראלי.pdf" — the export names itself,
+// so a clerk producing dozens of per-student forms never types a filename.
+function autoExportName() {
+  const parts = [String(currentFileName || 'filled').replace(/-filled$/, '').trim()];
+  const add = (s) => {
+    s = String(s || '').trim();
+    if (!s || s.length > 60) return;
+    if (parts.some((p) => p.includes(s) || s.includes(p))) return;  // "נספח ו לקורס חשמל" + "חשמל" → no dupe
+    parts.push(s);
+  };
+  try {
+    const ac = activeCourseId();
+    if (ac && PFS.courses) {
+      const c = PFS.courses.get(ac);
+      const facts = c && c.facts && c.facts.course_name && c.facts.course_name.v;
+      add(facts || (c && c.name));
+    }
+  } catch (e) {}
+  try {
+    const el = overlay.getElements().find((c2) => c2.model.type === 'text' && c2.model.fieldKey
+      && String(c2.model.text || '').trim() && PFS.vault.matchKey(c2.model.fieldKey) === 'full_name');
+    if (el) add(el.model.text);
+  } catch (e) {}
+  const joined = (parts.length > 1 ? parts.join(' - ') : parts[0] + '-filled')
+    .replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return joined || 'filled';
+}
 function exFileName() {
   const secure = $('exSecure') && $('exSecure').checked;
-  return currentFileName + (secure ? '-secure' : '-filled') + '.pdf';
+  return autoExportName() + (secure ? '-secure' : '') + '.pdf';
 }
 
 // Export-review companions row — the moment the quote is done is exactly when
@@ -3110,7 +3187,8 @@ $('mergeRun').addEventListener('click', async () => {
   } finally { btn.disabled = false; btn.textContent = prev; $('mergeProg').textContent=''; }
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
-$('detectBtn').addEventListener('click', runDetection);
+// the button is the escape hatch: always a FRESH run, refreshing the cache
+$('detectBtn').addEventListener('click', () => runDetection(true));
 // is any page rotated / deleted / reordered away from the loaded original?
 function hasPageOps() {
   try {

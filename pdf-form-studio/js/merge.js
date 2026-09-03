@@ -51,6 +51,80 @@
     return { headers, records };
   }
 
+  /* parseXlsx(bytes) → { headers, records } — read a real Excel file locally.
+   * An .xlsx is a ZIP of XML parts; fflate (already loaded for the batch ZIP)
+   * unzips it and DOMParser reads the parts: no library, no upload, the
+   * student list never leaves the browser. Strings resolve via sharedStrings;
+   * a serial number in a date-formatted cell becomes dd.mm.yyyy. */
+  function parseXlsx(bytes) {
+    if (!root.fflate) throw new Error('fflate not loaded');
+    const parts = root.fflate.unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+    const dec = new TextDecoder('utf-8');
+    const xml = (p) => { const b = parts[p]; return b ? new DOMParser().parseFromString(dec.decode(b), 'application/xml') : null; };
+    // FIRST sheet: workbook.xml orders them, the rels map its rId to a path
+    let sheetPath = 'xl/worksheets/sheet1.xml';
+    try {
+      const wb = xml('xl/workbook.xml'), rels = xml('xl/_rels/workbook.xml.rels');
+      const sh = wb && wb.querySelector('sheet');
+      const rid = sh && (sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'));
+      const rel = rid && rels && [...rels.querySelectorAll('Relationship')].find((r) => r.getAttribute('Id') === rid);
+      if (rel) sheetPath = 'xl/' + rel.getAttribute('Target').replace(/^\//, '').replace(/^xl\//, '');
+    } catch (e) {}
+    const shared = [];
+    const ss = xml('xl/sharedStrings.xml');
+    if (ss) ss.querySelectorAll('si').forEach((si) => {
+      shared.push([...si.querySelectorAll('t')].map((t) => t.textContent).join(''));
+    });
+    // which cell-style indices mean DATE? (builtin date formats + custom
+    // codes that spell day/month/year and are not plain number masks)
+    const dateStyle = [];
+    try {
+      const st = xml('xl/styles.xml');
+      const custom = {};
+      st && st.querySelectorAll('numFmts > numFmt').forEach((n) => { custom[n.getAttribute('numFmtId')] = n.getAttribute('formatCode') || ''; });
+      const builtin = new Set(['14', '15', '16', '17', '22']);
+      st && st.querySelectorAll('cellXfs > xf').forEach((xf, i) => {
+        const id = xf.getAttribute('numFmtId') || '0';
+        const code = custom[id];
+        dateStyle[i] = builtin.has(id) || !!(code && /[dy]/i.test(code) && /m/i.test(code) && !/[#0]/.test(code));
+      });
+    } catch (e) {}
+    const serialDate = (n) => {
+      const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000);   // Excel epoch
+      return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear();
+    };
+    const sheet = xml(sheetPath);
+    if (!sheet) return { headers: [], records: [] };
+    const colIdx = (ref) => { let n = 0; for (const ch of ref) { if (ch >= 'A' && ch <= 'Z') n = n * 26 + (ch.charCodeAt(0) - 64); else break; } return n - 1; };
+    const rows = [];
+    sheet.querySelectorAll('sheetData > row').forEach((rowEl) => {
+      const row = [];
+      rowEl.querySelectorAll('c').forEach((c) => {
+        const ref = c.getAttribute('r') || '', t = c.getAttribute('t') || 'n';
+        const sI = parseInt(c.getAttribute('s') || '-1', 10);
+        let v = '';
+        if (t === 'inlineStr') v = [...c.querySelectorAll('t')].map((x) => x.textContent).join('');
+        else {
+          const vEl = c.querySelector('v'), raw = vEl ? vEl.textContent : '';
+          if (t === 's') v = shared[parseInt(raw, 10)] ?? '';
+          else if (t === 'b') v = raw === '1' ? 'כן' : 'לא';
+          else if (raw !== '' && dateStyle[sI] && isFinite(+raw) && +raw > 20000 && +raw < 80000) v = serialDate(+raw);
+          else v = raw;
+        }
+        const ci = ref ? colIdx(ref) : row.length;
+        row[ci] = String(v).trim();
+      });
+      rows.push(row);
+    });
+    const clean = rows.filter((r) => r && r.some((x) => x != null && String(x).trim() !== ''));
+    if (!clean.length) return { headers: [], records: [] };
+    const headers = clean[0].map((h) => String(h ?? '').trim());
+    const records = clean.slice(1).map((r) => {
+      const o = {}; headers.forEach((h, j) => { if (h) o[h] = String(r[j] ?? '').trim(); }); return o;
+    });
+    return { headers, records };
+  }
+
   function cloneModels(models) { return models.map((m) => Object.assign({}, m)); }
 
   /* mapHeaders(headers, fieldKeys) → { header: fieldKey|null }
@@ -151,5 +225,5 @@
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip };
+  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip };
 })(window);

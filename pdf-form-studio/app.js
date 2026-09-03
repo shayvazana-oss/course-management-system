@@ -3131,9 +3131,11 @@ function renderMergePreview(parsed) {
   $('mergePreviewWrap').classList.remove('hidden');
 }
 function doParseMerge() {
-  const txt = $('mergeCsv').value;
-  const parsed = PFS.merge.parseCSV(txt);
-  if (!parsed.records.length) { $('mergeStatus').textContent = 'לא נמצאו רשומות'; $('mergeRun').disabled = true; mergeParsed = null; return; }
+  presentParsed(PFS.merge.parseCSV($('mergeCsv').value));
+}
+// one presenter for both sources — pasted/loaded CSV text and a parsed .xlsx
+function presentParsed(parsed) {
+  if (!parsed || !parsed.records.length) { $('mergeStatus').textContent = 'לא נמצאו רשומות'; $('mergeRun').disabled = true; mergeParsed = null; return; }
   mergeParsed = parsed;
   const keys = overlay.fieldKeys();
   // smart mapping: exact-normalized then shared-canon ('שם התלמיד' ↔ 'שם מלא')
@@ -3155,6 +3157,18 @@ $('mergeCsv').addEventListener('input', () => { $('mergeRun').disabled = true; }
 $('mergeLoadFile').addEventListener('click', () => $('mergeFile').click());
 $('mergeFile').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return; e.target.value='';
+  if (/\.xlsx$/i.test(f.name)) {
+    // a real Excel file — parsed locally (see merge.parseXlsx), never uploaded
+    try {
+      const parsed = PFS.merge.parseXlsx(new Uint8Array(await f.arrayBuffer()));
+      $('mergeCsv').value = `📊 ${f.name} — קובץ Excel נטען (${parsed.records.length} שורות)`;
+      presentParsed(parsed);
+    } catch (err) {
+      console.error('xlsx parse failed', err);
+      PFS.toast('קריאת קובץ ה-Excel נכשלה — נסו לשמור אותו כ-CSV ולטעון שוב', 'err', 6000);
+    }
+    return;
+  }
   $('mergeCsv').value = await f.text(); doParseMerge();
 });
 $('mergeClose').addEventListener('click', () => closeModal('mergeModal'));

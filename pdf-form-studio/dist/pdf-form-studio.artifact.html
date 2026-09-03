@@ -647,7 +647,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       <button class="btn ghost" id="libBtn" title="המאגר — הטפסים הקבועים שלכם, בקליק אחד"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="txt">מאגר</span></button>
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
       <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
-      <button class="btn ghost" id="mergeBtn" disabled title="מיזוג מרובה"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">מיזוג</span></button>
+      <button class="btn ghost" id="mergeBtn" disabled title="הפקה סדרתית — תעודות וטפסים לכל רשימת סטודנטים (Excel/CSV)"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">תעודות ואצווה</span></button>
       <button class="btn ghost" id="undoBtn" disabled title="בטל פעולה אחרונה (Ctrl+Z)" aria-label="בטל"><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></span></button>
       <button class="btn ghost" id="redoBtn" disabled title="בצע שוב (Ctrl+Y)" aria-label="בצע שוב"><span class="ic"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></span></button>
       <button class="btn accent" id="fillAllBtn" disabled title="מלא הכל בקליק"><span class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span><span class="txt">מלא הכל</span></button>
@@ -1066,18 +1066,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 <div class="modal-back" id="mergeModal">
   <div class="modal" style="max-width:560px">
-    <header>🧬 מיזוג מרובה — מילוי אצווה</header>
+    <header>🎓 הפקה סדרתית — תעודות וטפסים לכל הרשימה</header>
     <div class="m-body">
-      <div class="hint">מלאו טופס אחד לדוגמה, הדביקו את רשימת התלמידים מאקסל — והעמודות ימופו לשדות <b>אוטומטית</b> ("שם התלמיד" יזוהה כ"שם מלא" וכו'). התוצאה: ZIP עם PDF מוכן לכל שורה. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
+      <div class="hint">מושלם לתעודות: פתחו את פורמט התעודה, הניחו טקסט עם "שם שדה" (למשל "שם מלא") איפה שהשם מודפס — וטענו את קובץ ה-Excel של הסטודנטים כמו שהוא. העמודות ימופו לשדות <b>אוטומטית</b> ("שם התלמיד" יזוהה כ"שם מלא" וכו'). התוצאה: ZIP עם PDF מוכן לכל סטודנט, על שמו. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
       <div class="field">
         <label>שדות מתויגים בטופס</label>
         <div id="mergeKeys" class="hint">—</div>
       </div>
       <div class="field">
-        <label>הדביקו טבלה מאקסל (Ctrl+V) או טענו קובץ CSV — שורה ראשונה = כותרות</label>
+        <label>טענו קובץ Excel‏ (xlsx)‏ / CSV, או הדביקו טבלה (Ctrl+V) — שורה ראשונה = כותרות</label>
         <textarea id="mergeCsv" rows="6" style="width:100%; font-family:var(--font-mono); font-size:12px; padding:8px; border:1px solid var(--line); border-radius:8px; direction:ltr"></textarea>
         <div class="row" style="margin-top:6px">
-          <button class="btn sm ghost" id="mergeLoadFile">⬆️ טען CSV</button>
+          <button class="btn sm ghost" id="mergeLoadFile">⬆️ טען Excel / CSV</button>
           <button class="btn sm ghost" id="mergeParse">בדוק</button>
           <span id="mergeStatus" class="hint muted" style="flex:1; text-align:left"></span>
         </div>
@@ -1103,7 +1103,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     </footer>
   </div>
 </div>
-<input type="file" id="mergeFile" accept=".csv,text/csv,text/plain" class="hidden" />
+<input type="file" id="mergeFile" accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" />
 
 <datalist id="fieldKeyList"></datalist>
 <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
@@ -6271,6 +6271,80 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return { headers, records };
   }
 
+  /* parseXlsx(bytes) → { headers, records } — read a real Excel file locally.
+   * An .xlsx is a ZIP of XML parts; fflate (already loaded for the batch ZIP)
+   * unzips it and DOMParser reads the parts: no library, no upload, the
+   * student list never leaves the browser. Strings resolve via sharedStrings;
+   * a serial number in a date-formatted cell becomes dd.mm.yyyy. */
+  function parseXlsx(bytes) {
+    if (!root.fflate) throw new Error('fflate not loaded');
+    const parts = root.fflate.unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+    const dec = new TextDecoder('utf-8');
+    const xml = (p) => { const b = parts[p]; return b ? new DOMParser().parseFromString(dec.decode(b), 'application/xml') : null; };
+    // FIRST sheet: workbook.xml orders them, the rels map its rId to a path
+    let sheetPath = 'xl/worksheets/sheet1.xml';
+    try {
+      const wb = xml('xl/workbook.xml'), rels = xml('xl/_rels/workbook.xml.rels');
+      const sh = wb && wb.querySelector('sheet');
+      const rid = sh && (sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'));
+      const rel = rid && rels && [...rels.querySelectorAll('Relationship')].find((r) => r.getAttribute('Id') === rid);
+      if (rel) sheetPath = 'xl/' + rel.getAttribute('Target').replace(/^\//, '').replace(/^xl\//, '');
+    } catch (e) {}
+    const shared = [];
+    const ss = xml('xl/sharedStrings.xml');
+    if (ss) ss.querySelectorAll('si').forEach((si) => {
+      shared.push([...si.querySelectorAll('t')].map((t) => t.textContent).join(''));
+    });
+    // which cell-style indices mean DATE? (builtin date formats + custom
+    // codes that spell day/month/year and are not plain number masks)
+    const dateStyle = [];
+    try {
+      const st = xml('xl/styles.xml');
+      const custom = {};
+      st && st.querySelectorAll('numFmts > numFmt').forEach((n) => { custom[n.getAttribute('numFmtId')] = n.getAttribute('formatCode') || ''; });
+      const builtin = new Set(['14', '15', '16', '17', '22']);
+      st && st.querySelectorAll('cellXfs > xf').forEach((xf, i) => {
+        const id = xf.getAttribute('numFmtId') || '0';
+        const code = custom[id];
+        dateStyle[i] = builtin.has(id) || !!(code && /[dy]/i.test(code) && /m/i.test(code) && !/[#0]/.test(code));
+      });
+    } catch (e) {}
+    const serialDate = (n) => {
+      const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000);   // Excel epoch
+      return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.' + d.getUTCFullYear();
+    };
+    const sheet = xml(sheetPath);
+    if (!sheet) return { headers: [], records: [] };
+    const colIdx = (ref) => { let n = 0; for (const ch of ref) { if (ch >= 'A' && ch <= 'Z') n = n * 26 + (ch.charCodeAt(0) - 64); else break; } return n - 1; };
+    const rows = [];
+    sheet.querySelectorAll('sheetData > row').forEach((rowEl) => {
+      const row = [];
+      rowEl.querySelectorAll('c').forEach((c) => {
+        const ref = c.getAttribute('r') || '', t = c.getAttribute('t') || 'n';
+        const sI = parseInt(c.getAttribute('s') || '-1', 10);
+        let v = '';
+        if (t === 'inlineStr') v = [...c.querySelectorAll('t')].map((x) => x.textContent).join('');
+        else {
+          const vEl = c.querySelector('v'), raw = vEl ? vEl.textContent : '';
+          if (t === 's') v = shared[parseInt(raw, 10)] ?? '';
+          else if (t === 'b') v = raw === '1' ? 'כן' : 'לא';
+          else if (raw !== '' && dateStyle[sI] && isFinite(+raw) && +raw > 20000 && +raw < 80000) v = serialDate(+raw);
+          else v = raw;
+        }
+        const ci = ref ? colIdx(ref) : row.length;
+        row[ci] = String(v).trim();
+      });
+      rows.push(row);
+    });
+    const clean = rows.filter((r) => r && r.some((x) => x != null && String(x).trim() !== ''));
+    if (!clean.length) return { headers: [], records: [] };
+    const headers = clean[0].map((h) => String(h ?? '').trim());
+    const records = clean.slice(1).map((r) => {
+      const o = {}; headers.forEach((h, j) => { if (h) o[h] = String(r[j] ?? '').trim(); }); return o;
+    });
+    return { headers, records };
+  }
+
   function cloneModels(models) { return models.map((m) => Object.assign({}, m)); }
 
   /* mapHeaders(headers, fieldKeys) → { header: fieldKey|null }
@@ -6371,7 +6445,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip };
+  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip };
 })(window);
 
 </script>
@@ -10886,9 +10960,11 @@ function renderMergePreview(parsed) {
   $('mergePreviewWrap').classList.remove('hidden');
 }
 function doParseMerge() {
-  const txt = $('mergeCsv').value;
-  const parsed = PFS.merge.parseCSV(txt);
-  if (!parsed.records.length) { $('mergeStatus').textContent = 'לא נמצאו רשומות'; $('mergeRun').disabled = true; mergeParsed = null; return; }
+  presentParsed(PFS.merge.parseCSV($('mergeCsv').value));
+}
+// one presenter for both sources — pasted/loaded CSV text and a parsed .xlsx
+function presentParsed(parsed) {
+  if (!parsed || !parsed.records.length) { $('mergeStatus').textContent = 'לא נמצאו רשומות'; $('mergeRun').disabled = true; mergeParsed = null; return; }
   mergeParsed = parsed;
   const keys = overlay.fieldKeys();
   // smart mapping: exact-normalized then shared-canon ('שם התלמיד' ↔ 'שם מלא')
@@ -10910,6 +10986,18 @@ $('mergeCsv').addEventListener('input', () => { $('mergeRun').disabled = true; }
 $('mergeLoadFile').addEventListener('click', () => $('mergeFile').click());
 $('mergeFile').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return; e.target.value='';
+  if (/\.xlsx$/i.test(f.name)) {
+    // a real Excel file — parsed locally (see merge.parseXlsx), never uploaded
+    try {
+      const parsed = PFS.merge.parseXlsx(new Uint8Array(await f.arrayBuffer()));
+      $('mergeCsv').value = `📊 ${f.name} — קובץ Excel נטען (${parsed.records.length} שורות)`;
+      presentParsed(parsed);
+    } catch (err) {
+      console.error('xlsx parse failed', err);
+      PFS.toast('קריאת קובץ ה-Excel נכשלה — נסו לשמור אותו כ-CSV ולטעון שוב', 'err', 6000);
+    }
+    return;
+  }
   $('mergeCsv').value = await f.text(); doParseMerge();
 });
 $('mergeClose').addEventListener('click', () => closeModal('mergeModal'));

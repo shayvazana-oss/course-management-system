@@ -3109,6 +3109,50 @@ async function main() {
     return denseOk && sparseOk && colsOk;
   }));
 
+  // ---- certificates: a real Excel student list → one named PDF each ----
+  {
+    const certRes = await page.evaluate(async (xlsxBytes) => {
+      const M = window.PFS.merge;
+      const parsed = M.parseXlsx(new Uint8Array(xlsxBytes));
+      const out = { headers: parsed.headers, n: parsed.records.length, r0: parsed.records[0], r2: parsed.records[2] };
+      // full certificate flow: format PDF + tagged name/date, batch over the list
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create();
+      const pg = d.addPage([842, 595]);   // landscape certificate
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      const font = await d.embedFont(StandardFonts.Helvetica);
+      pg.drawText('CERTIFICATE OF COMPLETION', { x: 250, y: 450, size: 24, font });
+      const certBytes = await d.save();
+      const baseModels = [
+        { id: 'c1', type: 'text', kind: 'text', page: 0, fx: 0.40, fy: 0.5, fw: 0.2, fh: 0.05, fontFrac: 0.05, color: '#111111', align: 'right', text: '', fieldKey: 'שם מלא' },
+        { id: 'c2', type: 'text', kind: 'text', page: 0, fx: 0.45, fy: 0.7, fw: 0.1, fh: 0.03, fontFrac: 0.025, color: '#111111', align: 'right', text: '', fieldKey: 'תאריך סיום' }
+      ];
+      const mapping = M.mapHeaders(parsed.headers, ['שם מלא', 'תאריך סיום']);
+      const records = M.remapRecords(parsed.records, mapping).map((r, i) => {
+        r.__name = parsed.records[i]['שם מלא']; return r;
+      });
+      const { zip, count } = await M.runBatch({ originalBytes: certBytes, baseModels, records, nameField: '__name' });
+      const files = window.fflate.unzipSync(zip);
+      out.count = count;
+      out.names = Object.keys(files).sort();
+      // each entry is a real, loadable single-page PDF
+      const re = await PDFDocument.load(files[out.names[0]]);
+      out.onePage = re.getPageCount() === 1;
+      return out;
+    }, Array.from(fs.readFileSync(path.join(HERE, 'fixtures', 'students.xlsx'))));
+    if (!(certRes.n === 3 && certRes.count === 3)) console.log('  [cert debug]', JSON.stringify(certRes));
+    check('xlsx: a real Excel student list parses locally (strings, ids, dates)',
+      JSON.stringify(certRes.headers) === JSON.stringify(['שם מלא', 'תעודת זהות', 'שם הקורס', 'תאריך סיום', 'ציון'])
+      && certRes.n === 3
+      && certRes.r0['שם מלא'] === 'ישראל ישראלי'
+      && certRes.r0['תעודת זהות'] === '202665227'
+      && certRes.r0['תאריך סיום'] === '15.07.2026'      // date cell → readable date, not a serial
+      && certRes.r2['ציון'] === '100');
+    check('certificates: Excel list → ZIP with one named PDF per student',
+      certRes.count === 3 && certRes.onePage === true
+      && JSON.stringify(certRes.names) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort()));
+  }
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

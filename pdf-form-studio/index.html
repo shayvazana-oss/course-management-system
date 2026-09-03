@@ -49,7 +49,7 @@
       <button class="btn ghost" id="libBtn" title="המאגר — הטפסים הקבועים שלכם, בקליק אחד"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="txt">מאגר</span></button>
       <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
       <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
-      <button class="btn ghost" id="mergeBtn" disabled title="מיזוג מרובה"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">מיזוג</span></button>
+      <button class="btn ghost" id="mergeBtn" disabled title="הפקה סדרתית — תעודות וטפסים לכל רשימת סטודנטים (Excel/CSV)"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">תעודות ואצווה</span></button>
       <button class="btn ghost" id="undoBtn" disabled title="בטל פעולה אחרונה (Ctrl+Z)" aria-label="בטל"><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></span></button>
       <button class="btn ghost" id="redoBtn" disabled title="בצע שוב (Ctrl+Y)" aria-label="בצע שוב"><span class="ic"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></span></button>
       <button class="btn accent" id="fillAllBtn" disabled title="מלא הכל בקליק"><span class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span><span class="txt">מלא הכל</span></button>
@@ -468,18 +468,18 @@
 
 <div class="modal-back" id="mergeModal">
   <div class="modal" style="max-width:560px">
-    <header>🧬 מיזוג מרובה — מילוי אצווה</header>
+    <header>🎓 הפקה סדרתית — תעודות וטפסים לכל הרשימה</header>
     <div class="m-body">
-      <div class="hint">מלאו טופס אחד לדוגמה, הדביקו את רשימת התלמידים מאקסל — והעמודות ימופו לשדות <b>אוטומטית</b> ("שם התלמיד" יזוהה כ"שם מלא" וכו'). התוצאה: ZIP עם PDF מוכן לכל שורה. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
+      <div class="hint">מושלם לתעודות: פתחו את פורמט התעודה, הניחו טקסט עם "שם שדה" (למשל "שם מלא") איפה שהשם מודפס — וטענו את קובץ ה-Excel של הסטודנטים כמו שהוא. העמודות ימופו לשדות <b>אוטומטית</b> ("שם התלמיד" יזוהה כ"שם מלא" וכו'). התוצאה: ZIP עם PDF מוכן לכל סטודנט, על שמו. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
       <div class="field">
         <label>שדות מתויגים בטופס</label>
         <div id="mergeKeys" class="hint">—</div>
       </div>
       <div class="field">
-        <label>הדביקו טבלה מאקסל (Ctrl+V) או טענו קובץ CSV — שורה ראשונה = כותרות</label>
+        <label>טענו קובץ Excel‏ (xlsx)‏ / CSV, או הדביקו טבלה (Ctrl+V) — שורה ראשונה = כותרות</label>
         <textarea id="mergeCsv" rows="6" style="width:100%; font-family:var(--font-mono); font-size:12px; padding:8px; border:1px solid var(--line); border-radius:8px; direction:ltr"></textarea>
         <div class="row" style="margin-top:6px">
-          <button class="btn sm ghost" id="mergeLoadFile">⬆️ טען CSV</button>
+          <button class="btn sm ghost" id="mergeLoadFile">⬆️ טען Excel / CSV</button>
           <button class="btn sm ghost" id="mergeParse">בדוק</button>
           <span id="mergeStatus" class="hint muted" style="flex:1; text-align:left"></span>
         </div>
@@ -505,7 +505,7 @@
     </footer>
   </div>
 </div>
-<input type="file" id="mergeFile" accept=".csv,text/csv,text/plain" class="hidden" />
+<input type="file" id="mergeFile" accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" />
 
 <datalist id="fieldKeyList"></datalist>
 <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>

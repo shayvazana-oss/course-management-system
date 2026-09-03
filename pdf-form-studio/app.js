@@ -274,7 +274,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; } };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge() };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -3090,7 +3090,19 @@ function openMerge() {
   if (keys.length && !$('mergeCsv').value.trim()) $('mergeCsv').value = keys.join(',') + '\n';
   mergeParsed = null; mergeMapping = null; $('mergeRun').disabled = true; $('mergeStatus').textContent = ''; $('mergeProg').textContent = '';
   $('mergeMapWrap').classList.add('hidden'); $('mergePreviewWrap').classList.add('hidden');
+  // a certificate format has no blanks/labels for detection to find; there,
+  // values are placed by eye and should stay CENTERED on that spot whatever
+  // their length. A real form keeps right-anchored values beside its labels.
+  const nDetected = lastDet && lastDet.fields ? lastDet.fields.filter((f) => f.type === 'text').length : 0;
+  if ($('mergeCenter')) $('mergeCenter').checked = nDetected === 0;
   openModal('mergeModal');
+}
+// batch models with every tagged value re-anchored at the CENTER of the
+// sample's box — the sample was placed where the name should sit, and a longer
+// or shorter name must sit on that same spot (align:center keeps the box)
+function centerBatchModels(models) {
+  return models.map((m) => (m.type === 'text' && m.fieldKey && m.align !== 'center')
+    ? Object.assign({}, m, { align: 'center', wrapW: null }) : m);
 }
 let mergeMapping = null; // header → fieldKey|null (auto + manual overrides)
 function renderMergeMapUI(parsed, keys) {
@@ -3175,8 +3187,9 @@ $('mergeClose').addEventListener('click', () => closeModal('mergeModal'));
 $('mergeRun').addEventListener('click', async () => {
   if (!mergeParsed) doParseMerge();
   if (!mergeParsed) return;
-  const baseModels = overlay.getElements().map((c) => c.model);
+  let baseModels = overlay.getElements().map((c) => c.model);
   if (!baseModels.length) { PFS.toast('הטופס ריק', 'err'); return; }
+  if ($('mergeCenter') && $('mergeCenter').checked) baseModels = centerBatchModels(baseModels);
   const btn = $('mergeRun'); btn.disabled = true; const prev = btn.textContent;
   try {
     // records arrive keyed by spreadsheet headers — rekey them to fieldKeys
@@ -3192,6 +3205,7 @@ $('mergeRun').addEventListener('click', async () => {
       baseModels,
       records,
       nameField: nameHeader ? '__name' : '',
+      quality: 'high',   // certificates get printed — always the print-grade raster
       onProgress: (d, t) => { $('mergeProg').textContent = `מפיק ${d}/${t}…`; }
     });
     PFS.merge.downloadZip(zip, currentFileName + '-batch.zip');

@@ -3153,6 +3153,87 @@ async function main() {
       && JSON.stringify(certRes.names) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort()));
   }
 
+  // ---- certificates must never be WRONG: Excel files as they arrive from the
+  // field — title rows, lists on the second tab, IDs that lost their leading
+  // zero, formulas, error cells, sloppy whitespace ----
+  {
+    const xl = (n) => Array.from(fs.readFileSync(path.join(HERE, 'fixtures', 'xlsx', n)));
+    const advRes = await page.evaluate(async (F) => {
+      const M = window.PFS.merge, R = {};
+      const P = (n) => M.parseXlsx(new Uint8Array(F[n]));
+      R.a = P('a_title_rows.xlsx');          // merged title line + blank row above the header, blank row inside
+      R.b = P('b_second_sheet.xlsx');        // empty "הוראות" tab first, the list on tab 2
+      R.c = P('c_leading_zero.xlsx');        // ids/phones stored as NUMBERS (Excel drops the 0)
+      R.d = P('d_formulas_geresh.xlsx');     // formula cells with Excel's cached results, geresh/quotes, datetime, text date
+      // Google-Sheets/Numbers style: inlineStr, no sharedStrings, no r= on cells, an error cell, doubled spaces
+      const inl = `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
+<row r="1"><c t="inlineStr"><is><t>שם מלא</t></is></c><c t="inlineStr"><is><t>ת.ז.</t></is></c></row>
+<row r="2"><c t="inlineStr"><is><t>יוסי  כהן </t></is></c><c><v>123456782</v></c></row>
+<row r="3"><c t="e"><v>#N/A</v></c><c t="str"><v>abc</v></c></row></sheetData></worksheet>`;
+      const enc = (s) => new TextEncoder().encode(s);
+      R.inl = M.parseXlsx(window.fflate.zipSync({ 'xl/worksheets/sheet1.xml': enc(inl) }));
+      // ZIP entry names carry the UTF-8 flag (Hebrew names survive Windows Explorer)
+      const z = window.fflate.zipSync({ 'ישראל ישראלי.pdf': new Uint8Array([1, 2, 3]) });
+      R.zipUtf8 = !!((z[6] | (z[7] << 8)) & 0x800);
+      // file naming keeps apostrophes/geresh, swaps the illegal " for gershayim
+      R.idOk = M.israeliIdValid('123456782') && !M.israeliIdValid('123456780');
+      return R;
+    }, { 'a_title_rows.xlsx': xl('a_title_rows.xlsx'), 'b_second_sheet.xlsx': xl('b_second_sheet.xlsx'), 'c_leading_zero.xlsx': xl('c_leading_zero.xlsx'), 'd_formulas_geresh.xlsx': xl('d_formulas_geresh.xlsx') });
+    const dr = advRes.d.records;
+    const dOk = dr.length === 2
+      && dr[0]['שם מלא'] === "ג'ורג' בן-ציון"          // formula result (cached by Excel) is what prints
+      && dr[0]['ציון סופי'] === '92'
+      && dr[0]['תאריך סיום'] === '15.07.2026'           // datetime cell → the date only
+      && dr[0]['תעודת זהות'] === '012345675'            // text id keeps its zero as typed
+      && dr[1]['שם מלא'] === 'נועה ד"ר כץ'
+      && dr[1]['תאריך סיום'] === '15/07/2026';          // a date typed as text passes through untouched
+    const H = ['שם מלא', 'תעודת זהות', 'שם הקורס', 'תאריך סיום', 'ציון'];
+    const aOk = JSON.stringify(advRes.a.headers) === JSON.stringify(H) && advRes.a.records.length === 2
+      && advRes.a.records[0]['שם מלא'] === 'ישראל ישראלי' && advRes.a.records[1]['שם מלא'] === 'מירב עמיר';
+    const bOk = JSON.stringify(advRes.b.headers) === JSON.stringify(H) && advRes.b.records.length === 1 && advRes.b.records[0]['שם מלא'] === 'דנה כהן';
+    const c = advRes.c.records;
+    const cOk = c.length === 3
+      && c[0]['תעודת זהות'] === '012345674'       // zero-padded number format honoured
+      && c[1]['תעודת זהות'] === '012345674'       // plain number: zero restored because the checksum proves it
+      && c[2]['תעודת זהות'] === '301234563'       // 9 digits untouched
+      && c[0]['טלפון'] === '0501234567'           // mobile lost its 0
+      && c[2]['טלפון'] === '031234567';           // landline lost its 0
+    const iOk = advRes.inl.records.length === 2 && advRes.inl.records[0]['שם מלא'] === 'יוסי כהן'
+      && advRes.inl.records[1]['שם מלא'] === '' && advRes.inl.records[1]['ת.ז.'] === 'abc';
+    if (!(aOk && bOk && cOk && iOk && dOk)) console.log('  [xlsx-adversarial debug]', JSON.stringify(advRes));
+    check('xlsx: a title row above the header and blank rows do not swallow the list', aOk);
+    check('xlsx: formula results, quotes/geresh, datetime and text dates come through exactly', dOk);
+    check('xlsx: the student list on the SECOND tab is found', bOk);
+    check('xlsx: leading zeros Excel dropped from IDs/phones are restored (checksum-gated)', cOk && advRes.idOk);
+    check('xlsx: inlineStr files, error cells and doubled spaces are cleaned', iOk && advRes.zipUtf8);
+  }
+
+  // ---- certificates: a long name and a short name land on the SAME centre ----
+  check('certificates: centred batch keeps every name on the sample spot; file names keep geresh', await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const { PDFDocument, rgb } = window.PDFLib;
+    const d = await PDFDocument.create(); d.addPage([842, 595]).drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+    const cert = await d.save();
+    // the sample was placed RIGHT-aligned (the Hebrew default) — the batch re-anchors it at its centre
+    const sample = [{ id: 'n', type: 'text', kind: 'text', page: 0, fx: 0.3, fy: 0.4, fw: 0.4, fh: 0.08, fontFrac: 0.08, color: '#000000', align: 'right', text: 'ישראל ישראלי', fieldKey: 'שם מלא' }];
+    const models = T.centerBatchModels(sample);
+    const inkCenter = async (name) => {
+      const bytes = await window.PFS.exporter.exportPdf(cert, M.applyRecord(models, { 'שם מלא': name }), {});
+      const doc = await window.pdfjsLib.getDocument({ data: bytes }).promise; const p = await doc.getPage(1);
+      const vp = p.getViewport({ scale: 1 }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+      await p.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      const dd = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let minX = 1e9, maxX = -1;
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) { if (dd[(y * c.width + x) * 4] < 128) { if (x < minX) minX = x; if (x > maxX) maxX = x; } }
+      return { center: (minX + maxX) / 2, width: maxX - minX };
+    };
+    const s = await inkCenter('דן גל'), l = await inkCenter('אברהם בן-ציון הלוי מזרחי');
+    const centred = Math.abs(s.center - l.center) <= 2 && l.width > s.width * 2;
+    const { zip } = await M.runBatch({ originalBytes: cert, baseModels: models,
+      records: [{ 'שם מלא': "ג'ורג' בן-ציון", __name: "ג'ורג' בן-ציון" }, { 'שם מלא': 'נועה ד"ר כץ', __name: 'נועה ד"ר כץ' }], nameField: '__name', quality: 'high' });
+    const names = Object.keys(window.fflate.unzipSync(zip)).sort();
+    return centred && JSON.stringify(names) === JSON.stringify(["ג'ורג' בן-ציון.pdf", 'נועה ד״ר כץ.pdf'].sort());
+  }));
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

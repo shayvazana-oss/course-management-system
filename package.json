@@ -1,0 +1,16 @@
+{
+  "name": "fillo",
+  "version": "1.0.0",
+  "description": "Fillo — Hebrew-first PDF form filler. Vanilla JS app (no build); this package.json only wires the e2e smoke suite.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node build.mjs && node test/e2e.mjs && node test/single-file.mjs",
+    "test:e2e": "node test/e2e.mjs",
+    "test:single": "node build.mjs && node test/single-file.mjs",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.61.1"
+  }
+}

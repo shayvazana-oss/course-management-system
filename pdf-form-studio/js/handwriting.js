@@ -1,0 +1,229 @@
+/* handwriting.js — "כתב היד שלי": compose typed text from the user's own
+ * hand-drawn glyphs. The user trains once (draws each letter/digit); we store
+ * each glyph as normalized vector strokes, then render typed text by drawing
+ * those strokes right-to-left with small natural jitter. Fully local.
+ *
+ * v2 — typographic metrics model: each glyph knows its TRUE size and vertical
+ * position inside the em box (י is small and hangs high, ל ascends, ך ן ף ץ ק
+ * descend below the baseline). Metrics come from a canonical Hebrew table
+ * blended with what was measured against the trainer guidelines, so letters
+ * keep their identity (י no longer stretches into ו/ן) while staying personal.
+ * A "beautify" pass (Chaikin smoothing + regularized jitter + subtle width
+ * variation) makes the result cleaner but still authentically hand-written.
+ *
+ * Honest scope: per-glyph personal handwriting with variation — not connected
+ * cursive and not AI synthesis (unavailable offline for Hebrew).
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+  const store = PFS.store;
+  const KEY = 'handwriting';
+
+  const HEB = 'אבגדהוזחטיכלמנסעפצקרשת'.split('');
+  const FINALS = 'ךםןףץ'.split('');
+  const DIGITS = '0123456789'.split('');
+  const PUNCT = ['.', ',', '/', ':', '-', '(', ')', '"', "'"];
+  const GLYPHS = [].concat(HEB, FINALS, DIGITS, PUNCT);
+
+  /* Canonical em-box metrics per glyph: y = top offset, h = height, both in
+   * em units. The x-height band runs 0.06→0.78 (baseline at 0.78). */
+  const XH = { y: 0.06, h: 0.72 };                    // regular letters & digits
+  const DESC = { y: 0.06, h: 1.02 };                  // descend below baseline
+  const METRICS = {
+    'י': { y: 0.06, h: 0.30 },                        // small, hangs from the top
+    'ל': { y: -0.17, h: 0.95 },                       // ascends above the line
+    'ך': DESC, 'ן': DESC, 'ף': DESC, 'ץ': DESC, 'ק': DESC,
+    '.': { y: 0.68, h: 0.10 }, ',': { y: 0.66, h: 0.20 },
+    '/': { y: 0.02, h: 0.80 }, ':': { y: 0.25, h: 0.45 },
+    '-': { y: 0.38, h: 0.07 }, '(': { y: -0.02, h: 0.90 }, ')': { y: -0.02, h: 0.90 },
+    '"': { y: 0.06, h: 0.22 }, "'": { y: 0.06, h: 0.22 }
+  };
+  const metricsOf = (ch) => METRICS[ch] || XH;
+
+  function getProfile() {
+    const p = store.get(KEY, null);
+    if (!p || typeof p !== 'object' || !p.glyphs) return { glyphs: {}, space: 0.32, beautify: true, tracking: 1 };
+    if (p.beautify === undefined) p.beautify = true;
+    if (p.tracking === undefined) p.tracking = 1;
+    return p;
+  }
+  function saveProfile(p) { return store.set(KEY, p); }
+  function count() { return Object.keys(getProfile().glyphs).length; }
+  function hasGlyphs() { return count() > 0; }
+  function hasGlyph(ch) { return !!getProfile().glyphs[ch]; }
+  function clearAll() { store.remove(KEY); }
+  function getBeautify() { return getProfile().beautify !== false; }
+  function setBeautify(on) { const p = getProfile(); p.beautify = !!on; saveProfile(p); }
+  function getTracking() { const t = getProfile().tracking; return t == null ? 1 : t; }
+  function setTracking(t) { const p = getProfile(); p.tracking = Math.max(0.4, Math.min(2, +t || 1)); saveProfile(p); }
+  function getWeight() { const w = getProfile().weight; return w == null ? 1 : w; }   // pen thickness ×
+  function setWeight(w) { const p = getProfile(); p.weight = Math.max(0.5, Math.min(2, +w || 1)); saveProfile(p); }
+
+  /* store a glyph from raw strokes (canvas px). Normalizes to its bbox.
+   * ref (optional) = {top, base} — the trainer guideline lines in the same px
+   * space; when present we also record measured em metrics, so the size and
+   * position the user actually drew carry into the synthesis. */
+  function setGlyph(ch, strokes, ref) {
+    const p = getProfile();
+    const pts = [].concat.apply([], strokes || []);
+    if (pts.length < 2) { delete p.glyphs[ch]; saveProfile(p); return false; }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pts.forEach((q) => { if (q.x < minX) minX = q.x; if (q.x > maxX) maxX = q.x; if (q.y < minY) minY = q.y; if (q.y > maxY) maxY = q.y; });
+    const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
+    const norm = strokes.map((st) => st.map((q) => ({
+      x: Math.round(((q.x - minX) / w) * 1000) / 1000,
+      y: Math.round(((q.y - minY) / h) * 1000) / 1000
+    })));
+    const g = { s: norm, a: Math.round((w / h) * 100) / 100 };
+    if (ref && ref.base - ref.top > 4) {
+      const span = ref.base - ref.top; // the guides mark the x-height band (=0.72em)
+      g.m = {
+        h: Math.round(Math.max(0.05, Math.min(1.4, (h / span) * XH.h)) * 1000) / 1000,
+        y: Math.round(Math.max(-0.3, Math.min(1.0, XH.y + ((minY - ref.top) / span) * XH.h)) * 1000) / 1000
+      };
+    }
+    p.glyphs[ch] = g;
+    return saveProfile(p);
+  }
+  function removeGlyph(ch) { const p = getProfile(); delete p.glyphs[ch]; saveProfile(p); }
+
+  /* final metrics = canonical blended with what the user actually drew,
+   * clamped near canonical so a sloppy capture can't break letter identity. */
+  function blendMetrics(ch, g) {
+    const c = metricsOf(ch);
+    if (!g || !g.m) return c;
+    const W = 0.6;
+    const clamp = (v, base, r) => Math.min(base + r, Math.max(base - r, v));
+    return {
+      h: clamp(c.h * (1 - W) + g.m.h * W, c.h, 0.25),
+      y: clamp(c.y * (1 - W) + g.m.y * W, c.y, 0.20)
+    };
+  }
+
+  /* Chaikin corner-cutting (keeps endpoints) — removes hand/pointer jitter
+   * while preserving the letterform. */
+  // Reverse maximal LTR runs (letters/digits + internal . , : / - + ( ) @ and
+  // spaces between them) so the RTL layout renders them in natural order.
+  function toVisualRTL(s) {
+    return String(s).replace(/[0-9A-Za-z](?:[0-9A-Za-z .,:/@+()\-]*[0-9A-Za-z])?/g,
+      (m) => m.split('').reverse().join(''));
+  }
+
+  function smoothStroke(st, iters) {
+    let p = st;
+    for (let k = 0; k < iters; k++) {
+      if (p.length < 3) break;
+      const out = [p[0]];
+      for (let i = 0; i < p.length - 1; i++) {
+        const a = p[i], b = p[i + 1];
+        out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+        out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+      }
+      out.push(p[p.length - 1]);
+      p = out;
+    }
+    return p;
+  }
+
+  /* renderText(text, {fontPx, color, beautify}) → { url, w, h } trimmed PNG */
+  function renderText(text, opts) {
+    opts = opts || {};
+    const p = getProfile();
+    const fontPx = opts.fontPx || 64;
+    const color = opts.color || '#111111';
+    const beautify = opts.beautify !== undefined ? !!opts.beautify : (p.beautify !== false);
+    const weight = opts.weight != null ? opts.weight : (p.weight != null ? p.weight : 1);
+    const lw = Math.max(1.1, fontPx * 0.05 * weight);   // pen thickness (user control)
+    // Consistent side-bearing spacing. `tracking` (0.5 tight … 1.8 loose) is a
+    // user control; the base gap is measured relative to the x-height so small
+    // and tall letters sit evenly, not relative to each glyph's own height.
+    const tracking = opts.tracking != null ? opts.tracking : (p.tracking != null ? p.tracking : 1);
+    const gap = fontPx * (0.012 + 0.055 * tracking);   // floor + scale → slider has real reach
+    const spaceW = fontPx * (p.space || 0.32);
+    // BiDi: glyphs are laid out right-to-left (Hebrew base), so a naive pass
+    // would mirror digit/Latin runs — "054" would come out "450". Reverse each
+    // LTR run (digits, Latin, and their internal separators like . / : -) so
+    // numbers, dates and codes read correctly while Hebrew stays RTL.
+    const chars = toVisualRTL(String(text || '')).split('');
+
+    // layout: every glyph at its TRUE size — advance width follows the metrics
+    const items = []; let totalW = 0;
+    let drawn = 0; const missingSet = {};
+    chars.forEach((ch) => {
+      const isWs = (ch === ' ' || ch === '\t' || ch === '\n');
+      const g = p.glyphs[ch];
+      if (isWs || !g) {
+        if (!isWs && !g) missingSet[ch] = 1;         // an untrained glyph — renders blank
+        items.push({ space: true, w: spaceW }); totalW += spaceW + gap; return;
+      }
+      drawn++;
+      const m = blendMetrics(ch, g);
+      const gh = fontPx * m.h;
+      const gw = Math.max(fontPx * 0.06, gh * g.a);
+      items.push({ g, m, w: gw, h: gh });
+      totalW += gw + gap;
+    });
+    totalW = Math.max(1, totalW - gap);
+
+    const pad = Math.round(fontPx * 0.35);
+    const Wc = Math.round(totalW + pad * 2);
+    const H = Math.round(fontPx * 1.5 + pad * 2);
+    const c = document.createElement('canvas'); c.width = Wc; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.strokeStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+    const topY = pad + fontPx * 0.25;        // em-box top (leaves room for ל)
+    // Only rotation + baseline jitter — NO horizontal scaling. Scaling a glyph
+    // sideways after its advance width was fixed is what made gaps look uneven;
+    // dropping it keeps letter-to-letter spacing consistent.
+    const jRot = beautify ? 0.018 : 0.06;    // ±~0.5° vs ±1.7°
+    const jY = beautify ? 0.025 : 0.06;
+    let x = Wc - pad;                        // RTL: start at the right
+    items.forEach((it) => {
+      x -= it.w;
+      if (it.g) {
+        const gTop = topY + fontPx * it.m.y;
+        const jr = (Math.random() - 0.5) * jRot;
+        const jy = (Math.random() - 0.5) * fontPx * jY;
+        const cx = x + it.w / 2, cy = gTop + it.h / 2;
+        ctx.save();
+        ctx.translate(cx, cy + jy); ctx.rotate(jr); ctx.translate(-cx, -cy);
+        it.g.s.forEach((st) => {
+          let pts = st.map((q) => ({ x: x + q.x * it.w, y: gTop + q.y * it.h }));
+          if (beautify) pts = smoothStroke(pts, 3);
+          ctx.lineWidth = lw * (beautify ? (0.94 + Math.random() * 0.12) : 1); // subtle ink variation
+          ctx.beginPath();
+          if (beautify && pts.length > 2) {
+            // flowing pen: quadratic curves through the midpoints of each
+            // segment, so the ink reads as one continuous stroke, not facets
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let j = 1; j < pts.length - 1; j++) {
+              const mx = (pts[j].x + pts[j + 1].x) / 2, my = (pts[j].y + pts[j + 1].y) / 2;
+              ctx.quadraticCurveTo(pts[j].x, pts[j].y, mx, my);
+            }
+            ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+          } else {
+            pts.forEach((q, j) => (j === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)));
+          }
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+      x -= gap;
+    });
+
+    const trimmed = PFS.imageTools.autoTrim(c, 6);
+    // `drawn` = how many real (trained) glyphs actually got inked; `missing` =
+    // the untrained characters that came out blank. Callers use these to refuse
+    // placing an empty image instead of dropping an invisible box on the form.
+    return { url: trimmed.toDataURL('image/png'), w: trimmed.width, h: trimmed.height, drawn, missing: Object.keys(missingSet) };
+  }
+
+  PFS.handwriting = {
+    GLYPHS, HEB, FINALS, DIGITS, PUNCT, METRICS, metricsOf,
+    getProfile, saveProfile, count, hasGlyphs, hasGlyph, clearAll,
+    getBeautify, setBeautify, getTracking, setTracking, getWeight, setWeight,
+    setGlyph, removeGlyph, renderText
+  };
+})(window);

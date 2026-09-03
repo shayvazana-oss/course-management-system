@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fillo · מילוי וחתימה על טפסי PDF</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230E6E78'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%230E6E78' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#FFFFFF" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="tb-right">
+      <div class="brand">
+        <div class="logo" aria-label="Fillo">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true">
+            <path d="M12 3.2C15 7 18 10.6 18 13.7A6 6 0 1 1 6 13.7C6 10.6 9 7 12 3.2Z" fill="#fff"/>
+            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#0E6E78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">Fillo</div>
+          <div class="sub">מילוי טפסים · בלי הדפסה וסריקה</div>
+        </div>
+      </div>
+    </div>
+    <div class="tb-center">
+      <div class="docbar hidden" id="docbar">
+        <button class="btn ghost" id="homeBtn" title="דף הבית — סגירת המסמך וחזרה למסך הפתיחה (לפתיחת מסמך חדש)" aria-label="דף הבית"><span class="ic">🏠</span></button>
+        <span class="fname" id="fname">—</span>
+        <span id="savedInd" style="font-size:11px;font-weight:700;color:var(--ok);opacity:0;transition:opacity .4s">✓ נשמר</span>
+        <select id="pageJump" class="hidden" title="קפיצה לעמוד" style="width:auto;padding:6px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);font-size:12px;font-weight:700"></select>
+        <div class="zoomctl" id="zoomctl">
+          <button data-z="out" title="הקטן">−</button>
+          <span class="lvl" id="zoomLvl">100%</span>
+          <button data-z="in" title="הגדל">+</button>
+          <button data-z="fit" title="התאם לרוחב">⤢</button>
+        </div>
+      </div>
+    </div>
+    <div class="tb-left">
+      <button class="btn ghost" id="helpBtn" title="עזרה וקיצורי מקלדת (?)" aria-label="עזרה וקיצורי מקלדת"><span class="ic">?</span></button>
+      <button class="btn ghost" id="themeBtn" title="מצב תצוגה (בהיר/כהה)" aria-label="החלפת מצב תצוגה בהיר או כהה"><span class="ic" id="themeIc">🌙</span></button>
+      <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל" aria-label="פתיחת פאנל הצד">☰</button>
+      <button class="btn ghost" id="coursesBtn" title="תיקי קורסים — מי הגיש מה"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M9 13h6M9 17h6"/></svg></span><span class="txt">קורסים</span></button>
+      <button class="btn ghost" id="libBtn" title="המאגר — הטפסים הקבועים שלכם, בקליק אחד"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="txt">מאגר</span></button>
+      <button class="btn ghost" id="openBtn" title="פתח PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="txt">פתח</span></button>
+      <button class="btn ghost" id="tmplBtn" disabled title="תבניות"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="5" y="10" width="14" height="4" rx="1"/><rect x="7" y="16" width="10" height="4" rx="1"/></svg></span><span class="txt">תבניות</span></button>
+      <button class="btn ghost" id="mergeBtn" disabled title="הפקה סדרתית — תעודות וטפסים לכל רשימת סטודנטים (Excel/CSV)"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8 7.5c3 1.5 4.5 3 7.5 4M8 16.5c3-1.5 4.5-3 7.5-4"/></svg></span><span class="txt">תעודות ואצווה</span></button>
+      <button class="btn ghost" id="undoBtn" disabled title="בטל פעולה אחרונה (Ctrl+Z)" aria-label="בטל"><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></span></button>
+      <button class="btn ghost" id="redoBtn" disabled title="בצע שוב (Ctrl+Y)" aria-label="בצע שוב"><span class="ic"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></span></button>
+      <button class="btn accent" id="fillAllBtn" disabled title="מלא הכל בקליק"><span class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span><span class="txt">מלא הכל</span></button>
+      <button class="btn primary" id="exportBtn" disabled title="ייצוא PDF"><span class="ic"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></span><span class="txt">ייצוא PDF</span></button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <nav class="rail" id="rail" aria-label="כלים">
+      <div class="rail-group">
+        <div class="rail-head">הוספה</div>
+        <button class="rail-btn tool" data-tool="text" title="הוספת טקסט"><svg viewBox="0 0 24 24"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg><span class="lbl">טקסט</span></button>
+        <button class="rail-btn tool" data-tool="check" title="סימן וי"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg><span class="lbl">סימן וי</span></button>
+        <button class="rail-btn tool" data-tool="cross" title="איקס"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="lbl">איקס</span></button>
+        <button class="rail-btn tool" data-tool="date" title="תאריך היום"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="lbl">תאריך היום</span></button>
+        <button class="rail-btn tool" data-tool="draw" title="ציור חופשי"><svg viewBox="0 0 24 24"><path d="M4 20c4-1 2-5 5-7s6-4 8-8"/><path d="M15 4l5 5-9 9-6 1 1-6z"/></svg><span class="lbl">ציור חופשי</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">חתימה וחותמת</div>
+        <button class="rail-btn tool" data-tool="signature" title="הוספת חתימה"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg><span class="lbl">חתימה</span></button>
+        <button class="rail-btn tool" data-tool="stamp" title="הוספת חותמת"><svg viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M19 17H5v-1.5A2.5 2.5 0 0 1 7.5 13h9a2.5 2.5 0 0 1 2.5 2.5Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="lbl">חותמת</span></button>
+        <button class="rail-btn tool" data-tool="handwriting" title="טקסט בכתב היד שלך"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">כתב יד אישי</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">מחיקה והחלפה</div>
+        <button class="rail-btn tool" data-tool="clip" title="העתקת אזור — גררו מעל חלק קיים במסמך (חתימה, חותמת, בלוק שמולא בכתב יד) והדביקו אותו במקום אחר, בכל עמוד"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><span class="lbl">העתק אזור</span></button>
+        <button class="rail-btn tool" data-tool="replace" title="החלפת נתון — גררו מעל טקסט קיים: הישן מכוסה בצבע הרקע ותיבה חדשה נפתחת להקלדה"><svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3M4 8l3 3"/><path d="M20 16H8l3 3M20 16l-3-3"/></svg><span class="lbl">החלפה</span></button>
+        <button class="rail-btn tool" data-tool="whiteout" title="כיסוי — גררו לצייר אזור; הצבע מותאם אוטומטית לרקע כדי למחוק בצורה חלקה"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="#fff" stroke="currentColor"/></svg><span class="lbl">כיסוי חלק</span></button>
+        <button class="rail-btn tool" data-tool="redact" title="השחרה — גררו כדי להסתיר מידע רגיש בשחור"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span class="lbl">השחרה</span></button>
+        <button class="rail-btn tool" data-tool="highlight" title="הדגשה — גררו לסימון צהוב שקוף"><svg viewBox="0 0 24 24"><path d="M9 14l-4 4v2h2l4-4"/><path d="M13 5l6 6-7 7-6-6z" fill="#ffe600" stroke="currentColor"/></svg><span class="lbl">הדגשה</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">עמוד וקובץ</div>
+        <button class="rail-btn" id="rotateBtn" disabled title="סובב עמוד 90° (לסריקות מוטות)"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/></svg><span class="lbl">סובב עמוד</span></button>
+        <button class="rail-btn" id="attachBtn" disabled title="צרף עמודים (צילום ת״ז, קבלה, PDF) — יתווספו לקובץ המיוצא"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/></svg><span class="lbl">צרף עמוד</span></button>
+        <input id="attachInput" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
+        <button class="rail-btn" id="deleteBtn" disabled title="מחק את העמוד הנוכחי (לא ייכלל בייצוא)"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M18 7l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7"/></svg><span class="lbl">מחק עמוד</span></button>
+        <button class="rail-btn" id="enhanceBtn" disabled title="חידוד סריקה דהויה"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span class="lbl">חדד סריקה</span></button>
+        <button class="rail-btn" id="thumbsBtn" hidden title="תמונות עמודים"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/></svg><span class="lbl">עמודים</span></button>
+      </div>
+      <div class="rail-group">
+        <div class="rail-head">כלים</div>
+        <button class="rail-btn" id="detectBtn" disabled title="זהה שדות אוטומטית"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lbl">זהה שדות</span></button>
+        <button class="rail-btn" id="stickyBtn" title="מצב רצף — הכלי נשאר פעיל להנחה מרובה (Esc לעצירה)"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span class="lbl">מצב רצף</span></button>
+        <button class="rail-btn" id="clearBtn" disabled title="נקה טופס"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span class="lbl">נקה טופס</span></button>
+      </div>
+    </nav>
+
+    <aside class="thumbs" id="thumbs" hidden aria-label="תמונות ממוזערות של עמודים"></aside>
+    <main class="viewport" id="viewport">
+      <div class="dropzone" id="dropzone">
+        <div class="big"><svg viewBox="0 0 128 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="hsh" x="-20%" y="-20%" width="140%" height="145%">
+              <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#1E4E8C" flood-opacity="0.18"/>
+            </filter>
+          </defs>
+          <!-- back sheet -->
+          <rect x="36" y="20" width="60" height="82" rx="7" fill="var(--surface)" stroke="var(--line-2)" stroke-width="2" transform="rotate(6 66 61)" opacity=".7"/>
+          <!-- main form sheet -->
+          <g filter="url(#hsh)">
+            <rect x="30" y="16" width="62" height="86" rx="8" fill="var(--surface)" stroke="var(--brand)" stroke-width="2.5"/>
+          </g>
+          <!-- form field lines -->
+          <g stroke="var(--brand)" stroke-width="2.4" stroke-linecap="round" opacity=".85">
+            <path d="M40 32h30"/><path d="M40 42h42"/><path d="M40 52h42"/><path d="M40 62h26"/>
+          </g>
+          <!-- amber round institution stamp, overlapping top-right -->
+          <g transform="rotate(-12 92 34)">
+            <circle cx="92" cy="34" r="15" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.5"/>
+            <circle cx="92" cy="34" r="9.5" fill="none" stroke="var(--accent)" stroke-width="1.6" opacity=".7"/>
+            <path d="M87 34.5l3.5 3.5 6-7" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <!-- green check field -->
+          <circle cx="46" cy="78" r="7.5" fill="var(--ok, #1a7f4b)" opacity=".14"/>
+          <path d="M42.5 78l2.6 2.6 5-5.4" stroke="var(--ok, #1a7f4b)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- blue signature stroke -->
+          <path d="M58 84c3-1.6 4.5-6 6-6s1 4 2.6 4 2.4-5 4.2-5 1.8 3 3.4 3 2.2-1.4 4.4-2.4" stroke="var(--brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg></div>
+        <h2>ממלאים טפסים — בלי הדפסה ובלי סריקה</h2>
+        <p>גררו לכאן קובץ PDF, או פתחו קובץ כדי להתחיל.</p>
+        <div class="dz-steps">
+          <div class="dz-step"><div class="n">1</div><div class="t">פתחו PDF</div><div class="d">גררו או בחרו קובץ</div></div>
+          <div class="dz-step"><div class="n">2</div><div class="t">מלאו וחתמו</div><div class="d">טקסט · חתימה · חותמת</div></div>
+          <div class="dz-step"><div class="n">3</div><div class="t">ייצאו PDF</div><div class="d">מוכן לשליחה</div></div>
+        </div>
+        <div id="libWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">📚 המאגר שלכם — הטפסים הקבועים, בקליק:</div><div id="libStrip" class="tmpl-list"></div></div>
+        <div id="recentWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">⏱️ נפתחו לאחרונה — קליק ונפתח כבר ממולא:</div><div id="recentList" class="tmpl-list"></div></div>
+        <div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">
+          <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
+          <button class="btn" id="certBtn" title="פורמט תעודה + רשימת אקסל = תעודה מוכנה לכל סטודנט"><span class="ic">🎓</span> הנפקת תעודות לכיתה</button>
+        </div>
+        <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
+      </div>
+      <div class="pages" id="pages"></div>
+      <!-- floating align/distribute bar — shown when 2+ elements are selected -->
+      <div class="align-bar hidden" id="alignBar" role="toolbar" aria-label="יישור וסידור">
+        <span class="align-count" id="alignCount"></span>
+        <button class="align-btn" data-align="left"        title="יישור לשמאל">⇤</button>
+        <button class="align-btn" data-align="centerX"     title="מרכוז אופקי">⇋</button>
+        <button class="align-btn" data-align="right"       title="יישור לימין">⇥</button>
+        <span class="align-sep"></span>
+        <button class="align-btn" data-align="top"         title="יישור למעלה">⤒</button>
+        <button class="align-btn" data-align="centerY"     title="מרכוז אנכי">⇳</button>
+        <button class="align-btn" data-align="bottom"      title="יישור למטה">⤓</button>
+        <span class="align-sep"></span>
+        <button class="align-btn" data-align="distributeH" title="פיזור אופקי אחיד">↔</button>
+        <button class="align-btn" data-align="distributeV" title="פיזור אנכי אחיד">↕</button>
+      </div>
+    </main>
+
+    <aside class="rightpanel" id="rightpanel">
+      <div class="tabs">
+        <button class="tab active" data-tab="fill"><svg viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> מילוי</button>
+        <button class="tab" data-tab="assets"><svg viewBox="0 0 24 24"><path d="M3 17c2.5-1 3.5-4.5 5-4.5s1 3 2.5 3 2-4 3.5-4 1.5 2.5 3 2.5 2-1.5 4-2"/><path d="M4 21h16"/></svg> נכסים</button>
+        <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1.5 14H7M9.5 8H15M17.5 16H23"/></svg> הגדרות</button>
+      </div>
+      <div class="tab-body">
+        <section class="tab-panel active" data-panel="fill">
+          <div class="card" id="propsPanel" style="display:none">
+            <h3>✎ מאפייני הפריט</h3>
+            <div class="body-p" id="propsBody"></div>
+          </div>
+          <div class="card" id="fieldsPanel" style="display:none">
+            <h3>🔎 שדות שזוהו</h3>
+            <div class="body-p" id="fieldsBody"></div>
+          </div>
+          <div class="card" id="compCard" style="display:none">
+            <h3>🔗 נספחים מקושרים</h3>
+            <div class="body-p">
+              <div class="hint muted">קשרו לטופס הזה נספח (למשל נספח ה3 להצעת מחיר) — ובכל פעם שתמלאו אותו, Fillo יציע למלא את הנספח אוטומטית מהנתונים שהקלדתם.</div>
+              <div id="compList"></div>
+              <button class="btn sm block" id="compAddBtn">🔗 קשר נספח לטופס זה</button>
+              <input id="compInput" type="file" accept="application/pdf" hidden>
+            </div>
+          </div>
+          <div class="card">
+            <h3>👤 הפרטים שלי</h3>
+            <div class="body-p">
+              <button class="btn sm primary block" id="quickSetupBtn" title="הזינו את הפרטים האישיים פעם אחת — וכל טופס יתמלא לבד">⚡ מילוי מהיר של הפרטים שלי</button>
+              <button class="btn sm block" id="orgSetupBtn" title="שם המכללה, טלפון, כתובת ואיש קשר — יתמלאו לבד בכל טופס">🏫 פרטי המכללה / הארגון</button>
+              <div class="row">
+                <select id="profileSel" style="flex:1"></select>
+                <button class="btn sm" id="profileNew" title="פרופיל חדש">＋</button>
+              </div>
+              <div id="profileRows" class="tmpl-list"></div>
+              <button class="btn sm ghost" id="profileAddRow">＋ הוסף שדה</button>
+              <button class="btn sm primary" id="vaultScanBtn" title="צלמו/העלו תעודת זהות או רישיון — הפרטים יחולצו אוטומטית">📷 מלא מצילום ת״ז / רישיון</button>
+              <div class="hint muted" id="vaultScanStatus" style="display:none"></div>
+              <div class="row">
+                <button class="btn sm primary" id="profileFill" style="flex:1" title="ממלא שדות מתויגים">מלא בטופס</button>
+                <button class="btn sm" id="profileGrab" style="flex:1" title="שומר את ערכי השדות לפרופיל">שמור מהטופס</button>
+              </div>
+              <div class="hint muted">תייגו שדה טקסט ב“שם שדה” (במאפייני הפריט) כדי שהמילוי האוטומטי יזהה אותו.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="assets">
+          <div class="card">
+            <h3>✍️ חתימות שמורות</h3>
+            <div class="body-p">
+              <div class="asset-grid" id="sigGrid"></div>
+              <div class="row">
+                <button class="btn sm" id="drawSigBtn" style="flex:1">✎ צייר</button>
+                <button class="btn sm" id="upSigBtn" style="flex:1">⬆️ העלה</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔖 חותמות שמורות</h3>
+            <div class="body-p">
+              <div class="asset-grid" id="stampGrid"></div>
+              <button class="btn sm" id="upStampBtn">⬆️ העלה חותמת</button>
+              <div class="hint muted">רקע לבן מוסר אוטומטית כדי שהחותמת תשב נקי.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>📋 קטעים שהועתקו</h3>
+            <div class="body-p">
+              <div class="asset-grid" id="clipGrid"></div>
+              <div class="hint muted">גררו עם הכלי "העתק אזור" מעל חלק במסמך — חתימה, חותמת או בלוק שכבר מולא — ולחצו כאן כדי להדביק אותו שוב, בכל עמוד.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🖊️ כתב היד שלי</h3>
+            <div class="body-p">
+              <div class="hint muted" id="hwStatus">עדיין לא אימנת כתב יד.</div>
+              <button class="btn sm primary" id="hwTrainBtn">✍️ אמן / עדכן כתב יד</button>
+              <div class="row">
+                <label class="hint">צבע:</label>
+                <input type="color" id="hwInk" value="#000000" />
+                <button class="btn sm ghost" id="hwWriteBtn" style="flex:1" title="כתוב בכתב ידך">כתוב על הטופס</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="settings">
+          <div class="card">
+            <h3>🖨️ איכות הייצוא</h3>
+            <div class="body-p">
+              <div class="hint muted">רזולוציית ה־PDF המיוצא. <b>גבוהה</b> חדה יותר להדפסה; <b>טיוטה</b> קלה ומהירה יותר לשליחה במייל/וואטסאפ.</div>
+              <select id="exportQuality" class="sel block">
+                <option value="draft">טיוטה — קובץ קל</option>
+                <option value="standard" selected>רגילה (מומלץ)</option>
+                <option value="high">גבוהה — להדפסה</option>
+              </select>
+            </div>
+          </div>
+          <div class="card" id="acctCard">
+            <h3>👤 חשבון · סנכרון אוטומטי</h3>
+            <div class="body-p" id="acctBody">
+              <div class="hint muted">טוען…</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔒 ייצוא מאובטח</h3>
+            <div class="body-p">
+              <div class="hint muted">מייצא את הטופס כתמונה שטוחה: הטקסט לא ניתן לבחירה/חילוץ, **השחרות באמת מסתירות** את מה שמתחת, והקובץ מוגן משינוי. מומלץ לפני שיתוף מסמכים עם מידע רגיש.</div>
+              <button class="btn sm primary block" id="exportFlatBtn" disabled>🔒 ייצוא מאובטח (תמונה שטוחה)</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>📱 התקנה כאפליקציה</h3>
+            <div class="body-p">
+              <div class="hint muted">Fillo נפתח כאפליקציה מלאה — אייקון במסך הבית, מסך מלא, ועובד גם בלי אינטרנט.</div>
+              <button class="btn sm block primary" id="installBtn">📲 התקן את Fillo</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🧠 מה נלמד</h3>
+            <div class="body-p">
+              <div class="hint muted">Fillo לומד מכל ייצוא אילו ערכים חוזרים, וממלא/מציע אותם אוטומטית. כאן רואים ושולטים במה שנלמד.</div>
+              <div id="learnedBody"></div>
+              <button class="btn sm block" id="learnedClearBtn" style="color:var(--danger)">🗑 שכח את כל מה שנלמד</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>💾 גיבוי ושחזור</h3>
+            <div class="hint muted" id="buildTag" style="padding:0 14px 2px;font-size:11px"></div>
+            <div class="body-p">
+              <div class="hint muted">כל ההגדרות (תבניות, פרופילים, חתימות, חותמות, כתב-יד) שמורות בדפדפן. גבו לקובץ, ושחזרו בכל מכשיר.</div>
+              <div class="row">
+                <button class="btn sm" id="backupExportBtn" style="flex:1">⬇️ גבה הכל</button>
+                <button class="btn sm" id="backupImportBtn" style="flex:1">⤴️ שחזר מקובץ</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔄 סנכרון בין מכשירים</h3>
+            <div class="body-p">
+              <div class="hint muted">מסנכרן כתב־יד, חתימות, חותמות ותבניות בין המכשירים שלך — <b>מוצפן מקצה־לקצה</b> (רק מי שיודע את קוד הסנכרון יכול לפענח). דרוש חשבון Firebase חינמי חד־פעמי. <a href="#" id="syncHelp">איך מקימים? ⓘ</a></div>
+              <div id="syncHelpBox" class="hint" style="display:none; background:var(--brand-soft); padding:8px; border-radius:8px; line-height:1.6">
+                1. היכנסו ל־<b>console.firebase.google.com</b> → “Add project” (שם כלשהו, אפשר לדלג על Analytics).<br>
+                2. בתפריט → <b>Build → Firestore Database → Create database → Start in test mode</b>.<br>
+                3. ⚙️ (Project settings) → תחת “Your apps” לחצו על <b>&lt;/&gt;</b> (Web) → רשמו אפליקציה → העתיקו את <b>apiKey</b> ואת <b>projectId</b>.<br>
+                4. הדביקו אותם כאן למטה, בחרו קוד סנכרון סודי משלכם, ולחצו “שמור והעלה”. במכשיר השני — אותם פרטים + אותו קוד → “משוך”.
+              </div>
+              <div class="field"><label>Project ID</label><input type="text" id="syncProject" dir="ltr" placeholder="my-app-1234" /></div>
+              <div class="field"><label>Web API Key</label><input type="text" id="syncKey" dir="ltr" placeholder="AIza…" /></div>
+              <div class="field"><label>קוד סנכרון סודי (זכרו אותו — הוא המפתח!)</label><input type="text" id="syncCode" dir="ltr" placeholder="בחרו ביטוי סודי חזק" /></div>
+              <label class="hint" style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="syncAuto" /> סנכרן אוטומטית (משוך בפתיחה, העלה אחרי שינוי)</label>
+              <div class="row" style="margin-top:8px">
+                <button class="btn sm primary" id="syncPush" style="flex:1">⬆️ שמור והעלה</button>
+                <button class="btn sm" id="syncPull" style="flex:1">⬇️ משוך למכשיר זה</button>
+              </div>
+              <div class="hint" id="syncStatus" style="margin-top:6px"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔒 פרטיות ואחריות</h3>
+            <div class="body-p">
+              <div class="hint">כל העיבוד מתבצע בדפדפן שלך. שום קובץ לא נשלח לשרת.</div>
+              <div class="hint muted">השימוש באחריותך: חתמו/החתימו רק על מסמכים שאתם מורשים לחתום עליהם.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
+<input type="file" id="certInput" accept="application/pdf,image/png,image/jpeg,image/webp" class="hidden" />
+<input type="file" id="certListInput" accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" />
+<input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" class="hidden" />
+<input type="file" id="vaultInput" accept="image/*" capture="environment" class="hidden" />
+
+<!-- Signature pad modal -->
+<div class="modal-back" id="sigModal">
+  <div class="modal">
+    <header>✍️ ציור חתימה</header>
+    <div class="m-body">
+      <div class="hint">צייר את החתימה עם העכבר או האצבע. הרקע יהפוך לשקוף אוטומטית.</div>
+      <div class="sigpad-wrap"><canvas id="sigCanvas"></canvas></div>
+      <div class="row">
+        <label class="hint">צבע דיו:</label>
+        <input type="color" id="sigColor" value="#000000" />
+        <label class="hint">עובי:</label>
+        <input type="range" id="sigWidth" min="1" max="6" value="2.5" step="0.5" style="flex:1" />
+        <button class="btn sm ghost" id="sigClear">נקה</button>
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="sigSave">שמור והשתמש</button>
+      <button class="btn ghost" id="sigCancel">ביטול</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Handwriting training modal -->
+<div class="modal-back" id="hwModal">
+  <div class="modal" style="max-width:540px">
+    <header>🖊️ אימון כתב היד שלי</header>
+    <div class="m-body">
+      <div class="hint">ציירו כל תו פעם אחת בכתב ידכם, <b>בין הקווים כמו במחברת</b>: אות רגילה נשענת על הקו התחתון ומגיעה עד העליון · <b>י</b> קטנה וגבוהה · <b>ל</b> עולה מעל הקו העליון · <b>ך ן ף ץ ק</b> יורדות מתחת לקו התחתון. כך כל אות תשמור על הגודל והמיקום האמיתיים שלה.</div>
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <button class="btn sm ghost" id="hwPrev" title="הקודם">→</button>
+        <div style="text-align:center; flex:1">
+          <div id="hwGlyph" style="font-size:46px; font-weight:700; line-height:1.1"></div>
+          <div class="hint muted" id="hwProg"></div>
+        </div>
+        <button class="btn sm ghost" id="hwNext" title="הבא">←</button>
+      </div>
+      <div class="sigpad-wrap"><canvas id="hwCanvas"></canvas></div>
+      <div class="row">
+        <button class="btn sm ghost" id="hwClear">נקה</button>
+        <span class="spacer"></span>
+        <button class="btn sm" id="hwSkip">דלג</button>
+        <button class="btn sm primary" id="hwSave">שמור והמשך</button>
+      </div>
+      <div class="hw-grid" id="hwGrid"></div>
+    </div>
+    <footer>
+      <button class="btn ghost" id="hwClose">סיום</button>
+      <span class="spacer"></span>
+      <span class="hint muted" id="hwCount"></span>
+      <button class="btn sm ghost" id="hwReset" title="מחק את כל התווים">אפס</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Handwriting write modal (in-app; prompt() is blocked in sandboxed hosts) -->
+<div class="modal-back" id="hwWriteModal">
+  <div class="modal" style="max-width:460px">
+    <header>🖊️ כתיבה בכתב היד שלך</header>
+    <div class="m-body">
+      <div class="field">
+        <label>מה לכתוב?</label>
+        <input type="text" id="hwWriteText" dir="auto" placeholder="הקלידו כאן — והטקסט יופיע בכתב ידכם" />
+      </div>
+      <div class="field">
+        <label>תצוגה מקדימה</label>
+        <div class="hw-preview" id="hwWritePreview"><span class="hint muted">הקלידו טקסט כדי לראות אותו בכתב ידכם…</span></div>
+      </div>
+      <div class="row">
+        <label class="hint">צבע דיו:</label>
+        <input type="color" id="hwWriteInk" value="#000000" />
+        <label class="hint" style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="hwBeautify" checked /> ✨ שיפור אסתטי
+        </label>
+        <span class="spacer"></span>
+        <button class="btn sm ghost" id="hwWriteTrain">✍️ אמן / עדכן אותיות</button>
+      </div>
+      <div class="row">
+        <label class="hint" style="white-space:nowrap">מרווח בין אותיות:</label>
+        <input type="range" id="hwTracking" min="0.5" max="1.8" step="0.05" value="1" style="flex:1" />
+      </div>
+      <div class="row">
+        <label class="hint" style="white-space:nowrap">עובי העט:</label>
+        <input type="range" id="hwWeight" min="0.6" max="1.8" step="0.05" value="1" style="flex:1" title="דק ← → עבה" />
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="hwWritePlace" disabled>מקם על הטופס</button>
+      <button class="btn ghost" id="hwWriteCancel">ביטול</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Templates modal -->
+<div class="modal-back" id="tmplModal">
+  <div class="modal">
+    <header>🗂️ תבניות טופס</header>
+    <div class="m-body">
+      <div class="hint">תבנית שומרת את מיקומי כל השדות (טקסט, חתימה, חותמת) עבור הטופס הזה — כדי למלא אותו בשנייה בפעם הבאה.</div>
+      <div class="field">
+        <label>שמור פריסה נוכחית בשם</label>
+        <div class="row">
+          <input type="text" id="tmplName" placeholder="למשל: נספח ו׳ — משרד העבודה" />
+          <button class="btn primary sm" id="tmplSave">שמור</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>תבניות שמורות <span class="hint muted">(🔗 = מקושר לטופס; לחצו על שם לשינוי)</span></label>
+        <input type="text" id="tmplSearch" placeholder="חיפוש תבנית…" />
+        <div class="tmpl-list" id="tmplList" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <footer>
+      <button class="btn ghost" id="tmplClose">סגור</button>
+      <span class="spacer"></span>
+      <button class="btn sm ghost" id="tmplImport">⬆️ ייבא</button>
+      <button class="btn sm ghost" id="tmplExport">⬇️ ייצא הכול</button>
+    </footer>
+  </div>
+</div>
+<input type="file" id="tmplFile" accept="application/json" class="hidden" />
+<input type="file" id="backupFile" accept="application/json" class="hidden" />
+
+<!-- Mail-merge modal -->
+<div class="modal-back" id="coursesModal">
+  <div class="modal" style="max-width:760px">
+    <header>🗂 תיקי קורסים</header>
+    <div class="m-body" id="coursesBody" style="max-height:70vh;overflow:auto"></div>
+    <footer class="m-foot"><button class="btn" id="coursesClose">סגור</button></footer>
+  </div>
+</div>
+
+<div class="modal-back" id="mergeModal">
+  <div class="modal" style="max-width:560px">
+    <header>🎓 הפקה סדרתית — תעודות וטפסים לכל הרשימה</header>
+    <div class="m-body">
+      <div class="hint">מושלם לתעודות: פתחו את פורמט התעודה, הניחו טקסט עם "שם שדה" (למשל "שם מלא") איפה שהשם מודפס — וטענו את קובץ ה-Excel של הסטודנטים כמו שהוא. העמודות ימופו לשדות <b>אוטומטית</b> ("שם התלמיד" יזוהה כ"שם מלא" וכו'). התוצאה: ZIP עם PDF מוכן לכל סטודנט, על שמו. חתימה וחותמת נשארות זהות בכל הקבצים.</div>
+      <div class="field">
+        <label>שדות מתויגים בטופס</label>
+        <div id="mergeKeys" class="hint">—</div>
+      </div>
+      <div class="field">
+        <label>טענו קובץ Excel‏ (xlsx)‏ / CSV, או הדביקו טבלה (Ctrl+V) — שורה ראשונה = כותרות</label>
+        <textarea id="mergeCsv" rows="6" style="width:100%; font-family:var(--font-mono); font-size:12px; padding:8px; border:1px solid var(--line); border-radius:8px; direction:ltr"></textarea>
+        <div class="row" style="margin-top:6px">
+          <button class="btn sm ghost" id="mergeLoadFile">⬆️ טען Excel / CSV</button>
+          <button class="btn sm ghost" id="mergeParse">בדוק</button>
+          <span id="mergeStatus" class="hint muted" style="flex:1; text-align:left"></span>
+        </div>
+      </div>
+      <div class="field hidden" id="mergeMapWrap">
+        <label>מיפוי עמודות → שדות (זוהה אוטומטית; אפשר לשנות)</label>
+        <div id="mergeMap" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <div class="field hidden" id="mergePreviewWrap">
+        <label>תצוגה מקדימה</label>
+        <div id="mergePreview" style="overflow-x:auto;font-size:11.5px"></div>
+      </div>
+      <div class="field">
+        <label>שם הקובץ לכל רשומה לפי העמודה</label>
+        <select id="mergeNameField"><option value="">(מספר רץ)</option></select>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+          <input type="checkbox" id="mergeCenter" />
+          <span>מרכז כל ערך סביב מיקום הדוגמה — <b>מומלץ לתעודות</b>: שם קצר ושם ארוך יישארו ממורכזים באותו מקום</span>
+        </label>
+      </div>
+    </div>
+    <footer>
+      <button class="btn primary" id="mergeRun" disabled>הפק ZIP</button>
+      <button class="btn ghost" id="mergeClose">סגור</button>
+      <span class="spacer"></span>
+      <span id="mergeProg" class="hint muted"></span>
+    </footer>
+  </div>
+</div>
+<input type="file" id="mergeFile" accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" />
+
+<datalist id="fieldKeyList"></datalist>
+<div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<!-- Help & shortcuts -->
+<div class="modal-back" id="helpModal">
+  <div class="modal" style="max-width:560px">
+    <header>💡 עזרה — כל מה ש-Fillo יודע לעשות</header>
+    <div class="m-body" style="max-height:70vh;overflow:auto">
+      <button class="btn sm primary block" id="tourBtn" style="margin-bottom:4px">▶ סיור מודרך במסך (חמש תחנות, חצי דקה)</button>
+      <div class="help-grid">
+        <div class="help-card"><b>⚡ מילוי מהיר</b><span>הזינו את הפרטים פעם אחת (⚡ בפרטים שלי) — וכל טופס נפתח ממולא לפי משמעות השדות (עברית/אנגלית/ערבית), כולל סימון מין/מצב משפחתי/קופ״ח.</span></div>
+        <div class="help-card"><b>🪄 גזירת שדות</b><span>כתובת אחת מתפצלת לעיר/מספר בית/מיקוד; שם מלא לשם פרטי+משפחה; שדה “סכום במילים” מתמלא לבד מהמספר (כולל אגורות).</span></div>
+        <div class="help-card"><b>🎯 מצב ראיון · 🎤 דיבור</b><span>הכלי שואל שדה-אחרי-שדה (Enter/↓ הבא, ↑ קודם), או מלאו בדיבור.</span></div>
+        <div class="help-card"><b>✍️ חתימה · כתב-יד · חותמת</b><span>ציירו חתימה, אמנו את כתב-ידכם וכתבו איתו, או העלו חותמת. ✍️/⬤ בקליק על שורת חתימה/חותמת שזוהתה.</span></div>
+        <div class="help-card"><b>🖊️ כיסוי · השחרה · הדגשה</b><span>כיסוי לבן לתיקון שגיאה מודפסת, השחרה להסתרת מידע, והדגשה צהובה שקופה.</span></div>
+        <div class="help-card"><b>🪪 ולידציה · שדות חובה</b><span>ת״ז, ח.פ/עוסק, אימייל, טלפון ותאריך נבדקים מיד; שדות חובה (*) מסומנים ומזהירים לפני ייצוא.</span></div>
+        <div class="help-card"><b>📄 ניהול עמודים</b><span>סובבו סריקה מוטה, מחקו עמוד מיותר, שנו סדר (▲▼ בממוזערות), או צרפו עמודים (צילום ת״ז/קבלה/PDF) — הכול לקובץ אחד.</span></div>
+        <div class="help-card"><b>🔒 ייצוא מאובטח</b><span>ייצוא כתמונה שטוחה — הטקסט לא ניתן לחילוץ והשחרות באמת מסתירות. מומלץ לשיתוף מידע רגיש.</span></div>
+        <div class="help-card"><b>🔁 מצב רצף · 🟡 מד השלמה</b><span>“מצב רצף” משאיר כלי פעיל להנחה מרובה (Esc לעצירה); סימון ענבר ומד מראים מה נשאר.</span></div>
+        <div class="help-card"><b>⏱️ זיכרון · ☁️ סנכרון</b><span>טופס שמילאתם (כולל סיבוב/מחיקה/סדר) חוזר ממולא; סנכרון מוצפן בין מכשירים (הגדרות).</span></div>
+        <div class="help-card"><b>🧬 מיזוג מרובה</b><span>טופס אחד + טבלת CSV = PDF לכל שורה בבת אחת — עם אותה חכמת מילוי (גזירת שדות, סכום במילים).</span></div>
+        <div class="help-card"><b>📲 בנייד</b><span>התקינו כאפליקציה; שתפו PDF מ-WhatsApp אל Fillo — נפתח ממולא, וחוזר חתום לצ׳אט.</span></div>
+      </div>
+      <div class="sec-title" style="margin-top:14px">⌨️ קיצורי מקלדת</div>
+      <div class="help-keys">
+        <div><kbd>Ctrl</kbd>+<kbd>O</kbd> פתיחת PDF</div>
+        <div><kbd>Ctrl</kbd>+<kbd>S</kbd> ייצוא</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> ביטול</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Y</kbd> חזרה</div>
+        <div><kbd>Ctrl</kbd>+<kbd>D</kbd> שכפול פריט</div>
+        <div><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> הזזה מדויקת (<kbd>Shift</kbd> = צעד גדול)</div>
+        <div><kbd>Alt</kbd> בגרירה — ביטול הצמדה לקווי היישור</div>
+        <div><kbd>Shift</kbd>+קליק — בחירת כמה פריטים ליישור/פיזור</div>
+        <div><kbd>Delete</kbd> מחיקת פריט</div>
+        <div><kbd>Enter</kbd>/<kbd>↓</kbd> שדה הבא</div>
+        <div><kbd>?</kbd> פתיחת עזרה זו</div>
+      </div>
+    </div>
+    <footer><button class="btn primary" id="helpClose">הבנתי</button></footer>
+  </div>
+</div>
+
+<!-- Quick personal-details setup — fills the vault in one screen -->
+<div class="modal-back" id="quickModal">
+  <div class="modal" style="max-width:460px">
+    <header>⚡ הפרטים שלי — מילוי מהיר</header>
+    <div class="m-body" style="max-height:72vh;overflow:auto">
+      <div class="hint muted" style="margin-bottom:8px">הזינו פעם אחת — וכל טופס ייפתח כבר ממולא. הכול נשמר במכשיר שלכם בלבד.</div>
+      <div class="qs-grid">
+        <label>שם מלא<input type="text" id="qsFullName" dir="auto" placeholder="משה ישראלי"></label>
+        <label>תעודת זהות<input type="text" id="qsId" inputmode="numeric" placeholder="123456782"></label>
+        <label>מין<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsGender" value="זכר"> זכר</label><label class="qs-r"><input type="radio" name="qsGender" value="נקבה"> נקבה</label></span></label>
+        <label>מצב משפחתי<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsMarital" value="רווק"> רווק/ה</label><label class="qs-r"><input type="radio" name="qsMarital" value="נשוי"> נשוי/אה</label><label class="qs-r"><input type="radio" name="qsMarital" value="גרוש"> גרוש/ה</label><label class="qs-r"><input type="radio" name="qsMarital" value="אלמן"> אלמן/ה</label></span></label>
+        <label>קופת חולים<span class="qs-radio"><label class="qs-r"><input type="radio" name="qsHealth" value="כללית"> כללית</label><label class="qs-r"><input type="radio" name="qsHealth" value="מכבי"> מכבי</label><label class="qs-r"><input type="radio" name="qsHealth" value="מאוחדת"> מאוחדת</label><label class="qs-r"><input type="radio" name="qsHealth" value="לאומית"> לאומית</label></span></label>
+        <label>תאריך לידה<input type="text" id="qsBirth" dir="auto" placeholder="15/03/1990"></label>
+        <label>טלפון<input type="text" id="qsPhone" inputmode="tel" placeholder="0501234567"></label>
+        <label>דוא״ל<input type="text" id="qsEmail" inputmode="email" placeholder="me@example.com"></label>
+        <label>כתובת מלאה<input type="text" id="qsAddress" dir="auto" placeholder="רחוב הרצל 15, תל אביב 6100000"></label>
+      </div>
+    </div>
+    <footer><button class="btn ghost" id="qsCancel">ביטול</button><button class="btn primary" id="qsSave">שמירה</button></footer>
+  </div>
+</div>
+
+<!-- Export review: live preview of the real output + pre-flight checks + options -->
+<div class="modal-back" id="exportModal">
+  <div class="modal ex-modal">
+    <header>
+      <span class="ex-ttl"><span class="ex-dot"></span>סקירה לפני ייצוא</span>
+      <span class="ex-name" id="exName"></span>
+      <button class="ex-x" id="exClose" title="סגור" aria-label="סגור">✕</button>
+    </header>
+    <div class="ex-split">
+      <div class="ex-stage">
+        <div class="ex-view" id="exView">
+          <canvas id="exCanvas" class="ex-canvas"></canvas>
+          <div class="ex-busy" id="exBusy"><span class="ex-spin"></span><span id="exBusyTxt">מכין תצוגה מקדימה…</span></div>
+        </div>
+        <div class="ex-pager">
+          <button class="ex-nav" id="exPrev" title="עמוד קודם">‹</button>
+          <span class="ex-pg" id="exPage">— / —</span>
+          <button class="ex-nav" id="exNext" title="עמוד הבא">›</button>
+          <span class="ex-live">תצוגה של הקובץ הסופי</span>
+        </div>
+      </div>
+      <aside class="ex-side">
+        <div class="ex-checks" id="exChecks"></div>
+        <div class="ex-group">
+          <div class="ex-lbl">איכות הקובץ</div>
+          <div class="seg" id="exQual" role="group">
+            <button type="button" data-q="draft">טיוטה</button>
+            <button type="button" data-q="standard">רגילה</button>
+            <button type="button" data-q="high">להדפסה</button>
+          </div>
+        </div>
+        <label class="ex-switch">
+          <input type="checkbox" id="exSecure">
+          <span class="ex-sw" aria-hidden="true"></span>
+          <span class="ex-swtx"><b>🔒 ייצוא מאובטח</b><small>משטח לתמונה — הטקסט לא ניתן לחילוץ והשחרות באמת מסתירות</small></span>
+        </label>
+        <div class="ex-group">
+          <div class="ex-lbl">מה ייכלל בקובץ</div>
+          <div class="ex-sum" id="exSummary"></div>
+        </div>
+        <div class="ex-group" id="exCompGroup">
+          <div class="ex-lbl">🔗 נספח מקושר</div>
+          <div id="exCompBody"></div>
+        </div>
+        <div class="ex-meta" id="exMeta"></div>
+      </aside>
+    </div>
+    <footer class="ex-foot">
+      <button class="btn ghost" id="exCancel">ביטול</button>
+      <div class="ex-spacer"></div>
+      <button class="btn" id="exShare" hidden>📤 שיתוף</button>
+      <button class="btn primary" id="exDownload">⬇️ הורדת PDF</button>
+    </footer>
+  </div>
+</div>
+
+<div class="modal-back" id="libModal">
+  <div class="modal" style="max-width:520px">
+    <header>📚 המאגר — הטפסים הקבועים שלכם</header>
+    <div class="m-body" style="max-height:64vh;overflow:auto">
+      <div class="hint muted">שמרו כאן פעם אחת את הטפסים שחוזרים (הצעת מחיר, נספח ה3, נספח ו…) — ומכאן והלאה קליק אחד פותח אותם, בלי לחפש קבצים. הכול נשמר מקומית בדפדפן.</div>
+      <div id="libList" class="tmpl-list"></div>
+      <div class="row">
+        <button class="btn sm primary" id="libAddOpenBtn" style="flex:1" disabled>➕ שמור את הטופס הפתוח</button>
+        <button class="btn sm" id="libUploadBtn" style="flex:1">⬆️ העלה קובץ למאגר</button>
+      </div>
+      <input id="libInput" type="file" accept="application/pdf" hidden>
+    </div>
+    <footer><button class="btn ghost" id="libClose">סגור</button></footer>
+  </div>
+</div>
+
+<div class="modal-back" id="orgModal">
+  <div class="modal" style="max-width:440px">
+    <header>🏫 פרטי המכללה / הארגון</header>
+    <div class="m-body">
+      <div class="hint muted">הזינו פעם אחת — ובכל טופס, שדות כמו "שם מוסד ההכשרה", "טלפון המוסד" או "איש קשר" יתמלאו לבד (בכל ניסוח נפוץ).</div>
+      <div class="qs-grid">
+        <label>שם המכללה / המוסד<input type="text" id="orgName" dir="auto" placeholder="היחידה ללימודי חוץ"></label>
+        <label>טלפון<input type="text" id="orgPhone" inputmode="tel" placeholder="03-1234567"></label>
+        <label>כתובות הקמפוסים<span class="hint muted" style="font-weight:400;display:block;margin:2px 0 4px">הקמפוס הראשון הוא הראשי; כולם יופיעו כחלון בחירה בשדות כתובת המוסד</span></label>
+        <div id="orgCampuses" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button type="button" class="btn sm" id="orgAddCampus" style="align-self:start">+ הוסף קמפוס</button>
+        <label>איש קשר<input type="text" id="orgContact" dir="auto" placeholder="שי וזאנה"></label>
+        <label>ח.פ / עוסק<input type="text" id="orgBizId" inputmode="numeric" placeholder="512345678"></label>
+      </div>
+    </div>
+    <footer><button class="btn ghost" id="orgCancel">ביטול</button><button class="btn primary" id="orgSave">שמירה</button></footer>
+  </div>
+</div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<!-- pdf-lib (UMD → window.PDFLib) and pdf.js v3 (UMD → window.pdfjsLib) -->
+<script src="./vendor/pdf-lib/pdf-lib.min.js"></script>
+<script src="./vendor/pdfjs/pdf.min.js"></script>
+<script>
+  /* Served build: use a real Web Worker from the vendored file (over http).
+     The single-file Artifact build omits this and inlines pdf.worker instead
+     (main-thread fake worker) so it needs no external file and is CSP-safe. */
+  window.PFS_WORKER_SRC = './vendor/pdfjs/pdf.worker.min.js';
+  window.PFS_STDFONTS = './vendor/pdfjs/standard_fonts/';
+  /* Cloud accounts (Supabase). Operator sets these ONCE for the whole product;
+     then every user just signs up / logs in. Empty = accounts UI stays in
+     "not configured" mode (backup/restore + optional sync.js still work). */
+  window.PFS_SUPABASE = { url: '', anonKey: '' };
+  /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
+  window.PFS_TESS = { worker: './vendor/tesseract/worker.min.js', core: './vendor/tesseract/', lang: './vendor/tesseract/tessdata/' };
+  /* Deploy stamp — the Pages workflow rewrites __PFS_BUILD__ to the commit
+     SHA, so the running version is verifiable (Settings + console). */
+  window.PFS_BUILD = '__PFS_BUILD__'.indexOf('__') === 0 ? 'dev' : '__PFS_BUILD__';
+</script>
+<!-- IIFE modules hang on window.PFS -->
+<script src="./js/store.js"></script>
+<script src="./js/recent.js"></script>
+<script src="./js/pwa.js"></script>
+<script src="./js/account.js"></script>
+<script src="./js/sync.js"></script>
+<script src="./js/numwords.js"></script>
+<script src="./js/formula.js"></script>
+<script src="./js/vault.js"></script>
+<script src="./js/patterns.js"></script>
+<script src="./js/courses.js"></script>
+<script src="./js/validate.js"></script>
+<script src="./js/align.js"></script>
+<script src="./js/ui.js"></script>
+<script src="./js/deliver.js"></script>
+<script src="./js/image-tools.js"></script>
+<script src="./js/inpaint.js"></script>
+<script src="./js/companions.js"></script>
+<script src="./js/tour.js"></script>
+<script src="./js/library.js"></script>
+<script src="./js/handwriting.js"></script>
+<script src="./js/drag-resize.js"></script>
+<script src="./js/fontmatch.js"></script>
+<script src="./js/element.js"></script>
+<script src="./js/overlay.js"></script>
+<script src="./js/pdf-view.js"></script>
+<script src="./js/assets-library.js"></script>
+<script src="./js/templates.js"></script>
+<script src="./js/fingerprint.js"></script>
+<script src="./js/exporter.js"></script>
+<script src="./vendor/fflate/fflate.min.js"></script>
+<script src="./js/data.js"></script>
+<script src="./js/merge.js"></script>
+<script src="./js/detect.js"></script>
+<script src="./vendor/tesseract/tesseract.min.js"></script>
+<script src="./js/ocr.js"></script>
+<script src="./js/fields-panel.js"></script>
+<!-- app bootstrap (classic script; uses global window.pdfjsLib) -->
+<script src="./app.js"></script>
+</body>
+</html>

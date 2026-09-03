@@ -3234,6 +3234,74 @@ async function main() {
     return centred && JSON.stringify(names) === JSON.stringify(["ג'ורג' בן-ציון.pdf", 'נועה ד״ר כץ.pdf'].sort());
   }));
 
+  // ---- 🎓 the certificate wizard INSIDE Fillo: format → place → list → produce ----
+  {
+    const wizRes = await page.evaluate(async (xlsxBytes) => {
+      const T = window.PFS.__test, out = {};
+      const realConfirm = window.PFS.ui.confirm;
+      window.PFS.ui.confirm = async () => true;          // "close the dirty doc?" → yes
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create();
+      const pg = d.addPage([842, 595]);
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      // unique print → unique fingerprint: no auto-memory from other tests' docs
+      pg.drawText('CERTIFICATE WIZARD FIXTURE 2026', { x: 120, y: 480, size: 36, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+      const certBytes = await d.save();
+      window.PFS.store.set('det_cache', {});
+      // 1. the home entry: a format opens straight into the wizard, step 1
+      await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-גמר.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      out.s1 = T.certState();
+      // 2. click where the name goes → a centred sample lands on that spot
+      const c = T.certPlace(0, 0.5, 0.5, 'שם מלא');
+      out.placedCenter = c ? +(c.model.fx + c.model.fw / 2).toFixed(3) : null;
+      out.placedAlign = c && c.model.align;
+      T.certPlace(0, 0.5, 0.7, 'תאריך');
+      certCardNext();
+      out.s2 = T.certState();
+      // 3. the class list (real Excel) → auto-mapped to the placed fields
+      T.certLoadList(window.PFS.merge.parseXlsx(new Uint8Array(xlsxBytes)), 'students.xlsx');
+      out.s2b = T.certState();
+      certCardNext();
+      out.s3 = T.certState();
+      // 4. produce both outputs (no download in the test)
+      const zip = await T.certProduce('zip', { noDownload: true });
+      const one = await T.certProduce('single', { noDownload: true });
+      out.zipNames = Object.keys(window.fflate.unzipSync(zip.bytes)).sort();
+      out.onePages = (await PDFDocument.load(one.bytes)).getPageCount();
+      out.oneName = one.name;
+      // 5. memory: home, reopen the same format → placements restored, wizard at step 2
+      await T.goHome();
+      await new Promise((r) => setTimeout(r, 300));
+      await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-גמר.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      out.again = T.certState();
+      out.againPlaced = T.overlay.getElements().filter((e) => e.model.type === 'text' && e.model.fieldKey).length;
+      // 6. an IMAGE format (PNG) becomes a one-page PDF and opens the wizard too
+      const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 800;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, 1200, 800); cx.fillStyle = '#c90'; cx.fillRect(20, 20, 1160, 760); cx.fillStyle = '#fff'; cx.fillRect(40, 40, 1120, 720);
+      const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+      await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+      await T.startCertFlow(new File([blob], 'cert.png', { type: 'image/png' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      out.img = { pages: T.pdfView.numPages(), state: T.certState() };
+      await T.goHome();
+      window.PFS.ui.confirm = realConfirm;
+      function certCardNext() { const b = document.querySelector('.cert-card #certNext'); if (b && !b.disabled) b.click(); }
+      return out;
+    }, Array.from(fs.readFileSync(path.join(HERE, 'fixtures', 'students.xlsx'))));
+    const ok = wizRes.s1 && wizRes.s1.mode && wizRes.s1.card && wizRes.s1.step === 1
+      && Math.abs(wizRes.placedCenter - 0.5) < 0.01 && wizRes.placedAlign === 'center'
+      && wizRes.s2.step === 2 && wizRes.s2b.listN === 3 && wizRes.s2b.map['שם מלא'] === 'שם מלא' && wizRes.s2b.map['תאריך'] === 'תאריך סיום'
+      && wizRes.s3.step === 3
+      && JSON.stringify(wizRes.zipNames) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
+      && wizRes.onePages === 3 && wizRes.oneName === 'תעודת-גמר - כל התעודות.pdf'
+      && wizRes.again.step === 2 && wizRes.againPlaced === 2
+      && wizRes.img.pages === 1 && wizRes.img.state.card && wizRes.img.state.step === 1;
+    if (!ok) console.log('  [cert wizard debug]', JSON.stringify(wizRes));
+    check('🎓 certificate wizard: home entry → click-to-place (centred) → Excel auto-map → ZIP + one-PDF → placements remembered → image formats', ok);
+  }
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

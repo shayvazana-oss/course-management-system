@@ -274,9 +274,26 @@
     return { zip, count: records.length };
   }
 
+  /* runBatchSingle(...) → { pdf: Uint8Array, count } — every record's page(s)
+   * in ONE PDF, in list order: the print-shop / "send to the printer once"
+   * form of the same batch. */
+  async function runBatchSingle({ originalBytes, baseModels, records, onProgress, quality }) {
+    const { PDFDocument } = root.PDFLib;
+    const out = await PDFDocument.create();
+    for (let idx = 0; idx < records.length; idx++) {
+      const models = applyRecord(baseModels, records[idx]);
+      const bytes = await PFS.exporter.exportPdf(originalBytes, models, quality ? { quality } : {});
+      const src = await PDFDocument.load(bytes);
+      const pages = await out.copyPages(src, src.getPageIndices());
+      pages.forEach((p) => out.addPage(p));
+      onProgress && onProgress(idx + 1, records.length);
+    }
+    return { pdf: await out.save(), count: records.length };
+  }
+
   function downloadZip(zipBytes, filename) {
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip, israeliIdValid, restoreLeadingZeros };
+  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
 })(window);

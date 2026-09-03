@@ -736,7 +736,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         </div>
         <div id="libWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">📚 המאגר שלכם — הטפסים הקבועים, בקליק:</div><div id="libStrip" class="tmpl-list"></div></div>
         <div id="recentWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">⏱️ נפתחו לאחרונה — קליק ונפתח כבר ממולא:</div><div id="recentList" class="tmpl-list"></div></div>
-        <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
+        <div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">
+          <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
+          <button class="btn" id="certBtn" title="פורמט תעודה + רשימת אקסל = תעודה מוכנה לכל סטודנט"><span class="ic">🎓</span> הנפקת תעודות לכיתה</button>
+        </div>
         <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
       </div>
       <div class="pages" id="pages"></div>
@@ -930,6 +933,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
 <!-- Hidden file inputs -->
 <input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
+<input type="file" id="certInput" accept="application/pdf,image/png,image/jpeg,image/webp" class="hidden" />
+<input type="file" id="certListInput" accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" />
 <input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" class="hidden" />
 <input type="file" id="vaultInput" accept="image/*" capture="environment" class="hidden" />
 
@@ -6500,11 +6505,28 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return { zip, count: records.length };
   }
 
+  /* runBatchSingle(...) → { pdf: Uint8Array, count } — every record's page(s)
+   * in ONE PDF, in list order: the print-shop / "send to the printer once"
+   * form of the same batch. */
+  async function runBatchSingle({ originalBytes, baseModels, records, onProgress, quality }) {
+    const { PDFDocument } = root.PDFLib;
+    const out = await PDFDocument.create();
+    for (let idx = 0; idx < records.length; idx++) {
+      const models = applyRecord(baseModels, records[idx]);
+      const bytes = await PFS.exporter.exportPdf(originalBytes, models, quality ? { quality } : {});
+      const src = await PDFDocument.load(bytes);
+      const pages = await out.copyPages(src, src.getPageIndices());
+      pages.forEach((p) => out.addPage(p));
+      onProgress && onProgress(idx + 1, records.length);
+    }
+    return { pdf: await out.save(), count: records.length };
+  }
+
   function downloadZip(zipBytes, filename) {
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, downloadZip, israeliIdValid, restoreLeadingZeros };
+  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
 })(window);
 
 </script>
@@ -8162,7 +8184,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge() };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -8850,6 +8872,7 @@ async function openPdfFile(file) {
     loadGen++;
     const myGen = loadGen;
     lastDet = null;
+    if (!certOpening) { try { closeCertWizard(); } catch (e) {} }   // a plain open leaves certificate mode
     fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
     attachments = [];
     updateAttachBadge();
@@ -8979,6 +9002,7 @@ async function goHome() {
   }
   loadGen++;                        // in-flight detection/ink-snap bails out
   lastDet = null;
+  try { closeCertWizard(); } catch (e) {}
   fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
   attachments = [];
   updateAttachBadge();
@@ -11103,6 +11127,242 @@ $('mergeRun').addEventListener('click', async () => {
   } finally { btn.disabled = false; btn.textContent = prev; $('mergeProg').textContent=''; }
 });
 $('mergeBtn').addEventListener('click', () => { if (pdfView.hasDoc()) openMerge(); });
+
+// =====================================================================
+//  🎓 Certificates — format → where's the name → Excel list → produce
+//  One guided card inside Fillo (nothing external): the certificate format
+//  (PDF or image) opens like any document, the clerk clicks where the name
+//  goes, loads the class list as it is, and gets one certificate per
+//  student — a ZIP of named PDFs or one PDF for the printer. Placements
+//  ride the normal per-form memory, so the next cohort is two clicks.
+// =====================================================================
+let certMode = false, certOpening = false, certCard = null, certList = null, certMap = {};
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const CERT_FIELDS = [
+  { key: 'שם מלא', sample: 'שם הסטודנט', size: 0.06, bold: true, label: 'שם הסטודנט' },
+  { key: 'שם הקורס', sample: 'שם הקורס', size: 0.03, bold: false, label: 'שם הקורס' },
+  { key: 'תאריך', sample: '15.07.2026', size: 0.024, bold: false, label: 'תאריך' },
+  { key: 'ציון', sample: '100', size: 0.028, bold: false, label: 'ציון' },
+  { key: 'תעודת זהות', sample: '012345678', size: 0.022, bold: false, label: 'ת"ז' }
+];
+// a PNG/JPG certificate format becomes a one-page PDF (page = the image, at
+// A4 landscape/portrait proportions) so the whole pipeline stays PDF
+async function imageToPdfFile(file) {
+  const { PDFDocument } = PFS.PDFLib || window.PDFLib;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const doc = await PDFDocument.create();
+  let img;
+  if (/png$/i.test(file.type) || /\.png$/i.test(file.name)) img = await doc.embedPng(bytes);
+  else {
+    // webp/jpeg: normalize through a canvas to JPEG (pdf-lib embeds jpg/png only)
+    const url = URL.createObjectURL(file);
+    const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+    c.getContext('2d').drawImage(im, 0, 0);
+    URL.revokeObjectURL(url);
+    const jpg = await (await fetch(c.toDataURL('image/jpeg', 0.95))).arrayBuffer();
+    img = await doc.embedJpg(new Uint8Array(jpg));
+  }
+  const landscape = img.width >= img.height;
+  const W = landscape ? 842 : 595, H = landscape ? 595 : 842;
+  const page = doc.addPage([W, H]);
+  const s = Math.min(W / img.width, H / img.height);
+  const w = img.width * s, h = img.height * s;
+  page.drawImage(img, { x: (W - w) / 2, y: (H - h) / 2, width: w, height: h });
+  return new File([await doc.save()], file.name.replace(/\.[^.]+$/, '') + '.pdf', { type: 'application/pdf' });
+}
+async function startCertFlow(file) {
+  if (!file) return;
+  let pdf = file;
+  if (file.type !== 'application/pdf') {
+    try { pdf = await imageToPdfFile(file); } catch (e) { PFS.toast('לא הצלחתי לקרוא את התמונה', 'err'); return; }
+  }
+  certOpening = true;
+  try { await openPdfFile(pdf); } finally { certOpening = false; }
+  if (!pdfView.hasDoc()) return;
+  certMode = true; certList = null; certMap = {};
+  showCertWizard();
+}
+function certPlacedFields() {
+  return overlay.getElements().filter((c) => c.model.type === 'text' && c.model.fieldKey && String(c.model.text || '').trim());
+}
+// place a sample value CENTRED on the clicked spot — the box centre is what
+// the batch keeps for every real name, short or long
+function certPlace(pageIndex, fx, fy, key) {
+  const spec = CERT_FIELDS.find((f) => f.key === key) || { key, sample: key, size: 0.03, bold: false };
+  const ctrl = overlay.addModelAt('text', pageIndex, {
+    fx, fy: fy - spec.size * 0.6, fw: 0.3, fontFrac: spec.size, bold: spec.bold, align: 'center',
+    text: spec.sample, fieldKey: spec.key, noEdit: true
+  });
+  if (!ctrl) return null;
+  ctrl.model.fx = PFS.clamp(fx - ctrl.model.fw / 2, 0, 1 - ctrl.model.fw);
+  ctrl.layout();
+  overlay.deselectAll();
+  markDirty();
+  if (certCard && certCard.__render) certCard.__render();   // the card reflects every placement
+  return ctrl;
+}
+function closeCertWizard() {
+  if (certCard) { certCard.remove(); certCard = null; }
+  certMode = false;
+  overlay.setPlacing(null);
+}
+function showCertWizard() {
+  if (certCard) certCard.remove();
+  certCard = document.createElement('div');
+  certCard.className = 'gd-card cert-card';
+  document.body.appendChild(certCard);
+  let step = certPlacedFields().length ? 2 : 1;
+  const restored = step === 2;
+  const render = () => {
+    const placed = certPlacedFields();
+    const keys = [...new Set(placed.map((c) => c.model.fieldKey))];
+    let body = '';
+    if (step === 1) {
+      body = '<div class="gd-q">איפה השם על התעודה?</div>' +
+        '<div class="hint" style="margin:-2px 0 10px">לחצו על התעודה במקום שבו <b>שם הסטודנט</b> צריך להופיע. אחר כך אפשר לגרור, להגדיל ולשנות צבע כרגיל.</div>' +
+        '<div class="gd-chips" id="certChips"></div>' +
+        (keys.length ? '<div class="hint" style="margin-bottom:8px">✓ הונחו: ' + keys.join(' · ') + '</div>' : '') +
+        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>המשך לרשימה ➜</button></div>';
+    } else if (step === 2) {
+      const n = certList ? certList.records.length : 0;
+      body = '<div class="gd-q">רשימת הסטודנטים</div>' +
+        (restored && !certList ? '<div class="hint" style="margin:-2px 0 8px">📌 המיקומים מהפעם הקודמת שוחזרו — נשאר רק לטעון את הרשימה.</div>' : '') +
+        '<div class="gd-chips"><button type="button" class="gd-chip" id="certLoad">📊 טען Excel / CSV</button>' +
+        '<button type="button" class="gd-chip" id="certBack1">📍 הוסף/שנה שדות</button></div>' +
+        (certList ? '<div class="hint" id="certListInfo" style="margin-bottom:6px">נמצאו <b>' + n + '</b> סטודנטים · שורה ראשונה: <b>' + escapeHtml(String(Object.values(certList.records[0] || {})[0] || '')) + '</b></div>' +
+          '<div id="certMapUI" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>' : '') +
+        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (certList && Object.values(certMap).some(Boolean) ? '' : 'disabled') + '>המשך להפקה ➜</button></div>';
+    } else {
+      const n = certList ? certList.records.length : 0;
+      body = '<div class="gd-q">הפקת ' + n + ' תעודות</div>' +
+        '<div class="hint" style="margin:-2px 0 10px">כל תעודה תקבל את הנתונים של הסטודנט שלה, ממורכזת בדיוק במקום שסימנת. הכול נשאר במחשב שלך.</div>' +
+        '<div class="gd-chips"><button type="button" class="gd-chip" id="certZip">🎓 ZIP — קובץ לכל סטודנט</button>' +
+        '<button type="button" class="gd-chip" id="certOne">🖨️ PDF אחד להדפסה</button></div>' +
+        '<div class="hint" id="certProg" style="min-height:16px"></div>' +
+        '<div class="gd-foot"><button type="button" class="btn ghost sm" id="certBack2">‹ חזרה</button></div>';
+    }
+    certCard.innerHTML =
+      '<div class="gd-progwrap"><div class="gd-prog" style="width:' + Math.round((step - 1) / 3 * 100 + 10) + '%"></div></div>' +
+      '<button type="button" class="gd-x" id="certX" title="סגירה" aria-label="סגירת אשף התעודות">✕</button>' +
+      '<div class="gd-count">🎓 הנפקת תעודות · שלב ' + step + ' / 3</div>' + body;
+    const $c = (id) => certCard.querySelector('#' + id);
+    $c('certX').addEventListener('click', closeCertWizard);
+    if (step === 1) {
+      const chips = $c('certChips');
+      CERT_FIELDS.forEach((f) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip';
+        const done = keys.includes(f.key);
+        b.textContent = (done ? '✓ ' : '📍 ') + f.label;
+        b.addEventListener('click', () => {
+          PFS.toast('לחצו על התעודה במקום שבו "' + f.label + '" צריך להופיע', 'ok', 4000);
+          overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlace(pageIndex, fx, fy, f.key); render(); return null; } });
+        });
+        chips.appendChild(b);
+      });
+      const other = document.createElement('button'); other.type = 'button'; other.className = 'gd-chip'; other.textContent = '+ שדה אחר…';
+      other.addEventListener('click', async () => {
+        const name = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('שם השדה (כמו כותרת העמודה באקסל)', '') : Promise.resolve(window.prompt('שם השדה (כמו כותרת העמודה באקסל)')));
+        if (!name || !String(name).trim()) return;
+        overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlace(pageIndex, fx, fy, String(name).trim()); render(); return null; } });
+      });
+      chips.appendChild(other);
+      $c('certNext').addEventListener('click', () => { overlay.setPlacing(null); step = 2; render(); });
+    } else if (step === 2) {
+      $c('certLoad').addEventListener('click', () => $('certListInput').click());
+      $c('certBack1').addEventListener('click', () => { step = 1; render(); });
+      if (certList) {
+        const ui = $c('certMapUI');
+        keys.forEach((k) => {
+          const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12.5px';
+          const lab = document.createElement('span'); lab.style.cssText = 'min-width:90px;font-weight:700'; lab.textContent = k;
+          const sel = document.createElement('select'); sel.style.cssText = 'flex:1;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--surface)';
+          const none = document.createElement('option'); none.value = ''; none.textContent = '(השאר את הדוגמה)'; sel.appendChild(none);
+          certList.headers.forEach((h) => { const o = document.createElement('option'); o.value = h; o.textContent = h; sel.appendChild(o); });
+          sel.value = certMap[k] || '';
+          sel.addEventListener('change', () => { certMap[k] = sel.value || null; $c('certNext').disabled = !Object.values(certMap).some(Boolean); });
+          row.append(lab, sel); ui.appendChild(row);
+        });
+      }
+      $c('certNext').addEventListener('click', () => { step = 3; render(); });
+    } else {
+      $c('certBack2').addEventListener('click', () => { step = 2; render(); });
+      $c('certZip').addEventListener('click', () => certProduce('zip'));
+      $c('certOne').addEventListener('click', () => certProduce('single'));
+    }
+  };
+  render();
+  certCard.__render = render;
+}
+function certLoadList(parsed, fileName) {
+  if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return; }
+  certList = parsed;
+  const keys = [...new Set(certPlacedFields().map((c) => c.model.fieldKey))];
+  // auto-map: header ↔ placed field by exact name, then by shared meaning
+  const inv = PFS.merge.mapHeaders(parsed.headers, keys);   // header → key
+  certMap = {};
+  keys.forEach((k) => { const h = parsed.headers.find((hh) => inv[hh] === k); if (h) certMap[k] = h; });
+  // a bare "תאריך" placement takes any date-ish column
+  if (keys.includes('תאריך') && !certMap['תאריך']) {
+    const h = parsed.headers.find((hh) => /תאריך|מועד/.test(hh)); if (h) certMap['תאריך'] = h;
+  }
+  PFS.toast('📊 ' + (fileName || 'הרשימה') + ' — ' + parsed.records.length + ' סטודנטים', 'ok');
+  if (certCard && certCard.__render) certCard.__render();
+}
+async function certProduce(kind, opts) {
+  if (!certList) return null;
+  const placed = certPlacedFields();
+  const keys = [...new Set(placed.map((c) => c.model.fieldKey))];
+  const mapping = {};   // header → fieldKey (the merge engine's shape)
+  keys.forEach((k) => { if (certMap[k]) mapping[certMap[k]] = k; });
+  const nameHeader = certMap['שם מלא'] || certMap[keys[0]] || null;
+  const records = PFS.merge.remapRecords(certList.records, mapping).map((r, i) => {
+    r.__name = nameHeader ? certList.records[i][nameHeader] : '';
+    return r;
+  });
+  // every sample stays centred on its spot for every real value
+  const baseModels = centerBatchModels(overlay.getElements().map((c) => c.model));
+  const prog = certCard && certCard.querySelector('#certProg');
+  const onProgress = (d, t) => { if (prog) prog.textContent = 'מפיק ' + d + '/' + t + '…'; };
+  let result = null;
+  // the format's own name (never the sample text on it) heads the output name
+  const base = String(currentFileName || 'תעודות').replace(/-filled$/, '').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'תעודות';
+  try {
+    if (kind === 'single') {
+      const { pdf, count } = await PFS.merge.runBatchSingle({ originalBytes: pdfView.getBytes(), baseModels, records, quality: 'high', onProgress });
+      result = { bytes: pdf, count, name: base + ' - כל התעודות.pdf', mime: 'application/pdf' };
+    } else {
+      const { zip, count } = await PFS.merge.runBatch({ originalBytes: pdfView.getBytes(), baseModels, records, nameField: nameHeader ? '__name' : '', quality: 'high', onProgress });
+      result = { bytes: zip, count, name: base + ' - תעודות.zip', mime: 'application/zip' };
+    }
+    if (!(opts && opts.noDownload)) PFS.deliver.file(result.bytes, result.name, result.mime);
+    if (prog) prog.textContent = '✓ הופקו ' + result.count + ' תעודות';
+    PFS.toast('🎓 הופקו ' + result.count + ' תעודות', 'ok');
+    // the placements are this format's memory — next cohort starts at the list
+    try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
+  } catch (e) {
+    console.error(e); PFS.toast('ההפקה נכשלה: ' + (e.message || e), 'err');
+    if (prog) prog.textContent = '';
+  }
+  return result;
+}
+$('certBtn') && $('certBtn').addEventListener('click', () => $('certInput').click());
+$('certInput') && $('certInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (f) await startCertFlow(f);
+});
+$('certListInput') && $('certListInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const parsed = /\.xlsx$/i.test(f.name)
+      ? PFS.merge.parseXlsx(new Uint8Array(await f.arrayBuffer()))
+      : PFS.merge.parseCSV(await f.text());
+    certLoadList(parsed, f.name);
+  } catch (err) {
+    console.error(err); PFS.toast('קריאת הרשימה נכשלה — נסו לשמור כ-CSV ולטעון שוב', 'err', 6000);
+  }
+});
 // the button is the escape hatch: always a FRESH run, refreshing the cache
 $('detectBtn').addEventListener('click', () => runDetection(true));
 // is any page rotated / deleted / reordered away from the loaded original?

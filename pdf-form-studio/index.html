@@ -138,7 +138,10 @@
         </div>
         <div id="libWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">📚 המאגר שלכם — הטפסים הקבועים, בקליק:</div><div id="libStrip" class="tmpl-list"></div></div>
         <div id="recentWrap" style="display:none;margin:6px 0 14px"><div class="hint muted" style="margin-bottom:6px">⏱️ נפתחו לאחרונה — קליק ונפתח כבר ממולא:</div><div id="recentList" class="tmpl-list"></div></div>
-        <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
+        <div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap">
+          <button class="btn primary" id="openBtn2"><span class="ic">📄</span> פתח PDF</button>
+          <button class="btn" id="certBtn" title="פורמט תעודה + רשימת אקסל = תעודה מוכנה לכל סטודנט"><span class="ic">🎓</span> הנפקת תעודות לכיתה</button>
+        </div>
         <p class="hint" style="margin-top:16px">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המכשיר.</p>
       </div>
       <div class="pages" id="pages"></div>
@@ -332,6 +335,8 @@
 
 <!-- Hidden file inputs -->
 <input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
+<input type="file" id="certInput" accept="application/pdf,image/png,image/jpeg,image/webp" class="hidden" />
+<input type="file" id="certListInput" accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" />
 <input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" class="hidden" />
 <input type="file" id="vaultInput" accept="image/*" capture="environment" class="hidden" />
 

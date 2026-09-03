@@ -52,6 +52,7 @@
   /* file(data: Uint8Array|ArrayBuffer|string|Blob, filename, mime) */
   function file(data, filename, mime) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: mime || 'application/octet-stream' });
+    PFS.deliver.last = { filename: filename || 'file', size: blob.size, mime: blob.type };   // what was asked of the browser
     const url = URL.createObjectURL(blob);
     // the normal path — succeeds anywhere downloads are permitted
     try {

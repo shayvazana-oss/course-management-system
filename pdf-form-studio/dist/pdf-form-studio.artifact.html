@@ -3224,6 +3224,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   /* file(data: Uint8Array|ArrayBuffer|string|Blob, filename, mime) */
   function file(data, filename, mime) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: mime || 'application/octet-stream' });
+    PFS.deliver.last = { filename: filename || 'file', size: blob.size, mime: blob.type };   // what was asked of the browser
     const url = URL.createObjectURL(blob);
     // the normal path — succeeds anywhere downloads are permitted
     try {
@@ -8666,7 +8667,7 @@ async function runDetection(force) {
     }
     else if (nAuto) PFS.toast(`🪄 ${nAuto} שדות מולאו אוטומטית מהפרטים שלך — בדקו ותקנו במידת הצורך`, 'ok');
     else if (det.fields.length) PFS.toast(`זוהו ${det.fields.length} שדות`, 'ok');
-    else PFS.toast('לא זוהו שדות אוטומטית', 'err');
+    else if (!(certOpening || certMode)) PFS.toast('לא זוהו שדות אוטומטית', 'err');   // a certificate has none — expected
   } catch (e) {
     console.warn('detect failed', e); PFS.toast('זיהוי השדות נכשל', 'err');
   } finally { btn.disabled = false; btn.innerHTML = prev; }
@@ -8966,7 +8967,7 @@ async function openPdfFile(file) {
     }
     runDetection();
     // first-run guided tour — now that every zone on screen is alive
-    PFS.tour && PFS.tour.maybeStart();
+    if (!certOpening) PFS.tour && PFS.tour.maybeStart();   // the certificate wizard is its own guide
   } catch (e) {
     console.error(e);
     PFS.toast(loadErrorMessage(e), 'err', 5000);
@@ -11254,17 +11255,14 @@ function showCertWizard() {
         const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip';
         const done = keys.includes(f.key);
         b.textContent = (done ? '✓ ' : '📍 ') + f.label;
-        b.addEventListener('click', () => {
-          PFS.toast('לחצו על התעודה במקום שבו "' + f.label + '" צריך להופיע', 'ok', 4000);
-          overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlace(pageIndex, fx, fy, f.key); render(); return null; } });
-        });
+        b.addEventListener('click', () => armCertPlacement(f.key, f.label));
         chips.appendChild(b);
       });
       const other = document.createElement('button'); other.type = 'button'; other.className = 'gd-chip'; other.textContent = '+ שדה אחר…';
       other.addEventListener('click', async () => {
         const name = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('שם השדה (כמו כותרת העמודה באקסל)', '') : Promise.resolve(window.prompt('שם השדה (כמו כותרת העמודה באקסל)')));
         if (!name || !String(name).trim()) return;
-        overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlace(pageIndex, fx, fy, String(name).trim()); render(); return null; } });
+        armCertPlacement(String(name).trim(), String(name).trim());
       });
       chips.appendChild(other);
       $c('certNext').addEventListener('click', () => { overlay.setPlacing(null); step = 2; render(); });
@@ -11293,6 +11291,16 @@ function showCertWizard() {
   };
   render();
   certCard.__render = render;
+}
+// arm a click on the page; the card steps ASIDE meanwhile so it can never
+// cover the very spot the clerk wants to click (Esc brings it back)
+function armCertPlacement(key, label) {
+  PFS.toast('לחצו על התעודה במקום שבו "' + label + '" צריך להופיע (Esc לביטול)', 'ok', 4000);
+  if (certCard) certCard.style.display = 'none';
+  const restore = () => { if (certCard) { certCard.style.display = ''; certCard.__render && certCard.__render(); } document.removeEventListener('keydown', onEsc, true); };
+  const onEsc = (e) => { if (e.key === 'Escape') { overlay.setPlacing(null); restore(); } };
+  document.addEventListener('keydown', onEsc, true);
+  overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlace(pageIndex, fx, fy, key); restore(); return null; } });
 }
 function certLoadList(parsed, fileName) {
   if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return; }

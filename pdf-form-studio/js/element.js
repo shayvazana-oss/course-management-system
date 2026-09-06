@@ -57,6 +57,9 @@
     const node = document.createElement('div');
     node.className = 'el ' + (isImage ? 'image' : (isRect ? 'rect' : 'text'));
     node.dataset.id = model.id;
+    // a certificate field wears its name on screen (never printed) so the
+    // clerk always knows which sample is the ID and which is the date
+    if (model.certTag) node.dataset.tag = model.certTag;
 
     // delete button + resize handle
     const del = document.createElement('div');

@@ -3253,6 +3253,7 @@ async function main() {
       await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-גמר.pdf', { type: 'application/pdf' }));
       await new Promise((r) => setTimeout(r, 1500));
       out.s1 = T.certState();
+      T.overlay.clearElements();   // this test places its own fields (the auto-placed defaults would double them)
       // 2. click where the name goes → a centred sample lands on that spot
       const c = T.certPlace(0, 0.5, 0.5, 'שם מלא');
       out.placedCenter = c ? +(c.model.fx + c.model.fw / 2).toFixed(3) : null;
@@ -3343,37 +3344,31 @@ async function main() {
       await page.waitForSelector('.cert-card', { timeout: 20000 });
       await page.waitForTimeout(1500);
       J.step1 = await page.evaluate(() => window.PFS.__test.certState().step);
-      // chip → the card steps aside → a real click on the certificate
-      await page.click('.cert-card .gd-chip:has-text("שם הסטודנט")');
-      J.cardHidden = await page.evaluate(() => getComputedStyle(document.querySelector('.cert-card')).display === 'none');
-      const box = await page.evaluate(() => { const r = document.querySelector('.overlay').getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
-      await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.55);
-      await page.waitForTimeout(400);
+      // ZERO CLICKS: the usual four are already ON the certificate the moment it
+      // opens — stacked, centred, each wearing its name tag; the rows show ✓
+      J.preChecked = await page.evaluate(() => [...document.querySelectorAll('.cert-card .cert-row input:checked')].map((i) => i.dataset.key).sort());
+      J.placedAll = await page.evaluate(() => {
+        const els = window.PFS.__test.overlay.getElements().filter((c) => c.model.fieldKey).map((c) => ({ k: c.model.fieldKey, cx: +(c.model.fx + c.model.fw / 2).toFixed(2), fy: c.model.fy, tag: c.node.dataset.tag || '' }));
+        return { keys: els.map((e) => e.k).sort(), centred: els.every((e) => Math.abs(e.cx - 0.5) < 0.02), stacked: els.map((e) => e.fy).every((v, i, a) => i === 0 || v > a[i - 1]), tags: els.filter((e) => e.tag).length,
+          rowsOn: document.querySelectorAll('.cert-card .cert-row.on').length, cardVisible: getComputedStyle(document.querySelector('.cert-card')).display !== 'none' };
+      });
       J.placed = await page.evaluate(() => {
         const e = window.PFS.__test.overlay.getElements().find((c) => c.model.fieldKey === 'שם מלא');
-        return e ? { cx: +(e.model.fx + e.model.fw / 2).toFixed(2), cy: +(e.model.fy + e.model.fh / 2).toFixed(2), text: e.model.text, align: e.model.align } : null;
+        return e ? { cx: +(e.model.fx + e.model.fw / 2).toFixed(2), text: e.model.text, align: e.model.align } : null;
       });
-      J.cardBack = await page.evaluate(() => getComputedStyle(document.querySelector('.cert-card')).display !== 'none');
-      J.chipDone = await page.evaluate(() => /✓ שם הסטודנט/.test(document.querySelector('.cert-card').textContent));
-      // SEVERAL fields, the way a clerk does it: chip → click, chip → click…
-      // the ID lands INSIDE the name's box (a click over an element must not be
-      // swallowed), the date lower down; Esc cancels an armed chip cleanly
-      await page.click('.cert-card .gd-chip:has-text("תעודת זהות")');
-      J.banner = await page.evaluate(() => { const b = document.querySelector('.cert-arm'); return b ? b.textContent : null; });
-      await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.57);
-      await page.waitForTimeout(300);
-      await page.click('.cert-card .gd-chip:has-text("תאריך סיום")');
-      await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.75);
-      await page.waitForTimeout(300);
-      await page.click('.cert-card .gd-chip:has-text("ציון")');
-      await page.keyboard.press('Escape');
+      // change of mind: un-tick the course, tick the grade → the page follows at once
+      await page.click('.cert-card .cert-row input[data-key="שם הקורס"]');
       await page.waitForTimeout(200);
+      await page.click('.cert-card .cert-row input[data-key="ציון"]');
+      await page.waitForTimeout(300);
       J.multi = await page.evaluate(() => ({
         keys: window.PFS.__test.overlay.getElements().filter((c) => c.model.fieldKey).map((c) => c.model.fieldKey).sort(),
-        bannerGone: !document.querySelector('.cert-arm'),
         cardVisible: getComputedStyle(document.querySelector('.cert-card')).display !== 'none',
-        listed: /שם מלא/.test(document.querySelector('.cert-card').textContent) && /תעודת זהות/.test(document.querySelector('.cert-card').textContent)
+        listed: /ציון/.test(document.querySelector('.cert-card').textContent) && document.querySelectorAll('.cert-card .cert-row.on').length === 4
       }));
+      // the 🔍 on a row selects that field on the certificate
+      await page.click('.cert-card .cert-find[data-key="תעודת זהות"]');
+      J.found = await page.evaluate(() => { const s = document.querySelector('.el.selected'); return !!(s && s.dataset.tag === 'תעודת זהות'); });
       // המשך → step 2 → 📊 button → file dialog with the real Excel
       await page.click('.cert-card #certNext');
       const [fc2] = await Promise.all([page.waitForEvent('filechooser'), page.click('.cert-card #certLoad')]);
@@ -3416,10 +3411,13 @@ async function main() {
       await page.waitForTimeout(1500);
       J.plainNoCard = await page.evaluate(() => !document.querySelector('.cert-card'));
     } catch (e) { J.error = String(e && e.message || e); }
-    const okJ = !J.error && J.intro === true && J.step1 === 1 && J.cardHidden === true && J.placed && Math.abs(J.placed.cx - 0.5) < 0.03
-      && J.placed.align === 'center' && J.placed.text === 'שם הסטודנט' && J.cardBack && J.chipDone
-      && /תעודת זהות/.test(J.banner || '') && J.multi && JSON.stringify(J.multi.keys) === JSON.stringify(['שם מלא', 'תאריך סיום', 'תעודת זהות'].sort())
-      && J.multi.bannerGone && J.multi.cardVisible && J.multi.listed
+    const okJ = !J.error && J.intro === true && J.step1 === 1
+      && JSON.stringify(J.preChecked) === JSON.stringify(['שם מלא', 'שם הקורס', 'תאריך סיום', 'תעודת זהות'].sort())
+      && J.placedAll && JSON.stringify(J.placedAll.keys) === JSON.stringify(['שם מלא', 'שם הקורס', 'תאריך סיום', 'תעודת זהות'].sort())
+      && J.placedAll.centred && J.placedAll.stacked && J.placedAll.tags === 4 && J.placedAll.rowsOn === 4 && J.placedAll.cardVisible
+      && J.placed && Math.abs(J.placed.cx - 0.5) < 0.03 && J.placed.align === 'center' && J.placed.text === 'שם הסטודנט'
+      && J.multi && JSON.stringify(J.multi.keys) === JSON.stringify(['שם מלא', 'ציון', 'תאריך סיום', 'תעודת זהות'].sort())
+      && J.multi.cardVisible && J.multi.listed && J.found
       && /3/.test(J.info || '') && J.mapped === 'שם מלא'
       && /תעודות\.zip$/.test(J.zipName || '') && JSON.stringify(J.zipEntries) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
       && /כל התעודות\.pdf$/.test(J.oneName || '') && J.onePages === 3 && /הופקו 3/.test(J.done || '')
@@ -3466,8 +3464,9 @@ async function main() {
       const certBytes = await d.save();
       await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-הצטיינות.pdf', { type: 'application/pdf' }));
       await new Promise((r) => setTimeout(r, 1500));
-      // the chips the clerk asked for are on the card
-      const chips = [...document.querySelectorAll('.cert-card .gd-chip')].map((b) => b.textContent);
+      T.overlay.clearElements();   // this test places its own fields (the auto-placed defaults would double them)
+      // the rows the clerk asked for are on the checklist
+      const chips = [...document.querySelectorAll('.cert-card .cert-row')].map((b) => b.textContent);
       out.chips = { id: chips.some((t) => /תעודת זהות/.test(t)), dates: ['תאריך סיום', 'תאריך התחלה', 'תאריך הנפקה'].every((k) => chips.some((t) => t.includes(k))), sig: chips.some((t) => /חתימה/.test(t)), stamp: chips.some((t) => /חותמת/.test(t)) };
       // place the name near the RIGHT edge: its room is symmetric → smaller
       const c = T.certPlace(0, 0.8, 0.5, 'שם מלא');
@@ -3547,6 +3546,7 @@ async function main() {
       pg.drawText('SENTENCE FIXTURE 2026', { x: 200, y: 480, size: 36, font: await d.embedFont(StandardFonts.TimesRomanBold) });
       await T.startCertFlow(new File([await d.save()], 'תעודת-משפט.pdf', { type: 'application/pdf' }));
       await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements();   // this test places its own fields (the auto-placed defaults would double them)
       const s = T.certPlaceSentence(0, 0.5, 0.5);
       out.sentence = { wrapped: !!s.model.wrapW, keys: T.certKeys() };
       T.certPlace(0, 0.5, 0.8, 'שם מלא');
@@ -3605,6 +3605,7 @@ async function main() {
       const certBytes = await d.save();
       await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-רישום.pdf', { type: 'application/pdf' }));
       await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements();   // this test places its own fields (the auto-placed defaults would double them)
       T.certPlace(0, 0.5, 0.5, 'שם מלא'); T.certPlace(0, 0.5, 0.7, 'תעודת זהות'); T.certPlace(0, 0.8, 0.9, 'מספר תעודה');
       document.querySelector('.cert-card #certNext').click();
       T.certLoadList(M.parseXlsx(new Uint8Array(xlsxBytes)), 'students.xlsx');

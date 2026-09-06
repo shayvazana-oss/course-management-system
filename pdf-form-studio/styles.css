@@ -198,6 +198,27 @@ button, input, select, textarea { font-family: inherit; }
 .cert-card.docked { position: relative; inset: auto; transform: none; width: auto; max-width: none; box-shadow: none;
   animation: none; margin: 10px 12px 6px; padding: 16px 16px 12px; border-radius: 14px; }
 .cert-card.docked .gd-q { font-size: 17px; }
+/* step 1 checklist: tick what the certificate shows, one button places all */
+.cert-rows { display: flex; flex-direction: column; gap: 3px; margin-bottom: 4px; }
+.cert-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 9px;
+  font-size: 13px; background: var(--surface); }
+.cert-row:hover { border-color: var(--brand); }
+.cert-row.on { background: var(--brand-soft); border-color: var(--brand); }
+.cert-row-main { display: flex; align-items: center; gap: 8px; }
+.cert-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--brand); margin: 0; flex: none; cursor: pointer; }
+.cert-row-l { flex: 1; min-width: 0; font-weight: 600; cursor: pointer; }
+.cert-row-more { display: flex; gap: 6px; flex-wrap: wrap; padding-right: 25px; }
+.cert-where, .cert-fixed { font-size: 11.5px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-2); }
+.cert-where { flex: 1; min-width: 120px; }
+.cert-fixed { flex: 2; min-width: 140px; }
+.cert-row-s { font-size: 11.5px; color: var(--ok); font-weight: 700; white-space: nowrap; }
+.cert-row-s.muted { color: var(--ink-3); font-weight: 500; }
+.cert-find { border: 0; background: none; cursor: pointer; font-size: 14px; padding: 0 2px; }
+/* the on-screen name tag of a certificate field (editor only, never exported) */
+.el[data-tag]::after { content: attr(data-tag); position: absolute; top: -18px; right: 0; font-size: 10.5px; font-weight: 700;
+  color: #fff; background: var(--brand); border-radius: 999px; padding: 1px 8px; white-space: nowrap; pointer-events: none;
+  opacity: .85; line-height: 15px; font-family: inherit; letter-spacing: 0; }
+.el[data-tag].selected::after { opacity: 1; }
 /* pre-flight issues + the three preview thumbnails on the last step */
 .cert-issues { margin: 0 0 8px; padding: 0 18px 0 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; max-height: 120px; overflow: auto; }
 .cert-thumbs { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; min-height: 40px; }

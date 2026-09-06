@@ -232,6 +232,27 @@ button, input, select, textarea { font-family: inherit; }
 .cert-card.docked { position: relative; inset: auto; transform: none; width: auto; max-width: none; box-shadow: none;
   animation: none; margin: 10px 12px 6px; padding: 16px 16px 12px; border-radius: 14px; }
 .cert-card.docked .gd-q { font-size: 17px; }
+/* step 1 checklist: tick what the certificate shows, one button places all */
+.cert-rows { display: flex; flex-direction: column; gap: 3px; margin-bottom: 4px; }
+.cert-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 9px;
+  font-size: 13px; background: var(--surface); }
+.cert-row:hover { border-color: var(--brand); }
+.cert-row.on { background: var(--brand-soft); border-color: var(--brand); }
+.cert-row-main { display: flex; align-items: center; gap: 8px; }
+.cert-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--brand); margin: 0; flex: none; cursor: pointer; }
+.cert-row-l { flex: 1; min-width: 0; font-weight: 600; cursor: pointer; }
+.cert-row-more { display: flex; gap: 6px; flex-wrap: wrap; padding-right: 25px; }
+.cert-where, .cert-fixed { font-size: 11.5px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-2); }
+.cert-where { flex: 1; min-width: 120px; }
+.cert-fixed { flex: 2; min-width: 140px; }
+.cert-row-s { font-size: 11.5px; color: var(--ok); font-weight: 700; white-space: nowrap; }
+.cert-row-s.muted { color: var(--ink-3); font-weight: 500; }
+.cert-find { border: 0; background: none; cursor: pointer; font-size: 14px; padding: 0 2px; }
+/* the on-screen name tag of a certificate field (editor only, never exported) */
+.el[data-tag]::after { content: attr(data-tag); position: absolute; top: -18px; right: 0; font-size: 10.5px; font-weight: 700;
+  color: #fff; background: var(--brand); border-radius: 999px; padding: 1px 8px; white-space: nowrap; pointer-events: none;
+  opacity: .85; line-height: 15px; font-family: inherit; letter-spacing: 0; }
+.el[data-tag].selected::after { opacity: 1; }
 /* pre-flight issues + the three preview thumbnails on the last step */
 .cert-issues { margin: 0 0 8px; padding: 0 18px 0 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; max-height: 120px; overflow: auto; }
 .cert-thumbs { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; min-height: 40px; }
@@ -4784,6 +4805,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const node = document.createElement('div');
     node.className = 'el ' + (isImage ? 'image' : (isRect ? 'rect' : 'text'));
     node.dataset.id = model.id;
+    // a certificate field wears its name on screen (never printed) so the
+    // clerk always knows which sample is the ID and which is the date
+    if (model.certTag) node.dataset.tag = model.certTag;
 
     // delete button + resize handle
     const del = document.createElement('div');
@@ -5186,7 +5210,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
           opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0,
           font: m.font || undefined, wrapW: m.wrapW || undefined, cellW: m.cellW || undefined,
-          cellX: m.cellX != null ? round(m.cellX) : undefined, maxW: m.maxW || undefined
+          cellX: m.cellX != null ? round(m.cellX) : undefined, maxW: m.maxW || undefined, certTag: m.certTag || undefined
         };
       });
     }
@@ -11368,9 +11392,10 @@ function certPlaceSentence(pageIndex, fx, fy) {
   const maxW = PFS.clamp(2 * Math.min(fx, 1 - fx) - 0.06, 0.3, 0.92);
   const ctrl = overlay.addModelAt('text', pageIndex, {
     fx: fx - maxW / 2, fy: fy - 0.03, fw: maxW, fontFrac: 0.028, bold: false, align: 'center',
-    text: CERT_SENTENCE, wrapW: maxW, noEdit: true
+    text: CERT_SENTENCE, wrapW: maxW, noEdit: true, certTag: 'משפט — לחיצה כפולה לעריכה'
   });
   if (!ctrl) return null;
+  ctrl.node.dataset.tag = 'משפט — לחיצה כפולה לעריכה';
   ctrl.layout();
   overlay.deselectAll();
   markDirty();
@@ -11384,9 +11409,10 @@ function certPlace(pageIndex, fx, fy, key) {
   const spec = CERT_FIELDS.find((f) => f.key === key) || { key, sample: key, size: 0.03, bold: false };
   const ctrl = overlay.addModelAt('text', pageIndex, {
     fx, fy: fy - spec.size * 0.6, fw: 0.3, fontFrac: spec.size, bold: spec.bold, align: 'center',
-    text: spec.sample, fieldKey: spec.key, noEdit: true
+    text: spec.sample, fieldKey: spec.key, noEdit: true, certTag: spec.label || spec.key
   });
   if (!ctrl) return null;
+  ctrl.node.dataset.tag = spec.label || spec.key;   // the on-screen label ("תעודת זהות") — never printed
   ctrl.model.fx = PFS.clamp(fx - ctrl.model.fw / 2, 0, 1 - ctrl.model.fw);
   // the room a value has here: symmetric about the spot, inside a page margin —
   // a long name shrinks to fit it instead of spilling ("כשהשם ארוך מדי הוא לא
@@ -11410,6 +11436,75 @@ function certAddAsset(kind) {
   placeDefaultAsset(kind);
   PFS.toast((kind === 'stamp' ? 'החותמת' : 'החתימה') + ' הונחה — גררו אותה למקום הנכון. חתימה אחרת? לשונית "נכסים"', 'ok', 4500);
   markDirty();
+}
+// ---- the checklist behind step 1 ----
+// what can be on a certificate, in the order it is stacked when auto-placed
+let certExtraKeys = [];
+function certRowDefs() {
+  const base = [
+    { key: 'שם מלא', label: 'שם הסטודנט', icon: '👤', def: true },
+    { key: 'תעודת זהות', label: 'תעודת זהות', icon: '🪪', def: true },
+    { key: 'שם הקורס', label: 'שם הקורס', icon: '📚', def: true },
+    { key: '__sentence', label: 'משפט עם משתנים (מוענקת בזאת ל־{שם מלא}…)', icon: '📝', def: false },
+    { key: 'תאריך סיום', label: 'תאריך סיום', icon: '📅', def: true },
+    { key: 'תאריך התחלה', label: 'תאריך התחלה', icon: '📅', def: false },
+    { key: 'תאריך הנפקה', label: 'תאריך הנפקה', icon: '📅', def: false },
+    { key: 'ציון', label: 'ציון', icon: '💯', def: false },
+    { key: 'מספר תעודה', label: 'מספר תעודה (סידורי, נרשם ביומן)', icon: '🔢', def: false },
+    { key: '__signature', label: 'חתימה (מהמאגר)', icon: '✍️', def: false },
+    { key: '__stamp', label: 'חותמת (מהמאגר)', icon: '🔏', def: false }
+  ];
+  certExtraKeys.forEach((k) => { if (!base.some((b) => b.key === k)) base.push({ key: k, label: k, icon: '🏷️', def: false }); });
+  return base;
+}
+// what is on the page right now, keyed like the checklist
+function certOnPageMap() {
+  const map = {};
+  overlay.getElements().forEach((c) => {
+    const m = c.model;
+    if (m.type === 'text' && m.fieldKey && !map[m.fieldKey]) map[m.fieldKey] = c;
+    if (m.type === 'text' && !m.fieldKey && /\{[^{}]+\}/.test(m.text || '') && !map.__sentence) map.__sentence = c;
+    if (m.type === 'image' && m.kind === 'signature' && !map.__signature) map.__signature = c;
+    if (m.type === 'image' && m.kind === 'stamp' && !map.__stamp) map.__stamp = c;
+  });
+  return map;
+}
+// bring the page in line with the ticked list: add what is missing (stacked,
+// centred, top to bottom in list order), remove what was un-ticked
+function certApplyChecklist(wanted) {
+  const on = certOnPageMap();
+  let added = 0, removed = 0;
+  // remove un-ticked
+  Object.keys(on).forEach((k) => { if (!wanted.includes(k)) { overlay.deleteCtrl(on[k]); removed++; } });
+  // stack the missing ones below the lowest existing certificate field
+  const existing = certPlacedFields().map((c) => c.model.fy + (c.model.fh || 0.04));
+  let y = existing.length ? Math.max(...existing) + 0.03 : 0.42;
+  const order = certRowDefs().map((r) => r.key);
+  wanted.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)).forEach((k) => {
+    if (on[k]) return;
+    if (k === '__signature' || k === '__stamp') { certAddAsset(k === '__signature' ? 'signature' : 'stamp'); added++; return; }
+    if (k === '__sentence') { const c = certPlaceSentence(0, 0.5, Math.min(y + 0.03, 0.9)); if (c) { y = c.model.fy + c.model.fh + 0.03; added++; } return; }
+    if (k === 'מספר תעודה') { certPlace(0, 0.84, 0.92, k); added++; return; }   // a corner, like a real serial
+    const spec = CERT_FIELDS.find((f) => f.key === k) || { size: 0.03 };
+    const c = certPlace(0, 0.5, Math.min(y + spec.size * 0.6, 0.9), k);
+    if (c) { y = c.model.fy + c.model.fh + 0.025; added++; }
+  });
+  if (added || removed) markDirty();
+  return { added, removed };
+}
+// named spots on the page — position expressed in words
+function certMoveTo(key, slot) {
+  const on = certOnPageMap(); const c = on[key]; if (!c) return;
+  const m = c.model, fw = m.fw || 0.2, fh = m.fh || 0.04;
+  const name = on['שם מלא'];
+  const spots = {
+    center: [0.5, 0.45], below_name: [0.5, name && name !== c ? name.model.fy + name.model.fh + 0.04 : 0.55],
+    bottom_right: [0.8, 0.86], bottom_center: [0.5, 0.86], bottom_left: [0.2, 0.86], top_right: [0.85, 0.08], top_left: [0.15, 0.08]
+  };
+  const s = spots[slot]; if (!s) return;
+  m.fx = PFS.clamp(s[0] - fw / 2, 0, 1 - fw); m.fy = PFS.clamp(s[1] - fh / 2, 0, 1 - fh);
+  if (m.wrapW) m.fx = PFS.clamp(s[0] - m.wrapW / 2, 0, 1 - m.wrapW);
+  c.layout(); overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); markDirty();
 }
 function closeCertWizard() {
   if (certCard) { certCard.remove(); certCard = null; }
@@ -11440,6 +11535,13 @@ function showCertWizard() {
   mountCertCard(certCard);
   let step = certPlacedFields().length ? 2 : 1;
   const restored = step === 2;
+  // zero-click start: a fresh format opens with the standard fields ALREADY on
+  // it (name, ID, course, end date — centred, stacked). The clerk drags to
+  // adjust and ticks/unticks; nothing has to be summoned first.
+  let autoPlaced = 0;
+  if (step === 1 && pdfView.hasDoc()) {
+    autoPlaced = certApplyChecklist(certRowDefs().filter((r) => r.def).map((r) => r.key)).added;
+  }
   // a list dropped on the home screen rides in: load it and go straight to
   // the check-and-preview step (placements must exist for that)
   if (certPendingList && step === 2) {
@@ -11454,15 +11556,44 @@ function showCertWizard() {
     const keys = certKeys();
     let body = '';
     if (step === 1) {
-      body = '<div class="gd-q">' + (keys.length ? 'מה עוד להניח על התעודה?' : 'איפה השם על התעודה?') + '</div>' +
-        '<div class="hint" style="margin:-2px 0 10px">' +
-          (keys.length
-            ? 'כל צ\'יפ הוא <b>שדה נוסף</b>: לוחצים עליו, ואז לוחצים על התעודה במקום שלו. אפשר להניח כמה שרוצים — שם, ת"ז, תאריכים, חתימה.'
-            : 'לחצו על <b>📍 שם הסטודנט</b>, ואז על התעודה במקום שבו השם צריך להופיע. אחר כך מוסיפים ת"ז, תאריכים וחתימה באותה דרך.') +
+      // a CHECKLIST, not a click-on-the-page ritual: tick what the certificate
+      // shows, press one button, everything lands in a tidy stack in the
+      // middle — then only drag to adjust. Nothing hidden, nothing modal.
+      const onPage = certOnPageMap();
+      const fixedOk = (k) => !/^__/.test(k) && k !== 'שם מלא' && k !== 'תעודת זהות' && k !== 'מספר תעודה';
+      const rows = certRowDefs().map((r, i) => {
+        const placed = !!onPage[r.key];
+        const id = 'certRow' + i;
+        return '<div class="cert-row' + (placed ? ' on' : '') + '">' +
+          '<div class="cert-row-main">' +
+            '<input type="checkbox" id="' + id + '" data-key="' + escapeHtml(r.key) + '" ' + (placed ? 'checked' : '') + '>' +
+            '<label for="' + id + '" class="cert-row-l">' + r.icon + ' ' + escapeHtml(r.label) + '</label>' +
+            (placed ? '<button type="button" class="cert-find" data-key="' + escapeHtml(r.key) + '" title="הצג על התעודה">🔍</button>' : '') +
+          '</div>' +
+          (placed && !/^__(signature|stamp)$/.test(r.key)
+            ? '<div class="cert-row-more">' +
+                '<select class="cert-where" data-key="' + escapeHtml(r.key) + '" title="איפה על התעודה?">' +
+                  '<option value="">📍 איפה? (או גררו)</option>' +
+                  '<option value="center">במרכז התעודה</option><option value="below_name">מתחת לשם</option>' +
+                  '<option value="bottom_right">שורה תחתונה – ימין</option><option value="bottom_center">שורה תחתונה – מרכז</option>' +
+                  '<option value="bottom_left">שורה תחתונה – שמאל</option><option value="top_right">פינה ימנית עליונה</option><option value="top_left">פינה שמאלית עליונה</option>' +
+                '</select>' +
+                (fixedOk(r.key) ? '<input type="text" class="cert-fixed" data-key="' + escapeHtml(r.key) + '" placeholder="ערך קבוע לכולם (אם אין עמודה באקסל)" value="' + escapeHtml(onPage[r.key].model.text || '') + '">' : '') +
+              '</div>'
+            : '') +
+          '</div>';
+      }).join('');
+      const nOn = Object.keys(onPage).length;
+      body = '<div class="gd-q">' + (nOn ? nOn + ' שדות כבר על התעודה 👇' : 'מה מופיע על התעודה?') + '</div>' +
+        '<div class="hint" style="margin:-2px 0 8px">' +
+          (nOn ? 'סידרנו אותם במרכז. <b>גררו</b> כל שדה למקומו הנכון על התעודה. סימון ✓ מוסיף שדה, ביטול הסימון מסיר — מיד.'
+               : 'סמנו ✓ ליד מה שצריך להופיע — זה מופיע על התעודה מיד. אחר כך פשוט <b>גוררים</b> למקום.') +
         '</div>' +
-        '<div class="gd-chips" id="certChips"></div>' +
-        (keys.length ? '<div class="hint" style="margin-bottom:8px">✓ על התעודה כבר: <b>' + keys.join(' · ') + '</b> (גררו לכוונון; ✕ על השדה מוחק)</div>' : '') +
-        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>סיימתי — לרשימת הסטודנטים ➜</button></div>';
+        '<div class="cert-rows">' + rows + '</div>' +
+        '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
+        '<div class="gd-foot">' +
+          '<button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>✓ נראה טוב — לרשימת הסטודנטים ➜</button>' +
+        '</div>';
     } else if (step === 2) {
       const n = certList ? certList.records.length : 0;
       body = '<div class="gd-q">רשימת הסטודנטים</div>' +
@@ -11495,42 +11626,34 @@ function showCertWizard() {
     const $c = (id) => certCard.querySelector('#' + id);
     $c('certX').addEventListener('click', closeCertWizard);
     if (step === 1) {
-      const chips = $c('certChips');
-      CERT_FIELDS.forEach((f) => {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip';
-        const done = keys.includes(f.key);
-        b.textContent = (done ? '✓ ' : '📍 ') + f.label;
-        b.addEventListener('click', () => armCertPlacement(f.key, f.label));
-        chips.appendChild(b);
-      });
-      const sent = document.createElement('button'); sent.type = 'button'; sent.className = 'gd-chip'; sent.textContent = '📝 משפט עם משתנים';
-      sent.title = 'משפט שלם כמו "מוענקת בזאת ל־{שם מלא} על סיום קורס {שם הקורס}" — המשתנים מתמלאים לכל סטודנט';
-      sent.addEventListener('click', () => {
-        if (certCard) certCard.style.display = 'none';
-        document.querySelectorAll('.cert-arm').forEach((b) => b.remove());
-        const arm = document.createElement('div'); arm.className = 'cert-arm';
-        arm.innerHTML = '<span>📝 לחצו על התעודה במקום שבו המשפט צריך להופיע</span><button type="button">ביטול (Esc)</button>';
-        document.body.appendChild(arm);
-        const restore = () => { arm.remove(); if (certCard) { certCard.style.display = ''; certCard.__render && certCard.__render(); } document.removeEventListener('keydown', onEsc, true); };
-        const onEsc = (e) => { if (e.key === 'Escape') { overlay.setPlacing(null); restore(); } };
-        arm.querySelector('button').addEventListener('click', () => { overlay.setPlacing(null); restore(); });
-        document.addEventListener('keydown', onEsc, true);
-        overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlaceSentence(pageIndex, fx, fy); restore(); return null; } });
-      });
-      chips.appendChild(sent);
-      const other = document.createElement('button'); other.type = 'button'; other.className = 'gd-chip'; other.textContent = '+ שדה אחר…';
-      other.addEventListener('click', async () => {
+      // a tick IS the action: the field appears on the certificate at once
+      certCard.querySelectorAll('.cert-row input[type=checkbox]').forEach((cb) => cb.addEventListener('change', () => {
+        const wanted = [...certCard.querySelectorAll('.cert-row input[type=checkbox]')].filter((i) => i.checked).map((i) => i.dataset.key);
+        const n = certApplyChecklist(wanted);
+        render();
+        if (n.added) PFS.toast('✓ הונח על התעודה — גררו למקום הנכון', 'ok', 3000);
+      }));
+      certCard.querySelectorAll('.cert-find').forEach((b) => b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const c = certOnPageMap()[b.dataset.key];
+        if (c) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); }
+      }));
+      // "where?" in words — for anyone who would rather not drag on a touchpad
+      certCard.querySelectorAll('.cert-where').forEach((sel) => sel.addEventListener('change', () => {
+        if (sel.value) { certMoveTo(sel.dataset.key, sel.value); sel.value = ''; }
+      }));
+      // a value that is the same for everyone, typed once here
+      certCard.querySelectorAll('.cert-fixed').forEach((inp) => inp.addEventListener('input', () => {
+        const c = certOnPageMap()[inp.dataset.key]; if (!c) return;
+        c.model.text = inp.value; const t = c.node.querySelector('.txt'); if (t) t.textContent = inp.value;
+        c.layout(); markDirty();
+      }));
+      $c('certAddOther').addEventListener('click', async () => {
         const name = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('שם השדה (כמו כותרת העמודה באקסל)', '') : Promise.resolve(window.prompt('שם השדה (כמו כותרת העמודה באקסל)')));
         if (!name || !String(name).trim()) return;
-        armCertPlacement(String(name).trim(), String(name).trim());
-      });
-      chips.appendChild(other);
-      // the parts that are the SAME on every certificate
-      [['signature', '✍️ חתימה'], ['stamp', '🔏 חותמת']].forEach(([kind, label]) => {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip'; b.textContent = label;
-        b.title = kind === 'signature' ? 'חתימה מהמאגר (או ציור/העלאה) — תודפס על כל התעודות' : 'חותמת מהמאגר — תודפס על כל התעודות';
-        b.addEventListener('click', () => certAddAsset(kind));
-        chips.appendChild(b);
+        certExtraKeys.push(String(name).trim());
+        certApplyChecklist([...certKeys(), String(name).trim()]);
+        render();
       });
       $c('certNext').addEventListener('click', () => {
         overlay.setPlacing(null); step = 2;
@@ -11564,33 +11687,8 @@ function showCertWizard() {
   render();
   certCard.__render = render;
 }
-// arm a click on the page; the card steps ASIDE meanwhile so it can never
-// cover the very spot the clerk wants to click (Esc brings it back)
-function armCertPlacement(key, label) {
-  if (certCard) certCard.style.display = 'none';
-  // a loud, explicit banner replaces the card while armed — a vanished card
-  // with nothing said read as "the tool only places one thing"
-  document.querySelectorAll('.cert-arm').forEach((b) => b.remove());
-  const arm = document.createElement('div');
-  arm.className = 'cert-arm';
-  arm.innerHTML = '<span>📍 עכשיו לחצו על התעודה במקום שבו <b></b> צריך להופיע</span><button type="button">ביטול (Esc)</button>';
-  arm.querySelector('b').textContent = label;
-  document.body.appendChild(arm);
-  const restore = () => {
-    arm.remove();
-    if (certCard) { certCard.style.display = ''; certCard.__render && certCard.__render(); }
-    document.removeEventListener('keydown', onEsc, true);
-  };
-  const cancel = () => { overlay.setPlacing(null); restore(); };
-  const onEsc = (e) => { if (e.key === 'Escape') cancel(); };
-  arm.querySelector('button').addEventListener('click', cancel);
-  document.addEventListener('keydown', onEsc, true);
-  overlay.setPlacing({ create: (pageIndex, fx, fy) => {
-    certPlace(pageIndex, fx, fy, key); restore();
-    PFS.toast('✓ "' + label + '" הונח — אפשר לגרור אותו, ולהוסיף עוד שדות מהכרטיס', 'ok', 3500);
-    return null;
-  } });
-}
+// (the old "arm a chip, then click on the page" ritual is gone: non-technical
+// clerks never guessed the second step — the checklist above replaced it)
 function certLoadList(parsed, fileName) {
   if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return; }
   certList = parsed;

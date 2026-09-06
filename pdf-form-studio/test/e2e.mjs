@@ -3589,6 +3589,64 @@ async function main() {
     check('🎓 sentence with {variables} fills per student; pre-flight flags bad rows and skips blanks; three previews before producing', okS);
   }
 
+  // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
+  // dropped on the home screen opens the last format and lands on the check ----
+  {
+    const regRes = await page.evaluate(async (xlsxBytes) => {
+      const T = window.PFS.__test, M = window.PFS.merge, out = {};
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      window.PFS.store.set('cert_registry', { batches: [] });
+      const y = new Date().getFullYear();
+      window.PFS.store.set('cert_serial_next_' + y, 1);
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([842, 595]);
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawText('REGISTRY FIXTURE 2026', { x: 200, y: 480, size: 36, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+      const certBytes = await d.save();
+      await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-רישום.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      T.certPlace(0, 0.5, 0.5, 'שם מלא'); T.certPlace(0, 0.5, 0.7, 'תעודת זהות'); T.certPlace(0, 0.8, 0.9, 'מספר תעודה');
+      document.querySelector('.cert-card #certNext').click();
+      T.certLoadList(M.parseXlsx(new Uint8Array(xlsxBytes)), 'students.xlsx');
+      document.querySelector('.cert-card #certNext').click();
+      // nothing issued yet → no "already issued" warnings (the fixture's two fake IDs are flagged as bad checksums, correctly)
+      out.firstIssues = T.certPreflightNow().issues.filter((i) => i.kind === 'already_issued').length;
+      const zip = await T.certProduce('zip', { noDownload: true });
+      out.count = zip.count;
+      const reg = T.certRegistry();
+      out.batch = reg.batches.length === 1 ? { n: reg.batches[0].entries.length, serials: reg.batches[0].entries.map((e) => e.serial), ids: reg.batches[0].entries.map((e) => e.id), format: reg.batches[0].format } : null;
+      out.nextSerial = T.certNextSerial(0);
+      const csv = T.certRegistryCsv();
+      out.csv = { bom: csv.charCodeAt(0) === 0xFEFF, rows: csv.split('\r\n').length, hasName: /ישראל ישראלי/.test(csv) && /2026-0001/.test(csv.replace(/\d{4}-0001/, '2026-0001')) };
+      // the same list again → every student is flagged as already issued
+      out.secondIssues = T.certPreflightNow().issues.filter((i) => i.kind === 'already_issued').length;
+      // ONE TOUCH: home, then DROP the Excel on the viewport
+      await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(xlsxBytes)], 'students.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      document.getElementById('viewport').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      let st = null;
+      for (let i = 0; i < 40; i++) { await new Promise((r) => setTimeout(r, 250)); st = T.certState(); if (st.card && st.step === 3) break; }
+      out.drop = { step: st && st.step, listN: st && st.listN, doc: T.pdfView.hasDoc(), placed: T.overlay.getElements().filter((e) => e.model.fieldKey).length,
+        warned: /כבר קיבל/.test(document.querySelector('.cert-card') ? document.querySelector('.cert-card').textContent : '') };
+      await T.goHome();
+      for (const x of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /רישום/.test(l.name))) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+      window.PFS.store.set('cert_registry', { batches: [] });
+      window.PFS.ui.confirm = realConfirm;
+      return out;
+    }, Array.from(fs.readFileSync(path.join(HERE, 'fixtures', 'students.xlsx'))));
+    const y = new Date().getFullYear();
+    const okG = regRes.firstIssues === 0 && regRes.count === 3 && regRes.batch && regRes.batch.n === 3
+      && JSON.stringify(regRes.batch.serials) === JSON.stringify([y + '-0001', y + '-0002', y + '-0003'])
+      && regRes.batch.ids[0] === '202665227' && regRes.batch.format === 'תעודת-רישום'
+      && regRes.nextSerial === y + '-0004'
+      && regRes.csv.bom && regRes.csv.rows === 4 && regRes.csv.hasName
+      && regRes.secondIssues === 3
+      && regRes.drop && regRes.drop.step === 3 && regRes.drop.listN === 3 && regRes.drop.doc && regRes.drop.placed === 3 && regRes.drop.warned;
+    if (!okG) console.log('  [cert registry debug]', JSON.stringify(regRes));
+    check('🎓 serials + registry (CSV, re-issue warning) and ONE-TOUCH: Excel dropped on home → last format → check step', okG);
+  }
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

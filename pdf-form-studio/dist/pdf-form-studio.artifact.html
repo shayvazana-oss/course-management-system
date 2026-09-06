@@ -8292,7 +8292,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -10288,10 +10288,21 @@ let dragDepth = 0;
   e.preventDefault(); if (ev === 'dragleave') { if (--dragDepth > 0) return; }
   dz.classList.remove('hot');
 }));
-vp.addEventListener('drop', (e) => {
+vp.addEventListener('drop', async (e) => {
   dragDepth = 0;
-  const file = [...(e.dataTransfer?.files || [])].find((f) => f.type === 'application/pdf');
-  if (file) openPdfFile(file);
+  const files = [...(e.dataTransfer?.files || [])];
+  const file = files.find((f) => f.type === 'application/pdf');
+  if (file) { openPdfFile(file); return; }
+  // a student list dropped on the home screen → certificates, one touch
+  const list = files.find((f) => /\.(xlsx|csv)$/i.test(f.name));
+  if (list && !pdfView.hasDoc()) {
+    try {
+      const parsed = /\.xlsx$/i.test(list.name)
+        ? PFS.merge.parseXlsx(new Uint8Array(await list.arrayBuffer()))
+        : PFS.merge.parseCSV(await list.text());
+      await certAutoFromList(parsed, list.name);
+    } catch (err) { console.error(err); PFS.toast('קריאת הרשימה נכשלה', 'err'); }
+  }
 });
 
 $('pageJump') && $('pageJump').addEventListener('change', (e) => {
@@ -11260,8 +11271,39 @@ const CERT_FIELDS = [
   { key: 'תאריך סיום', sample: '15.07.2026', size: 0.024, bold: false, label: 'תאריך סיום' },
   { key: 'תאריך התחלה', sample: '01.03.2026', size: 0.024, bold: false, label: 'תאריך התחלה' },
   { key: 'תאריך הנפקה', sample: new Date().toLocaleDateString('he-IL'), size: 0.022, bold: false, label: 'תאריך הנפקה' },
-  { key: 'ציון', sample: '100', size: 0.028, bold: false, label: 'ציון' }
+  { key: 'ציון', sample: '100', size: 0.028, bold: false, label: 'ציון' },
+  { key: 'מספר תעודה', sample: 'מס׳ ' + new Date().getFullYear() + '-0001', size: 0.02, bold: false, label: 'מספר תעודה' }
 ];
+// ---- the certificate registry: every issued certificate, with its serial ----
+// {batches:[{id, at, format, count, entries:[{serial, name, id, course}]}]}
+// A serial (2026-0041) prints on the certificate when the 🔢 field/{מספר תעודה}
+// token is used; the registry exports as CSV and warns before a second
+// certificate goes to the same ID from the same format.
+function certRegistry() { return PFS.store.get('cert_registry', { batches: [] }) || { batches: [] }; }
+function certNextSerial(offset) {
+  const y = new Date().getFullYear();
+  const n = (PFS.store.get('cert_serial_next_' + y, 1) || 1) + (offset || 0);
+  return y + '-' + String(n).padStart(4, '0');
+}
+function certCommitSerials(count) {
+  const y = new Date().getFullYear();
+  PFS.store.set('cert_serial_next_' + y, (PFS.store.get('cert_serial_next_' + y, 1) || 1) + count);
+}
+function certAlreadyIssued(idValue, format) {
+  if (!idValue) return null;
+  for (const b of certRegistry().batches) {
+    if (format && b.format !== format) continue;
+    const hit = (b.entries || []).find((e) => e.id === idValue);
+    if (hit) return { serial: hit.serial, at: b.at, format: b.format };
+  }
+  return null;
+}
+function certRegistryCsv() {
+  const rows = [['מספר תעודה', 'שם מלא', 'תעודת זהות', 'קורס', 'פורמט', 'תאריך הנפקה']];
+  certRegistry().batches.forEach((b) => (b.entries || []).forEach((e) => rows.push([e.serial, e.name, e.id, e.course, b.format, new Date(b.at).toLocaleDateString('he-IL')])));
+  const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  return '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
+}
 // which spreadsheet column feeds a date placement — by the date's MEANING
 const CERT_DATE_HINTS = {
   'תאריך סיום': /סיום|סיים|גמר/, 'תאריך התחלה': /התחלה|תחילת|פתיחה/, 'תאריך הנפקה': /הנפקה|הפקה|מתן/
@@ -11398,6 +11440,15 @@ function showCertWizard() {
   mountCertCard(certCard);
   let step = certPlacedFields().length ? 2 : 1;
   const restored = step === 2;
+  // a list dropped on the home screen rides in: load it and go straight to
+  // the check-and-preview step (placements must exist for that)
+  if (certPendingList && step === 2) {
+    const pend = certPendingList; certPendingList = null;
+    certLoadList(pend.parsed, pend.fileName);
+    if (Object.values(certMap).some(Boolean)) step = 3;
+  } else if (certPendingList && step === 1) {
+    PFS.toast('📊 הרשימה מחכה — סמן איפה השם, ואז היא תיטען לבד', 'ok', 4000);
+  }
   const render = () => {
     const placed = certPlacedFields();
     const keys = certKeys();
@@ -11481,7 +11532,11 @@ function showCertWizard() {
         b.addEventListener('click', () => certAddAsset(kind));
         chips.appendChild(b);
       });
-      $c('certNext').addEventListener('click', () => { overlay.setPlacing(null); step = 2; render(); });
+      $c('certNext').addEventListener('click', () => {
+        overlay.setPlacing(null); step = 2;
+        if (certPendingList) { const pend = certPendingList; certPendingList = null; certLoadList(pend.parsed, pend.fileName); if (Object.values(certMap).some(Boolean)) step = 3; }
+        render();
+      });
     } else if (step === 2) {
       $c('certLoad').addEventListener('click', () => $('certListInput').click());
       $c('certBack1').addEventListener('click', () => { step = 1; render(); });
@@ -11571,7 +11626,17 @@ function certBuildRecords() {
 function certPreflightNow() {
   if (!certList) return { issues: [], clean: [] };
   const { records, nameHeader, idHeader } = certBuildRecords();
-  return PFS.merge.preflight(records, { nameKey: nameHeader || '__name', idKey: idHeader });
+  const pf = PFS.merge.preflight(records, { nameKey: nameHeader || '__name', idKey: idHeader });
+  // the registry remembers: a second certificate to the same ID from this
+  // format is worth a look (a re-issue is legitimate, a duplicate is not)
+  if (idHeader) {
+    const format = String(currentFileName || '').replace(/-filled$/, '');
+    pf.clean.forEach((r, i) => {
+      const prev = certAlreadyIssued(String(r[idHeader] || '').trim(), format);
+      if (prev) pf.issues.push({ row: i + 2, kind: 'already_issued', msg: (r.__name || '') + ' כבר קיבל/ה תעודה מהפורמט הזה (' + prev.serial + ', ' + new Date(prev.at).toLocaleDateString('he-IL') + ')' });
+    });
+  }
+  return pf;
 }
 // three thumbnails before anything is produced: the first row, the longest
 // name (the stress case for the layout) and the last row
@@ -11610,6 +11675,13 @@ async function certProduce(kind, opts) {
   // never print a blank certificate: rows without a name are skipped
   const records = PFS.merge.preflight(built.records, { nameKey: nameHeader || '__name', idKey: built.idHeader }).clean;
   if (!records.length) { PFS.toast('אין שורות עם שם להפקה', 'err'); return null; }
+  // serial numbers: one per certificate, in list order, committed only when
+  // the batch really came out (a failed run must not burn numbers)
+  const keys = certKeys();
+  const wantsSerial = keys.includes('מספר תעודה');
+  records.forEach((r, i) => { r['מספר תעודה'] = certNextSerial(i); });
+  const format = String(currentFileName || '').replace(/-filled$/, '');
+  const courseHeader = certMap['שם הקורס'] || certList.headers.find((h) => /קורס/.test(h)) || null;
   // every sample stays centred on its spot for every real value
   const baseModels = centerBatchModels(overlay.getElements().map((c) => c.model));
   const prog = certCard && certCard.querySelector('#certProg');
@@ -11626,8 +11698,20 @@ async function certProduce(kind, opts) {
       result = { bytes: zip, count, name: base + ' - תעודות.zip', mime: 'application/zip' };
     }
     if (!(opts && opts.noDownload)) PFS.deliver.file(result.bytes, result.name, result.mime);
-    if (prog) prog.textContent = '✓ הופקו ' + result.count + ' תעודות';
-    PFS.toast('🎓 הופקו ' + result.count + ' תעודות', 'ok');
+    if (prog) prog.textContent = '✓ הופקו ' + result.count + ' תעודות' + (wantsSerial ? ' · מספרים ' + records[0]['מספר תעודה'] + ' עד ' + records[records.length - 1]['מספר תעודה'] : '');
+    PFS.toast('🎓 הופקו ' + result.count + ' תעודות — נרשמו ביומן התעודות', 'ok');
+    // the registry: who got which certificate, when, from which format
+    try {
+      const reg = certRegistry();
+      reg.batches.push({
+        id: 'cb' + Date.now().toString(36), at: Date.now(), format, count: records.length, kind,
+        entries: records.map((r) => ({ serial: r['מספר תעודה'], name: String(r.__name || ''), id: built.idHeader ? String(r[built.idHeader] || '') : '', course: courseHeader ? String(r[courseHeader] || '') : '' }))
+      });
+      if (reg.batches.length > 200) reg.batches = reg.batches.slice(-200);
+      PFS.store.set('cert_registry', reg);
+      certCommitSerials(records.length);
+      PFS.store.set('cert_last_format', format);
+    } catch (e) { console.warn('registry write failed', e); }
     // the placements are this format's memory — next cohort starts at the list
     try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
     // …and the format itself joins the certificate shelf, so next time it is
@@ -11664,10 +11748,16 @@ function showCertIntro() {
     '</div>' +
     '<div id="certShelf" class="gd-chips" style="display:none"></div>' +
     '<div class="gd-foot"><button type="button" class="btn primary" id="certPick">📄 בחר את פורמט התעודה</button>' +
-    '<span class="hint muted" style="flex:1">את האקסל תבחר אחרי שתסמן איפה השם</span></div>';
+    '<span class="hint muted" style="flex:1">' + (certPendingList ? '📊 הרשימה שגררת מחכה — בחר פורמט והיא תיטען לבד' : 'את האקסל תבחר אחרי שתסמן איפה השם') + '</span></div>' +
+    (certRegistry().batches.length
+      ? '<div class="hint" style="margin-top:8px"><button type="button" class="btn ghost sm" id="certReg">📒 יומן התעודות שהונפקו (' + certRegistry().batches.reduce((n, b) => n + (b.count || 0), 0) + ') — הורד CSV</button></div>'
+      : '') +
+    '<div class="hint muted" style="margin-top:6px">טיפ: אפשר גם לגרור קובץ אקסל של סטודנטים ישר למסך הבית — הפורמט האחרון ייבחר לבד.</div>';
   mountCertCard(certCard);
-  certCard.querySelector('#certX').addEventListener('click', closeCertWizard);
+  certCard.querySelector('#certX').addEventListener('click', () => { certPendingList = null; closeCertWizard(); });
   certCard.querySelector('#certPick').addEventListener('click', () => $('certInput').click());
+  const regBtn = certCard.querySelector('#certReg');
+  if (regBtn) regBtn.addEventListener('click', () => PFS.deliver.file(certRegistryCsv(), 'יומן תעודות.csv', 'text/csv;charset=utf-8'));
   // the certificate shelf: formats used before, one click each
   const card = certCard;
   PFS.library.list().then((docs) => {
@@ -11685,6 +11775,24 @@ function showCertIntro() {
     card.querySelector('#certPick').textContent = '📄 פורמט חדש מקובץ';
     shelf.style.display = '';
   }).catch(() => {});
+}
+// ONE touch: a student list dropped on the home screen. The last format used
+// (or the only one on the shelf) opens by itself, the list loads, and the
+// wizard lands on the check-and-preview step — the clerk only approves.
+let certPendingList = null;
+async function certAutoFromList(parsed, fileName) {
+  if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return false; }
+  certPendingList = { parsed, fileName };
+  const certs = (await PFS.library.list()).filter((d) => d.kind === 'cert');
+  const last = PFS.store.get('cert_last_format', '');
+  const pick = certs.find((d) => d.name === last) || (certs.length === 1 ? certs[0] : null);
+  if (!pick) {
+    showCertIntro();
+    PFS.toast(certs.length ? 'בחר את פורמט התעודה — הרשימה תיטען לבד אחריו' : 'בחר קודם פורמט תעודה; הרשימה שגררת תיטען לבד אחריו', 'ok', 5000);
+    return false;
+  }
+  await certOpenFromShelf(pick.id);
+  return true;
 }
 async function certOpenFromShelf(id) {
   try {

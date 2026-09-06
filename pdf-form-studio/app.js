@@ -3324,14 +3324,31 @@ function certAddAsset(kind) {
 }
 function closeCertWizard() {
   if (certCard) { certCard.remove(); certCard = null; }
+  document.querySelectorAll('.cert-arm').forEach((b) => b.remove());
   certMode = false;
   overlay.setPlacing(null);
+}
+// where the card lives: docked in the side panel on a wide screen (the
+// certificate stays fully visible), floating over the page on a phone
+function mountCertCard(card) {
+  const dock = $('certDock');
+  if (dock && window.innerWidth >= 900) {
+    card.classList.add('docked');
+    dock.innerHTML = '';
+    dock.appendChild(card);
+    // make sure the fill tab (the dock's tab) is the one showing
+    const tab = document.querySelector('.tab[data-tab="fill"], [data-tab="fill"]');
+    if (tab && !tab.classList.contains('active')) tab.click();
+    try { dock.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  } else {
+    document.body.appendChild(card);
+  }
 }
 function showCertWizard() {
   if (certCard) certCard.remove();
   certCard = document.createElement('div');
   certCard.className = 'gd-card cert-card';
-  document.body.appendChild(certCard);
+  mountCertCard(certCard);
   let step = certPlacedFields().length ? 2 : 1;
   const restored = step === 2;
   const render = () => {
@@ -3536,7 +3553,7 @@ function showCertIntro() {
     '<div id="certShelf" class="gd-chips" style="display:none"></div>' +
     '<div class="gd-foot"><button type="button" class="btn primary" id="certPick">📄 בחר את פורמט התעודה</button>' +
     '<span class="hint muted" style="flex:1">את האקסל תבחר אחרי שתסמן איפה השם</span></div>';
-  document.body.appendChild(certCard);
+  mountCertCard(certCard);
   certCard.querySelector('#certX').addEventListener('click', closeCertWizard);
   certCard.querySelector('#certPick').addEventListener('click', () => $('certInput').click());
   // the certificate shelf: formats used before, one click each

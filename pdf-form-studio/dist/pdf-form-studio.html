@@ -232,6 +232,12 @@ button, input, select, textarea { font-family: inherit; }
 /* while a placement is armed, existing elements never swallow the click —
    the second field can land right beside (or over) the first one */
 .overlay.placing .el { pointer-events: none; }
+/* on a wide screen the certificate card DOCKS into the side panel, so the
+   certificate itself stays fully visible (a floating card hid the lower
+   half — exactly where the ID and dates go); phones keep the floating card */
+.cert-card.docked { position: relative; inset: auto; transform: none; width: auto; max-width: none; box-shadow: none;
+  animation: none; margin: 10px 12px 6px; padding: 16px 16px 12px; border-radius: 14px; }
+.cert-card.docked .gd-q { font-size: 17px; }
 /* the armed banner: says exactly what to do while the wizard card steps aside */
 .cert-arm { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 95;
   background: var(--brand); color: #fff; border-radius: 999px; padding: 10px 18px; font-weight: 700;
@@ -786,6 +792,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       </div>
       <div class="tab-body">
         <section class="tab-panel active" data-panel="fill">
+          <div id="certDock"></div>
           <div class="card" id="propsPanel" style="display:none">
             <h3>✎ מאפייני הפריט</h3>
             <div class="body-p" id="propsBody"></div>
@@ -11289,14 +11296,31 @@ function certAddAsset(kind) {
 }
 function closeCertWizard() {
   if (certCard) { certCard.remove(); certCard = null; }
+  document.querySelectorAll('.cert-arm').forEach((b) => b.remove());
   certMode = false;
   overlay.setPlacing(null);
+}
+// where the card lives: docked in the side panel on a wide screen (the
+// certificate stays fully visible), floating over the page on a phone
+function mountCertCard(card) {
+  const dock = $('certDock');
+  if (dock && window.innerWidth >= 900) {
+    card.classList.add('docked');
+    dock.innerHTML = '';
+    dock.appendChild(card);
+    // make sure the fill tab (the dock's tab) is the one showing
+    const tab = document.querySelector('.tab[data-tab="fill"], [data-tab="fill"]');
+    if (tab && !tab.classList.contains('active')) tab.click();
+    try { dock.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  } else {
+    document.body.appendChild(card);
+  }
 }
 function showCertWizard() {
   if (certCard) certCard.remove();
   certCard = document.createElement('div');
   certCard.className = 'gd-card cert-card';
-  document.body.appendChild(certCard);
+  mountCertCard(certCard);
   let step = certPlacedFields().length ? 2 : 1;
   const restored = step === 2;
   const render = () => {
@@ -11501,7 +11525,7 @@ function showCertIntro() {
     '<div id="certShelf" class="gd-chips" style="display:none"></div>' +
     '<div class="gd-foot"><button type="button" class="btn primary" id="certPick">📄 בחר את פורמט התעודה</button>' +
     '<span class="hint muted" style="flex:1">את האקסל תבחר אחרי שתסמן איפה השם</span></div>';
-  document.body.appendChild(certCard);
+  mountCertCard(certCard);
   certCard.querySelector('#certX').addEventListener('click', closeCertWizard);
   certCard.querySelector('#certPick').addEventListener('click', () => $('certInput').click());
   // the certificate shelf: formats used before, one click each

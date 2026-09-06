@@ -3432,6 +3432,74 @@ async function main() {
     check('🎓 on a phone the wizard card fits the screen with its buttons reachable', okM);
   }
 
+  // ---- certificate refinements: long names shrink to fit, ID + date chips,
+  // signature chip, a shelf of certificate formats ----
+  {
+    const refRes = await page.evaluate(async (xlsxBytes) => {
+      const T = window.PFS.__test, M = window.PFS.merge, out = {};
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([842, 595]);
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawText('CERTIFICATE REFINEMENTS FIXTURE 2026', { x: 90, y: 480, size: 32, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+      const certBytes = await d.save();
+      await T.startCertFlow(new File([certBytes.slice(0)], 'תעודת-הצטיינות.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      // the chips the clerk asked for are on the card
+      const chips = [...document.querySelectorAll('.cert-card .gd-chip')].map((b) => b.textContent);
+      out.chips = { id: chips.some((t) => /תעודת זהות/.test(t)), dates: ['תאריך סיום', 'תאריך התחלה', 'תאריך הנפקה'].every((k) => chips.some((t) => t.includes(k))), sig: chips.some((t) => /חתימה/.test(t)), stamp: chips.some((t) => /חותמת/.test(t)) };
+      // place the name near the RIGHT edge: its room is symmetric → smaller
+      const c = T.certPlace(0, 0.8, 0.5, 'שם מלא');
+      out.maxW = +c.model.maxW.toFixed(2);              // 2*0.2-0.06 = 0.34
+      T.certPlace(0, 0.5, 0.7, 'תאריך סיום'); T.certPlace(0, 0.5, 0.8, 'תעודת זהות');
+      // a very long name must stay on ONE line inside that room (font shrinks)
+      const models = T.centerBatchModels(T.overlay.getElements().map((e) => e.model));
+      const long = M.applyRecord(models, { 'שם מלא': 'אברהם יצחק בן-ציון הלוי מזרחי סגל', 'תאריך סיום': '15.07.2026', 'תעודת זהות': '123456782' });
+      const bytes = await window.PFS.exporter.exportPdf(certBytes, long, {});
+      const doc = await window.pdfjsLib.getDocument({ data: bytes }).promise; const p = await doc.getPage(1);
+      const vp = p.getViewport({ scale: 1 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await p.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const dd = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      // ink in the name band (rows around fy 0.5 → y ≈ 0.47..0.56 of 595)
+      let minX = 1e9, maxX = -1;
+      for (let y = Math.round(0.46 * cv.height); y < Math.round(0.57 * cv.height); y++) for (let x = 0; x < cv.width; x++) {
+        if (dd[(y * cv.width + x) * 4] < 128) { if (x < minX) minX = x; if (x > maxX) maxX = x; }
+      }
+      out.nameInk = { minX, maxX, W: cv.width, limit: Math.round(c.model.maxW * cv.width), center: (minX + maxX) / 2, spot: Math.round(0.8 * cv.width) };
+      out.serMaxW = T.overlay.serialize().find((m) => m.fieldKey === 'שם מלא').maxW > 0;
+      // the Excel: dates map by meaning, the ID column maps to the ID chip
+      document.querySelector('.cert-card #certNext').click();
+      T.certLoadList(M.parseXlsx(new Uint8Array(xlsxBytes)), 'students.xlsx');
+      out.map = T.certState().map;
+      document.querySelector('.cert-card #certNext').click();
+      await T.certProduce('zip', { noDownload: true });
+      // the format joined the certificate shelf…
+      const shelf = (await window.PFS.library.list()).filter((x) => x.kind === 'cert');
+      out.shelf = shelf.map((x) => x.name);
+      // …and the intro card offers it; picking it opens the wizard at step 2
+      await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+      document.getElementById('certBtn').click();
+      await new Promise((r) => setTimeout(r, 600));
+      const chip = [...document.querySelectorAll('.cert-card #certShelf .gd-chip')].find((b) => /תעודת-הצטיינות/.test(b.textContent));
+      out.shelfChip = !!chip;
+      if (chip) { chip.click(); await new Promise((r) => setTimeout(r, 2000)); }
+      out.reopened = T.certState();
+      out.reopenedPlaced = T.overlay.getElements().filter((e) => e.model.fieldKey).length;
+      await T.goHome();
+      for (const x of shelf) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+      window.PFS.ui.confirm = realConfirm;
+      return out;
+    }, Array.from(fs.readFileSync(path.join(HERE, 'fixtures', 'students.xlsx'))));
+    const nameOk = refRes.nameInk && refRes.nameInk.maxX - refRes.nameInk.minX <= refRes.nameInk.limit + 3
+      && Math.abs(refRes.nameInk.center - refRes.nameInk.spot) <= 4 && refRes.nameInk.maxX < refRes.nameInk.W;
+    const okR = refRes.chips.id && refRes.chips.dates && refRes.chips.sig && refRes.chips.stamp
+      && Math.abs(refRes.maxW - 0.34) < 0.01 && nameOk && refRes.serMaxW
+      && refRes.map['שם מלא'] === 'שם מלא' && refRes.map['תאריך סיום'] === 'תאריך סיום' && refRes.map['תעודת זהות'] === 'תעודת זהות'
+      && refRes.shelf.includes('תעודת-הצטיינות') && refRes.shelfChip && refRes.reopened.step === 2 && refRes.reopenedPlaced === 3;
+    if (!okR) console.log('  [cert refinements debug]', JSON.stringify(refRes));
+    check('🎓 refinements: ID/date/signature chips, a long name shrinks to fit on its spot, formats shelf remembers the certificate', okR);
+  }
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

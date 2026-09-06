@@ -129,6 +129,13 @@
           inner.style.whiteSpace = model.cellW ? 'pre' : '';
           inner.style.wordBreak = '';
         }
+        // fit-to-width: text longer than the room it has shrinks to one line
+        // (the exporter applies the same rule, so the screen tells the truth)
+        if (model.maxW && !model.wrapW) {
+          inner.style.fontSize = fontPx + 'px';
+          const natural = node.offsetWidth - 2, limit = model.maxW * W;
+          if (natural > limit && natural > 0) inner.style.fontSize = (fontPx * limit / natural) + 'px';
+        }
         node.style.height = 'auto';
         // reflect measured size back into fractions (for drag clamp + templates)
         // minus the 2×1px selection border, which is chrome, not content — the

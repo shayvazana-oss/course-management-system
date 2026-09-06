@@ -30,11 +30,13 @@
   }
   const uid = () => 'lib' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-  async function add(name, bytes) {
+  // extra.kind marks a special shelf — 'cert' = a certificate format (shown
+  // in the certificate wizard's own picker, not among the everyday forms)
+  async function add(name, bytes, extra) {
     if (!bytes || !bytes.byteLength) throw new Error('קובץ ריק');
     if (bytes.byteLength > MAX_BYTES) throw new Error('הקובץ גדול מדי למאגר (עד 15MB)');
     const clean = String(name || 'מסמך').replace(/\.pdf$/i, '').trim() || 'מסמך';
-    const rec = { id: uid(), name: clean, bytes, size: bytes.byteLength, added: Date.now(), lastUsed: 0 };
+    const rec = { id: uid(), name: clean, bytes, size: bytes.byteLength, added: Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '' };
     const db = await open();
     await tx(db, 'readwrite', (s) => s.put(rec));
     return { id: rec.id, name: rec.name };
@@ -45,7 +47,7 @@
       const db = await open();
       const all = await tx(db, 'readonly', (s) => s.getAll());
       return (all || [])
-        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed }))
+        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '' }))
         .sort((a, b) => (b.lastUsed || b.added) - (a.lastUsed || a.added));
     } catch (e) { return []; }
   }

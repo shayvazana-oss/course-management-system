@@ -3103,8 +3103,15 @@ function openMerge() {
 // sample's box — the sample was placed where the name should sit, and a longer
 // or shorter name must sit on that same spot (align:center keeps the box)
 function centerBatchModels(models) {
-  return models.map((m) => (m.type === 'text' && m.fieldKey && m.align !== 'center')
-    ? Object.assign({}, m, { align: 'center', wrapW: null }) : m);
+  return models.map((m) => {
+    if (m.type !== 'text' || !m.fieldKey) return m;
+    const cx = m.fx + (m.fw || 0) / 2;
+    return Object.assign({}, m, {
+      align: 'center', wrapW: null,
+      // room for a long value: symmetric about the spot, inside a page margin
+      maxW: m.maxW || PFS.clamp(2 * Math.min(cx, 1 - cx) - 0.06, 0.2, 0.92)
+    });
+  });
 }
 let mergeMapping = null; // header → fieldKey|null (auto + manual overrides)
 function renderMergeMapUI(parsed, keys) {
@@ -3230,11 +3237,17 @@ let certMode = false, certOpening = false, certCard = null, certList = null, cer
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const CERT_FIELDS = [
   { key: 'שם מלא', sample: 'שם הסטודנט', size: 0.06, bold: true, label: 'שם הסטודנט' },
+  { key: 'תעודת זהות', sample: 'ת"ז 012345678', size: 0.024, bold: false, label: 'תעודת זהות' },
   { key: 'שם הקורס', sample: 'שם הקורס', size: 0.03, bold: false, label: 'שם הקורס' },
-  { key: 'תאריך', sample: '15.07.2026', size: 0.024, bold: false, label: 'תאריך' },
-  { key: 'ציון', sample: '100', size: 0.028, bold: false, label: 'ציון' },
-  { key: 'תעודת זהות', sample: '012345678', size: 0.022, bold: false, label: 'ת"ז' }
+  { key: 'תאריך סיום', sample: '15.07.2026', size: 0.024, bold: false, label: 'תאריך סיום' },
+  { key: 'תאריך התחלה', sample: '01.03.2026', size: 0.024, bold: false, label: 'תאריך התחלה' },
+  { key: 'תאריך הנפקה', sample: new Date().toLocaleDateString('he-IL'), size: 0.022, bold: false, label: 'תאריך הנפקה' },
+  { key: 'ציון', sample: '100', size: 0.028, bold: false, label: 'ציון' }
 ];
+// which spreadsheet column feeds a date placement — by the date's MEANING
+const CERT_DATE_HINTS = {
+  'תאריך סיום': /סיום|סיים|גמר/, 'תאריך התחלה': /התחלה|תחילת|פתיחה/, 'תאריך הנפקה': /הנפקה|הפקה|מתן/
+};
 // a PNG/JPG certificate format becomes a one-page PDF (page = the image, at
 // A4 landscape/portrait proportions) so the whole pipeline stays PDF
 async function imageToPdfFile(file) {
@@ -3286,11 +3299,28 @@ function certPlace(pageIndex, fx, fy, key) {
   });
   if (!ctrl) return null;
   ctrl.model.fx = PFS.clamp(fx - ctrl.model.fw / 2, 0, 1 - ctrl.model.fw);
+  // the room a value has here: symmetric about the spot, inside a page margin —
+  // a long name shrinks to fit it instead of spilling ("כשהשם ארוך מדי הוא לא
+  // רושם אותו טוב")
+  ctrl.model.maxW = PFS.clamp(2 * Math.min(fx, 1 - fx) - 0.06, 0.2, 0.92);
   ctrl.layout();
   overlay.deselectAll();
   markDirty();
   if (certCard && certCard.__render) certCard.__render();   // the card reflects every placement
   return ctrl;
+}
+// a signature/stamp on a certificate: pick the saved one (or draw/upload a new
+// one); untagged, so it prints identically on every student's copy
+function certAddAsset(kind) {
+  const have = assets.list ? assets.list(kind) : [];
+  if (!have.length) {
+    PFS.toast(kind === 'stamp' ? 'אין חותמת שמורה — העלו אחת ותוצב על התעודה' : 'ציירו או העלו חתימה — היא תישמר במאגר ותוצב על התעודה', 'ok', 4000);
+    (kind === 'stamp' ? startStampFlow : startSignatureFlow)();
+    return;
+  }
+  placeDefaultAsset(kind);
+  PFS.toast((kind === 'stamp' ? 'החותמת' : 'החתימה') + ' הונחה — גררו אותה למקום הנכון. חתימה אחרת? לשונית "נכסים"', 'ok', 4500);
+  markDirty();
 }
 function closeCertWizard() {
   if (certCard) { certCard.remove(); certCard = null; }
@@ -3354,6 +3384,13 @@ function showCertWizard() {
         armCertPlacement(String(name).trim(), String(name).trim());
       });
       chips.appendChild(other);
+      // the parts that are the SAME on every certificate
+      [['signature', '✍️ חתימה'], ['stamp', '🔏 חותמת']].forEach(([kind, label]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip'; b.textContent = label;
+        b.title = kind === 'signature' ? 'חתימה מהמאגר (או ציור/העלאה) — תודפס על כל התעודות' : 'חותמת מהמאגר — תודפס על כל התעודות';
+        b.addEventListener('click', () => certAddAsset(kind));
+        chips.appendChild(b);
+      });
       $c('certNext').addEventListener('click', () => { overlay.setPlacing(null); step = 2; render(); });
     } else if (step === 2) {
       $c('certLoad').addEventListener('click', () => $('certListInput').click());
@@ -3399,10 +3436,16 @@ function certLoadList(parsed, fileName) {
   const inv = PFS.merge.mapHeaders(parsed.headers, keys);   // header → key
   certMap = {};
   keys.forEach((k) => { const h = parsed.headers.find((hh) => inv[hh] === k); if (h) certMap[k] = h; });
-  // a bare "תאריך" placement takes any date-ish column
-  if (keys.includes('תאריך') && !certMap['תאריך']) {
-    const h = parsed.headers.find((hh) => /תאריך|מועד/.test(hh)); if (h) certMap['תאריך'] = h;
-  }
+  // date placements find their column by MEANING (סיום/התחלה/הנפקה), then any
+  // date-ish column; an unmapped date keeps the sample — type today's date
+  // into it once and it prints on every certificate
+  const taken = new Set(Object.values(certMap));
+  keys.filter((k) => /^תאריך/.test(k) && !certMap[k]).forEach((k) => {
+    const hint = CERT_DATE_HINTS[k];
+    const h = (hint && parsed.headers.find((hh) => !taken.has(hh) && /תאריך|מועד/.test(hh) && hint.test(hh)))
+      || parsed.headers.find((hh) => !taken.has(hh) && /תאריך|מועד/.test(hh));
+    if (h) { certMap[k] = h; taken.add(h); }
+  });
   PFS.toast('📊 ' + (fileName || 'הרשימה') + ' — ' + parsed.records.length + ' סטודנטים', 'ok');
   if (certCard && certCard.__render) certCard.__render();
 }
@@ -3437,6 +3480,15 @@ async function certProduce(kind, opts) {
     PFS.toast('🎓 הופקו ' + result.count + ' תעודות', 'ok');
     // the placements are this format's memory — next cohort starts at the list
     try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
+    // …and the format itself joins the certificate shelf, so next time it is
+    // picked from the intro card instead of hunted for on disk
+    try {
+      const clean = String(currentFileName || '').replace(/-filled$/, '').trim();
+      const have = await PFS.library.list();
+      if (clean && !have.some((d) => d.kind === 'cert' && d.name === clean)) {
+        await PFS.library.add(clean, pdfView.getBytes().slice(0), { kind: 'cert' });
+      }
+    } catch (e) {}
   } catch (e) {
     console.error(e); PFS.toast('ההפקה נכשלה: ' + (e.message || e), 'err');
     if (prog) prog.textContent = '';
@@ -3460,11 +3512,36 @@ function showCertIntro() {
       '<b>2.</b> לוחצים על התעודה במקום שבו <b>השם</b> צריך להופיע (וגם קורס/תאריך אם רוצים).<br>' +
       '<b>3.</b> טוענים את <b>רשימת הסטודנטים</b> מאקסל כמו שהיא — ומקבלים תעודה לכל אחד, על שמו.' +
     '</div>' +
+    '<div id="certShelf" class="gd-chips" style="display:none"></div>' +
     '<div class="gd-foot"><button type="button" class="btn primary" id="certPick">📄 בחר את פורמט התעודה</button>' +
     '<span class="hint muted" style="flex:1">את האקסל תבחר אחרי שתסמן איפה השם</span></div>';
   document.body.appendChild(certCard);
   certCard.querySelector('#certX').addEventListener('click', closeCertWizard);
   certCard.querySelector('#certPick').addEventListener('click', () => $('certInput').click());
+  // the certificate shelf: formats used before, one click each
+  const card = certCard;
+  PFS.library.list().then((docs) => {
+    if (card !== certCard) return;
+    const shelf = card.querySelector('#certShelf');
+    const certs = docs.filter((d) => d.kind === 'cert');
+    if (!certs.length) return;
+    const lab = document.createElement('span'); lab.className = 'hint'; lab.style.cssText = 'width:100%;margin-bottom:2px'; lab.textContent = '📚 הפורמטים שלך:';
+    shelf.appendChild(lab);
+    certs.forEach((d) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip'; b.textContent = '🎓 ' + d.name;
+      b.addEventListener('click', () => certOpenFromShelf(d.id));
+      shelf.appendChild(b);
+    });
+    card.querySelector('#certPick').textContent = '📄 פורמט חדש מקובץ';
+    shelf.style.display = '';
+  }).catch(() => {});
+}
+async function certOpenFromShelf(id) {
+  try {
+    const rec = await PFS.library.get(id);
+    if (!rec || !rec.bytes) { PFS.toast('הפורמט לא נמצא במאגר', 'err'); return; }
+    await startCertFlow(new File([rec.bytes], rec.name + '.pdf', { type: 'application/pdf' }));
+  } catch (e) { PFS.toast('פתיחת הפורמט נכשלה: ' + (e.message || e), 'err'); }
 }
 $('certBtn') && $('certBtn').addEventListener('click', showCertIntro);
 $('certInput') && $('certInput').addEventListener('change', async (e) => {

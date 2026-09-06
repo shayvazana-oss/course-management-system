@@ -94,13 +94,22 @@
       return;
     }
     // text
-    const fontPx = m.fontFrac * ch;
+    let fontPx = m.fontFrac * ch;
     const boxW = m.fw * cw;
     ctx.direction = 'rtl';
     ctx.fillStyle = m.color || '#111';
     // the element's own face when it adopted the document's (fontmatch), else
     // the app font — the exported raster must match what the editor showed
-    ctx.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px ' + (m.font || 'Heebo, sans-serif');
+    const fontCss = (px) => (m.bold ? '700 ' : '400 ') + px + 'px ' + (m.font || 'Heebo, sans-serif');
+    ctx.font = fontCss(fontPx);
+    // fit-to-width (certificates): a value longer than the room it has on the
+    // page shrinks to stay on ONE line at its spot — a long name must never
+    // spill past the frame or onto its neighbours
+    if (m.maxW && !m.wrapW) {
+      const limit = m.maxW * cw;
+      const widest = Math.max(...String(m.text ?? '').split('\n').map((ln) => ctx.measureText(ln).width), 0);
+      if (widest > limit && widest > 0) { fontPx = fontPx * (limit / widest); ctx.font = fontCss(fontPx); }
+    }
     // letter-spacing (aligns typed text to per-character boxes) — supported in
     // modern Chromium/Safari; older engines ignore it (text still exports).
     try { ctx.letterSpacing = m.letterSpacing ? (m.letterSpacing * fontPx) + 'px' : '0px'; } catch (e) {}
@@ -157,9 +166,26 @@
     const fullCh = Math.max(1, Math.round(displayHpt * s));
     const pad = 0.03;   // generous, so text overflowing its box never clips
     let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+    // a text value can be WIDER than its stored box (a batch value longer than
+    // the sample it replaced, a long name on a certificate): measure the real
+    // drawn extent so the crop never guillotines it at the box edge
+    const probe = document.createElement('canvas').getContext('2d');
     models.forEach((m) => {
-      x0 = Math.min(x0, m.fx); y0 = Math.min(y0, m.fy);
-      x1 = Math.max(x1, m.fx + (m.fw || 0)); y1 = Math.max(y1, m.fy + (m.fh || 0));
+      let bx0 = m.fx, bx1 = m.fx + (m.fw || 0);
+      if (m.type === 'text' && !m.wrapW && String(m.text || '').trim()) {
+        try {
+          let fontPx = m.fontFrac * fullCh;
+          probe.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px ' + (m.font || 'Heebo, sans-serif');
+          let w = Math.max(...String(m.text).split('\n').map((ln) => probe.measureText(ln).width), 0);
+          if (m.maxW && w > m.maxW * fullCw) w = m.maxW * fullCw;   // drawElement shrinks to this
+          const fw = w / fullCw;
+          if (m.align === 'center') { const c = m.fx + (m.fw || 0) / 2; bx0 = Math.min(bx0, c - fw / 2); bx1 = Math.max(bx1, c + fw / 2); }
+          else if (m.align === 'left') bx1 = Math.max(bx1, m.fx + fw);
+          else bx0 = Math.min(bx0, m.fx + (m.fw || 0) - fw);
+        } catch (e) {}
+      }
+      x0 = Math.min(x0, bx0); y0 = Math.min(y0, m.fy);
+      x1 = Math.max(x1, bx1); y1 = Math.max(y1, m.fy + (m.fh || 0));
     });
     x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
     x1 = Math.min(1, x1 + pad); y1 = Math.min(1, y1 + pad);

@@ -3339,11 +3339,15 @@ function showCertWizard() {
     const keys = [...new Set(placed.map((c) => c.model.fieldKey))];
     let body = '';
     if (step === 1) {
-      body = '<div class="gd-q">איפה השם על התעודה?</div>' +
-        '<div class="hint" style="margin:-2px 0 10px">לחצו על התעודה במקום שבו <b>שם הסטודנט</b> צריך להופיע. אחר כך אפשר לגרור, להגדיל ולשנות צבע כרגיל.</div>' +
+      body = '<div class="gd-q">' + (keys.length ? 'מה עוד להניח על התעודה?' : 'איפה השם על התעודה?') + '</div>' +
+        '<div class="hint" style="margin:-2px 0 10px">' +
+          (keys.length
+            ? 'כל צ\'יפ הוא <b>שדה נוסף</b>: לוחצים עליו, ואז לוחצים על התעודה במקום שלו. אפשר להניח כמה שרוצים — שם, ת"ז, תאריכים, חתימה.'
+            : 'לחצו על <b>📍 שם הסטודנט</b>, ואז על התעודה במקום שבו השם צריך להופיע. אחר כך מוסיפים ת"ז, תאריכים וחתימה באותה דרך.') +
+        '</div>' +
         '<div class="gd-chips" id="certChips"></div>' +
-        (keys.length ? '<div class="hint" style="margin-bottom:8px">✓ הונחו: ' + keys.join(' · ') + '</div>' : '') +
-        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>המשך לרשימה ➜</button></div>';
+        (keys.length ? '<div class="hint" style="margin-bottom:8px">✓ על התעודה כבר: <b>' + keys.join(' · ') + '</b> (גררו לכוונון; ✕ על השדה מוחק)</div>' : '') +
+        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>סיימתי — לרשימת הסטודנטים ➜</button></div>';
     } else if (step === 2) {
       const n = certList ? certList.records.length : 0;
       body = '<div class="gd-q">רשימת הסטודנטים</div>' +
@@ -3421,12 +3425,29 @@ function showCertWizard() {
 // arm a click on the page; the card steps ASIDE meanwhile so it can never
 // cover the very spot the clerk wants to click (Esc brings it back)
 function armCertPlacement(key, label) {
-  PFS.toast('לחצו על התעודה במקום שבו "' + label + '" צריך להופיע (Esc לביטול)', 'ok', 4000);
   if (certCard) certCard.style.display = 'none';
-  const restore = () => { if (certCard) { certCard.style.display = ''; certCard.__render && certCard.__render(); } document.removeEventListener('keydown', onEsc, true); };
-  const onEsc = (e) => { if (e.key === 'Escape') { overlay.setPlacing(null); restore(); } };
+  // a loud, explicit banner replaces the card while armed — a vanished card
+  // with nothing said read as "the tool only places one thing"
+  document.querySelectorAll('.cert-arm').forEach((b) => b.remove());
+  const arm = document.createElement('div');
+  arm.className = 'cert-arm';
+  arm.innerHTML = '<span>📍 עכשיו לחצו על התעודה במקום שבו <b></b> צריך להופיע</span><button type="button">ביטול (Esc)</button>';
+  arm.querySelector('b').textContent = label;
+  document.body.appendChild(arm);
+  const restore = () => {
+    arm.remove();
+    if (certCard) { certCard.style.display = ''; certCard.__render && certCard.__render(); }
+    document.removeEventListener('keydown', onEsc, true);
+  };
+  const cancel = () => { overlay.setPlacing(null); restore(); };
+  const onEsc = (e) => { if (e.key === 'Escape') cancel(); };
+  arm.querySelector('button').addEventListener('click', cancel);
   document.addEventListener('keydown', onEsc, true);
-  overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlace(pageIndex, fx, fy, key); restore(); return null; } });
+  overlay.setPlacing({ create: (pageIndex, fx, fy) => {
+    certPlace(pageIndex, fx, fy, key); restore();
+    PFS.toast('✓ "' + label + '" הונח — אפשר לגרור אותו, ולהוסיף עוד שדות מהכרטיס', 'ok', 3500);
+    return null;
+  } });
 }
 function certLoadList(parsed, fileName) {
   if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return; }

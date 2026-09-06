@@ -189,6 +189,16 @@ button, input, select, textarea { font-family: inherit; }
 .pages.enhance canvas.pdf { filter: contrast(1.6) brightness(1.08) saturate(.85); }
 .overlay { position: absolute; inset: 0; overflow: hidden; }
 .overlay.placing { cursor: crosshair; }
+/* while a placement is armed, existing elements never swallow the click —
+   the second field can land right beside (or over) the first one */
+.overlay.placing .el { pointer-events: none; }
+/* the armed banner: says exactly what to do while the wizard card steps aside */
+.cert-arm { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 95;
+  background: var(--brand); color: #fff; border-radius: 999px; padding: 10px 18px; font-weight: 700;
+  font-size: 14px; box-shadow: 0 10px 30px rgba(19,28,43,.3); display: flex; gap: 12px; align-items: center;
+  direction: rtl; animation: gdIn .2s ease-out; max-width: calc(100vw - 24px); }
+.cert-arm button { border: 1px solid rgba(255,255,255,.6); background: transparent; color: #fff; border-radius: 999px;
+  padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
 /* subtle amber hint over a detected-but-empty field; vanishes when filled */
 .field-marker { position: absolute; pointer-events: auto; cursor: pointer; z-index: 1; border-radius: 4px;
   background: rgba(224,147,47,.12); box-shadow: inset 0 0 0 1.5px rgba(224,147,47,.55);

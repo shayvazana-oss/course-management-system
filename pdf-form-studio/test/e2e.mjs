@@ -3355,6 +3355,25 @@ async function main() {
       });
       J.cardBack = await page.evaluate(() => getComputedStyle(document.querySelector('.cert-card')).display !== 'none');
       J.chipDone = await page.evaluate(() => /✓ שם הסטודנט/.test(document.querySelector('.cert-card').textContent));
+      // SEVERAL fields, the way a clerk does it: chip → click, chip → click…
+      // the ID lands INSIDE the name's box (a click over an element must not be
+      // swallowed), the date lower down; Esc cancels an armed chip cleanly
+      await page.click('.cert-card .gd-chip:has-text("תעודת זהות")');
+      J.banner = await page.evaluate(() => { const b = document.querySelector('.cert-arm'); return b ? b.textContent : null; });
+      await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.57);
+      await page.waitForTimeout(300);
+      await page.click('.cert-card .gd-chip:has-text("תאריך סיום")');
+      await page.mouse.click(box.x + box.w * 0.5, box.y + box.h * 0.75);
+      await page.waitForTimeout(300);
+      await page.click('.cert-card .gd-chip:has-text("ציון")');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(200);
+      J.multi = await page.evaluate(() => ({
+        keys: window.PFS.__test.overlay.getElements().filter((c) => c.model.fieldKey).map((c) => c.model.fieldKey).sort(),
+        bannerGone: !document.querySelector('.cert-arm'),
+        cardVisible: getComputedStyle(document.querySelector('.cert-card')).display !== 'none',
+        listed: /שם מלא/.test(document.querySelector('.cert-card').textContent) && /תעודת זהות/.test(document.querySelector('.cert-card').textContent)
+      }));
       // המשך → step 2 → 📊 button → file dialog with the real Excel
       await page.click('.cert-card #certNext');
       const [fc2] = await Promise.all([page.waitForEvent('filechooser'), page.click('.cert-card #certLoad')]);
@@ -3399,6 +3418,8 @@ async function main() {
     } catch (e) { J.error = String(e && e.message || e); }
     const okJ = !J.error && J.intro === true && J.step1 === 1 && J.cardHidden === true && J.placed && Math.abs(J.placed.cx - 0.5) < 0.03
       && J.placed.align === 'center' && J.placed.text === 'שם הסטודנט' && J.cardBack && J.chipDone
+      && /תעודת זהות/.test(J.banner || '') && J.multi && JSON.stringify(J.multi.keys) === JSON.stringify(['שם מלא', 'תאריך סיום', 'תעודת זהות'].sort())
+      && J.multi.bannerGone && J.multi.cardVisible && J.multi.listed
       && /3/.test(J.info || '') && J.mapped === 'שם מלא'
       && /תעודות\.zip$/.test(J.zipName || '') && JSON.stringify(J.zipEntries) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
       && /כל התעודות\.pdf$/.test(J.oneName || '') && J.onePages === 3 && /הופקו 3/.test(J.done || '')

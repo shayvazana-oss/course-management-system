@@ -3333,8 +3333,12 @@ async function main() {
     await page.evaluate(async () => { const T = window.PFS.__test; const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; } });
     await page.waitForFunction(() => document.getElementById('dropzone').style.display !== 'none', { timeout: 10000 });
     try {
-      // home → 🎓 button → the OS file dialog → the format opens into the wizard
-      const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15000 }), page.click('#certBtn', { timeout: 15000 })]);
+      // home → 🎓 button → an INTRO card explains the three steps → its button opens
+      // the OS file dialog → the format opens into the wizard
+      await page.click('#certBtn', { timeout: 15000 });
+      await page.waitForSelector('.cert-card #certPick', { timeout: 5000 });
+      J.intro = await page.evaluate(() => /פורמט התעודה/.test(document.querySelector('.cert-card').textContent) && /אקסל/.test(document.querySelector('.cert-card').textContent));
+      const [fc] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15000 }), page.click('.cert-card #certPick', { timeout: 15000 })]);
       await fc.setFiles({ name: 'תעודת-מסע.pdf', mimeType: 'application/pdf', buffer: certBuf });
       await page.waitForSelector('.cert-card', { timeout: 20000 });
       await page.waitForTimeout(1500);
@@ -3376,7 +3380,8 @@ async function main() {
       try { await page.waitForSelector('#uiDlgOk', { timeout: 2000 }); await page.click('#uiDlgOk'); } catch (e) {}
       await page.waitForFunction(() => document.getElementById('dropzone').style.display !== 'none', { timeout: 10000 });
       J.homeCardGone = await page.evaluate(() => !document.querySelector('.cert-card'));
-      const [fc3] = await Promise.all([page.waitForEvent('filechooser'), page.click('#certBtn')]);
+      await page.click('#certBtn'); await page.waitForSelector('.cert-card #certPick', { timeout: 5000 });
+      const [fc3] = await Promise.all([page.waitForEvent('filechooser'), page.click('.cert-card #certPick')]);
       await fc3.setFiles({ name: 'תעודת-מסע.pdf', mimeType: 'application/pdf', buffer: certBuf });
       await page.waitForSelector('.cert-card', { timeout: 20000 });
       await page.waitForTimeout(1500);
@@ -3392,7 +3397,7 @@ async function main() {
       await page.waitForTimeout(1500);
       J.plainNoCard = await page.evaluate(() => !document.querySelector('.cert-card'));
     } catch (e) { J.error = String(e && e.message || e); }
-    const okJ = !J.error && J.step1 === 1 && J.cardHidden === true && J.placed && Math.abs(J.placed.cx - 0.5) < 0.03
+    const okJ = !J.error && J.intro === true && J.step1 === 1 && J.cardHidden === true && J.placed && Math.abs(J.placed.cx - 0.5) < 0.03
       && J.placed.align === 'center' && J.placed.text === 'שם הסטודנט' && J.cardBack && J.chipDone
       && /3/.test(J.info || '') && J.mapped === 'שם מלא'
       && /תעודות\.zip$/.test(J.zipName || '') && JSON.stringify(J.zipEntries) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
@@ -3408,7 +3413,10 @@ async function main() {
       await page.evaluate(() => { const b = document.getElementById('homeBtn'); if (b && document.getElementById('dropzone').style.display === 'none') b.click(); });
       try { await page.waitForSelector('#uiDlgOk', { timeout: 1500 }); await page.click('#uiDlgOk'); } catch (e) {}
       await page.waitForFunction(() => document.getElementById('dropzone').style.display !== 'none', { timeout: 10000 });
-      const [fc5] = await Promise.all([page.waitForEvent('filechooser'), page.click('#certBtn')]);
+      await page.click('#certBtn'); await page.waitForSelector('.cert-card #certPick', { timeout: 5000 });
+      await page.waitForTimeout(400);   // let the slide-in animation settle before measuring
+      M.introBox = await page.evaluate(() => { const r = document.querySelector('.cert-card').getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1; });
+      const [fc5] = await Promise.all([page.waitForEvent('filechooser'), page.click('.cert-card #certPick')]);
       await fc5.setFiles({ name: 'תעודת-מסע.pdf', mimeType: 'application/pdf', buffer: certBuf });
       await page.waitForSelector('.cert-card', { timeout: 20000 });
       await page.waitForTimeout(1200);
@@ -3419,7 +3427,7 @@ async function main() {
     // cleanup (the phone toolbar hides the home button — go home programmatically)
     await page.evaluate(async () => { const T = window.PFS.__test; const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; } });
     await page.setViewportSize({ width: 1280, height: 860 });
-    const okM = !M.error && M.box && M.box.l >= -1 && M.box.r <= M.box.W + 1 && M.box.b <= M.box.H + 1 && M.btnVisible;
+    const okM = !M.error && M.introBox === true && M.box && M.box.l >= -1 && M.box.r <= M.box.W + 1 && M.box.b <= M.box.H + 1 && M.btnVisible;
     if (!okM) console.log('  [cert mobile debug]', JSON.stringify(M));
     check('🎓 on a phone the wizard card fits the screen with its buttons reachable', okM);
   }

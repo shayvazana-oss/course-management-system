@@ -3443,7 +3443,30 @@ async function certProduce(kind, opts) {
   }
   return result;
 }
-$('certBtn') && $('certBtn').addEventListener('click', () => $('certInput').click());
+// the entry card: say what the flow needs BEFORE any file dialog opens —
+// a bare OS "choose file" window explains nothing ("לא הבנתי איך הוא קולט
+// את פורמט התעודה וגם את קובץ האקסל")
+function showCertIntro() {
+  if (certCard) certCard.remove();
+  certCard = document.createElement('div');
+  certCard.className = 'gd-card cert-card';
+  certCard.innerHTML =
+    '<div class="gd-progwrap"><div class="gd-prog" style="width:6%"></div></div>' +
+    '<button type="button" class="gd-x" id="certX" title="סגירה" aria-label="סגירה">✕</button>' +
+    '<div class="gd-count">🎓 הנפקת תעודות לכיתה</div>' +
+    '<div class="gd-q">תעודה מוכנה לכל סטודנט — בשלושה צעדים</div>' +
+    '<div class="hint" style="margin:-2px 0 10px;line-height:1.6">' +
+      '<b>1.</b> בוחרים את <b>פורמט התעודה</b> — קובץ PDF או תמונה (PNG/JPG) של התעודה הריקה.<br>' +
+      '<b>2.</b> לוחצים על התעודה במקום שבו <b>השם</b> צריך להופיע (וגם קורס/תאריך אם רוצים).<br>' +
+      '<b>3.</b> טוענים את <b>רשימת הסטודנטים</b> מאקסל כמו שהיא — ומקבלים תעודה לכל אחד, על שמו.' +
+    '</div>' +
+    '<div class="gd-foot"><button type="button" class="btn primary" id="certPick">📄 בחר את פורמט התעודה</button>' +
+    '<span class="hint muted" style="flex:1">את האקסל תבחר אחרי שתסמן איפה השם</span></div>';
+  document.body.appendChild(certCard);
+  certCard.querySelector('#certX').addEventListener('click', closeCertWizard);
+  certCard.querySelector('#certPick').addEventListener('click', () => $('certInput').click());
+}
+$('certBtn') && $('certBtn').addEventListener('click', showCertIntro);
 $('certInput') && $('certInput').addEventListener('change', async (e) => {
   const f = e.target.files[0]; e.target.value = '';
   if (f) await startCertFlow(f);

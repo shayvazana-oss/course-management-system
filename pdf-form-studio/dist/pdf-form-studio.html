@@ -238,6 +238,12 @@ button, input, select, textarea { font-family: inherit; }
 .cert-card.docked { position: relative; inset: auto; transform: none; width: auto; max-width: none; box-shadow: none;
   animation: none; margin: 10px 12px 6px; padding: 16px 16px 12px; border-radius: 14px; }
 .cert-card.docked .gd-q { font-size: 17px; }
+/* pre-flight issues + the three preview thumbnails on the last step */
+.cert-issues { margin: 0 0 8px; padding: 0 18px 0 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; max-height: 120px; overflow: auto; }
+.cert-thumbs { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; min-height: 40px; }
+.cert-thumbs figure { margin: 0; width: 31%; min-width: 96px; }
+.cert-thumbs img { width: 100%; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.08); cursor: zoom-in; background: #fff; }
+.cert-thumbs figcaption { font-size: 11px; color: var(--ink-3); text-align: center; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* the armed banner: says exactly what to do while the wizard card steps aside */
 .cert-arm { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 95;
   background: var(--brand); color: #fff; border-radius: 999px; padding: 10px 18px; font-weight: 700;
@@ -6529,12 +6535,33 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     }
     return out;
   }
+  // "{שם מלא}" inside any text → the record's value. A certificate sentence
+  // ("מוענקת בזאת ל־{שם מלא} על סיום קורס {שם הקורס}") is one text element
+  // that fills per student while keeping its natural flow. Unknown tokens stay
+  // as typed so a typo is visible, never silently blank.
+  const TOKEN_RE = /\{([^{}]+)\}/g;
+  function fillTokens(text, rec) {
+    if (!text || text.indexOf('{') < 0) return text;
+    return String(text).replace(TOKEN_RE, (m0, t) => {
+      const k = t.trim();
+      if (Object.prototype.hasOwnProperty.call(rec, k) && rec[k] != null && rec[k] !== '') return String(rec[k]);
+      return m0;
+    });
+  }
+  function tokensIn(text) {
+    const out = []; let m;
+    TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(String(text || '')))) out.push(m[1].trim());
+    return [...new Set(out)];
+  }
   function applyRecord(models, record) {
     const rec = enrichRecord(models, record);
     const out = cloneModels(models).map((m) => {
-      if (m.type === 'text' && m.fieldKey && Object.prototype.hasOwnProperty.call(rec, m.fieldKey)) {
+      if (m.type !== 'text') return m;
+      if (m.fieldKey && Object.prototype.hasOwnProperty.call(rec, m.fieldKey)) {
         m = Object.assign({}, m, { text: String(rec[m.fieldKey] ?? '') });
       }
+      if (m.text && m.text.indexOf('{') >= 0) m = Object.assign({}, m, { text: fillTokens(m.text, rec) });
       return m;
     });
     // recompute calculated fields per record with the SAME resolver the
@@ -6567,6 +6594,34 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return { zip, count: records.length };
   }
 
+  /* preflight(records, {nameKey, idKey}) → { issues: [{row, kind, msg}], clean: records }
+   * The last look before N certificates exist: rows that would print WRONG
+   * (empty name → skipped; bad ID checksum, duplicates, digits in a name →
+   * flagged with the row number so the clerk fixes the sheet, or accepts). */
+  function preflight(records, opts) {
+    const nameKey = opts && opts.nameKey, idKey = opts && opts.idKey;
+    const issues = [], clean = [];
+    const seenName = new Map(), seenId = new Map();
+    records.forEach((r, i) => {
+      const row = i + 2;   // sheet row (1 = header)
+      const name = nameKey ? String(r[nameKey] || '').trim() : '';
+      const id = idKey ? String(r[idKey] || '').trim() : '';
+      if (nameKey && !name) { issues.push({ row, kind: 'empty_name', msg: 'שורה ' + row + ': אין שם — תדולג' }); return; }
+      if (name && /\d/.test(name)) issues.push({ row, kind: 'digits_in_name', msg: 'שורה ' + row + ': ספרות בתוך השם "' + name + '"' });
+      if (idKey) {
+        if (!id) issues.push({ row, kind: 'empty_id', msg: 'שורה ' + row + ' (' + name + '): אין תעודת זהות' });
+        else if (!/^\d{9}$/.test(id) || !israeliIdValid(id)) issues.push({ row, kind: 'bad_id', msg: 'שורה ' + row + ' (' + name + '): ת"ז ' + id + ' לא תקינה' });
+        if (id) { if (seenId.has(id)) issues.push({ row, kind: 'dup_id', msg: 'שורה ' + row + ': אותה ת"ז כמו בשורה ' + seenId.get(id) + ' (' + name + ')' }); else seenId.set(id, row); }
+      }
+      if (name) {
+        const nk = name.replace(/\s+/g, ' ').toLowerCase();
+        if (seenName.has(nk)) issues.push({ row, kind: 'dup_name', msg: 'שורה ' + row + ': "' + name + '" מופיע גם בשורה ' + seenName.get(nk) }); else seenName.set(nk, row);
+      }
+      clean.push(r);
+    });
+    return { issues, clean };
+  }
+
   /* runBatchSingle(...) → { pdf: Uint8Array, count } — every record's page(s)
    * in ONE PDF, in list order: the print-shop / "send to the printer once"
    * form of the same batch. */
@@ -6588,7 +6643,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
+  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, fillTokens, tokensIn, preflight, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
 })(window);
 
 </script>
@@ -8246,7 +8301,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -11258,8 +11313,37 @@ async function startCertFlow(file) {
   certMode = true; certList = null; certMap = {};
   showCertWizard();
 }
+// everything on the certificate that changes per student: tagged fields AND
+// sentences carrying {משתנים}
 function certPlacedFields() {
-  return overlay.getElements().filter((c) => c.model.type === 'text' && c.model.fieldKey && String(c.model.text || '').trim());
+  return overlay.getElements().filter((c) => c.model.type === 'text' && String(c.model.text || '').trim()
+    && (c.model.fieldKey || /\{[^{}]+\}/.test(c.model.text)));
+}
+// the variable names in play: field keys + every {token} inside sentences
+function certKeys() {
+  const keys = [];
+  certPlacedFields().forEach((c) => {
+    if (c.model.fieldKey && !keys.includes(c.model.fieldKey)) keys.push(c.model.fieldKey);
+    PFS.merge.tokensIn(c.model.text).forEach((t) => { if (!keys.includes(t)) keys.push(t); });
+  });
+  return keys;
+}
+const CERT_SENTENCE = 'מוענקת בזאת ל־{שם מלא}, ת"ז {תעודת זהות},\nעל סיום בהצלחה של קורס {שם הקורס}';
+// a sentence with variables: ONE text block that keeps its natural flow while
+// {שם מלא}, {תעודת זהות}… fill per student. Wraps inside the page width.
+function certPlaceSentence(pageIndex, fx, fy) {
+  const maxW = PFS.clamp(2 * Math.min(fx, 1 - fx) - 0.06, 0.3, 0.92);
+  const ctrl = overlay.addModelAt('text', pageIndex, {
+    fx: fx - maxW / 2, fy: fy - 0.03, fw: maxW, fontFrac: 0.028, bold: false, align: 'center',
+    text: CERT_SENTENCE, wrapW: maxW, noEdit: true
+  });
+  if (!ctrl) return null;
+  ctrl.layout();
+  overlay.deselectAll();
+  markDirty();
+  if (certCard && certCard.__render) certCard.__render();
+  PFS.toast('לחיצה כפולה על המשפט כדי לערוך אותו — השאירו את ה־{משתנים} במקומם', 'ok', 5000);
+  return ctrl;
 }
 // place a sample value CENTRED on the clicked spot — the box centre is what
 // the batch keeps for every real name, short or long
@@ -11325,7 +11409,7 @@ function showCertWizard() {
   const restored = step === 2;
   const render = () => {
     const placed = certPlacedFields();
-    const keys = [...new Set(placed.map((c) => c.model.fieldKey))];
+    const keys = certKeys();
     let body = '';
     if (step === 1) {
       body = '<div class="gd-q">' + (keys.length ? 'מה עוד להניח על התעודה?' : 'איפה השם על התעודה?') + '</div>' +
@@ -11344,16 +11428,23 @@ function showCertWizard() {
         '<div class="gd-chips"><button type="button" class="gd-chip" id="certLoad">📊 טען Excel / CSV</button>' +
         '<button type="button" class="gd-chip" id="certBack1">📍 הוסף/שנה שדות</button></div>' +
         (certList ? '<div class="hint" id="certListInfo" style="margin-bottom:6px">נמצאו <b>' + n + '</b> סטודנטים · שורה ראשונה: <b>' + escapeHtml(String(Object.values(certList.records[0] || {})[0] || '')) + '</b></div>' +
-          '<div id="certMapUI" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>' : '') +
-        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (certList && Object.values(certMap).some(Boolean) ? '' : 'disabled') + '>המשך להפקה ➜</button></div>';
+          '<div id="certMapUI" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px"></div>' +
+          '<div class="hint muted" style="margin-bottom:8px">משתנים למשפט: ' + certList.headers.map((h) => '<code>{' + escapeHtml(h) + '}</code>').join(' ') + '</div>' : '') +
+        '<div class="gd-foot"><button type="button" class="btn primary" id="certNext" ' + (certList && Object.values(certMap).some(Boolean) ? '' : 'disabled') + '>המשך לבדיקה והפקה ➜</button></div>';
     } else {
-      const n = certList ? certList.records.length : 0;
-      body = '<div class="gd-q">הפקת ' + n + ' תעודות</div>' +
-        '<div class="hint" style="margin:-2px 0 10px">כל תעודה תקבל את הנתונים של הסטודנט שלה, ממורכזת בדיוק במקום שסימנת. הכול נשאר במחשב שלך.</div>' +
-        '<div class="gd-chips"><button type="button" class="gd-chip" id="certZip">🎓 ZIP — קובץ לכל סטודנט</button>' +
-        '<button type="button" class="gd-chip" id="certOne">🖨️ PDF אחד להדפסה</button></div>' +
+      const pf = certPreflightNow();
+      const n = pf.clean.length, skipped = (certList ? certList.records.length : 0) - n;
+      body = '<div class="gd-q">בדיקה אחרונה — ואז ' + n + ' תעודות</div>' +
+        (pf.issues.length
+          ? '<div class="hint" style="margin:-2px 0 8px;color:var(--danger);font-weight:700">⚠ ' + pf.issues.length + ' דברים לבדוק ברשימה' + (skipped ? ' · ' + skipped + ' שורות בלי שם ידולגו' : '') + '</div>' +
+            '<ul class="cert-issues">' + pf.issues.slice(0, 8).map((i) => '<li>' + escapeHtml(i.msg) + '</li>').join('') + (pf.issues.length > 8 ? '<li>…ועוד ' + (pf.issues.length - 8) + '</li>' : '') + '</ul>'
+          : '<div class="hint" style="margin:-2px 0 8px;color:var(--ok);font-weight:700">✓ הרשימה נקייה: שמות, ת"ז וכפילויות נבדקו</div>') +
+        '<div class="hint" style="margin-bottom:4px">תצוגה מקדימה — הראשונה, השם הארוך ביותר, האחרונה:</div>' +
+        '<div class="cert-thumbs" id="certThumbs"><span class="hint muted">מכין תצוגה מקדימה…</span></div>' +
+        '<div class="gd-chips" style="margin-top:8px"><button type="button" class="gd-chip" id="certZip">✅ אשר והפק ZIP — קובץ לכל סטודנט</button>' +
+        '<button type="button" class="gd-chip" id="certOne">🖨️ אשר והפק PDF אחד להדפסה</button></div>' +
         '<div class="hint" id="certProg" style="min-height:16px"></div>' +
-        '<div class="gd-foot"><button type="button" class="btn ghost sm" id="certBack2">‹ חזרה</button></div>';
+        '<div class="gd-foot"><button type="button" class="btn ghost sm" id="certBack2">‹ חזרה לרשימה</button></div>';
     }
     certCard.innerHTML =
       '<div class="gd-progwrap"><div class="gd-prog" style="width:' + Math.round((step - 1) / 3 * 100 + 10) + '%"></div></div>' +
@@ -11370,6 +11461,21 @@ function showCertWizard() {
         b.addEventListener('click', () => armCertPlacement(f.key, f.label));
         chips.appendChild(b);
       });
+      const sent = document.createElement('button'); sent.type = 'button'; sent.className = 'gd-chip'; sent.textContent = '📝 משפט עם משתנים';
+      sent.title = 'משפט שלם כמו "מוענקת בזאת ל־{שם מלא} על סיום קורס {שם הקורס}" — המשתנים מתמלאים לכל סטודנט';
+      sent.addEventListener('click', () => {
+        if (certCard) certCard.style.display = 'none';
+        document.querySelectorAll('.cert-arm').forEach((b) => b.remove());
+        const arm = document.createElement('div'); arm.className = 'cert-arm';
+        arm.innerHTML = '<span>📝 לחצו על התעודה במקום שבו המשפט צריך להופיע</span><button type="button">ביטול (Esc)</button>';
+        document.body.appendChild(arm);
+        const restore = () => { arm.remove(); if (certCard) { certCard.style.display = ''; certCard.__render && certCard.__render(); } document.removeEventListener('keydown', onEsc, true); };
+        const onEsc = (e) => { if (e.key === 'Escape') { overlay.setPlacing(null); restore(); } };
+        arm.querySelector('button').addEventListener('click', () => { overlay.setPlacing(null); restore(); });
+        document.addEventListener('keydown', onEsc, true);
+        overlay.setPlacing({ create: (pageIndex, fx, fy) => { certPlaceSentence(pageIndex, fx, fy); restore(); return null; } });
+      });
+      chips.appendChild(sent);
       const other = document.createElement('button'); other.type = 'button'; other.className = 'gd-chip'; other.textContent = '+ שדה אחר…';
       other.addEventListener('click', async () => {
         const name = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('שם השדה (כמו כותרת העמודה באקסל)', '') : Promise.resolve(window.prompt('שם השדה (כמו כותרת העמודה באקסל)')));
@@ -11406,6 +11512,7 @@ function showCertWizard() {
       $c('certBack2').addEventListener('click', () => { step = 2; render(); });
       $c('certZip').addEventListener('click', () => certProduce('zip'));
       $c('certOne').addEventListener('click', () => certProduce('single'));
+      certRenderPreviews($c('certThumbs'));
     }
   };
   render();
@@ -11441,7 +11548,7 @@ function armCertPlacement(key, label) {
 function certLoadList(parsed, fileName) {
   if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return; }
   certList = parsed;
-  const keys = [...new Set(certPlacedFields().map((c) => c.model.fieldKey))];
+  const keys = certKeys();
   // auto-map: header ↔ placed field by exact name, then by shared meaning
   const inv = PFS.merge.mapHeaders(parsed.headers, keys);   // header → key
   certMap = {};
@@ -11459,17 +11566,59 @@ function certLoadList(parsed, fileName) {
   PFS.toast('📊 ' + (fileName || 'הרשימה') + ' — ' + parsed.records.length + ' סטודנטים', 'ok');
   if (certCard && certCard.__render) certCard.__render();
 }
-async function certProduce(kind, opts) {
-  if (!certList) return null;
-  const placed = certPlacedFields();
-  const keys = [...new Set(placed.map((c) => c.model.fieldKey))];
-  const mapping = {};   // header → fieldKey (the merge engine's shape)
+// the records the batch will print: the sheet's raw columns (so a sentence
+// may use any {column}) + the placed keys mapped onto them + the file name
+function certBuildRecords() {
+  const keys = certKeys();
+  const mapping = {};   // header → key (the merge engine's shape)
   keys.forEach((k) => { if (certMap[k]) mapping[certMap[k]] = k; });
   const nameHeader = certMap['שם מלא'] || certMap[keys[0]] || null;
-  const records = PFS.merge.remapRecords(certList.records, mapping).map((r, i) => {
-    r.__name = nameHeader ? certList.records[i][nameHeader] : '';
-    return r;
-  });
+  const mapped = PFS.merge.remapRecords(certList.records, mapping);
+  const records = certList.records.map((raw, i) => Object.assign({}, raw, mapped[i], { __name: nameHeader ? raw[nameHeader] : '' }));
+  return { records, nameHeader, idHeader: certMap['תעודת זהות'] || null };
+}
+function certPreflightNow() {
+  if (!certList) return { issues: [], clean: [] };
+  const { records, nameHeader, idHeader } = certBuildRecords();
+  return PFS.merge.preflight(records, { nameKey: nameHeader || '__name', idKey: idHeader });
+}
+// three thumbnails before anything is produced: the first row, the longest
+// name (the stress case for the layout) and the last row
+async function certRenderPreviews(host) {
+  if (!host || !certList) return;
+  const { clean } = certPreflightNow();
+  if (!clean.length) { host.innerHTML = '<span class="hint muted">אין שורות תקינות להצגה</span>'; return; }
+  const longest = clean.reduce((a, b) => (String(b.__name || '').length > String(a.__name || '').length ? b : a), clean[0]);
+  const picks = [...new Map([clean[0], longest, clean[clean.length - 1]].map((r) => [r, r])).values()];
+  const baseModels = centerBatchModels(overlay.getElements().map((c) => c.model));
+  host.innerHTML = '';
+  for (const rec of picks) {
+    try {
+      const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), PFS.merge.applyRecord(baseModels, rec), { quality: 'draft' });
+      const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+      const pg = await doc.getPage(1);
+      const vp0 = pg.getViewport({ scale: 1 });
+      const scale = 220 / vp0.width;
+      const vp = pg.getViewport({ scale });
+      const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const fig = document.createElement('figure');
+      const img = document.createElement('img'); img.src = cv.toDataURL('image/png'); img.alt = rec.__name || '';
+      img.title = 'לחיצה להגדלה'; img.addEventListener('click', () => window.open(img.src, '_blank'));
+      const cap = document.createElement('figcaption'); cap.textContent = rec.__name || '—';
+      fig.append(img, cap); host.appendChild(fig);
+      try { doc.destroy(); } catch (e) {}
+    } catch (e) { console.warn('preview failed', e); }
+  }
+  if (!host.children.length) host.innerHTML = '<span class="hint muted">התצוגה המקדימה נכשלה — אפשר להפיק בכל זאת</span>';
+}
+async function certProduce(kind, opts) {
+  if (!certList) return null;
+  const built = certBuildRecords();
+  const nameHeader = built.nameHeader;
+  // never print a blank certificate: rows without a name are skipped
+  const records = PFS.merge.preflight(built.records, { nameKey: nameHeader || '__name', idKey: built.idHeader }).clean;
+  if (!records.length) { PFS.toast('אין שורות עם שם להפקה', 'err'); return null; }
   // every sample stays centred on its spot for every real value
   const baseModels = centerBatchModels(overlay.getElements().map((c) => c.model));
   const prog = certCard && certCard.querySelector('#certProg');

@@ -236,12 +236,33 @@
     }
     return out;
   }
+  // "{שם מלא}" inside any text → the record's value. A certificate sentence
+  // ("מוענקת בזאת ל־{שם מלא} על סיום קורס {שם הקורס}") is one text element
+  // that fills per student while keeping its natural flow. Unknown tokens stay
+  // as typed so a typo is visible, never silently blank.
+  const TOKEN_RE = /\{([^{}]+)\}/g;
+  function fillTokens(text, rec) {
+    if (!text || text.indexOf('{') < 0) return text;
+    return String(text).replace(TOKEN_RE, (m0, t) => {
+      const k = t.trim();
+      if (Object.prototype.hasOwnProperty.call(rec, k) && rec[k] != null && rec[k] !== '') return String(rec[k]);
+      return m0;
+    });
+  }
+  function tokensIn(text) {
+    const out = []; let m;
+    TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(String(text || '')))) out.push(m[1].trim());
+    return [...new Set(out)];
+  }
   function applyRecord(models, record) {
     const rec = enrichRecord(models, record);
     const out = cloneModels(models).map((m) => {
-      if (m.type === 'text' && m.fieldKey && Object.prototype.hasOwnProperty.call(rec, m.fieldKey)) {
+      if (m.type !== 'text') return m;
+      if (m.fieldKey && Object.prototype.hasOwnProperty.call(rec, m.fieldKey)) {
         m = Object.assign({}, m, { text: String(rec[m.fieldKey] ?? '') });
       }
+      if (m.text && m.text.indexOf('{') >= 0) m = Object.assign({}, m, { text: fillTokens(m.text, rec) });
       return m;
     });
     // recompute calculated fields per record with the SAME resolver the
@@ -274,6 +295,34 @@
     return { zip, count: records.length };
   }
 
+  /* preflight(records, {nameKey, idKey}) → { issues: [{row, kind, msg}], clean: records }
+   * The last look before N certificates exist: rows that would print WRONG
+   * (empty name → skipped; bad ID checksum, duplicates, digits in a name →
+   * flagged with the row number so the clerk fixes the sheet, or accepts). */
+  function preflight(records, opts) {
+    const nameKey = opts && opts.nameKey, idKey = opts && opts.idKey;
+    const issues = [], clean = [];
+    const seenName = new Map(), seenId = new Map();
+    records.forEach((r, i) => {
+      const row = i + 2;   // sheet row (1 = header)
+      const name = nameKey ? String(r[nameKey] || '').trim() : '';
+      const id = idKey ? String(r[idKey] || '').trim() : '';
+      if (nameKey && !name) { issues.push({ row, kind: 'empty_name', msg: 'שורה ' + row + ': אין שם — תדולג' }); return; }
+      if (name && /\d/.test(name)) issues.push({ row, kind: 'digits_in_name', msg: 'שורה ' + row + ': ספרות בתוך השם "' + name + '"' });
+      if (idKey) {
+        if (!id) issues.push({ row, kind: 'empty_id', msg: 'שורה ' + row + ' (' + name + '): אין תעודת זהות' });
+        else if (!/^\d{9}$/.test(id) || !israeliIdValid(id)) issues.push({ row, kind: 'bad_id', msg: 'שורה ' + row + ' (' + name + '): ת"ז ' + id + ' לא תקינה' });
+        if (id) { if (seenId.has(id)) issues.push({ row, kind: 'dup_id', msg: 'שורה ' + row + ': אותה ת"ז כמו בשורה ' + seenId.get(id) + ' (' + name + ')' }); else seenId.set(id, row); }
+      }
+      if (name) {
+        const nk = name.replace(/\s+/g, ' ').toLowerCase();
+        if (seenName.has(nk)) issues.push({ row, kind: 'dup_name', msg: 'שורה ' + row + ': "' + name + '" מופיע גם בשורה ' + seenName.get(nk) }); else seenName.set(nk, row);
+      }
+      clean.push(r);
+    });
+    return { issues, clean };
+  }
+
   /* runBatchSingle(...) → { pdf: Uint8Array, count } — every record's page(s)
    * in ONE PDF, in list order: the print-shop / "send to the printer once"
    * form of the same batch. */
@@ -295,5 +344,5 @@
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
+  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, fillTokens, tokensIn, preflight, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
 })(window);

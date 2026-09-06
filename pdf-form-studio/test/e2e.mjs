@@ -3521,6 +3521,74 @@ async function main() {
     check('🎓 refinements: ID/date/signature chips, a long name shrinks to fit on its spot, formats shelf remembers the certificate', okR);
   }
 
+  // ---- certificates: a sentence with {variables}, the pre-flight check and
+  // the three-thumbnail preview before anything is produced ----
+  {
+    const sentRes = await page.evaluate(async () => {
+      const T = window.PFS.__test, M = window.PFS.merge, out = {};
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      // engine: tokens fill from the record, unknown tokens stay visible
+      const filled = M.applyRecord([{ id: 's', type: 'text', kind: 'text', page: 0, fx: 0.1, fy: 0.1, fw: 0.8, fh: 0.05, fontFrac: 0.03, text: 'מוענקת ל־{שם מלא} (ת"ז {תעודת זהות}) — {לא קיים}', align: 'center' }],
+        { 'שם מלא': 'דנה לוי', 'תעודת זהות': '123456782' });
+      out.engine = filled[0].text === 'מוענקת ל־דנה לוי (ת"ז 123456782) — {לא קיים}';
+      out.tokens = JSON.stringify(M.tokensIn('א {שם מלא} ב {שם מלא} ג { ציון }')) === JSON.stringify(['שם מלא', 'ציון']);
+      // pre-flight on a dirty list
+      const pf = M.preflight([
+        { 'שם מלא': 'דנה לוי', 'תעודת זהות': '123456782' },
+        { 'שם מלא': '', 'תעודת זהות': '111111118' },                 // no name → skipped
+        { 'שם מלא': 'רון גל 2', 'תעודת זהות': '123456780' },        // digits in name + bad checksum
+        { 'שם מלא': 'דנה לוי', 'תעודת זהות': '123456782' }          // duplicate name + id
+      ], { nameKey: 'שם מלא', idKey: 'תעודת זהות' });
+      out.pf = { n: pf.clean.length, kinds: pf.issues.map((i) => i.kind).sort() };
+      // the wizard: a sentence on the certificate, list with a blank row → preview + skip
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([842, 595]);
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawText('SENTENCE FIXTURE 2026', { x: 200, y: 480, size: 36, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+      await T.startCertFlow(new File([await d.save()], 'תעודת-משפט.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      const s = T.certPlaceSentence(0, 0.5, 0.5);
+      out.sentence = { wrapped: !!s.model.wrapW, keys: T.certKeys() };
+      T.certPlace(0, 0.5, 0.8, 'שם מלא');
+      document.querySelector('.cert-card #certNext').click();
+      T.certLoadList(M.parseCSV('שם מלא,תעודת זהות,שם הקורס\nישראל ישראלי,123456782,חשמלאות\n,000000018,חשמלאות\nאברהם בן-ציון הלוי מזרחי סגל,987654324,חשמלאות\nרוני שפירא,311862528,חשמלאות'), 'list.csv');
+      out.map = T.certState().map;
+      document.querySelector('.cert-card #certNext').click();
+      const pfNow = T.certPreflightNow();
+      out.pfNow = { n: pfNow.clean.length, issues: pfNow.issues.length };
+      out.stepText = /בדיקה אחרונה/.test(document.querySelector('.cert-card').textContent) && /ידולגו/.test(document.querySelector('.cert-card').textContent);
+      // previews: wait for the thumbnails (first / longest / last)
+      let thumbs = [];
+      for (let i = 0; i < 40 && thumbs.length < 3; i++) { await new Promise((r) => setTimeout(r, 250)); thumbs = [...document.querySelectorAll('.cert-card .cert-thumbs img')]; }
+      out.thumbs = { n: thumbs.length, caps: [...document.querySelectorAll('.cert-card .cert-thumbs figcaption')].map((c) => c.textContent), dataUrls: thumbs.every((im) => /^data:image\/png/.test(im.src)) };
+      const zip = await T.certProduce('zip', { noDownload: true });
+      out.zipNames = Object.keys(window.fflate.unzipSync(zip.bytes)).sort();
+      // the produced page carries the sentence with the student's values (ink in the sentence band)
+      const files = window.fflate.unzipSync(zip.bytes);
+      const doc = await window.pdfjsLib.getDocument({ data: files['רוני שפירא.pdf'].slice(0) }).promise;
+      const p1 = await doc.getPage(1); const vp = p1.getViewport({ scale: 1 });
+      const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const dd = cv.getContext('2d').getImageData(0, Math.round(0.44 * cv.height), cv.width, Math.round(0.14 * cv.height)).data;
+      let ink = 0; for (let i = 0; i < dd.length; i += 4) if (dd[i] < 128) ink++;
+      out.sentenceInk = ink;
+      await T.goHome();
+      for (const x of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /משפט/.test(l.name))) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+      window.PFS.ui.confirm = realConfirm;
+      return out;
+    });
+    const okS = sentRes.engine && sentRes.tokens
+      && sentRes.pf.n === 3 && JSON.stringify(sentRes.pf.kinds) === JSON.stringify(['bad_id', 'digits_in_name', 'dup_id', 'dup_name', 'empty_name'].sort())
+      && sentRes.sentence.wrapped && sentRes.sentence.keys.includes('שם הקורס') && sentRes.sentence.keys.includes('תעודת זהות')
+      && sentRes.map['שם מלא'] === 'שם מלא' && sentRes.map['תעודת זהות'] === 'תעודת זהות' && sentRes.map['שם הקורס'] === 'שם הקורס'
+      && sentRes.pfNow.n === 3 && sentRes.pfNow.issues === 1 && sentRes.stepText
+      && sentRes.thumbs.n === 3 && sentRes.thumbs.dataUrls && sentRes.thumbs.caps[1] === 'אברהם בן-ציון הלוי מזרחי סגל'
+      && JSON.stringify(sentRes.zipNames) === JSON.stringify(['אברהם בן-ציון הלוי מזרחי סגל.pdf', 'ישראל ישראלי.pdf', 'רוני שפירא.pdf'].sort())
+      && sentRes.sentenceInk > 300;
+    if (!okS) console.log('  [cert sentence debug]', JSON.stringify(sentRes));
+    check('🎓 sentence with {variables} fills per student; pre-flight flags bad rows and skips blanks; three previews before producing', okS);
+  }
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

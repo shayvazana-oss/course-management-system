@@ -274,7 +274,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -1919,6 +1919,19 @@ function exRenderSummary(models) {
     el.appendChild(r);
   });
 }
+// whose form is this? the tagged full-name field first; failing that, a name
+// mined from whatever was typed (a person beside "שם:" in free text)
+function studentNameNow() {
+  try {
+    const el = overlay.getElements().find((c2) => c2.model.type === 'text' && c2.model.fieldKey
+      && String(c2.model.text || '').trim() && PFS.vault.matchKey(c2.model.fieldKey) === 'full_name');
+    if (el) return String(el.model.text).trim();
+    const keyed = overlay.currentValues ? overlay.currentValues() : {};
+    const free = overlay.getElements().filter((c2) => c2.model.type === 'text' && !c2.model.fieldKey && String(c2.model.text || '').trim()).map((c2) => c2.model.text).join('\n');
+    const built = buildPersonAndCarry(keyed, free, {});
+    return String((built.person && built.person['שם מלא']) || '').trim();
+  } catch (e) { return ''; }
+}
 // "נספח ו - חשמלאות מוסמכים - ישראל ישראלי.pdf" — the export names itself,
 // so a clerk producing dozens of per-student forms never types a filename.
 function autoExportName() {
@@ -1937,11 +1950,7 @@ function autoExportName() {
       add(facts || (c && c.name));
     }
   } catch (e) {}
-  try {
-    const el = overlay.getElements().find((c2) => c2.model.type === 'text' && c2.model.fieldKey
-      && String(c2.model.text || '').trim() && PFS.vault.matchKey(c2.model.fieldKey) === 'full_name');
-    if (el) add(el.model.text);
-  } catch (e) {}
+  try { add(studentNameNow()); } catch (e) {}
   const joined = (parts.length > 1 ? parts.join(' - ') : parts[0] + '-filled')
     .replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
   return joined || 'filled';
@@ -2019,6 +2028,9 @@ async function exDeliver(preferShare) {
   PFS.toast(shared ? 'הטופס שותף ✓' : 'ה-PDF יוצא בהצלחה', 'ok');
   dirty = false;
   try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
+  // the finished document joins the history under the STUDENT's name, with
+  // its fill — one entry per student, reopening exactly as exported
+  try { saveFilledToHistory(outName); } catch (e) { console.warn('history snapshot failed', e); }
   // a successful export confirms the filled values — feed the learning engine
   // (skipping values that were auto-filled and never touched, so learning
   // can't amplify itself)
@@ -2054,6 +2066,22 @@ async function exDeliver(preferShare) {
   offerCompanions();
 }
 
+// "כל מסמך שאני שומר ישמר כבר עם שם הסטודנט": the export's own name (form -
+// course - student) becomes a history entry carrying the ORIGINAL form bytes
+// plus this student's fill. Two students → two entries; the same student
+// exported twice → one entry, refreshed.
+async function saveFilledToHistory(outName) {
+  if (!PFS.recent || !pdfView.hasDoc()) return;
+  const label = String(outName || '').replace(/\.pdf$/i, '').replace(/-secure$/, '').replace(/-filled$/, '');
+  const fill = overlay.serialize();
+  if (!fill.length) return;
+  // getBytes() is the ORIGINAL form's ArrayBuffer (the export's own bytes are
+  // flattened — reopening must be editable, so the fill rides separately)
+  const bytes = pdfView.getBytes().slice(0);
+  const id = await PFS.recent.save(label + '.pdf', bytes, { fill, label });
+  renderRecent();
+  if (id) cloudPutDoc('recent', id, bytes.slice(0), { name: label + '.pdf', label, fill });
+}
 // ---- export modal wiring ----
 $('exClose') && $('exClose').addEventListener('click', () => closeModal('exportModal'));
 $('exCancel') && $('exCancel').addEventListener('click', () => closeModal('exportModal'));
@@ -4592,7 +4620,7 @@ async function renderRecent(filter) {
   try {
     if (PFS.account && PFS.account.authed()) {
       const local = new Set(docs.map((d) => d.id));
-      PFS.account.fileIndex('recent').forEach((f) => { if (!local.has(f.id)) docs.push({ id: f.id, name: f.name || 'מסמך', ts: f.ts, cloud: true }); });
+      PFS.account.fileIndex('recent').forEach((f) => { if (!local.has(f.id)) docs.push({ id: f.id, name: f.name || 'מסמך', ts: f.ts, cloud: true, label: f.label || '', filled: !!f.fill, fill: f.fill }); });
       docs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
     }
   } catch (e) {}
@@ -4612,8 +4640,10 @@ async function renderRecent(filter) {
   }
   shown.forEach((d) => {
     const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
-    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = (d.cloud ? '☁️ ' : '📄 ') + d.name;
+    const nm = document.createElement('div'); nm.className = 'nm';
+    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + (d.label || d.name);
     if (d.cloud) nm.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
+    else if (d.filled) nm.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
     const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = relDate(d.ts);
     const del = document.createElement('button');
     del.className = 'btn sm ghost'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
@@ -4631,10 +4661,19 @@ async function renderRecent(filter) {
         // history from another computer: fetch the bytes from the user's folder
         PFS.toast('☁️ מוריד מהחשבון שלך…', 'ok', 2500);
         const bytes = await PFS.account.getFile('recent', d.id).catch(() => null);
-        if (bytes) { await PFS.recent.save(d.name, bytes.buffer, { id: d.id, ts: d.ts }); doc = { name: d.name, bytes: bytes.buffer }; }
+        if (bytes) { await PFS.recent.save(d.name, bytes.buffer, { id: d.id, ts: d.ts, fill: d.fill, label: d.label }); doc = { name: d.name, bytes: bytes.buffer, fill: d.fill }; }
       }
-      if (doc && doc.bytes) openPdfFile(new File([doc.bytes], doc.name, { type: 'application/pdf' }));
-      else PFS.toast('הקובץ לא זמין', 'err');
+      if (!(doc && doc.bytes)) { PFS.toast('הקובץ לא זמין', 'err'); return; }
+      // a filled snapshot: the ORIGINAL form comes up with THAT student's fill
+      // (not the form's latest memory), exactly as it was exported
+      const fill = doc.fill;
+      const openName = fill ? doc.name.replace(/\.pdf$/i, '').split(' - ')[0] + '.pdf' : doc.name;
+      await openPdfFile(new File([doc.bytes], openName, { type: 'application/pdf' }));
+      if (fill && pdfView.hasDoc()) {
+        overlay.clearElements(); overlay.applyModels(fill); fieldsPanel.syncValues && fieldsPanel.syncValues(panelValueMap());
+        markDirty(); dirty = false;
+        PFS.toast('✅ נפתח המסמך השמור: ' + (d.label || d.name), 'ok', 3500);
+      }
     });
     list.appendChild(row);
   });

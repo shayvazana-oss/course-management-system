@@ -28,14 +28,22 @@
   // save(name, bytes, opts?) → the doc id (a cloud copy is stored under the
   // same id, so the two sides always agree). opts.id / opts.ts pin a cloud
   // record being brought back to this computer.
+  // opts.fill = the filled state (element models) saved WITH the document —
+  // a finished form for one student is its own history entry, labelled with
+  // the student's name, and reopens exactly as it was exported
   async function save(name, bytes, opts) {
     try {
       const db = await open();
       const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
-      // same name → replace (refresh ts); else insert
+      // same name → replace (refresh ts); else insert. A filled snapshot never
+      // replaces the blank form's entry (different name) but does replace an
+      // earlier snapshot of the same form + same student.
       const dup = all.find((d) => d.name === name);
       const id = (opts && opts.id) || (dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6));
-      await tx(db, 'readwrite', (s) => s.put({ id, name, ts: (opts && opts.ts) || Date.now(), bytes }));
+      const rec = { id, name, ts: (opts && opts.ts) || Date.now(), bytes };
+      if (opts && opts.fill) rec.fill = opts.fill;
+      if (opts && opts.label) rec.label = opts.label;
+      await tx(db, 'readwrite', (s) => s.put(rec));
       const rest = all.filter((d) => d.id !== id && d.name !== name).sort((a, b) => b.ts - a.ts);
       for (const d of rest.slice(CAP - 1)) await tx(db, 'readwrite', (s) => s.delete(d.id));
       db.close();
@@ -50,7 +58,7 @@
       const db = await open();
       const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
       db.close();
-      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts }) => ({ id, name, ts }));
+      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts, label, fill }) => ({ id, name, ts, label: label || '', filled: !!fill }));
     } catch (e) { return []; }
   }
   async function get(id) {

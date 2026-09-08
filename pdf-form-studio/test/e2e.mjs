@@ -3743,6 +3743,73 @@ async function main() {
       && !/[\\/:*?"<>|]/.test(clean);
   }));
 
+  // ---- "כל מסמך שאני שומר ישמר כבר עם שם הסטודנט" ----
+  // every export lands in the history under the student's name, WITH its
+  // fill: two students → two entries, the same student twice → one entry,
+  // and clicking an entry brings the form back exactly as it was exported
+  {
+    const waitBuild = () => page.waitForFunction(
+      () => { const b = document.getElementById('exBusy'); const c = document.getElementById('exCanvas'); return b && !b.classList.contains('on') && c && c.width > 10; },
+      { timeout: 60000 }
+    );
+    const exportAs = async (student) => {
+      await page.evaluate(async (name) => {
+        const T = window.PFS.__test;
+        T.overlay.clearElements();
+        T.overlay.addModelAt('text', 0, { fx: 0.3, fy: 0.3, text: name, fieldKey: 'שם מלא', noEdit: true });
+        T.overlay.addModelAt('text', 0, { fx: 0.3, fy: 0.5, text: '27/03/27', noEdit: true });
+        T.overlay.deselectAll();
+        document.getElementById('exportBtn').click();
+      }, student);
+      await waitBuild();
+      await page.evaluate(() => document.getElementById('exDownload').click());
+      await page.waitForTimeout(700);
+      // the delivery may offer a companion / dialog — dismiss so the next step is clean
+      await page.evaluate(() => { const d = document.getElementById('uiDialog'); if (d && d.classList.contains('show')) { const c = document.getElementById('uiDlgCancel'); c ? c.click() : d.classList.remove('show'); } });
+    };
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      window.confirm = () => true;
+      await window.PFS.recent.clearAll();
+      const { PDFDocument, rgb } = window.PDFLib;
+      const d = await PDFDocument.create();
+      d.addPage([595, 842]).drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+      await T.openPdfFile(new File([await d.save()], 'נספח ו.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+    });
+    await exportAs('ישראל ישראלי');
+    const one = await page.evaluate(async () => (await window.PFS.recent.list()).filter((d) => d.filled).map((d) => d.label));
+    await exportAs('מירב עמיר');
+    await exportAs('מירב עמיר');          // same student again → refreshed, not duplicated
+    const hist = await page.evaluate(async () => (await window.PFS.recent.list()).filter((d) => d.filled).map((d) => d.label));
+    const fileName = await page.evaluate(() => window.PFS.deliver.last && window.PFS.deliver.last.filename);
+    if (!(one.length === 1 && hist.length === 2)) console.log('  [history debug]', JSON.stringify({ one, hist, fileName }));
+    check('every export is saved to the history under the student\'s name (one entry per student)',
+      one.length === 1 && one[0] === 'נספח ו - ישראל ישראלי'
+      && hist.length === 2 && hist.includes('נספח ו - ישראל ישראלי') && hist.includes('נספח ו - מירב עמיר')
+      && fileName === 'נספח ו - מירב עמיר.pdf');
+    // the home list shows the student's entries with a ✅, and clicking one
+    // reopens the ORIGINAL form with THAT student's fill
+    const reopen = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      await T.renderRecent();
+      const rows = [...document.querySelectorAll('#recentList .tmpl-item')];
+      const row = rows.find((r) => r.querySelector('.nm').textContent === '✅ נספח ו - ישראל ישראלי');
+      if (!row) return { row: false, names: rows.map((r) => r.querySelector('.nm').textContent) };
+      T.overlay.clearElements();
+      row.click();
+      await new Promise((r) => setTimeout(r, 2500));
+      const texts = T.overlay.getElements().map((e) => e.model.text);
+      return { row: true, fname: document.getElementById('fname').textContent, texts, hasDoc: T.pdfView.hasDoc() };
+    });
+    if (!(reopen.row && reopen.texts && reopen.texts.includes('ישראל ישראלי'))) console.log('  [reopen debug]', JSON.stringify(reopen));
+    check('clicking a saved student document reopens the form with that student\'s fill',
+      reopen.row === true && reopen.hasDoc && reopen.texts.includes('ישראל ישראלי') && reopen.texts.includes('27/03/27')
+      && !reopen.texts.includes('מירב עמיר') && /נספח ו/.test(reopen.fname));
+    await page.evaluate(async () => { const T = window.PFS.__test; T.overlay.clearElements(); T.fieldsPanel.clear(); await window.PFS.recent.clearAll(); T.setFileName('filled'); });
+  }
+
   // "מה הבעיה שזה יירד שורה מתחת לשורה? למה זה חייב להימתח לרוחב?" — the cell
   // is a hard wall: ANY mutation (enlarging, typing on the form) wraps the
   // value line-under-line inside the cell instead of stretching past it

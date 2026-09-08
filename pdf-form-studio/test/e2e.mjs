@@ -3743,6 +3743,62 @@ async function main() {
       && !/[\\/:*?"<>|]/.test(clean);
   }));
 
+  // ---- "כשאני ממלא בתבניות המוכנות מראש הוא מדביק את זה בפונט ממש קטן" ----
+  // a template / auto-memory remembered with tiny fills (before the readable
+  // floor, or shrunk by an older fitter) must come back at the document's
+  // handwriting size — spacious rows lifted to the floor, dense rows capped so
+  // they never pile up, a Hebrew value's right edge planted, larger values
+  // untouched. Both on the "החל" button and on the silent reopen of a form.
+  {
+    const tplRes = await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      const { PDFDocument, rgb } = window.PDFLib;
+      const d = await PDFDocument.create();
+      d.addPage([595, 842]).drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+      const bytes = await d.save();
+      await T.openPdfFile(new File([bytes.slice(0)], 'tiny-tpl.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      const fp = T.getFp();
+      const tiny = (extra) => Object.assign({ type: 'text', kind: 'text', page: 0, fw: 0.15, fh: 0.012, fontFrac: 0.008, color: '#111111', bold: false, align: 'right' }, extra);
+      const els = [
+        tiny({ fx: 0.30, fy: 0.20, text: 'דנה לוי', fieldKey: 'שם מלא' }),   // spacious → lifted to the floor
+        tiny({ fx: 0.30, fy: 0.50, text: 'שורה א', fieldKey: 'r1' }),              // dense pair: 0.012 apart
+        tiny({ fx: 0.30, fy: 0.512, text: 'שורה ב', fieldKey: 'r2' }),
+        tiny({ fx: 0.30, fy: 0.70, text: 'ערך גדול', fontFrac: 0.019 })             // already readable → untouched
+      ];
+      // what the tiny name measured before the lift → its right edge must survive
+      const probe = T.overlay.addModelAt('text', 0, { fx: 0.30, fy: 0.20, fontFrac: 0.008, align: 'right', text: 'דנה לוי', noEdit: true });
+      const rightEdgeBefore = probe.model.fx + probe.model.fw;
+      T.overlay.clearElements();
+      // 1) the explicit "החל" button
+      const arr = window.PFS.store.get('templates', []) || [];
+      arr.unshift({ id: '__tiny_tpl__', name: '__tiny_tpl__', ts: Date.now(), elements: els, rotations: {}, removePages: [], pageOrder: null, fp, auto: true });
+      window.PFS.store.set('templates', arr);
+      T.templates.apply('__tiny_tpl__');
+      await new Promise((r) => setTimeout(r, 200));
+      const size = (t) => { const c = T.overlay.getElements().find((e) => e.model.text === t); return c ? c.model : null; };
+      const a = size('דנה לוי'), b1 = size('שורה א'), b2 = size('שורה ב'), big = size('ערך גדול');
+      const rightEdgeA = a ? a.fx + a.fw : null;
+      const applied = { a: a && a.fontFrac, b1: b1 && b1.fontFrac, b2: b2 && b2.fontFrac, big: big && big.fontFrac, rightEdgeA, rightEdgeBefore };
+      // 2) the silent reopen path: same form again → auto-memory → detection
+      await T.openPdfFile(new File([bytes.slice(0)], 'tiny-tpl.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 2500));
+      const a2c = T.overlay.getElements().find((e) => e.model.fieldKey === 'שם מלא'); const a2 = a2c && a2c.model, b12 = size('שורה א');
+      const reopened = { a: a2 && a2.fontFrac, b1: b12 && b12.fontFrac, n: T.overlay.getElements().length, texts: T.overlay.getElements().map((e) => e.model.text) };
+      window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => t.id !== '__tiny_tpl__' && t.name !== '__tiny_tpl__'));
+      T.overlay.clearElements(); T.fieldsPanel.clear();
+      return { applied, reopened };
+    });
+    const A = tplRes.applied, R = tplRes.reopened;
+    const near = (v, t, tol) => v != null && Math.abs(v - t) <= tol;
+    const ok = near(A.a, 0.0135, 0.0005) && near(A.b1, 0.0096, 0.0004) && near(A.b2, 0.0096, 0.0004) && near(A.big, 0.019, 1e-6)
+      && near(A.rightEdgeA, A.rightEdgeBefore, 0.004)
+      && R.a != null && R.a >= 0.0135 - 0.0005 && near(R.b1, 0.0096, 0.0004) && R.n >= 4;
+    if (!ok) console.log('  [tiny template debug]', JSON.stringify(tplRes));
+    check('templates: tiny remembered fills come back at the readable size (dense rows capped, right edge kept, large untouched), on apply AND on reopen', ok);
+  }
+
   // ---- "כל מסמך שאני שומר ישמר כבר עם שם הסטודנט" ----
   // every export lands in the history under the student's name, WITH its
   // fill: two students → two entries, the same student twice → one entry,

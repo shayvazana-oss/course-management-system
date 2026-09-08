@@ -8336,7 +8336,7 @@ const assets = PFS.createAssetsLibrary({
 const templates = PFS.createTemplates({
   getElements: () => overlay.serialize(),
   // applying a template replaces the current layout (avoids stacking duplicates)
-  applyModels: (models) => { overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(models); },
+  applyModels: (models) => { overlay.clearElements(); fieldsPanel.clear(); overlay.applyModels(models); liftSmallFills('template'); },
   // page rotations & deletions travel with the template so a straightened/
   // trimmed form reopens the same way
   getRotations: () => pdfView.getRotations(),
@@ -8433,7 +8433,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, liftSmallFills, templates, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -8796,6 +8796,52 @@ function uniformizeHandwriting(taggedOnly) {
 PFS.uniformizeHandwriting = uniformizeHandwriting;
 PFS.docUniformSize = docUniformSize;
 
+/* liftSmallFills() — a saved template / auto-memory replays its elements
+ * EXACTLY as stored, and layouts remembered before the readable floor existed
+ * (or shrunk by an older fitter) carry fills of 6-9pt. They came back on the
+ * page tiny and the clerk had to enlarge every one by hand ("כשאני ממלא
+ * בתבניות המוכנות מראש הוא מדביק את זה בפונט ממש קטן"). Values below the
+ * fitter's own floor (85% of the readable size) are raised to the document's
+ * handwriting size — never shrunk — with the same dense-row cap detection
+ * applies, so a lifted table row never piles onto the row beneath it. The
+ * right edge of a Hebrew value stays planted. Idempotent and cheap: runs
+ * after every template apply and again once detection knows the form. */
+function liftSmallFills(reason) {
+  const els = overlay.getElements().filter(isPlainTextEl);
+  if (!els.length) return 0;
+  const uni = Math.max(MIN_FILL_FRAC, (lastDet && lastDet.uniFontFrac) || 0);
+  const floor = MIN_FILL_FRAC * 0.85 - 1e-6;
+  const fieldFF = {};
+  if (lastDet && lastDet.fields) lastDet.fields.forEach((f) => { if (f.type === 'text' && f.fieldKey && f.fontFrac) fieldFF[f.fieldKey] = f.fontFrac; });
+  let changed = 0;
+  els.forEach((c) => {
+    const m = c.model;
+    if ((m.fontFrac || 0) >= floor) return;
+    let cap = uni;
+    // dense rows: the nearest value above OR below in the same column bounds
+    // the size (both directions — a lifted last row must not climb onto the
+    // row above it either)
+    let pitch = Infinity;
+    els.forEach((o) => {
+      if (o === c || o.model.page !== m.page) return;
+      const dy = Math.abs(o.model.fy - m.fy);
+      if (dy > 0.004 && dy < pitch && o.model.fx < m.fx + (m.fw || 0) && o.model.fx + (o.model.fw || 0) > m.fx) pitch = dy;
+    });
+    if (pitch < 0.028) cap = Math.min(cap, Math.max(0.0095, pitch * 0.8));
+    // the detected field's own (already pitch-capped) size is a hard ceiling
+    if (m.fieldKey && fieldFF[m.fieldKey]) cap = Math.min(cap, Math.max(fieldFF[m.fieldKey], m.fontFrac || 0));
+    if (cap <= (m.fontFrac || 0) + 0.0003) return;
+    const oldW = m.fw, oldWrap = m.wrapW;
+    m.fontFrac = cap;
+    c.layout();
+    if (m.align === 'right' && isFinite(oldW) && !m.wrapW && !oldWrap) { m.fx += (oldW - m.fw); c.layout(); }
+    changed++;
+  });
+  if (changed) { console.info('[fills] lifted', changed, 'small values to readable size (' + (reason || '') + ')'); markDirty(); }
+  return changed;
+}
+PFS.liftSmallFills = liftSmallFills;
+
 // heal learning slots poisoned before the bare-'שם' guard existed
 try { const n = PFS.patterns.purgePersonValues(); if (n) console.info('[patterns] purged', n, 'person-name values from learned slots'); } catch (e) {}
 
@@ -8878,6 +8924,7 @@ async function runDetection(force) {
       lastDetFromCache = true;
       try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
       const nCa = fieldsPanel.show(cached, vaultPrefill(cached));
+      try { liftSmallFills('cached-detect'); } catch (e) {}
       PFS.toast(nCa
         ? `⚡ טופס מוכר — נפתח מיידית, ${nCa} שדות מולאו אוטומטית`
         : '⚡ טופס מוכר — נפתח מיידית (זיהוי מהזיכרון)', 'ok');
@@ -8900,6 +8947,7 @@ async function runDetection(force) {
     detCachePut(currentFp, det);   // next open of this form is instant
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
+    try { liftSmallFills('detect'); } catch (e) {}
     if (det.tier === 'scanned') {
       // A scan has no text layer, so the normal detector finds nothing — but
       // OCR can read it. Waiting for the user to discover a button left whole

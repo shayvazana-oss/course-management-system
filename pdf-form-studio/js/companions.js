@@ -94,5 +94,12 @@
     save(all().map((r) => (r.id === id ? Object.assign({}, r, obj) : r)));
   }
 
-  PFS.companions = { add, remove, listFor, all, patch, getBytes: readBytes };
+  // bring a companion's bytes back from the cloud (its record already rides in the vault)
+  async function restoreBytes(id, bytes) { await putBytes(id, bytes); }
+  async function clearAll() {
+    for (const r of all()) { try { await dropBytes(r.id); } catch (e) {} }
+    save([]);
+  }
+
+  PFS.companions = { add, remove, listFor, all, patch, getBytes: readBytes, restoreBytes, clearAll };
 })(window);

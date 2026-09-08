@@ -25,18 +25,25 @@
     });
   }
 
-  async function save(name, bytes) {
+  // save(name, bytes, opts?) → the doc id (a cloud copy is stored under the
+  // same id, so the two sides always agree). opts.id / opts.ts pin a cloud
+  // record being brought back to this computer.
+  async function save(name, bytes, opts) {
     try {
       const db = await open();
       const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
       // same name → replace (refresh ts); else insert
       const dup = all.find((d) => d.name === name);
-      const id = dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6);
-      await tx(db, 'readwrite', (s) => s.put({ id, name, ts: Date.now(), bytes }));
-      const rest = all.filter((d) => d.id !== id).sort((a, b) => b.ts - a.ts);
+      const id = (opts && opts.id) || (dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6));
+      await tx(db, 'readwrite', (s) => s.put({ id, name, ts: (opts && opts.ts) || Date.now(), bytes }));
+      const rest = all.filter((d) => d.id !== id && d.name !== name).sort((a, b) => b.ts - a.ts);
       for (const d of rest.slice(CAP - 1)) await tx(db, 'readwrite', (s) => s.delete(d.id));
       db.close();
-    } catch (e) { /* private-mode / quota — recents are a bonus, never block */ }
+      return id;
+    } catch (e) { return null; /* private-mode / quota — recents are a bonus, never block */ }
+  }
+  async function clearAll() {
+    try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); db.close(); } catch (e) {}
   }
   async function list() {
     try {
@@ -62,5 +69,5 @@
     } catch (e) { return false; }
   }
 
-  PFS.recent = { save, list, get, remove };
+  PFS.recent = { save, list, get, remove, clearAll };
 })(window);

@@ -84,6 +84,13 @@
       if (!obj || typeof obj !== 'object') return false;
       try { Object.keys(obj).forEach((k) => { if (k.indexOf(PREFIX) === 0) backend.set(k, obj[k]); }); return true; }
       catch (e) { console.warn('[store] restore failed', e); return false; }
+    },
+    // wipe every app key except the ones listed (account switch on a shared
+    // computer: the next person must not inherit the previous one's data)
+    clear(keep) {
+      const keepSet = new Set((keep || []).map((k) => PREFIX + k));
+      try { backend.keys().forEach((k) => { if (k && k.indexOf(PREFIX) === 0 && !keepSet.has(k)) backend.remove(k); }); return true; }
+      catch (e) { return false; }
     }
   };
 

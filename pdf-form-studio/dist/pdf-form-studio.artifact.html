@@ -1280,6 +1280,16 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   </div>
 </div>
 
+<!-- the login gate (shown at start when the operator set requireLogin) -->
+<div class="modal-back" id="loginModal">
+  <div class="modal" style="max-width:420px">
+    <header>👤 התחברות ל-Fillo</header>
+    <div class="m-body">
+      <div class="hint" style="margin-bottom:10px">כל עובד/ת עובד/ת בחשבון משלו: הפרטים, הטפסים וההיסטוריה נשמרים אוטומטית וזמינים בכל מחשב.</div>
+      <div id="loginBody"><div class="hint muted">טוען…</div></div>
+    </div>
+  </div>
+</div>
 <div class="modal-back" id="libModal">
   <div class="modal" style="max-width:520px">
     <header>📚 המאגר — הטפסים הקבועים שלכם</header>
@@ -1393,7 +1403,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   /* Cloud accounts (Supabase). Operator sets these ONCE for the whole product;
      then every user just signs up / logs in. Empty = accounts UI stays in
      "not configured" mode (backup/restore + optional sync.js still work). */
-  window.PFS_SUPABASE = { url: '', anonKey: '' };
+  window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false };
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = null; /* OCR omitted from single-file build */
   window.PFS_SINGLE_FILE = true; /* no service worker / manifest here */
@@ -1489,6 +1499,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       if (!obj || typeof obj !== 'object') return false;
       try { Object.keys(obj).forEach((k) => { if (k.indexOf(PREFIX) === 0) backend.set(k, obj[k]); }); return true; }
       catch (e) { console.warn('[store] restore failed', e); return false; }
+    },
+    // wipe every app key except the ones listed (account switch on a shared
+    // computer: the next person must not inherit the previous one's data)
+    clear(keep) {
+      const keepSet = new Set((keep || []).map((k) => PREFIX + k));
+      try { backend.keys().forEach((k) => { if (k && k.indexOf(PREFIX) === 0 && !keepSet.has(k)) backend.remove(k); }); return true; }
+      catch (e) { return false; }
     }
   };
 
@@ -1524,18 +1541,25 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     });
   }
 
-  async function save(name, bytes) {
+  // save(name, bytes, opts?) → the doc id (a cloud copy is stored under the
+  // same id, so the two sides always agree). opts.id / opts.ts pin a cloud
+  // record being brought back to this computer.
+  async function save(name, bytes, opts) {
     try {
       const db = await open();
       const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
       // same name → replace (refresh ts); else insert
       const dup = all.find((d) => d.name === name);
-      const id = dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6);
-      await tx(db, 'readwrite', (s) => s.put({ id, name, ts: Date.now(), bytes }));
-      const rest = all.filter((d) => d.id !== id).sort((a, b) => b.ts - a.ts);
+      const id = (opts && opts.id) || (dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6));
+      await tx(db, 'readwrite', (s) => s.put({ id, name, ts: (opts && opts.ts) || Date.now(), bytes }));
+      const rest = all.filter((d) => d.id !== id && d.name !== name).sort((a, b) => b.ts - a.ts);
       for (const d of rest.slice(CAP - 1)) await tx(db, 'readwrite', (s) => s.delete(d.id));
       db.close();
-    } catch (e) { /* private-mode / quota — recents are a bonus, never block */ }
+      return id;
+    } catch (e) { return null; /* private-mode / quota — recents are a bonus, never block */ }
+  }
+  async function clearAll() {
+    try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); db.close(); } catch (e) {}
   }
   async function list() {
     try {
@@ -1561,7 +1585,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     } catch (e) { return false; }
   }
 
-  PFS.recent = { save, list, get, remove };
+  PFS.recent = { save, list, get, remove, clearAll };
 })(window);
 
 </script>
@@ -1762,7 +1786,54 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     return true;
   }
 
-  PFS.account = { cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
+  // ---- files (the user's documents: history, certificate formats, appendices) --
+  // Bytes live in a PRIVATE Storage bucket ('docs'), one folder per user
+  // (`<user id>/<kind>/<id>.pdf`), guarded by storage policies so a user can
+  // only ever touch their own folder. The index of what exists rides in the
+  // vault (store key 'cloud_files'), so it syncs with everything else.
+  const BUCKET = 'docs';
+  function filePath(kind, id) { return user().id + '/' + kind + '/' + id + '.pdf'; }
+  async function putFile(kind, id, bytes, meta) {
+    if (!authed()) return false;
+    await ensureFresh();
+    const c = cfg();
+    const res = await fetch(c.url + '/storage/v1/object/' + BUCKET + '/' + filePath(kind, id), {
+      method: 'POST',
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
+      body: bytes
+    });
+    if (!res.ok) throw new Error('HTTP_' + res.status);
+    // index entry (deduped by kind+id)
+    const idx = (store.get('cloud_files', []) || []).filter((f) => !(f.kind === kind && f.id === id));
+    idx.push(Object.assign({ kind, id, ts: Date.now(), size: bytes.byteLength || bytes.length || 0 }, meta || {}));
+    store.set('cloud_files', idx.slice(-120));
+    return true;
+  }
+  async function getFile(kind, id) {
+    if (!authed()) return null;
+    await ensureFresh();
+    const c = cfg();
+    const res = await fetch(c.url + '/storage/v1/object/authenticated/' + BUCKET + '/' + filePath(kind, id), {
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token }
+    });
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  async function deleteFile(kind, id) {
+    if (!authed()) return false;
+    await ensureFresh();
+    const c = cfg();
+    await fetch(c.url + '/storage/v1/object/' + BUCKET, {
+      method: 'DELETE',
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: [filePath(kind, id)] })
+    }).catch(() => {});
+    store.set('cloud_files', (store.get('cloud_files', []) || []).filter((f) => !(f.kind === kind && f.id === id)));
+    return true;
+  }
+  function fileIndex(kind) { return (store.get('cloud_files', []) || []).filter((f) => !kind || f.kind === kind); }
+
+  PFS.account = { cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
 })(window);
 
 </script>
@@ -4000,7 +4071,14 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     save(all().map((r) => (r.id === id ? Object.assign({}, r, obj) : r)));
   }
 
-  PFS.companions = { add, remove, listFor, all, patch, getBytes: readBytes };
+  // bring a companion's bytes back from the cloud (its record already rides in the vault)
+  async function restoreBytes(id, bytes) { await putBytes(id, bytes); }
+  async function clearAll() {
+    for (const r of all()) { try { await dropBytes(r.id); } catch (e) {} }
+    save([]);
+  }
+
+  PFS.companions = { add, remove, listFor, all, patch, getBytes: readBytes, restoreBytes, clearAll };
 })(window);
 
 </script>
@@ -4144,7 +4222,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     if (!bytes || !bytes.byteLength) throw new Error('קובץ ריק');
     if (bytes.byteLength > MAX_BYTES) throw new Error('הקובץ גדול מדי למאגר (עד 15MB)');
     const clean = String(name || 'מסמך').replace(/\.pdf$/i, '').trim() || 'מסמך';
-    const rec = { id: uid(), name: clean, bytes, size: bytes.byteLength, added: Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '' };
+    // extra.id / extra.added pin a cloud record being brought back to this computer
+    const rec = { id: (extra && extra.id) || uid(), name: clean, bytes, size: bytes.byteLength, added: (extra && extra.added) || Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '' };
     const db = await open();
     await tx(db, 'readwrite', (s) => s.put(rec));
     return { id: rec.id, name: rec.name };
@@ -4182,8 +4261,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
     const db = await open();
     await tx(db, 'readwrite', (s) => s.delete(id));
   }
+  async function clearAll() {
+    try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); } catch (e) {}
+  }
 
-  PFS.library = { add, list, get, rename, remove };
+  PFS.library = { add, list, get, rename, remove, clearAll };
 })(window);
 
 </script>
@@ -8316,7 +8398,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -8986,10 +9068,12 @@ $('compInput') && $('compInput').addEventListener('change', async (e) => {
   if (!f) return;
   if (f.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   try {
+    const compBytes = await f.arrayBuffer();
     const rec = await PFS.companions.add({
       ownerFp: currentFp, ownerName: currentFileName,
-      name: f.name, bytes: await f.arrayBuffer()
+      name: f.name, bytes: compBytes
     });
+    cloudPutDoc('comp', rec.id, compBytes.slice(0), { name: rec.name });
     renderCompanions();
     renderExportCompanions();
     PFS.toast('"' + rec.name + '" קושר לטופס — יוצע אוטומטית בכל מילוי ✓', 'ok');
@@ -9032,7 +9116,11 @@ async function openPdfFile(file) {
     $('exportFlatBtn') && ($('exportFlatBtn').disabled = false);
     $('fillAllBtn').disabled = false;
     currentFileName = file.name.replace(/\.pdf$/i, '');
-    PFS.recent && PFS.recent.save(file.name, buf.slice(0)).then(() => renderRecent());
+    // history: local first, then the user's private cloud folder (if logged in)
+    PFS.recent && PFS.recent.save(file.name, buf.slice(0)).then((id) => {
+      renderRecent();
+      if (id) cloudPutDoc('recent', id, buf.slice(0), { name: file.name });
+    });
     PFS.toast('הטופס נטען — ' + pdfView.numPages() + ' עמודים', 'ok');
     // page navigator: only worth showing on multi-page docs
     buildPageNav();
@@ -10833,6 +10921,7 @@ function renderCourseGrid(c) {
         const b = pdfView.getBytes();
         const copy = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
         libId = (await PFS.library.add(currentFileName, copy)).id;
+        cloudPutDoc('lib', libId, copy.slice(0), { name: currentFileName });
       } else libId = hit.id;
     } catch (e) { console.warn(e); }
     const ok = C.addForm(c.id, { name: currentFileName, fp: currentFp, libId });
@@ -11818,7 +11907,9 @@ async function certProduce(kind, opts) {
       const clean = String(currentFileName || '').replace(/-filled$/, '').trim();
       const have = await PFS.library.list();
       if (clean && !have.some((d) => d.kind === 'cert' && d.name === clean)) {
-        await PFS.library.add(clean, pdfView.getBytes().slice(0), { kind: 'cert' });
+        const bytes = pdfView.getBytes().slice(0);
+        const rec = await PFS.library.add(clean, bytes, { kind: 'cert' });
+        cloudPutDoc('lib', rec.id, bytes, { name: clean, libKind: 'cert' });
       }
     } catch (e) {}
   } catch (e) {
@@ -12232,7 +12323,9 @@ syncAutoPullOnLoad();
 // ---- accounts + automatic cloud save (js/account.js) -------------------
 const ACCT = () => PFS.account;
 let acctSaveTimer = null, acctBusy = false;
-function acctStatus(t, kind) { const el = $('acctStatus'); if (el) { el.textContent = t || ''; el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--ok,#1a7f4b)' : 'var(--ink-3)'); } }
+function acctStatus(t, kind) {
+  document.querySelectorAll('.acct-status').forEach((el) => { el.textContent = t || ''; el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--ok,#1a7f4b)' : 'var(--ink-3)'); });
+}
 function scheduleAccountSave() {
   if (!ACCT().authed()) return;
   clearTimeout(acctSaveTimer);
@@ -12241,8 +12334,68 @@ function scheduleAccountSave() {
     catch (e) { acctStatus('שמירה בענן נכשלה — בדקו חיבור', 'err'); }
   }, 2000);
 }
-function renderAccount() {
-  const body = $('acctBody'); if (!body) return;
+// ---- the user's documents in their private cloud folder --------------------
+// Every document that matters rides along: history (recent), the certificate
+// shelf / library (lib), linked appendices (comp). Uploads are fire-and-forget
+// (local always wins first); downloads happen on login (library, appendices)
+// or on click (history).
+function cloudPutDoc(kind, id, bytes, meta) {
+  try {
+    if (!ACCT().authed() || !bytes || !id) return;
+    ACCT().putFile(kind, id, bytes, meta || {}).then(() => acctStatus('נשמר בענן ✓ ' + new Date().toLocaleTimeString('he-IL'), 'ok'))
+      .catch((e) => { console.warn('cloud put failed', e); acctStatus('שמירת קובץ בענן נכשלה', 'err'); });
+  } catch (e) {}
+}
+async function cloudHydrate() {
+  if (!ACCT().authed()) return;
+  try {
+    const lib = await PFS.library.list(); const have = new Set(lib.map((d) => d.id));
+    for (const f of ACCT().fileIndex('lib')) {
+      if (have.has(f.id)) continue;
+      const bytes = await ACCT().getFile('lib', f.id); if (!bytes) continue;
+      await PFS.library.add(f.name || 'מסמך', bytes.buffer, { id: f.id, added: f.ts, kind: f.libKind || '' });
+    }
+    for (const f of ACCT().fileIndex('comp')) {
+      const has = await PFS.companions.getBytes(f.id); if (has) continue;
+      const bytes = await ACCT().getFile('comp', f.id); if (bytes) await PFS.companions.restoreBytes(f.id, bytes.buffer);
+    }
+  } catch (e) { console.warn('cloud hydrate failed', e); }
+  renderRecent(); try { renderLibrary(); } catch (e) {}
+}
+// a shared computer: the next person must not see the previous one's data
+async function wipeLocalForUserSwitch() {
+  try { closeCertWizard(); } catch (e) {}
+  if (pdfView.hasDoc()) { try { await goHomeSilently(); } catch (e) {} }
+  PFS.store.clear(['acct:cfg', 'acct:session', 'acct:last_user', 'sync:cfg', 'onboarded', 'tour_done', 'export_quality']);
+  try { await PFS.recent.clearAll(); } catch (e) {}
+  try { await PFS.library.clearAll(); } catch (e) {}
+  try { await PFS.companions.clearAll(); } catch (e) {}
+  refreshAllFromStore(); renderRecent(); try { renderLibrary(); } catch (e) {} try { renderCourses(); } catch (e) {}
+}
+async function goHomeSilently() {
+  const c = PFS.ui.confirm; PFS.ui.confirm = async () => true;
+  try { await goHome(); } finally { PFS.ui.confirm = c; }
+}
+// cloud copies follow local deletions
+(function () {
+  const wrapDel = (mod, fnName, kind) => {
+    const orig = mod[fnName].bind(mod);
+    mod[fnName] = async function (id) { const r = await orig(id); try { if (ACCT().authed()) await ACCT().deleteFile(kind, id); } catch (e) {} return r; };
+  };
+  if (PFS.library) wrapDel(PFS.library, 'remove', 'lib');
+  if (PFS.companions) wrapDel(PFS.companions, 'remove', 'comp');
+})();
+// the login gate: with requireLogin baked in, Fillo opens on the sign-in
+// screen and nothing else is usable until a person is signed in
+function loginRequired() { const b = window.PFS_SUPABASE || {}; return !!(b.requireLogin && ACCT().configured()); }
+function showLoginGate() {
+  const m = $('loginModal'); if (!m) return;
+  renderAccount($('loginBody'));
+  m.classList.add('show');
+}
+function hideLoginGate() { const m = $('loginModal'); if (m) m.classList.remove('show'); }
+function renderAccount(target) {
+  const body = target || $('acctBody'); if (!body) return;
   if (!ACCT().configured()) {
     body.innerHTML = '<div class="hint muted">סנכרון חשבונות בענן עדיין לא הופעל למוצר. כשתחברו Supabase — כל משתמש יתחבר עם אימייל וסיסמה, והכול יישמר וייטען אוטומטית בכל מכשיר.</div>' +
       '<details style="margin-top:6px"><summary class="hint" style="cursor:pointer">הפעלה (למפעיל) ⓘ</summary>' +
@@ -12255,43 +12408,67 @@ function renderAccount() {
     });
     return;
   }
+  const q = (id) => body.querySelector('#' + id);   // scoped: the same form renders in the settings card AND the login gate
   if (ACCT().authed()) {
     const u = ACCT().user() || {};
     body.innerHTML = '<div class="hint">מחובר/ת כ־<b dir="ltr">' + (u.email || '—') + '</b></div>' +
-      '<div class="hint muted">הכול נשמר בענן אוטומטית וייטען בכל מכשיר שתתחברו בו.</div>' +
+      '<div class="hint muted">הכול נשמר בענן אוטומטית — פרטים, טפסים, היסטוריה — וזמין בכל מחשב שתתחברו בו.</div>' +
       '<div class="row" style="margin-top:6px"><button class="btn sm" id="acctSaveNow" style="flex:1">שמור עכשיו</button><button class="btn sm ghost" id="acctOut" style="flex:1">התנתק</button></div>' +
-      '<div class="hint" id="acctStatus" style="margin-top:6px"></div>';
-    $('acctSaveNow').addEventListener('click', async () => { acctStatus('שומר…'); try { await ACCT().saveVault(); acctStatus('נשמר בענן ✓', 'ok'); } catch (e) { acctStatus('השמירה נכשלה', 'err'); } });
-    $('acctOut').addEventListener('click', () => { ACCT().signOut(); renderAccount(); PFS.toast('התנתקת', 'ok'); });
+      '<div class="hint acct-status" style="margin-top:6px"></div>';
+    q('acctSaveNow').addEventListener('click', async () => { acctStatus('שומר…'); try { await ACCT().saveVault(); acctStatus('נשמר בענן ✓', 'ok'); } catch (e) { acctStatus('השמירה נכשלה', 'err'); } });
+    q('acctOut').addEventListener('click', () => acctSignOut());
     return;
   }
-  body.innerHTML = '<div class="field"><label>אימייל</label><input id="acctEmail" type="email" dir="ltr" placeholder="you@email.com" /></div>' +
-    '<div class="field"><label>סיסמה</label><input id="acctPass" type="password" dir="ltr" placeholder="לפחות 6 תווים" /></div>' +
+  body.innerHTML = '<div class="field"><label>אימייל</label><input id="acctEmail" type="email" dir="ltr" placeholder="you@email.com" autocomplete="username" /></div>' +
+    '<div class="field"><label>סיסמה</label><input id="acctPass" type="password" dir="ltr" placeholder="לפחות 6 תווים" autocomplete="current-password" /></div>' +
     '<div class="row"><button class="btn sm primary" id="acctIn" style="flex:1">התחבר</button><button class="btn sm" id="acctUp" style="flex:1">הרשמה</button></div>' +
-    '<div class="hint" id="acctStatus" style="margin-top:6px"></div>';
-  const email = () => $('acctEmail').value.trim(), pass = () => $('acctPass').value;
-  async function afterAuth() {
-    acctStatus('טוען את הנתונים שלך…');
-    try { const had = await ACCT().loadVault(); if (had) { refreshAllFromStore(); } else { await ACCT().saveVault(); } }
-    catch (e) { /* keep local data; will auto-save */ }
-    renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הנתונים שלך מסונכרנים', 'ok');
-  }
-  $('acctIn').addEventListener('click', async () => {
+    '<div class="hint acct-status" style="margin-top:6px"></div>';
+  const email = () => q('acctEmail').value.trim(), pass = () => q('acctPass').value;
+  q('acctIn').addEventListener('click', async () => {
     if (acctBusy) return; acctBusy = true; acctStatus('מתחבר…');
-    try { await ACCT().signIn(email(), pass()); await afterAuth(); }
+    try { await ACCT().signIn(email(), pass()); await acctAfterAuth(); }
     catch (e) { acctStatus((e.message === 'BAD_CREDENTIALS') ? 'אימייל או סיסמה שגויים' : 'ההתחברות נכשלה', 'err'); }
     finally { acctBusy = false; }
   });
-  $('acctUp').addEventListener('click', async () => {
+  q('acctPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') q('acctIn').click(); });
+  q('acctUp').addEventListener('click', async () => {
     if (acctBusy) return; acctBusy = true; acctStatus('יוצר חשבון…');
-    try { const r = await ACCT().signUp(email(), pass()); if (r.needsConfirm) { acctStatus('נשלח אליך מייל אימות — אשרו ואז התחברו.', 'ok'); } else { await afterAuth(); } }
+    try { const r = await ACCT().signUp(email(), pass()); if (r.needsConfirm) { acctStatus('נשלח אליך מייל אימות — אשרו ואז התחברו.', 'ok'); } else { await acctAfterAuth(); } }
     catch (e) { acctStatus(/already/i.test(e.message) ? 'האימייל כבר רשום — התחברו' : ('ההרשמה נכשלה: ' + e.message), 'err'); }
     finally { acctBusy = false; }
   });
 }
+// after sign-in: a DIFFERENT person than the last one on this computer gets
+// a clean slate first (never inherit someone else's forms or history), then
+// the account's vault is loaded and the documents hydrated
+async function acctAfterAuth() {
+  acctStatus('טוען את הנתונים שלך…');
+  const uid = (ACCT().user() || {}).id || '';
+  const last = PFS.store.get('acct:last_user', '');
+  if (last && last !== uid) await wipeLocalForUserSwitch();
+  PFS.store.set('acct:last_user', uid);
+  try { const had = await ACCT().loadVault(); if (had) refreshAllFromStore(); else await ACCT().saveVault(); }
+  catch (e) { /* keep local data; will auto-save */ }
+  await cloudHydrate();
+  try { renderCourses(); } catch (e) {}
+  hideLoginGate();
+  renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הפרטים וההיסטוריה שלך זמינים', 'ok');
+}
+async function acctSignOut() {
+  try { await ACCT().saveVault(); } catch (e) {}
+  ACCT().signOut();
+  // a shared computer: sign-out leaves nothing of this person behind
+  await wipeLocalForUserSwitch();
+  PFS.store.remove('acct:last_user');
+  renderAccount();
+  PFS.toast('התנתקת — המחשב הזה נקי מהנתונים שלך', 'ok');
+  if (loginRequired()) showLoginGate();
+}
 async function acctAutoLoadOnStart() {
-  if (!ACCT().configured() || !ACCT().authed()) { renderAccount(); return; }
+  if (!ACCT().configured()) { renderAccount(); return; }
+  if (!ACCT().authed()) { renderAccount(); if (loginRequired()) showLoginGate(); return; }
   try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {}
+  await cloudHydrate();
   renderAccount();
 }
 acctAutoLoadOnStart();
@@ -12432,7 +12609,9 @@ $('libInput') && $('libInput').addEventListener('change', async (e) => {
   if (!f) return;
   if (f.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
   try {
-    const rec = await PFS.library.add(f.name, await f.arrayBuffer());
+    const libBytes = await f.arrayBuffer();
+    const rec = await PFS.library.add(f.name, libBytes);
+    cloudPutDoc('lib', rec.id, libBytes.slice(0), { name: rec.name });
     renderLibrary();
     PFS.toast('"' + rec.name + '" נשמר במאגר ✓', 'ok');
   } catch (err) { PFS.toast(err.message || 'השמירה נכשלה', 'err'); }
@@ -12442,7 +12621,9 @@ $('libAddOpenBtn') && $('libAddOpenBtn').addEventListener('click', async () => {
   try {
     const name = await PFS.ui.prompt('שם המסמך במאגר', { value: currentFileName });
     if (!name || !name.trim()) return;
-    const rec = await PFS.library.add(name, pdfView.getBytes().slice(0));
+    const libBytes2 = pdfView.getBytes().slice(0);
+    const rec = await PFS.library.add(name, libBytes2);
+    cloudPutDoc('lib', rec.id, libBytes2.slice(0), { name: rec.name });
     renderLibrary();
     PFS.toast('"' + rec.name + '" נשמר במאגר ✓ — יופיע גם במסך הפתיחה', 'ok');
   } catch (err) { PFS.toast(err.message || 'השמירה נכשלה', 'err'); }
@@ -12529,7 +12710,16 @@ async function renderRecent(filter) {
   if (!PFS.recent) return;
   const wrap = $('recentWrap'), list = $('recentList');
   if (!wrap || !list) return;
-  const docs = await PFS.recent.list();
+  let docs = await PFS.recent.list();
+  // logged in: the history of every computer this account used — cloud-only
+  // entries appear alongside the local ones and download on click
+  try {
+    if (PFS.account && PFS.account.authed()) {
+      const local = new Set(docs.map((d) => d.id));
+      PFS.account.fileIndex('recent').forEach((f) => { if (!local.has(f.id)) docs.push({ id: f.id, name: f.name || 'מסמך', ts: f.ts, cloud: true }); });
+      docs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    }
+  } catch (e) {}
   if (!docs.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
   list.innerHTML = '';
@@ -12546,16 +12736,29 @@ async function renderRecent(filter) {
   }
   shown.forEach((d) => {
     const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
-    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = '📄 ' + d.name;
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = (d.cloud ? '☁️ ' : '📄 ') + d.name;
+    if (d.cloud) nm.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
     const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = relDate(d.ts);
     const del = document.createElement('button');
     del.className = 'btn sm ghost'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
     del.style.cssText = 'color:var(--danger);flex:none;padding:2px 7px';
-    del.addEventListener('click', async (e) => { e.stopPropagation(); await PFS.recent.remove(d.id); renderRecent(filter); });
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await PFS.recent.remove(d.id);
+      try { if (PFS.account && PFS.account.authed()) await PFS.account.deleteFile('recent', d.id); } catch (e2) {}
+      renderRecent(filter);
+    });
     row.append(nm, pill, del);
     row.addEventListener('click', async () => {
-      const doc = await PFS.recent.get(d.id);
+      let doc = await PFS.recent.get(d.id);
+      if ((!doc || !doc.bytes) && d.cloud) {
+        // history from another computer: fetch the bytes from the user's folder
+        PFS.toast('☁️ מוריד מהחשבון שלך…', 'ok', 2500);
+        const bytes = await PFS.account.getFile('recent', d.id).catch(() => null);
+        if (bytes) { await PFS.recent.save(d.name, bytes.buffer, { id: d.id, ts: d.ts }); doc = { name: d.name, bytes: bytes.buffer }; }
+      }
       if (doc && doc.bytes) openPdfFile(new File([doc.bytes], doc.name, { type: 'application/pdf' }));
+      else PFS.toast('הקובץ לא זמין', 'err');
     });
     list.appendChild(row);
   });

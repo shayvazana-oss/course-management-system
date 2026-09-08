@@ -4036,7 +4036,134 @@ async function main() {
   await page.mouse.click(pb.x + pb.width * 0.4, pb.y + pb.height * 0.7); await page.waitForTimeout(500);
   check('signature places an image element', await page.evaluate(() => document.querySelectorAll('.el.image').length > 0));
 
+  // ===== per-user cloud accounts: login gate, each person's data + history,
+  // a clean slate for the next person on a shared computer =====
+  // A mock of the four Supabase endpoints Fillo uses (auth, vault row,
+  // private storage bucket with per-user folders) — behaviour, not network.
+  {
+    const users = {}, tokens = {}, vaults = {}, files = {};
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' }); res.end(JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const who = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); return m && tokens[m[1]] ? tokens[m[1]] : null; };
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204, {});
+      if (p === '/auth/v1/signup') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (users[b.email]) return json(res, 400, { msg: 'User already registered' });
+        const id = 'u' + Object.keys(users).length + 1; users[b.email] = { id, password: b.password, email: b.email };
+        const tok = 'tok_' + id + '_' + Math.random().toString(36).slice(2); tokens[tok] = id;
+        return json(res, 200, { access_token: tok, refresh_token: 'r_' + id, expires_in: 3600, user: { id, email: b.email } });
+      }
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (u.searchParams.get('grant_type') === 'refresh_token') { const id = String(b.refresh_token || '').replace(/^r_/, ''); const tok = 'tok_' + id + '_' + Math.random().toString(36).slice(2); tokens[tok] = id; return json(res, 200, { access_token: tok, refresh_token: 'r_' + id, expires_in: 3600, user: { id, email: (Object.values(users).find((x) => x.id === id) || {}).email } }); }
+        const usr = users[b.email]; if (!usr || usr.password !== b.password) return json(res, 400, { error_description: 'Invalid login credentials' });
+        const tok = 'tok_' + usr.id + '_' + Math.random().toString(36).slice(2); tokens[tok] = usr.id;
+        return json(res, 200, { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } });
+      }
+      const me = who(req);
+      if (p === '/rest/v1/vaults') {
+        if (!me) return json(res, 401, {});
+        if (req.method === 'GET') { const q = /user_id=eq\.(\w+)/.exec(u.search || ''); const id = q && q[1]; if (id !== me) return json(res, 200, []); return json(res, 200, vaults[id] ? [{ data: vaults[id] }] : []); }
+        const b = JSON.parse((await body(req)).toString() || '{}'); if (b.user_id !== me) return json(res, 403, {}); vaults[me] = b.data; return json(res, 201, {});
+      }
+      if (p.startsWith('/storage/v1/object/')) {
+        if (!me) return json(res, 401, {});
+        const rest = p.replace('/storage/v1/object/', '');
+        if (req.method === 'POST' && rest.startsWith('docs/')) { const path = rest.slice(5); if (!path.startsWith(me + '/')) return json(res, 403, {}); files[path] = await body(req); return json(res, 200, { Key: path }); }
+        if (req.method === 'GET' && rest.startsWith('authenticated/docs/')) { const path = rest.slice('authenticated/docs/'.length); if (!path.startsWith(me + '/') || !files[path]) return json(res, 404, {}); res.writeHead(200, { 'content-type': 'application/pdf', 'access-control-allow-origin': '*' }); return res.end(files[path]); }
+        if (req.method === 'DELETE' && rest === 'docs') { const b = JSON.parse((await body(req)).toString() || '{}'); (b.prefixes || []).forEach((x) => { if (x.startsWith(me + '/')) delete files[x]; }); return json(res, 200, {}); }
+      }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const A = {};
+    try {
+      // configure: operator baked requireLogin → the gate opens
+      await page.evaluate((url) => {
+        const T = window.PFS.__test; T.overlay.clearElements();
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+        T.acct.gate();
+      }, mockUrl);
+      A.gate = await page.evaluate(() => document.getElementById('loginModal').classList.contains('show') && !!document.querySelector('#loginBody #acctUp'));
+      // user A signs up through the gate's own form
+      await page.fill('#loginBody #acctEmail', 'a@fillo.test'); await page.fill('#loginBody #acctPass', 'secret-a');
+      await page.click('#loginBody #acctUp');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      A.loggedA = await page.evaluate(() => window.PFS.account.authed() && window.PFS.account.user().email === 'a@fillo.test');
+      // A works: a course (vault data) + a document (history → private cloud folder) + a certificate format (library)
+      A.work = await page.evaluate(async () => {
+        const T = window.PFS.__test;
+        window.PFS.courses.create('קורס של א');
+        const { PDFDocument, rgb } = window.PDFLib;
+        const d = await PDFDocument.create(); d.addPage([595, 842]).drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+        const bytes = await d.save();
+        await T.openPdfFile(new File([bytes.slice(0)], 'מסמך-של-א.pdf', { type: 'application/pdf' }));
+        await new Promise((r) => setTimeout(r, 1500));
+        const rec = await window.PFS.library.add('פורמט-של-א', bytes.slice(0).buffer, { kind: 'cert' });
+        T.acct.cloudPut('lib', rec.id, bytes.slice(0), { name: 'פורמט-של-א', libKind: 'cert' });
+        await new Promise((r) => setTimeout(r, 3500));   // debounced vault save + uploads; the page has long finished rendering
+        const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; }
+        return { idx: window.PFS.account.fileIndex().map((f) => f.kind).sort() };
+      });
+      A.server = { vaultHasCourse: Object.values(vaults).some((v) => JSON.stringify(v || {}).includes('קורס של א')), files: Object.keys(files).sort() };
+      // A signs out → the shared computer is clean, and the gate is back
+      await page.evaluate(() => window.PFS.__test.acct.signOut());
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      A.wiped = await page.evaluate(async () => ({ courses: window.PFS.courses.all().length, recent: (await window.PFS.recent.list()).length, lib: (await window.PFS.library.list()).length, authed: window.PFS.account.authed() }));
+      // user B signs up: sees nothing of A's, makes her own course
+      await page.fill('#loginBody #acctEmail', 'b@fillo.test'); await page.fill('#loginBody #acctPass', 'secret-b');
+      await page.click('#loginBody #acctUp');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      A.bSees = await page.evaluate(async () => { window.PFS.courses.create('קורס של ב'); await new Promise((r) => setTimeout(r, 2500)); return { courses: window.PFS.courses.all().map((c) => c.name), recent: (await window.PFS.recent.list()).length + window.PFS.account.fileIndex('recent').length }; });
+      // B cannot reach A's files even by asking for them by path (bucket policy: folder = user).
+      // Checked from Node with B's token so the browser console stays clean of a deliberate 404.
+      A.bIsolated = await new Promise((resolve) => {
+        const bTok = Object.keys(tokens).find((t) => tokens[t] !== 'u01') || '';
+        const aFile = A.server.files.find((f) => f.startsWith('u01/')) || 'u01/none';
+        http.get(mockUrl + '/storage/v1/object/authenticated/docs/' + aFile, { headers: { apikey: 'test', Authorization: 'Bearer ' + bTok } }, (r) => { r.resume(); resolve(r.statusCode === 404 || r.statusCode === 403); }).on('error', () => resolve(false));
+      });
+      await page.evaluate(() => window.PFS.__test.acct.signOut());
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      // A signs in on this "other computer": her course, her format (hydrated), her history (☁️, downloads on click)
+      await page.fill('#loginBody #acctEmail', 'a@fillo.test'); await page.fill('#loginBody #acctPass', 'secret-a');
+      await page.click('#loginBody #acctIn');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      await page.waitForTimeout(800);
+      A.back = await page.evaluate(async () => ({ courses: window.PFS.courses.all().map((c) => c.name), lib: (await window.PFS.library.list()).map((l) => l.name + ':' + l.kind), cloudRows: [...document.querySelectorAll('#recentList .tmpl-item .nm')].map((n) => n.textContent) }));
+      await page.click('#recentList .tmpl-item:has-text("מסמך-של-א")');
+      await page.waitForFunction(() => /מסמך-של-א/.test(document.getElementById('fname').textContent), { timeout: 15000 });
+      A.opened = await page.evaluate(() => document.getElementById('fname').textContent);
+      await page.waitForTimeout(1500);   // let the page finish rendering before it is closed again
+    } catch (e) { A.error = String(e && e.message || e); }
+    // cleanup: back to the no-account world for the checks that follow
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      window.PFS.store.remove('acct:cfg'); window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+      document.getElementById('loginModal').classList.remove('show');
+      const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; }
+      T.acct.render();
+    });
+    mock.close();
+    const okA = !A.error && A.gate && A.loggedA
+      && JSON.stringify(A.work.idx) === JSON.stringify(['lib', 'recent'])
+      && A.server.vaultHasCourse && A.server.files.length === 2 && A.server.files.every((f) => f.startsWith('u01/'))
+      && A.wiped.courses === 0 && A.wiped.recent === 0 && A.wiped.lib === 0 && !A.wiped.authed
+      && JSON.stringify(A.bSees.courses) === JSON.stringify(['קורס של ב']) && A.bSees.recent === 0 && A.bIsolated
+      && JSON.stringify(A.back.courses) === JSON.stringify(['קורס של א']) && JSON.stringify(A.back.lib) === JSON.stringify(['פורמט-של-א:cert'])
+      && A.back.cloudRows.some((t) => /☁️ מסמך-של-א/.test(t)) && /מסמך-של-א/.test(A.opened || '');
+    if (!okA) console.log('  [accounts debug]', JSON.stringify(A));
+    check('👤 accounts: login gate → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);
+  }
+
   check('exporter library present', await page.evaluate(() => !!(window.PFS.exporter && window.PFS.exporter.exportPdf)));
+  if (jsErrors.length) console.log('  [js errors]', JSON.stringify(jsErrors.slice(0, 6)));
   check('no uncaught JS errors during run', jsErrors.length === 0);
   jsErrors.forEach((e) => console.log('    ! ' + e));
 

@@ -36,7 +36,8 @@
     if (!bytes || !bytes.byteLength) throw new Error('קובץ ריק');
     if (bytes.byteLength > MAX_BYTES) throw new Error('הקובץ גדול מדי למאגר (עד 15MB)');
     const clean = String(name || 'מסמך').replace(/\.pdf$/i, '').trim() || 'מסמך';
-    const rec = { id: uid(), name: clean, bytes, size: bytes.byteLength, added: Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '' };
+    // extra.id / extra.added pin a cloud record being brought back to this computer
+    const rec = { id: (extra && extra.id) || uid(), name: clean, bytes, size: bytes.byteLength, added: (extra && extra.added) || Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '' };
     const db = await open();
     await tx(db, 'readwrite', (s) => s.put(rec));
     return { id: rec.id, name: rec.name };
@@ -74,6 +75,9 @@
     const db = await open();
     await tx(db, 'readwrite', (s) => s.delete(id));
   }
+  async function clearAll() {
+    try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); } catch (e) {}
+  }
 
-  PFS.library = { add, list, get, rename, remove };
+  PFS.library = { add, list, get, rename, remove, clearAll };
 })(window);

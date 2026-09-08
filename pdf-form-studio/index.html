@@ -639,6 +639,16 @@
   </div>
 </div>
 
+<!-- the login gate (shown at start when the operator set requireLogin) -->
+<div class="modal-back" id="loginModal">
+  <div class="modal" style="max-width:420px">
+    <header>👤 התחברות ל-Fillo</header>
+    <div class="m-body">
+      <div class="hint" style="margin-bottom:10px">כל עובד/ת עובד/ת בחשבון משלו: הפרטים, הטפסים וההיסטוריה נשמרים אוטומטית וזמינים בכל מחשב.</div>
+      <div id="loginBody"><div class="hint muted">טוען…</div></div>
+    </div>
+  </div>
+</div>
 <div class="modal-back" id="libModal">
   <div class="modal" style="max-width:520px">
     <header>📚 המאגר — הטפסים הקבועים שלכם</header>
@@ -687,7 +697,7 @@
   /* Cloud accounts (Supabase). Operator sets these ONCE for the whole product;
      then every user just signs up / logs in. Empty = accounts UI stays in
      "not configured" mode (backup/restore + optional sync.js still work). */
-  window.PFS_SUPABASE = { url: '', anonKey: '' };
+  window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false };
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = { worker: './vendor/tesseract/worker.min.js', core: './vendor/tesseract/', lang: './vendor/tesseract/tessdata/' };
   /* Deploy stamp — the Pages workflow rewrites __PFS_BUILD__ to the commit

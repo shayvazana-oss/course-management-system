@@ -113,5 +113,52 @@
     return true;
   }
 
-  PFS.account = { cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
+  // ---- files (the user's documents: history, certificate formats, appendices) --
+  // Bytes live in a PRIVATE Storage bucket ('docs'), one folder per user
+  // (`<user id>/<kind>/<id>.pdf`), guarded by storage policies so a user can
+  // only ever touch their own folder. The index of what exists rides in the
+  // vault (store key 'cloud_files'), so it syncs with everything else.
+  const BUCKET = 'docs';
+  function filePath(kind, id) { return user().id + '/' + kind + '/' + id + '.pdf'; }
+  async function putFile(kind, id, bytes, meta) {
+    if (!authed()) return false;
+    await ensureFresh();
+    const c = cfg();
+    const res = await fetch(c.url + '/storage/v1/object/' + BUCKET + '/' + filePath(kind, id), {
+      method: 'POST',
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
+      body: bytes
+    });
+    if (!res.ok) throw new Error('HTTP_' + res.status);
+    // index entry (deduped by kind+id)
+    const idx = (store.get('cloud_files', []) || []).filter((f) => !(f.kind === kind && f.id === id));
+    idx.push(Object.assign({ kind, id, ts: Date.now(), size: bytes.byteLength || bytes.length || 0 }, meta || {}));
+    store.set('cloud_files', idx.slice(-120));
+    return true;
+  }
+  async function getFile(kind, id) {
+    if (!authed()) return null;
+    await ensureFresh();
+    const c = cfg();
+    const res = await fetch(c.url + '/storage/v1/object/authenticated/' + BUCKET + '/' + filePath(kind, id), {
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token }
+    });
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  async function deleteFile(kind, id) {
+    if (!authed()) return false;
+    await ensureFresh();
+    const c = cfg();
+    await fetch(c.url + '/storage/v1/object/' + BUCKET, {
+      method: 'DELETE',
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: [filePath(kind, id)] })
+    }).catch(() => {});
+    store.set('cloud_files', (store.get('cloud_files', []) || []).filter((f) => !(f.kind === kind && f.id === id)));
+    return true;
+  }
+  function fileIndex(kind) { return (store.get('cloud_files', []) || []).filter((f) => !kind || f.kind === kind); }
+
+  PFS.account = { cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
 })(window);

@@ -3648,6 +3648,38 @@ async function main() {
     check('🎓 serials + registry (CSV, re-issue warning) and ONE-TOUCH: Excel dropped on home → last format → check step', okG);
   }
 
+  // ---- dates never flip: "27/03//27" must export exactly as typed ----
+  // (the exporter forced RTL on every value; the bidi algorithm then reordered
+  // digit-only strings with a double separator or a range — "03/27//27")
+  check('bidi: digit-only values export LTR exactly as typed; Hebrew stays RTL; editor agrees', await page.evaluate(() => {
+    const E = window.PFS.exporter, T = window.PFS.__test;
+    const dirOk = window.PFS.textDir('27/03//27') === 'ltr' && window.PFS.textDir('15/07/2026 - 20/08/2026') === 'ltr'
+      && window.PFS.textDir('ת"ז 012345678') === 'rtl' && window.PFS.textDir('Course 2026') === 'ltr' && window.PFS.textDir('') === 'ltr';
+    // pixel proof: drawElement output == a plain LTR fillText with the same
+    // font/baseline; and != the RTL rendering (so the test is sensitive)
+    const draw = (text, forceDir) => {
+      const c = document.createElement('canvas'); c.width = 600; c.height = 120; const x = c.getContext('2d');
+      if (forceDir) {
+        x.direction = forceDir; x.fillStyle = '#111111'; x.font = '400 40px Heebo, sans-serif'; x.textAlign = 'left';
+        const p = x.measureText('אAg1'); const asc = p.fontBoundingBoxAscent, desc = p.fontBoundingBoxDescent || 0;
+        const lineH = 40 * 1.15, halfLead = (lineH - (asc + desc)) / 2;
+        x.textBaseline = 'alphabetic'; x.fillText(text, 30, 20 + halfLead + asc);
+      } else {
+        E.drawElement(x, { type: 'text', kind: 'text', page: 0, fx: 30 / 600, fy: 20 / 120, fw: 0.5, fh: 0.4, fontFrac: 40 / 120, color: '#111111', align: 'left', text }, 600, 120, new Map(), null);
+      }
+      return c.toDataURL();
+    };
+    const pixelOk = ['27/03//27', '15/07/2026 - 20/08/2026'].every((t) => draw(t) === draw(t, 'ltr') && draw(t) !== draw(t, 'rtl'));
+    const hebOk = draw('שם: ישראל') === draw('שם: ישראל', 'rtl');
+    // the editor element carries the same explicit direction
+    T.overlay.clearElements();
+    const a = T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.2, text: '27/03//27', noEdit: true });
+    const b = T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.4, text: 'ת"ז 012345678', noEdit: true });
+    const domOk = a && b && a.node.querySelector('.txt').dir === 'ltr' && b.node.querySelector('.txt').dir === 'rtl';
+    T.overlay.clearElements();
+    return dirOk && pixelOk && hebOk && domOk;
+  }));
+
   // ---- instant open: the 41st open of a known form skips detection ----
   {
     const icRes = await page.evaluate(async () => {

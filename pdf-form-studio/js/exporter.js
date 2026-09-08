@@ -10,6 +10,13 @@
   const PFS = (root.PFS = root.PFS || {});
 
   const EXPORT_SCALE = 2.6; // default raster DPI multiplier (sharpness vs memory)
+  // 'rtl' when the first strong character is Hebrew/Arabic, else 'ltr' — the
+  // same rule the editor applies, so a value renders identically on both
+  function textDir(text) {
+    const m = /[A-Za-z֐-׿؀-ۿ]/.exec(String(text || ''));
+    return m && /[֐-׿؀-ۿ]/.test(m[0]) ? 'rtl' : 'ltr';
+  }
+  PFS.textDir = textDir;
   // named quality presets → DPI multiplier. Draft is lighter/faster for e-mail
   // and quick proofs; High is crisper for printing. Clamped to a safe range so
   // a bad value can never blow up canvas memory.
@@ -96,7 +103,12 @@
     // text
     let fontPx = m.fontFrac * ch;
     const boxW = m.fw * cw;
-    ctx.direction = 'rtl';
+    // direction from the FIRST STRONG character (what dir="auto" does): a
+    // date or an ID has no Hebrew, so it is LTR — forcing RTL on it let the
+    // bidi algorithm reorder "27/03//27" into "03/27//27" on export while the
+    // editor showed it right. Hebrew text stays RTL (its digits keep their
+    // own LTR runs, identically in both).
+    ctx.direction = textDir(m.text);
     ctx.fillStyle = m.color || '#111';
     // the element's own face when it adopted the document's (fontmatch), else
     // the app font — the exported raster must match what the editor showed

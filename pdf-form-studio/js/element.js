@@ -100,6 +100,12 @@
         const fontPx = model.fontFrac * H;
         inner.style.fontSize = fontPx + 'px';
         inner.style.color = model.color;
+        // direction from the first strong character — the exporter applies the
+        // identical rule, so a date/ID (LTR) or Hebrew (RTL) prints as shown
+        {
+          const s = /[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '');
+          inner.dir = s && /[֐-׿؀-ۿ]/.test(s[0]) ? 'rtl' : 'ltr';
+        }
         inner.style.fontFamily = model.font || '';   // '' = inherit the app font
         inner.style.fontWeight = model.bold ? '700' : '400';
         inner.style.textAlign = model.align;

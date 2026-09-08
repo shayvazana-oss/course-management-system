@@ -1,0 +1,137 @@
+/* templates.js — save & reapply a form's field layout.
+ * A template is the serialized set of placed elements (positions as fractions,
+ * plus any signature/stamp image). Saving one lets you refill the same form in
+ * seconds next time. Persisted in localStorage; exportable/importable as JSON.
+ */
+(function (root) {
+  'use strict';
+  const PFS = (root.PFS = root.PFS || {});
+
+  function createTemplates(opts = {}) {
+    const store = PFS.store;
+    const KEY = 'templates';
+    const listEl = document.getElementById('tmplList');
+
+    let SEQ = 1;
+    const uid = () => 'tpl' + (SEQ++) + '_' + Math.floor(performance.now());
+
+    const all = () => { const v = store.get(KEY, []); return Array.isArray(v) ? v : []; };
+    const persist = (arr) => store.set(KEY, arr); // returns false on quota/serialize failure
+
+    const grabRotations = () => { try { return (opts.getRotations && opts.getRotations()) || {}; } catch (e) { return {}; } };
+    const grabRemoved = () => { try { return (opts.getRemovedPages && opts.getRemovedPages()) || []; } catch (e) { return []; } };
+    const grabOrder = () => { try { return (opts.getPageOrder && opts.getPageOrder()) || null; } catch (e) { return null; } };
+
+    function save(name, fp) {
+      const els = opts.getElements();
+      if (!els.length) { PFS.toast('אין פריטים לשמירה', 'err'); return; }
+      const arr = all();
+      const tpl = { id: uid(), name: name || ('תבנית ' + (arr.length + 1)), ts: Date.now(), elements: els, rotations: grabRotations(), removePages: grabRemoved(), pageOrder: grabOrder(), fp: fp || null };
+      arr.unshift(tpl);
+      if (!persist(arr)) return; // store.set already toasted the quota error
+      render();
+      PFS.toast('התבנית נשמרה', 'ok');
+    }
+    // Automatic memory: silently remember the current layout, keyed to the
+    // form's fingerprint, so opening the same form again auto-applies it with
+    // zero manual "save template". Upserts the single auto-entry per form
+    // instead of piling up duplicates.
+    function autoSave(fp, name) {
+      if (!fp || !PFS.fingerprint) return;
+      const els = opts.getElements();
+      const rotations = grabRotations();
+      const removePages = grabRemoved();
+      const pageOrder = grabOrder();
+      // remember the form even with no placed elements if it was rotated/trimmed/reordered
+      if (!els.length && !Object.keys(rotations).length && !removePages.length && !pageOrder) return;
+      const arr = all();
+      let tpl = arr.find((t) => t.auto && t.fp && PFS.fingerprint.score(fp, t.fp) >= 0.9);
+      if (tpl) { tpl.elements = els; tpl.rotations = rotations; tpl.removePages = removePages; tpl.pageOrder = pageOrder; tpl.ts = Date.now(); tpl.fp = fp; if (name) tpl.name = name; }
+      else { arr.unshift({ id: uid(), name: name || 'זיכרון אוטומטי', ts: Date.now(), elements: els, rotations, removePages, pageOrder, fp: fp, auto: true }); }
+      if (!persist(arr)) return;
+      render();
+    }
+    function apply(id) {
+      const tpl = all().find((t) => t.id === id);
+      if (!tpl) return;
+      opts.applyModels(tpl.elements);
+      if (opts.applyRotations) opts.applyRotations(tpl.rotations);
+      if (opts.applyRemovedPages) opts.applyRemovedPages(tpl.removePages);
+      if (opts.applyPageOrder) opts.applyPageOrder(tpl.pageOrder);
+      PFS.toast('התבנית הוחלה', 'ok');
+      opts.afterApply && opts.afterApply();
+    }
+    function remove(id) { persist(all().filter((t) => t.id !== id)); render(); }
+
+    function exportAll() {
+      const data = JSON.stringify({ app: 'pdf-form-studio', version: 1, templates: all() }, null, 2);
+      PFS.deliver.file(data, 'pdf-form-studio-templates.json', 'application/json');
+    }
+    async function importFile(file) {
+      try {
+        const txt = await file.text();
+        const obj = JSON.parse(txt);
+        const incoming = Array.isArray(obj) ? obj : (obj.templates || []);
+        if (!incoming.length) throw new Error('empty');
+        const arr = all();
+        incoming.forEach((t) => arr.unshift(Object.assign({}, t, { id: uid() })));
+        persist(arr);
+        render();
+        PFS.toast('התבניות יובאו', 'ok');
+      } catch (e) {
+        PFS.toast('קובץ תבניות לא תקין', 'err');
+      }
+    }
+
+    // best template whose stored fingerprint matches the given form fingerprint
+    function findMatch(fp) {
+      if (!fp || !PFS.fingerprint) return null;
+      let best = null, bestScore = 0;
+      all().forEach((t) => { if (!t.fp) return; const sc = PFS.fingerprint.score(fp, t.fp); if (sc > bestScore) { bestScore = sc; best = t; } });
+      return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
+    }
+
+    async function rename(id) {
+      const t = all().find((x) => x.id === id); if (!t) return;
+      const nm = await PFS.ui.prompt('שם חדש לתבנית', { value: t.name });
+      if (nm == null) return;
+      const arr = all(); const item = arr.find((x) => x.id === id);
+      if (item) { item.name = nm.trim() || item.name; persist(arr); render(); }
+    }
+
+    let filterText = '';
+    function setFilter(q) { filterText = (q || '').trim().toLowerCase(); render(); }
+    function render() {
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      let arr = all();
+      if (filterText) arr = arr.filter((t) => (t.name || '').toLowerCase().indexOf(filterText) !== -1);
+      if (!arr.length) {
+        const em = document.createElement('div');
+        em.className = 'hint muted'; em.textContent = filterText ? 'אין תבניות תואמות.' : 'אין תבניות שמורות עדיין.';
+        listEl.appendChild(em);
+        return;
+      }
+      arr.forEach((t) => {
+        const row = document.createElement('div'); row.className = 'tmpl-item';
+        const nm = document.createElement('div'); nm.className = 'nm';
+        nm.textContent = (t.fp ? '🔗 ' : '') + t.name;
+        nm.title = (t.fp ? 'מקושר לטופס — יוחל אוטומטית כשתפתחו אותו\n' : '') + 'לחצו לשינוי שם';
+        nm.style.cursor = 'pointer';
+        nm.addEventListener('click', () => rename(t.id));
+        const cnt = document.createElement('span'); cnt.className = 'pill'; cnt.textContent = (t.elements || []).length + ' שדות';
+        const applyBtn = document.createElement('button'); applyBtn.className = 'btn sm primary'; applyBtn.textContent = 'החל';
+        applyBtn.addEventListener('click', () => apply(t.id));
+        const delBtn = document.createElement('button'); delBtn.className = 'btn sm ghost'; delBtn.textContent = '🗑';
+        delBtn.addEventListener('click', () => remove(t.id));
+        row.append(nm, cnt, applyBtn, delBtn);
+        listEl.appendChild(row);
+      });
+    }
+
+    render();
+    return { save, autoSave, apply, remove, exportAll, importFile, render, all, findMatch, rename, setFilter };
+  }
+
+  PFS.createTemplates = createTemplates;
+})(window);

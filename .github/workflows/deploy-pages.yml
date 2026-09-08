@@ -1,0 +1,39 @@
+name: Deploy PDF Form Studio to GitHub Pages
+
+# Publishes pdf-form-studio/ to the gh-pages branch; GitHub Pages serves that
+# branch. (The pages-artifact flow needs the Pages site pre-created with an
+# admin token, which the workflow token can't do — branch deploy just works.)
+
+on:
+  push:
+    branches: ["claude/wizardly-hamilton-p1paz2"]
+    paths: ["pdf-form-studio/**", ".github/workflows/deploy-pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push app to gh-pages
+        run: |
+          cd pdf-form-studio
+          touch .nojekyll
+          # Stamp the deploy SHA into the app + service worker. This gives the
+          # SW a fresh cache name per deploy and makes the running version
+          # verifiable in the UI (Settings) — the old fixed-version cache-first
+          # worker froze users on their first-installed version forever.
+          sed -i "s/__PFS_BUILD__/${GITHUB_SHA::7}/g" index.html sw.js
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy ${GITHUB_SHA::7}"
+          git push --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages

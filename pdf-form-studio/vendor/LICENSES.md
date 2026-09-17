@@ -1,0 +1,19 @@
+# Third-party components (vendored, offline)
+
+This folder contains unmodified redistributable builds of open-source libraries
+and fonts so the app runs fully offline with no CDN. Each retains its own license.
+
+| Component | Version | License | Files |
+|-----------|---------|---------|-------|
+| pdf-lib | 1.17.1 | MIT | `pdf-lib/pdf-lib.min.js` |
+| pdf.js (pdfjs-dist) | 3.11.174 (UMD) | Apache-2.0 | `pdfjs/pdf.min.js`, `pdfjs/pdf.worker.min.js` |
+| pdf.js standard fonts | 4.6.82 | Foxit / Liberation (see `pdfjs/standard_fonts/LICENSE_*`) | `pdfjs/standard_fonts/*` |
+| fflate | 0.8.2 | MIT | `fflate/fflate.min.js` |
+| Tesseract.js | 5.1.1 | Apache-2.0 | `tesseract/tesseract.min.js`, `tesseract/worker.min.js` |
+| tesseract.js-core (wasm) | — | Apache-2.0 | `tesseract/tesseract-core-simd-lstm.*` |
+| Hebrew traineddata (tessdata) | — | Apache-2.0 | `tesseract/tessdata/heb.traineddata` |
+| Heebo (via @fontsource/heebo) | — | SIL OFL 1.1 | `fonts/Heebo-*.woff2` |
+
+- pdf-lib — https://github.com/Hopding/pdf-lib (MIT)
+- pdf.js — https://github.com/mozilla/pdf.js (Apache-2.0)
+- Heebo — https://fonts.google.com/specimen/Heebo (SIL Open Font License 1.1)

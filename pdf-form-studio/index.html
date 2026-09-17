@@ -697,7 +697,10 @@
   /* Cloud accounts (Supabase). Operator sets these ONCE for the whole product;
      then every user just signs up / logs in. Empty = accounts UI stays in
      "not configured" mode (backup/restore + optional sync.js still work). */
-  window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false };
+  window.PFS_SUPABASE = { url: 'https://qosledoureuelpxvskio.supabase.co', anonKey: 'sb_publishable_NZ9Qdq0GYKVBdJnCzmpRZw_2-vT6eiY', requireLogin: true };
+  /* the automated suites run the whole product without an account — a flag
+     they inject BEFORE this script (not a URL trick anyone could type) */
+  if (window.__PFS_NO_GATE) window.PFS_SUPABASE.requireLogin = false;
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = { worker: './vendor/tesseract/worker.min.js', core: './vendor/tesseract/', lang: './vendor/tesseract/tessdata/' };
   /* Deploy stamp — the Pages workflow rewrites __PFS_BUILD__ to the commit

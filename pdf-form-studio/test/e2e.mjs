@@ -48,6 +48,9 @@ async function main() {
 
   const browser = await chromium.launch({ executablePath: exe });
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 860 } })).newPage();
+  // the product ships with the login gate ON; the suite injects the escape
+  // hatch index.html honours, and tests the gate itself with a mock backend
+  await page.addInitScript(() => { window.__PFS_NO_GATE = true; });
   const jsErrors = [];
   page.on('pageerror', (e) => jsErrors.push('PAGEERROR: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') jsErrors.push('CONSOLE: ' + m.text()); });
@@ -4236,9 +4239,16 @@ async function main() {
     const mockUrl = 'http://localhost:' + mock.address().port;
     const A = {};
     try {
-      // configure: operator baked requireLogin → the gate opens
-      await page.evaluate((url) => {
+      // configure: operator baked requireLogin → the gate opens. This "computer"
+      // already holds one certificate format from before accounts existed —
+      // it must travel up with the first login (handover of everything)
+      await page.evaluate(async (url) => {
         const T = window.PFS.__test; T.overlay.clearElements();
+        await window.PFS.recent.clearAll(); await window.PFS.library.clearAll(); await window.PFS.companions.clearAll();
+        window.PFS.store.remove('cloud_files');
+        const { PDFDocument, rgb } = window.PDFLib;
+        const d = await PDFDocument.create(); d.addPage([595, 842]).drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+        await window.PFS.library.add('פורמט-ישן-מהמחשב', (await d.save()).buffer, { kind: 'cert' });
         window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
         window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
         window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
@@ -4307,11 +4317,11 @@ async function main() {
     });
     mock.close();
     const okA = !A.error && A.gate && A.loggedA
-      && JSON.stringify(A.work.idx) === JSON.stringify(['lib', 'recent'])
-      && A.server.vaultHasCourse && A.server.files.length === 2 && A.server.files.every((f) => f.startsWith('u01/'))
+      && JSON.stringify(A.work.idx) === JSON.stringify(['lib', 'lib', 'recent'])
+      && A.server.vaultHasCourse && A.server.files.length === 3 && A.server.files.every((f) => f.startsWith('u01/'))
       && A.wiped.courses === 0 && A.wiped.recent === 0 && A.wiped.lib === 0 && !A.wiped.authed
       && JSON.stringify(A.bSees.courses) === JSON.stringify(['קורס של ב']) && A.bSees.recent === 0 && A.bIsolated
-      && JSON.stringify(A.back.courses) === JSON.stringify(['קורס של א']) && JSON.stringify(A.back.lib) === JSON.stringify(['פורמט-של-א:cert'])
+      && JSON.stringify(A.back.courses) === JSON.stringify(['קורס של א']) && JSON.stringify([...A.back.lib].sort()) === JSON.stringify(['פורמט-ישן-מהמחשב:cert', 'פורמט-של-א:cert'].sort())
       && A.back.cloudRows.some((t) => /☁️ מסמך-של-א/.test(t)) && /מסמך-של-א/.test(A.opened || '');
     if (!okA) console.log('  [accounts debug]', JSON.stringify(A));
     check('👤 accounts: login gate → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);

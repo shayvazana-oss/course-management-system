@@ -32,6 +32,7 @@ async function main() {
 
   const browser = await chromium.launch({ executablePath: exe });
   const page = await (await browser.newContext({ viewport: { width: 1000, height: 800 } })).newPage();
+  await page.addInitScript(() => { window.__PFS_NO_GATE = true; });
   const errs = [];
   page.on('pageerror', (e) => errs.push('PAGEERROR: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') errs.push('CONSOLE: ' + m.text()); });

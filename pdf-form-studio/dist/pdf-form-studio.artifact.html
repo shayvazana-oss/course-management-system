@@ -1403,7 +1403,10 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
   /* Cloud accounts (Supabase). Operator sets these ONCE for the whole product;
      then every user just signs up / logs in. Empty = accounts UI stays in
      "not configured" mode (backup/restore + optional sync.js still work). */
-  window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false };
+  window.PFS_SUPABASE = { url: 'https://qosledoureuelpxvskio.supabase.co', anonKey: 'sb_publishable_NZ9Qdq0GYKVBdJnCzmpRZw_2-vT6eiY', requireLogin: true };
+  /* the automated suites run the whole product without an account — a flag
+     they inject BEFORE this script (not a URL trick anyone could type) */
+  if (window.__PFS_NO_GATE) window.PFS_SUPABASE.requireLogin = false;
   /* Tesseract OCR paths (served build only; the single-file build sets this to null). */
   window.PFS_TESS = null; /* OCR omitted from single-file build */
   window.PFS_SINGLE_FILE = true; /* no service worker / manifest here */
@@ -12552,9 +12555,42 @@ async function acctAfterAuth() {
   try { const had = await ACCT().loadVault(); if (had) refreshAllFromStore(); else await ACCT().saveVault(); }
   catch (e) { /* keep local data; will auto-save */ }
   await cloudHydrate();
+  await cloudBackfill();
   try { renderCourses(); } catch (e) {}
   hideLoginGate();
   renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הפרטים וההיסטוריה שלך זמינים', 'ok');
+}
+// "כל ההיסטוריה והפיתוחים יישמרו כשאני מעביר אותו לאדם אחר": a computer that
+// already holds work (history, certificate formats, appendices) hands ALL of
+// it to the account the moment someone logs in — the vault carries the
+// settings/templates/memory, this carries the files the vault only indexes.
+// Only what the account lacks goes up, so a repeat login costs nothing.
+async function cloudBackfill() {
+  if (!ACCT().authed()) return 0;
+  let n = 0;
+  const has = (k) => new Set(ACCT().fileIndex(k).map((f) => f.id));
+  try {
+    const lib = has('lib');
+    for (const d of await PFS.library.list()) {
+      if (lib.has(d.id)) continue;
+      const rec = await PFS.library.get(d.id); if (!rec || !rec.bytes) continue;
+      await ACCT().putFile('lib', d.id, new Uint8Array(rec.bytes), { name: d.name, libKind: d.kind || '' }); n++;
+    }
+    const rc = has('recent');
+    for (const d of await PFS.recent.list()) {
+      if (rc.has(d.id)) continue;
+      const doc = await PFS.recent.get(d.id); if (!doc || !doc.bytes) continue;
+      await ACCT().putFile('recent', d.id, new Uint8Array(doc.bytes), Object.assign({ name: doc.name, label: doc.label || '' }, doc.fill ? { fill: doc.fill } : {})); n++;
+    }
+    const cp = has('comp');
+    for (const r of PFS.companions.all()) {
+      if (cp.has(r.id)) continue;
+      const b = await PFS.companions.getBytes(r.id); if (!b) continue;
+      await ACCT().putFile('comp', r.id, new Uint8Array(b), { name: r.name }); n++;
+    }
+  } catch (e) { console.warn('cloud backfill failed', e); }
+  if (n) { acctStatus('הועלו ' + n + ' קבצים מהמחשב הזה לחשבון ✓', 'ok'); renderRecent(); }
+  return n;
 }
 async function acctSignOut() {
   try { await ACCT().saveVault(); } catch (e) {}
@@ -12571,6 +12607,7 @@ async function acctAutoLoadOnStart() {
   if (!ACCT().authed()) { renderAccount(); if (loginRequired()) showLoginGate(); return; }
   try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {}
   await cloudHydrate();
+  await cloudBackfill();
   renderAccount();
 }
 acctAutoLoadOnStart();

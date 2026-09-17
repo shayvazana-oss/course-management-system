@@ -4402,9 +4402,42 @@ async function acctAfterAuth() {
   try { const had = await ACCT().loadVault(); if (had) refreshAllFromStore(); else await ACCT().saveVault(); }
   catch (e) { /* keep local data; will auto-save */ }
   await cloudHydrate();
+  await cloudBackfill();
   try { renderCourses(); } catch (e) {}
   hideLoginGate();
   renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הפרטים וההיסטוריה שלך זמינים', 'ok');
+}
+// "כל ההיסטוריה והפיתוחים יישמרו כשאני מעביר אותו לאדם אחר": a computer that
+// already holds work (history, certificate formats, appendices) hands ALL of
+// it to the account the moment someone logs in — the vault carries the
+// settings/templates/memory, this carries the files the vault only indexes.
+// Only what the account lacks goes up, so a repeat login costs nothing.
+async function cloudBackfill() {
+  if (!ACCT().authed()) return 0;
+  let n = 0;
+  const has = (k) => new Set(ACCT().fileIndex(k).map((f) => f.id));
+  try {
+    const lib = has('lib');
+    for (const d of await PFS.library.list()) {
+      if (lib.has(d.id)) continue;
+      const rec = await PFS.library.get(d.id); if (!rec || !rec.bytes) continue;
+      await ACCT().putFile('lib', d.id, new Uint8Array(rec.bytes), { name: d.name, libKind: d.kind || '' }); n++;
+    }
+    const rc = has('recent');
+    for (const d of await PFS.recent.list()) {
+      if (rc.has(d.id)) continue;
+      const doc = await PFS.recent.get(d.id); if (!doc || !doc.bytes) continue;
+      await ACCT().putFile('recent', d.id, new Uint8Array(doc.bytes), Object.assign({ name: doc.name, label: doc.label || '' }, doc.fill ? { fill: doc.fill } : {})); n++;
+    }
+    const cp = has('comp');
+    for (const r of PFS.companions.all()) {
+      if (cp.has(r.id)) continue;
+      const b = await PFS.companions.getBytes(r.id); if (!b) continue;
+      await ACCT().putFile('comp', r.id, new Uint8Array(b), { name: r.name }); n++;
+    }
+  } catch (e) { console.warn('cloud backfill failed', e); }
+  if (n) { acctStatus('הועלו ' + n + ' קבצים מהמחשב הזה לחשבון ✓', 'ok'); renderRecent(); }
+  return n;
 }
 async function acctSignOut() {
   try { await ACCT().saveVault(); } catch (e) {}
@@ -4421,6 +4454,7 @@ async function acctAutoLoadOnStart() {
   if (!ACCT().authed()) { renderAccount(); if (loginRequired()) showLoginGate(); return; }
   try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {}
   await cloudHydrate();
+  await cloudBackfill();
   renderAccount();
 }
 acctAutoLoadOnStart();

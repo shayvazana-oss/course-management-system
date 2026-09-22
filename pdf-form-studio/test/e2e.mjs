@@ -3638,6 +3638,81 @@ async function main() {
     check('🎓 split first/last-name lists compose the full name; ID found by header or by value shape; course by meaning; all three print', okSplit);
   }
 
+  // ---- "שנת לימוד" fills itself with the Hebrew school year; fields settle
+  // precisely onto what the certificate prints (labels, underlines) and line
+  // up on one axis with an even rhythm ("סימטרי ומדויק") ----
+  {
+    const precRes = await page.evaluate(async () => {
+      const T = window.PFS.__test, M = window.PFS.merge, out = {};
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      out.letters = [5787, 5786, 5775, 5715, 5790, 5800].map((y) => T.hebrewYearLetters(y));
+      out.years = [new Date(2026, 8, 1), new Date(2026, 8, 22), new Date(2026, 7, 20), new Date(2027, 1, 10)].map((d) => T.hebrewAcademicYear(d));
+      out.now = T.hebrewAcademicYear();
+      out.labels = ['שנת לימוד', 'שנה"ל', 'שם הסטודנט', 'ת.ז.', 'תאריך סיום הקורס', 'שם הקורס', 'ציון סופי', 'מספר תעודה'].map((l) => T.certKeyForLabel(l));
+      // a landscape format with ONE printed underline (x 250→590 of 842, y 60% down)
+      const { PDFDocument, rgb } = window.PDFLib; const d = await PDFDocument.create();
+      const pg = d.addPage([842, 595]); pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawLine({ start: { x: 250, y: 238 }, end: { x: 590, y: 238 }, thickness: 2, color: rgb(0.2, 0.2, 0.2) });
+      await T.startCertFlow(new File([await d.save()], 'תעודת-דיוק.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1800));
+      T.overlay.clearElements();
+      // 1) the year field carries the current school year and prints it
+      const yr = T.certPlace(0, 0.5, 0.25, 'שנת לימוד');
+      out.yearText = yr.model.text;
+      // 2) a printed "שנת לימוד: ____" label (as detection reports it) pulls the field into its blank
+      T.setLastDet({ tier: 'text', fields: [{ page: 0, fieldKey: 'c_year', label: 'שנת לימוד', type: 'text', fx: 0.55, fy: 0.80, fw: 0.2, fh: 0.03 }] });
+      const anchored = T.certAnchorToDetected(true);
+      const ym = yr.model;
+      out.anchor = { n: anchored, cx: ym.fx + ym.fw / 2, top: ym.fy, bottom: ym.fy + ym.fh, size: ym.fontFrac, kind: ym.certAnchor, maxW: ym.maxW };
+      T.setLastDet(null);
+      // 3) a field dropped just above the printed line settles onto it, centred on the line's extent
+      const idc = T.certPlace(0, 0.42, 0.53, 'תעודת זהות');
+      const before = { cx: idc.model.fx + idc.model.fw / 2, bottom: idc.model.fy + idc.model.fh };
+      const snapped = T.certSnapToInk(idc);
+      out.snap = { ok: snapped, before, cx: idc.model.fx + idc.model.fw / 2, bottom: idc.model.fy + idc.model.fh, kind: idc.model.certAnchor };
+      // 4) three free fields with jittered centres and uneven gaps → one axis, even rhythm
+      T.overlay.clearElements();
+      const a = T.certPlace(0, 0.48, 0.30, 'שם מלא'), b = T.certPlace(0, 0.52, 0.42, 'שם הקורס'), c = T.certPlace(0, 0.505, 0.47, 'תאריך סיום');
+      const n = T.certAlignAll();
+      const cx = (m) => m.fx + m.fw / 2;
+      const col = [a, b, c].map((x) => x.model).sort((p, q) => p.fy - q.fy);
+      out.align = { n, cxs: [a, b, c].map((x) => cx(x.model)), gaps: [col[1].fy - (col[0].fy + col[0].fh), col[2].fy - (col[1].fy + col[1].fh)] };
+      // 5) the produced certificate prints the year; a list column overrides it in a sentence
+      T.overlay.clearElements();
+      T.certPlace(0, 0.5, 0.3, 'שם מלא'); T.certPlace(0, 0.5, 0.75, 'שנת לימוד');
+      T.certLoadList(M.parseCSV('שם מלא,תעודת זהות\nרוני שפירא,311862528'), 'list.csv');
+      out.recYear = T.certPreflightNow().clean[0]['שנת לימוד'];
+      const zip = await T.certProduce('zip', { noDownload: true });
+      const files = window.fflate.unzipSync(zip.bytes);
+      const doc = await window.pdfjsLib.getDocument({ data: files['רוני שפירא.pdf'].slice(0) }).promise;
+      const p1 = await doc.getPage(1); const vp = p1.getViewport({ scale: 1 });
+      const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const dd = cv.getContext('2d').getImageData(0, Math.round(0.70 * cv.height), cv.width, Math.round(0.09 * cv.height)).data;
+      let ink = 0; for (let i = 0; i < dd.length; i += 4) if (dd[i] < 128) ink++;
+      out.yearInk = ink;
+      T.certLoadList(M.parseCSV('שם מלא,תעודת זהות,שנת לימוד\nרוני שפירא,311862528,תשפ״ה'), 'list.csv');
+      out.recYearCol = { map: T.certState().map['שנת לימוד'], v: T.certPreflightNow().clean[0]['שנת לימוד'] };
+      await T.goHome();
+      for (const x of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /דיוק/.test(l.name))) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+      window.PFS.ui.confirm = realConfirm;
+      return out;
+    });
+    const near = (v, t, tol) => typeof v === 'number' && Math.abs(v - t) <= tol;
+    const P = precRes;
+    const okYear = JSON.stringify(P.letters) === JSON.stringify(['תשפ״ז', 'תשפ״ו', 'תשע״ה', 'תשט״ו', 'תש״צ', 'ת״ת'])
+      && JSON.stringify(P.years) === JSON.stringify(['תשפ״ז', 'תשפ״ז', 'תשפ״ו', 'תשפ״ז'])
+      && P.yearText === P.now && /^[א-ת]+״[א-ת]$/.test(P.now)
+      && P.recYear === undefined && P.yearInk > 60 && P.recYearCol.map === 'שנת לימוד' && P.recYearCol.v === 'תשפ״ה';
+    const okLabels = JSON.stringify(P.labels) === JSON.stringify(['שנת לימוד', 'שנת לימוד', 'שם מלא', 'תעודת זהות', 'תאריך סיום', 'שם הקורס', 'ציון', 'מספר תעודה']);
+    const okAnchor = P.anchor.n === 1 && P.anchor.kind === 'label' && near(P.anchor.cx, 0.65, 0.006) && P.anchor.top >= 0.795 && P.anchor.bottom <= 0.835 && P.anchor.size <= 0.027 && near(P.anchor.maxW, 0.2, 1e-6);
+    const okSnap = P.snap.ok === true && P.snap.kind === 'line' && near(P.snap.cx, 420 / 842, 0.008) && near(P.snap.bottom, 0.6, 0.012) && Math.abs(P.snap.before.cx - 420 / 842) > 0.03;
+    const okAlign = P.align.n >= 3 && P.align.cxs.every((x) => near(x, 0.5, 1e-3)) && near(P.align.gaps[0], P.align.gaps[1], 1e-3);
+    if (!(okYear && okLabels && okAnchor && okSnap && okAlign)) console.log('  [cert precision debug]', JSON.stringify({ okYear, okLabels, okAnchor, okSnap, okAlign, P }));
+    check('🎓 "שנת לימוד" fills itself with the Hebrew school year (תשפ״ז) and prints; a list column overrides it', okYear && okLabels);
+    check('🎓 precision: fields settle into printed label blanks and onto dropped-on underlines; one-click symmetric alignment', okAnchor && okSnap && okAlign);
+  }
+
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----
   {

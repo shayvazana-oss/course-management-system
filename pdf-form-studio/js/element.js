@@ -208,7 +208,8 @@
         model.fontFrac = clamp(start.fontFrac + dy * 0.35, 0.006, 0.2);
         return false; // handled → skip default box resize
       },
-      onChange: () => { layout(); ctx.onChange && ctx.onChange(); }
+      onChange: () => { layout(); ctx.onChange && ctx.onChange(); },
+      onDragEnd: () => { ctx.onDragEnd && ctx.onDragEnd(ctrl); }
     });
 
     return ctrl;

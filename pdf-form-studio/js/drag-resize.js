@@ -100,9 +100,11 @@
       const start = { px: e.clientX, py: e.clientY, fx: model.fx, fy: model.fy };
       node.setPointerCapture(e.pointerId);
 
+      let moved = false;
       const move = (ev) => {
         const dfx = (ev.clientX - start.px) / size.w;
         const dfy = (ev.clientY - start.py) / size.h;
+        moved = moved || Math.abs(ev.clientX - start.px) > 2 || Math.abs(ev.clientY - start.py) > 2;
         model.fx = clamp(start.fx + dfx, -model.fw * 0.5, 1 - model.fw * 0.5);
         model.fy = clamp(start.fy + dfy, -model.fh * 0.5, 1 - model.fh * 0.5);
         // alignment snapping (hold Alt to drag freely). Guides show what lined up.
@@ -120,6 +122,8 @@
         node.removeEventListener('pointermove', move);
         node.removeEventListener('pointerup', up);
         node.removeEventListener('pointercancel', up);
+        // the drop is the moment to settle onto whatever is printed underneath
+        if (moved && opts.onDragEnd) opts.onDragEnd();
       };
       node.addEventListener('pointermove', move);
       node.addEventListener('pointerup', up);

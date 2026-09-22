@@ -4624,9 +4624,11 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       const start = { px: e.clientX, py: e.clientY, fx: model.fx, fy: model.fy };
       node.setPointerCapture(e.pointerId);
 
+      let moved = false;
       const move = (ev) => {
         const dfx = (ev.clientX - start.px) / size.w;
         const dfy = (ev.clientY - start.py) / size.h;
+        moved = moved || Math.abs(ev.clientX - start.px) > 2 || Math.abs(ev.clientY - start.py) > 2;
         model.fx = clamp(start.fx + dfx, -model.fw * 0.5, 1 - model.fw * 0.5);
         model.fy = clamp(start.fy + dfy, -model.fh * 0.5, 1 - model.fh * 0.5);
         // alignment snapping (hold Alt to drag freely). Guides show what lined up.
@@ -4644,6 +4646,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         node.removeEventListener('pointermove', move);
         node.removeEventListener('pointerup', up);
         node.removeEventListener('pointercancel', up);
+        // the drop is the moment to settle onto whatever is printed underneath
+        if (moved && opts.onDragEnd) opts.onDragEnd();
       };
       node.addEventListener('pointermove', move);
       node.addEventListener('pointerup', up);
@@ -5058,7 +5062,8 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         model.fontFrac = clamp(start.fontFrac + dy * 0.35, 0.006, 0.2);
         return false; // handled → skip default box resize
       },
-      onChange: () => { layout(); ctx.onChange && ctx.onChange(); }
+      onChange: () => { layout(); ctx.onChange && ctx.onChange(); },
+      onDragEnd: () => { ctx.onDragEnd && ctx.onDragEnd(ctrl); }
     });
 
     return ctrl;
@@ -5162,6 +5167,7 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
         getOverlaySize: () => overlaySizeFor(model.page),
         onSelect: (c, additive) => selectCtrl(c, additive),
         onChange: () => opts.onChange && opts.onChange(),
+        onDragEnd: (c) => opts.onDragEnd && opts.onDragEnd(c),
         onDelete: (c) => deleteCtrl(c),
         // peer geometries on this page (excluding self) for drag snapping
         getPeers: () => elements.filter((c) => c.model !== model && c.model.page === model.page).map((c) => c.model)
@@ -8287,6 +8293,8 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
+  // a certificate field dropped near a printed underline settles onto it
+  onDragEnd: (c) => { try { if (certMode && typeof certSnapToInk === 'function') certSnapToInk(c); } catch (e) {} },
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
@@ -8436,7 +8444,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, liftSmallFills, templates, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, liftSmallFills, templates, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -8473,6 +8481,9 @@ function vaultPrefill(det) {
   try {
     if (skipPrefillOnce) { skipPrefillOnce = false; return null; }
     if (!det || !det.fields) return null;
+    // a certificate format is filled from the STUDENT LIST, never from the
+    // clerk's own profile — a printed "שם:" blank must not get the clerk's name
+    if (certMode || certOpening) return null;
     const ap = profiles.active();
     // remembered choices (learned from manual ticks) fill gaps; an explicit
     // profile value always wins over a remembered one.
@@ -8928,6 +8939,7 @@ async function runDetection(force) {
       try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
       const nCa = fieldsPanel.show(cached, vaultPrefill(cached));
       try { liftSmallFills('cached-detect'); } catch (e) {}
+      try { if (certMode && certAnchorToDetected(true)) { if (certCard && certCard.__render) certCard.__render(); } } catch (e) {}
       PFS.toast(nCa
         ? `⚡ טופס מוכר — נפתח מיידית, ${nCa} שדות מולאו אוטומטית`
         : '⚡ טופס מוכר — נפתח מיידית (זיהוי מהזיכרון)', 'ok');
@@ -8951,6 +8963,9 @@ async function runDetection(force) {
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     try { liftSmallFills('detect'); } catch (e) {}
+    // certificate: the printed labels just found are the exact anchors for
+    // the fields that were auto-stacked before detection finished
+    try { if (certMode && certAnchorToDetected(true)) { if (certCard && certCard.__render) certCard.__render(); } } catch (e) {}
     if (det.tier === 'scanned') {
       // A scan has no text layer, so the normal detector finds nothing — but
       // OCR can read it. Waiting for the user to discover a button left whole
@@ -11498,9 +11513,42 @@ const CERT_FIELDS = [
   { key: 'תאריך סיום', sample: '15.07.2026', size: 0.024, bold: false, label: 'תאריך סיום' },
   { key: 'תאריך התחלה', sample: '01.03.2026', size: 0.024, bold: false, label: 'תאריך התחלה' },
   { key: 'תאריך הנפקה', sample: new Date().toLocaleDateString('he-IL'), size: 0.022, bold: false, label: 'תאריך הנפקה' },
+  // "שנת לימוד": the CURRENT Hebrew school year, filled by itself (a column
+  // in the list still wins when there is one)
+  { key: 'שנת לימוד', get sample() { return hebrewAcademicYear(); }, size: 0.024, bold: false, label: 'שנת לימוד' },
   { key: 'ציון', sample: '100', size: 0.028, bold: false, label: 'ציון' },
   { key: 'מספר תעודה', sample: 'מס׳ ' + new Date().getFullYear() + '-0001', size: 0.02, bold: false, label: 'מספר תעודה' }
 ];
+// ---- the Hebrew school year (תשפ״ז) ----
+// 5787 → תשפ״ז: thousands dropped, letters by value, gershayim before the
+// last letter (a single letter takes a geresh); 15/16 are ט״ו/ט״ז, never י־ה
+function hebrewYearLetters(year) {
+  let n = year % 1000;
+  const out = [];
+  [[400, 'ת'], [300, 'ש'], [200, 'ר'], [100, 'ק']].forEach(([v, l]) => { while (n >= v) { out.push(l); n -= v; } });
+  if (n === 15) { out.push('ט', 'ו'); n = 0; } else if (n === 16) { out.push('ט', 'ז'); n = 0; }
+  for (const [v, l] of [[90, 'צ'], [80, 'פ'], [70, 'ע'], [60, 'ס'], [50, 'נ'], [40, 'מ'], [30, 'ל'], [20, 'כ'], [10, 'י']]) { if (n >= v) { out.push(l); n -= v; break; } }
+  if (n) out.push(['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'][n]);
+  if (out.length === 1) return out[0] + '׳';
+  return out.slice(0, -1).join('') + '״' + out[out.length - 1];
+}
+function hebrewYearOf(date) {
+  try {
+    const s = new Intl.DateTimeFormat('en-u-ca-hebrew', { year: 'numeric' }).format(date);
+    const m = /(\d{4})/.exec(s); if (m) return +m[1];
+  } catch (e) {}
+  const y = date.getFullYear() + 3760;   // fallback: Rosh Hashana ≈ mid-September
+  return (date.getMonth() > 8 || (date.getMonth() === 8 && date.getDate() >= 15)) ? y + 1 : y;
+}
+// the school year runs September → summer: from September the year that
+// begins at the coming Tishrei (September 1st 2026 is already תשפ״ז), until
+// August the year still running
+function hebrewAcademicYear(date) {
+  const d = date || new Date();
+  const ref = d.getMonth() >= 8 ? new Date(d.getFullYear() + 1, 0, 15) : d;
+  return hebrewYearLetters(hebrewYearOf(ref));
+}
+PFS.hebrewAcademicYear = hebrewAcademicYear; PFS.hebrewYearLetters = hebrewYearLetters;
 // ---- the certificate registry: every issued certificate, with its serial ----
 // {batches:[{id, at, format, count, entries:[{serial, name, id, course}]}]}
 // A serial (2026-0041) prints on the certificate when the 🔢 field/{מספר תעודה}
@@ -11622,10 +11670,139 @@ function certPlace(pageIndex, fx, fy, key) {
   // רושם אותו טוב")
   ctrl.model.maxW = PFS.clamp(2 * Math.min(fx, 1 - fx) - 0.06, 0.2, 0.92);
   ctrl.layout();
+  ctrl.model.certAuto = [ctrl.model.fx, ctrl.model.fy];   // "untouched" marker for later anchoring
   overlay.deselectAll();
   markDirty();
   if (certCard && certCard.__render) certCard.__render();   // the card reflects every placement
   return ctrl;
+}
+// ---- precision: fields settle onto what the certificate already prints ----
+// A designed format usually carries its own labels and lines ("שנת לימוד:
+// ______"). Values must sit IN those blanks, centred, at the blank's size —
+// not float somewhere near them ("זה חייב להיראות יותר סימטרי ומדויק").
+const CERT_LABEL_KEY = [
+  ['שנת לימוד', /שנת\s*(ה)?לימוד|שנה["״]ל|שנת\s*לימודים/],
+  ['תאריך סיום', /סיום|גמר/], ['תאריך התחלה', /התחלה|תחילת|פתיחה/], ['תאריך הנפקה', /הנפקה|הופק|ניתן/],
+  ['ציון', /ציון/], ['מספר תעודה', /מס(פר)?['׳]?\s*(ה)?תעודה|סידורי/]
+];
+function certKeyForLabel(label) {
+  const L = String(label || '').trim();
+  if (!L) return null;
+  const canon = PFS.vault.matchKey(L);
+  if (canon === 'full_name') return 'שם מלא';
+  if (canon === 'id') return 'תעודת זהות';
+  for (const [k, re] of CERT_LABEL_KEY) if (re.test(L)) return k;
+  if (canon === 'course_name' || /קורס|מסלול|תכנית|תוכנית/.test(L)) return 'שם הקורס';
+  if (/תאריך|מועד/.test(L)) return 'תאריך סיום';
+  return null;
+}
+// centre a field inside a detected blank, at the blank's own size
+function certPlaceInBlank(c, f) {
+  const m = c.model;
+  if (f.page !== m.page) return false;
+  const spec = CERT_FIELDS.find((s) => s.key === m.fieldKey) || { size: 0.03 };
+  m.fontFrac = PFS.clamp(f.fh * 0.9, 0.014, spec.size);
+  m.align = 'center'; m.wrapW = null; m.cellW = null; m.cellX = null;
+  m.maxW = f.fw;
+  c.layout();
+  m.fx = PFS.clamp(f.fx + f.fw / 2 - m.fw / 2, 0, 1 - m.fw);
+  m.fy = f.fy + f.fh / 2 - m.fh / 2;
+  m.certAnchor = 'label'; m.certAuto = [m.fx, m.fy];
+  c.layout();
+  return true;
+}
+// every placed field whose meaning matches a printed label moves into that
+// label's blank. onlyUntouched: leave anything the clerk already dragged.
+function certAnchorToDetected(onlyUntouched) {
+  if (!lastDet || !lastDet.fields || !lastDet.fields.length) return 0;
+  const on = certOnPageMap();
+  const used = new Set();
+  let moved = 0;
+  Object.keys(on).forEach((key) => {
+    if (/^__/.test(key)) return;
+    const c = on[key], m = c.model;
+    if (onlyUntouched && !(m.certAuto && Math.abs(m.fx - m.certAuto[0]) < 1e-4 && Math.abs(m.fy - m.certAuto[1]) < 1e-4)) return;
+    const f = lastDet.fields.find((f2) => f2.type === 'text' && !used.has(f2) && (f2.fw || 0) > 0.03 && f2.page === m.page && certKeyForLabel(f2.label) === key);
+    if (!f) return;
+    used.add(f);
+    if (certPlaceInBlank(c, f)) moved++;
+  });
+  if (moved) { markDirty(); scheduleSnap(); }
+  return moved;
+}
+// a field DROPPED near a printed underline settles onto it: centred on the
+// line's own extent, sitting just above it (works on scanned/image formats
+// too — it reads the rendered pixels, not a text layer)
+function certSnapToInk(c) {
+  const m = c.model; if (!m || m.type !== 'text') return false;
+  const views = pdfView.viewList ? pdfView.viewList() : [];
+  const view = views[m.page], canvas = view && view.canvas;
+  if (!canvas || !canvas.width) return false;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const W = canvas.width, H = canvas.height;
+  const fh = m.fh || 0.04, fw = m.fw || 0.2;
+  const lum = (d, j) => 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+  // look from the middle of the box to a hand's width below it (a small
+  // field — an ID at 2.4% — must still find a line dropped 5% under it)
+  const yFrom = Math.max(0, Math.round((m.fy + fh * 0.5) * H)), yTo = Math.min(H - 1, Math.round((m.fy + fh + Math.max(fh * 1.5, 0.07)) * H));
+  const x0 = Math.max(0, Math.round((m.fx - fw * 0.3) * W)), x1 = Math.min(W, Math.round((m.fx + fw * 1.3) * W));
+  if (x1 - x0 < 10 || yTo <= yFrom) return false;
+  let lineY = -1;
+  for (let y = yFrom; y <= yTo; y++) {
+    const row = ctx.getImageData(x0, y, x1 - x0, 1).data; let d = 0, n = 0;
+    for (let i = 0; i < x1 - x0; i += 2) { if (lum(row, i * 4) < 140) d++; n++; }
+    if (d / n > 0.45) { lineY = y; break; }
+  }
+  if (lineY < 0) return false;
+  const rowFull = ctx.getImageData(0, lineY, W, 1).data;
+  const ink = (x) => lum(rowFull, x * 4) < 140;
+  // start from the ink nearest the field's centre, then walk to both ends
+  const cx = Math.round((m.fx + fw / 2) * W);
+  let s = -1;
+  for (let d = 0; d < (x1 - x0) / 2 && s < 0; d++) { if (cx + d < W && ink(cx + d)) s = cx + d; else if (cx - d >= 0 && ink(cx - d)) s = cx - d; }
+  if (s < 0) return false;
+  let L = s, R = s, gap = 0;
+  while (L > 0 && gap < 4) { L--; gap = ink(L) ? 0 : gap + 1; } L += gap;
+  gap = 0; while (R < W - 1 && gap < 4) { R++; gap = ink(R) ? 0 : gap + 1; } R -= gap;
+  const extent = (R - L) / W;
+  if (extent > 0.9 || extent < 0.05) return false;   // a page border / a speck
+  m.align = 'center'; m.wrapW = null; m.cellW = null; m.cellX = null; m.maxW = extent;
+  c.layout();
+  m.fx = PFS.clamp((L + R) / 2 / W - m.fw / 2, 0, 1 - m.fw);
+  m.fy = lineY / H - m.fh + m.fh * 0.12;   // the glyphs SIT on the line (baseline ≈ line), like a hand would write
+  m.certAnchor = 'line'; m.certAuto = [m.fx, m.fy];
+  c.layout(); markDirty(); scheduleSnap();
+  PFS.toast('📏 יושר על הקו המודפס', 'ok', 1500);
+  return true;
+}
+// one click: every free-floating field shares ONE axis (the page centre when
+// they are near it) and the stack gets an even rhythm — top and bottom stay,
+// the gaps between become equal. Anchored fields are left where they belong.
+function certAlignAll() {
+  const els = certPlacedFields().filter((c) => !c.model.certAnchor);
+  if (els.length < 2) return 0;
+  const cxs = els.map((c) => c.model.fx + (c.model.fw || 0) / 2);
+  const sorted = cxs.slice().sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  const axis = Math.abs(med - 0.5) < 0.02 ? 0.5 : med;
+  let n = 0;
+  const onAxis = els.filter((c, i) => Math.abs(cxs[i] - axis) < 0.05);
+  onAxis.forEach((c) => {
+    const m = c.model; m.align = 'center'; m.wrapW = null; c.layout();
+    const nx = PFS.clamp(axis - m.fw / 2, 0, 1 - m.fw);
+    if (Math.abs(nx - m.fx) > 1e-4) { m.fx = nx; n++; }
+    c.layout();
+  });
+  const col = onAxis.slice().sort((a, b) => a.model.fy - b.model.fy);
+  if (col.length >= 3) {
+    const top = col[0].model.fy, bottom = col[col.length - 1].model.fy + col[col.length - 1].model.fh;
+    const totalH = col.reduce((s, c) => s + c.model.fh, 0);
+    const gap = (bottom - top - totalH) / (col.length - 1);
+    if (gap >= 0) { let y = top; col.forEach((c) => { if (Math.abs(c.model.fy - y) > 1e-4) { c.model.fy = y; n++; } c.layout(); y += c.model.fh + gap; }); }
+  }
+  onAxis.forEach((c) => { c.model.certAuto = [c.model.fx, c.model.fy]; });
+  if (n) { markDirty(); scheduleSnap(); }
+  return n;
 }
 // a signature/stamp on a certificate: pick the saved one (or draw/upload a new
 // one); untagged, so it prints identically on every student's copy
@@ -11652,6 +11829,7 @@ function certRowDefs() {
     { key: 'תאריך סיום', label: 'תאריך סיום', icon: '📅', def: true },
     { key: 'תאריך התחלה', label: 'תאריך התחלה', icon: '📅', def: false },
     { key: 'תאריך הנפקה', label: 'תאריך הנפקה', icon: '📅', def: false },
+    { key: 'שנת לימוד', label: 'שנת לימוד (' + hebrewAcademicYear() + ' — מתמלא לבד)', icon: '🗓️', def: false },
     { key: 'ציון', label: 'ציון', icon: '💯', def: false },
     { key: 'מספר תעודה', label: 'מספר תעודה (סידורי, נרשם ביומן)', icon: '🔢', def: false },
     { key: '__signature', label: 'חתימה (מהמאגר)', icon: '✍️', def: false },
@@ -11692,6 +11870,8 @@ function certApplyChecklist(wanted) {
     const c = certPlace(0, 0.5, Math.min(y + spec.size * 0.6, 0.9), k);
     if (c) { y = c.model.fy + c.model.fh + 0.025; added++; }
   });
+  // printed labels already known → the new fields go straight into their blanks
+  if (added) { try { certAnchorToDetected(true); } catch (e) {} }
   if (added || removed) markDirty();
   return { added, removed };
 }
@@ -11793,7 +11973,8 @@ function showCertWizard() {
                : 'סמנו ✓ ליד מה שצריך להופיע — זה מופיע על התעודה מיד. אחר כך פשוט <b>גוררים</b> למקום.') +
         '</div>' +
         '<div class="cert-rows">' + rows + '</div>' +
-        '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
+        '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAlign" title="כל השדות על ציר אחד, ברווחים שווים">✨ יישור סימטרי</button><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
+        '<div class="hint muted" style="margin-bottom:6px">שדה שמשחררים ליד קו מודפס מתיישב עליו לבד; תוויות מודפסות (״שנת לימוד: ___״) נתפסות אוטומטית.</div>' +
         '<div class="gd-foot">' +
           '<button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>✓ נראה טוב — לרשימת הסטודנטים ➜</button>' +
         '</div>';
@@ -11851,6 +12032,10 @@ function showCertWizard() {
         c.model.text = inp.value; const t = c.node.querySelector('.txt'); if (t) t.textContent = inp.value;
         c.layout(); markDirty();
       }));
+      $c('certAlign').addEventListener('click', () => {
+        const n = certAlignAll();
+        PFS.toast(n ? '✨ יושרו ' + n + ' שדות — ציר אחד, רווחים שווים' : 'השדות כבר מיושרים', 'ok');
+      });
       $c('certAddOther').addEventListener('click', async () => {
         const name = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('שם השדה (כמו כותרת העמודה באקסל)', '') : Promise.resolve(window.prompt('שם השדה (כמו כותרת העמודה באקסל)')));
         if (!name || !String(name).trim()) return;
@@ -11949,7 +12134,10 @@ function certBuildRecords() {
   keys.forEach((k) => { if (certMap[k]) mapping[certMap[k]] = k; });
   const nameHeader = certMap['שם מלא'] || certMap[keys[0]] || null;
   const mapped = PFS.merge.remapRecords(certList.records, mapping);
-  const records = certList.records.map((raw, i) => Object.assign({}, raw, mapped[i], { __name: nameHeader ? raw[nameHeader] : '' }));
+  // {שנת לימוד} in a sentence resolves to the current school year unless the
+  // list has its own column (a placed FIELD keeps its own, editable text)
+  const yearDefault = (keys.includes('שנת לימוד') && !certMap['שנת לימוד'] && !certOnPageMap()['שנת לימוד']) ? { 'שנת לימוד': hebrewAcademicYear() } : {};
+  const records = certList.records.map((raw, i) => Object.assign({}, yearDefault, raw, mapped[i], { __name: nameHeader ? raw[nameHeader] : '' }));
   return { records, nameHeader, idHeader: certMap['תעודת זהות'] || null };
 }
 function certPreflightNow() {

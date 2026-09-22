@@ -3742,13 +3742,41 @@ function certLoadList(parsed, fileName) {
   // date-ish column; an unmapped date keeps the sample — type today's date
   // into it once and it prints on every certificate
   const taken = new Set(Object.values(certMap));
+  // SPLIT NAMES: most registration lists carry "שם פרטי" + "שם משפחה" and no
+  // full-name column — the certificate's name field then came out EMPTY and
+  // every row was skipped ("לא שואב את הפרטים בצורה מלאה עם שם מלא"). Compose
+  // a full-name column (first last) for every record and map to it.
+  let composedName = false;
+  if (keys.includes('שם מלא') && !certMap['שם מלא']) {
+    const V = PFS.vault;
+    const first = parsed.headers.find((h) => !taken.has(h) && V.matchKey(h) === 'first_name');
+    const last = parsed.headers.find((h) => !taken.has(h) && V.matchKey(h) === 'last_name');
+    if (first || last) {
+      const col = 'שם מלא';
+      parsed.records.forEach((r) => { r[col] = [r[first], r[last]].map((v) => String(v == null ? '' : v).trim()).filter(Boolean).join(' '); });
+      if (!parsed.headers.includes(col)) parsed.headers.push(col);
+      certMap['שם מלא'] = col; taken.add(col); composedName = true;
+    }
+  }
+  // the course column by meaning ("קורס", "מסלול") when no exact header exists
+  if (keys.includes('שם הקורס') && !certMap['שם הקורס']) {
+    const h = parsed.headers.find((hh) => !taken.has(hh) && /קורס|מסלול|course/i.test(hh));
+    if (h) { certMap['שם הקורס'] = h; taken.add(h); }
+  }
+  // the ID column by shape when its header is unusual: a column whose values
+  // are 7–9 digit numbers is the ID column
+  if (keys.includes('תעודת זהות') && !certMap['תעודת זהות']) {
+    const looksId = (h) => { const vals = parsed.records.slice(0, 20).map((r) => String(r[h] == null ? '' : r[h]).trim()).filter(Boolean); return vals.length >= 1 && vals.every((v) => /^\d{7,9}$/.test(v)); };
+    const h = parsed.headers.find((hh) => !taken.has(hh) && looksId(hh));
+    if (h) { certMap['תעודת זהות'] = h; taken.add(h); }
+  }
   keys.filter((k) => /^תאריך/.test(k) && !certMap[k]).forEach((k) => {
     const hint = CERT_DATE_HINTS[k];
     const h = (hint && parsed.headers.find((hh) => !taken.has(hh) && /תאריך|מועד/.test(hh) && hint.test(hh)))
       || parsed.headers.find((hh) => !taken.has(hh) && /תאריך|מועד/.test(hh));
     if (h) { certMap[k] = h; taken.add(h); }
   });
-  PFS.toast('📊 ' + (fileName || 'הרשימה') + ' — ' + parsed.records.length + ' סטודנטים', 'ok');
+  PFS.toast('📊 ' + (fileName || 'הרשימה') + ' — ' + parsed.records.length + ' סטודנטים' + (composedName ? ' · השם המלא הורכב משם פרטי + משפחה' : ''), 'ok', composedName ? 4500 : 3000);
   if (certCard && certCard.__render) certCard.__render();
 }
 // the records the batch will print: the sheet's raw columns (so a sentence

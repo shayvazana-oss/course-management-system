@@ -3592,6 +3592,52 @@ async function main() {
     check('🎓 sentence with {variables} fills per student; pre-flight flags bad rows and skips blanks; three previews before producing', okS);
   }
 
+  // ---- "בהנפקת התעודות הוא לא שואב את הפרטים בצורה מלאה עם שם מלא ותעודת זהות" ----
+  // real registration lists: "שם פרטי" + "שם משפחה" and no full-name column,
+  // an ID header nobody spelled the same way twice, a course column called
+  // just "קורס". The full name is composed, the ID found by header OR by the
+  // shape of its values, the course by meaning — and the certificate prints
+  // all three.
+  {
+    const splitRes = await page.evaluate(async () => {
+      const T = window.PFS.__test, M = window.PFS.merge, out = {};
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      const { PDFDocument, rgb } = window.PDFLib; const d = await PDFDocument.create();
+      d.addPage([842, 595]).drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      await T.startCertFlow(new File([await d.save()], 'תעודת-פיצול.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements();
+      T.certPlace(0, 0.5, 0.4, 'שם מלא'); T.certPlace(0, 0.5, 0.55, 'תעודת זהות'); T.certPlace(0, 0.5, 0.7, 'שם הקורס');
+      const load = (csv) => { T.certLoadList(M.parseCSV(csv), 'list.csv'); const pf = T.certPreflightNow(); return { map: T.certState().map, rows: pf.clean.map((r) => [r['שם מלא'], r['תעודת זהות'], r['שם הקורס']]), skipped: pf.issues.filter((i) => i.kind === 'empty_name').length }; };
+      out.split = load('שם משפחה,שם פרטי,ת.ז,קורס\nישראלי,ישראל,123456782,חשמלאות\nשפירא,רוני,311862528,חשמלאות');
+      out.lastOnly = load('שם משפחה,מספר ת.ז\nכהן,987654324');
+      out.oddId = load('שם ושם משפחה,מזהה,מסלול\nדנה לוי,311862528,נגרות');
+      // the produced certificate really carries the composed name + the ID
+      T.certLoadList(M.parseCSV('שם פרטי,שם משפחה,ת.ז,קורס\nרוני,שפירא,311862528,חשמלאות'), 'list.csv');
+      const zip = await T.certProduce('zip', { noDownload: true });
+      const files = window.fflate.unzipSync(zip.bytes);
+      out.zipNames = Object.keys(files);
+      const doc = await window.pdfjsLib.getDocument({ data: files['רוני שפירא.pdf'].slice(0) }).promise;
+      const p1 = await doc.getPage(1); const vp = p1.getViewport({ scale: 1 });
+      const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const inkIn = (fy0, fy1) => { const dd = cv.getContext('2d').getImageData(0, Math.round(fy0 * cv.height), cv.width, Math.round((fy1 - fy0) * cv.height)).data; let n = 0; for (let i = 0; i < dd.length; i += 4) if (dd[i] < 128) n++; return n; };
+      out.ink = { name: inkIn(0.33, 0.44), id: inkIn(0.50, 0.58), course: inkIn(0.65, 0.73) };
+      await T.goHome();
+      for (const x of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /פיצול/.test(l.name))) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+      window.PFS.ui.confirm = realConfirm;
+      return out;
+    });
+    const okSplit = splitRes.split.map['שם מלא'] === 'שם מלא' && splitRes.split.map['תעודת זהות'] === 'ת.ז' && splitRes.split.map['שם הקורס'] === 'קורס'
+      && JSON.stringify(splitRes.split.rows) === JSON.stringify([['ישראל ישראלי', '123456782', 'חשמלאות'], ['רוני שפירא', '311862528', 'חשמלאות']]) && splitRes.split.skipped === 0
+      && JSON.stringify(splitRes.lastOnly.rows) === JSON.stringify([['כהן', '987654324', undefined]])
+      && JSON.stringify(splitRes.oddId.rows) === JSON.stringify([['דנה לוי', '311862528', 'נגרות']])
+      && JSON.stringify(splitRes.zipNames) === JSON.stringify(['רוני שפירא.pdf'])
+      && splitRes.ink.name > 200 && splitRes.ink.id > 100 && splitRes.ink.course > 100;
+    if (!okSplit) console.log('  [cert split debug]', JSON.stringify(splitRes));
+    check('🎓 split first/last-name lists compose the full name; ID found by header or by value shape; course by meaning; all three print', okSplit);
+  }
+
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----
   {

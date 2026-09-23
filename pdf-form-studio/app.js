@@ -718,7 +718,7 @@ function inkCellAt(page, fx, fy, fontFrac) {
     const x0 = Math.max(0, cx - Math.round(W * 0.06)), x1 = Math.min(W, cx + Math.round(W * 0.06));
     for (let y = Math.max(0, cy - Math.round(fhPx * 0.3)); y < Math.min(H, cy + Math.round(fhPx * 1.4)); y++) {
       const row = ctx.getImageData(x0, y, x1 - x0, 1).data; let d = 0, n = 0;
-      for (let i = 0; i < x1 - x0; i += 2) { if (lum(row, i * 4) < 140) d++; n++; }
+      for (let i = 0; i < x1 - x0; i += 2) { if (lum(row, i * 4) < 175) d++; n++; }
       if (d / n > 0.6) { out.lineY = y / H; break; }
     }
     // vertical borders left/right of the tap on the tap's own row band
@@ -1121,7 +1121,7 @@ async function openPdfFile(file) {
     fieldsPanel.clear();
     resetHistory();
     mergeParsed = null;
-    $('dropzone').style.display = 'none';
+    $('dropzone').style.display = 'none'; document.body.classList.remove('home');
     await pdfView.load(buf);
     // a phone screen never fits an A4 at 100% — start fitted so the whole
     // page is visible and fingers pan less
@@ -1216,7 +1216,7 @@ async function openPdfFile(file) {
   } catch (e) {
     console.error(e);
     PFS.toast(loadErrorMessage(e), 'err', 5000);
-    if (!pdfView.hasDoc()) { $('dropzone').style.display = ''; $('docbar').classList.add('hidden'); }
+    if (!pdfView.hasDoc()) { $('dropzone').style.display = ''; document.body.classList.add('home'); $('docbar').classList.add('hidden'); }
   }
 }
 // Turn a pdf.js load error into an actionable Hebrew message. Password-protected
@@ -1265,7 +1265,7 @@ async function goHome() {
   resetHistory();
   $('docbar').classList.add('hidden');
   $('fname').textContent = '—';
-  $('dropzone').style.display = '';
+  $('dropzone').style.display = ''; document.body.classList.add('home');
   try { renderRecent(); } catch (e) {}   // the history strip greets the return home
   ['exportBtn', 'tmplBtn', 'mergeBtn', 'detectBtn', 'clearBtn', 'enhanceBtn',
    'rotateBtn', 'attachBtn', 'deleteBtn', 'exportFlatBtn', 'fillAllBtn'
@@ -3675,12 +3675,12 @@ function certSnapToInk(c) {
   let lineY = -1;
   for (let y = yFrom; y <= yTo; y++) {
     const row = ctx.getImageData(x0, y, x1 - x0, 1).data; let d = 0, n = 0;
-    for (let i = 0; i < x1 - x0; i += 2) { if (lum(row, i * 4) < 140) d++; n++; }
+    for (let i = 0; i < x1 - x0; i += 2) { if (lum(row, i * 4) < 175) d++; n++; }
     if (d / n > 0.45) { lineY = y; break; }
   }
   if (lineY < 0) return false;
   const rowFull = ctx.getImageData(0, lineY, W, 1).data;
-  const ink = (x) => lum(rowFull, x * 4) < 140;
+  const ink = (x) => lum(rowFull, x * 4) < 175;
   // start from the ink nearest the field's centre, then walk to both ends
   const cx = Math.round((m.fx + fw / 2) * W);
   let s = -1;
@@ -3824,7 +3824,8 @@ function closeCertWizard() {
 // certificate stays fully visible), floating over the page on a phone
 function mountCertCard(card) {
   const dock = $('certDock');
-  if (dock && window.innerWidth >= 900) {
+  // on the home screen the side panel is hidden — the card floats instead
+  if (dock && window.innerWidth >= 900 && pdfView.hasDoc() && !document.body.classList.contains('home')) {
     card.classList.add('docked');
     dock.innerHTML = '';
     dock.appendChild(card);
@@ -5076,6 +5077,8 @@ async function renderRecent(filter) {
   }
 }
 renderRecent();
+document.body.classList.toggle('home', !pdfView.hasDoc());
+$('homeLibBtn') && $('homeLibBtn').addEventListener('click', () => $('libBtn').click());
 
 // A PDF shared into the app (WhatsApp → share → Fillo): sw.js stashed it,
 // pick it up and open like a normal file — the whole smart pipeline

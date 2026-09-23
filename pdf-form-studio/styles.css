@@ -1,51 +1,57 @@
 @import url('./vendor/fonts/heebo.css');
 
 /* ============================================================= *
- *  Fillo — "Studio" design system
- *  Calm, professional document workspace. Navy primary, amber
- *  accent used sparingly, warm-cool neutrals, real hierarchy.
+ *  Fillo — "Paper & Ink" design system
+ *  Cream paper, ink outlines, one lime action colour, a violet pop,
+ *  hard offset shadows. Playful but still a serious document tool.
  * ============================================================= */
 :root {
-  --font: 'Heebo', 'Segoe UI', 'Arial', sans-serif;
+  --font: 'Rubik', 'Heebo', 'Segoe UI', 'Arial', sans-serif;
   --mono: ui-monospace, 'JetBrains Mono', monospace;
 
-  --canvas: #EAEDEE;
-  --surface: #FFFFFF;
-  --surface-2: #F4F6F7;
-  --surface-3: #EBEFF0;
+  --canvas: #F1F1E7;
+  --surface: #FCFCF7;
+  --surface-2: #F4F4EA;
+  --surface-3: #E9E9DC;
   --paper: #FFFFFF;
 
-  --ink-1: #15201F;
-  --ink-2: #3A4746;
-  --ink-3: #667472;
-  --ink-4: #97A4A2;
-  --line: #E2E7E6;
-  --line-2: #CBD3D2;
+  --ink-1: #15170F;
+  --ink-2: #3B3F33;
+  --ink-3: #6B7061;
+  --ink-4: #9A9F90;
+  --line: #DCDCCD;
+  --line-2: #C4C5B4;
 
-  /* petrol teal — distinctive, trustworthy, not the default SaaS navy */
-  --brand: #0E6E78;
-  --brand-600: #0B5C65;
-  --brand-700: #094C54;
-  --brand-800: #073E45;
-  --brand-soft: #E1F0F1;
-  /* amber used sparingly as the "official seal" accent */
-  --accent: #DE9327;
-  --accent-600: #C27C17;
+  /* the ACTION colour is ink itself; lime is the highlight it sits on */
+  --brand: #15170F;
+  --brand-600: #000000;
+  --brand-700: #000000;
+  --brand-800: #000000;
+  --brand-soft: #EAF7BF;
+  --lime: #C6F135; --lime-600: #B2E21C; --on-lime: #15170F;
+  --violet: #6D4AFF; --violet-soft: #E9E3FF;
+  /* amber stays for warnings / the "official seal" moments */
+  --accent: #F2A93B;
+  --accent-600: #D98F1F;
   --accent-soft: #FBEFD8;
 
-  --ok: #10875A; --ok-soft: #E4F5EC;
-  --danger: #D0453F; --danger-soft: #FBECEB;
+  --ok: #1C8A4C; --ok-soft: #E3F5E8;
+  --danger: #D9463F; --danger-soft: #FBECEB;
   --warn: #C9821B;
 
-  --shadow-1: 0 1px 2px rgba(19,28,43,.06), 0 1px 1px rgba(19,28,43,.04);
-  --shadow-2: 0 4px 14px rgba(19,28,43,.10);
-  --shadow-3: 0 16px 40px rgba(19,28,43,.18);
-  --shadow-pop: 0 8px 28px rgba(19,28,43,.16);
-  --ring: 0 0 0 3px rgba(14,110,120,.20);
+  --shade: var(--ink-1);                      /* hard-shadow colour */
+  --hard: 3px 3px 0 var(--shade);
+  --hard-sm: 2px 2px 0 var(--shade);
+  --hard-lg: 6px 6px 0 var(--shade);
+  --shadow-1: 0 1px 2px rgba(21,23,15,.06);
+  --shadow-2: 0 4px 14px rgba(21,23,15,.10);
+  --shadow-3: 6px 6px 0 var(--shade);
+  --shadow-pop: 4px 4px 0 rgba(21,23,15,.22);
+  --ring: 0 0 0 3px rgba(198,241,53,.65);
 
-  --dot: rgba(20,24,31,.045);   /* viewport grid dots — theme-aware */
+  --dot: rgba(21,23,15,.07);   /* viewport grid dots — theme-aware */
 
-  --r: 12px; --r-sm: 8px; --r-lg: 18px;
+  --r: 14px; --r-sm: 10px; --r-lg: 20px;
   --rail-w: 172px; --panel-w: 340px; --topbar-h: 60px;
 }
 
@@ -54,27 +60,31 @@
  * scanned/printed forms remain legible, exactly like a desktop PDF reader.
  * Tokens are redefined; components keep styling through the variables. */
 :root[data-theme="dark"] {
-  --canvas: #0E1621; --surface: #172230; --surface-2: #1E2A3A; --surface-3: #263447;
+  --canvas: #101210; --surface: #191C17; --surface-2: #21251E; --surface-3: #2B3027;
   --paper: #FFFFFF;
-  --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
-  --line: #263243; --line-2: #35435A;
-  --brand-soft: #0E2A2D; --accent-soft: #2C2213;
-  --ok-soft: #10281E; --danger-soft: #2E1714;
-  --dot: rgba(255,255,255,.05);
+  --ink-1: #F1F2E8; --ink-2: #C9CCBD; --ink-3: #969A8B; --ink-4: #6E7265;
+  --line: #2E332A; --line-2: #3D4338;
+  --brand: #F1F2E8; --brand-600: #FFFFFF; --brand-700: #FFFFFF; --brand-800: #FFFFFF;
+  --brand-soft: #2C3A10; --accent-soft: #33260E; --violet-soft: #241C4A;
+  --ok-soft: #12281A; --danger-soft: #2E1714;
+  --shade: #000000;
+  --dot: rgba(255,255,255,.06);
   --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
-  --shadow-3: 0 18px 44px rgba(0,0,0,.6); --shadow-pop: 0 8px 30px rgba(0,0,0,.55);
+  --shadow-pop: 4px 4px 0 rgba(0,0,0,.6);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --canvas: #0E1621; --surface: #172230; --surface-2: #1E2A3A; --surface-3: #263447;
+    --canvas: #101210; --surface: #191C17; --surface-2: #21251E; --surface-3: #2B3027;
     --paper: #FFFFFF;
-    --ink-1: #EAF1F9; --ink-2: #BFCBDA; --ink-3: #8E9BAD; --ink-4: #66748A;
-    --line: #263243; --line-2: #35435A;
-    --brand-soft: #0E2A2D; --accent-soft: #2C2213;
-    --ok-soft: #10281E; --danger-soft: #2E1714;
-    --dot: rgba(255,255,255,.05);
+    --ink-1: #F1F2E8; --ink-2: #C9CCBD; --ink-3: #969A8B; --ink-4: #6E7265;
+    --line: #2E332A; --line-2: #3D4338;
+    --brand: #F1F2E8; --brand-600: #FFFFFF; --brand-700: #FFFFFF; --brand-800: #FFFFFF;
+    --brand-soft: #2C3A10; --accent-soft: #33260E; --violet-soft: #241C4A;
+    --ok-soft: #12281A; --danger-soft: #2E1714;
+    --shade: #000000;
+    --dot: rgba(255,255,255,.06);
     --shadow-1: 0 1px 2px rgba(0,0,0,.4); --shadow-2: 0 4px 16px rgba(0,0,0,.5);
-    --shadow-3: 0 18px 44px rgba(0,0,0,.6); --shadow-pop: 0 8px 30px rgba(0,0,0,.55);
+    --shadow-pop: 4px 4px 0 rgba(0,0,0,.6);
   }
 }
 
@@ -615,3 +625,172 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .course-chip.on { border-style: solid; border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
 .course-chip .cc-arrow { margin-inline-start: auto; opacity: .7; }
 .course-chip:hover { filter: brightness(0.97); }
+
+/* ============================================================= *
+ *  PAPER & INK — component layer. Everything below sits on top of the
+ *  base rules: ink outlines (1.5px), hard offset shadows, lime for the
+ *  one action that matters, violet for "smart" moments, rounded corners.
+ * ============================================================= */
+body { font-weight: 500; }
+b, strong, h1, h2, h3, .brand .title, .gd-q, .dropzone h2 { font-weight: 800; letter-spacing: -.01em; }
+
+/* buttons: outlined, hard shadow, they PRESS */
+.btn { border: 1.5px solid var(--ink-1); border-radius: 12px; box-shadow: var(--hard); font-weight: 700; background: var(--surface); color: var(--ink-1);
+  transition: transform .08s, box-shadow .08s, background .15s; }
+.btn:hover { background: var(--brand-soft); border-color: var(--ink-1); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shade); }
+.btn.sm { border-radius: 10px; box-shadow: var(--hard-sm); }
+.btn.sm:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--shade); }
+.btn.primary, .topbar .btn.primary { background: var(--lime); border-color: var(--ink-1); color: var(--on-lime); box-shadow: var(--hard); }
+.btn.primary:hover, .topbar .btn.primary:hover { background: var(--lime-600); border-color: var(--ink-1); box-shadow: var(--hard); }
+.btn.accent, .topbar .btn.accent { background: var(--violet); border-color: var(--ink-1); color: #fff; box-shadow: var(--hard); }
+.btn.accent:hover, .topbar .btn.accent:hover { background: #5B3BE6; border-color: var(--ink-1); box-shadow: var(--hard); }
+.btn.ghost { border-color: transparent; box-shadow: none; background: transparent; }
+.btn.ghost:hover { background: var(--surface-3); border-color: transparent; }
+.btn:disabled, .topbar .btn:disabled { box-shadow: none; transform: none; opacity: .45; }
+.btn:focus-visible, .rail-btn:focus-visible, .tab:focus-visible { box-shadow: var(--ring); }
+
+/* shell */
+.topbar { background: var(--surface); border-bottom: 1.5px solid var(--ink-1); box-shadow: none; }
+.brand .logo { background: var(--lime); color: var(--on-lime); border: 1.5px solid var(--ink-1); border-radius: 11px; box-shadow: var(--hard-sm); }
+.brand .logo svg path[fill="#fff"] { fill: var(--on-lime); }
+.brand .title { font-size: 17px; }
+.docbar .fname, .zoomctl { border: 1.5px solid var(--ink-1); background: var(--surface); color: var(--ink-1); }
+.zoomctl button:hover { background: var(--brand-soft); }
+.rail { border-inline-end: 1.5px solid var(--ink-1); }
+.rail-group { border-bottom: 1.5px dashed var(--line-2); }
+.rail-btn { border-radius: 11px; font-weight: 600; }
+.rail-btn:hover { background: var(--surface-3); }
+.rail-btn.active { background: var(--lime); color: var(--on-lime); border-color: var(--ink-1); box-shadow: var(--hard-sm); }
+.rightpanel { border-inline-start: 1.5px solid var(--ink-1); }
+.tabs { border-bottom: 1.5px solid var(--ink-1); }
+.tab { border-radius: 11px 11px 0 0; }
+.tab.active { color: var(--ink-1); border-bottom: 3px solid var(--lime); background: var(--brand-soft); }
+.thumbs { border-inline-start: 1.5px solid var(--ink-1); box-shadow: none; }
+.thumb { border: 1.5px solid var(--ink-1); border-radius: 10px; }
+.thumb:hover { box-shadow: var(--hard-sm); }
+.thumb.current { border-color: var(--ink-1); box-shadow: 3px 3px 0 var(--lime); }
+.page-wrap { border-radius: 4px; outline: 1px solid rgba(21,23,15,.35); box-shadow: 6px 6px 0 rgba(21,23,15,.10); }
+
+/* cards, fields, chips */
+.card { border: 1.5px solid var(--ink-1); border-radius: 16px; box-shadow: var(--hard); background: var(--surface); }
+.card > h3 { background: var(--surface-2); border-bottom: 1.5px solid var(--ink-1); font-size: 13px; padding: 12px 14px; }
+.card > h3::before { background: var(--lime); width: 4px; opacity: 1; border-radius: 0; top: 0; bottom: 0; }
+input[type=text], input[type=number], select, textarea { border: 1.5px solid var(--ink-1); border-radius: 11px; background: var(--surface); }
+input:focus, select:focus, textarea:focus { border-color: var(--ink-1); box-shadow: var(--ring); }
+input[type=color] { border: 1.5px solid var(--ink-1); border-radius: 11px; }
+input[type=range], .cert-row input[type=checkbox], .qs-radio .qs-r input { accent-color: var(--ink-1); }
+.seg { border: 1.5px solid var(--ink-1); background: var(--surface); border-radius: 12px; }
+.seg button { color: var(--ink-3); }
+.seg button.on { background: var(--lime); color: var(--on-lime); box-shadow: none; }
+.pill { background: var(--lime); color: var(--on-lime); border: 1px solid var(--ink-1); }
+.tmpl-item { border: 1.5px solid var(--ink-1); border-radius: 12px; background: var(--surface); transition: transform .08s, box-shadow .08s, background .12s; }
+.tmpl-item:hover { background: var(--brand-soft); box-shadow: var(--hard-sm); transform: translate(-1px, -1px); }
+.asset { border: 1.5px solid var(--ink-1); border-radius: 12px; }
+.asset:hover { box-shadow: var(--hard-sm); }
+.asset.is-default { border-color: var(--ink-1); box-shadow: 3px 3px 0 var(--lime); }
+.asset.empty { border-style: dashed; box-shadow: none; }
+.help-card { border: 1.5px solid var(--ink-1); border-radius: 12px; }
+kbd { border: 1.5px solid var(--ink-1); border-bottom-width: 3px; border-radius: 6px; }
+.hw-grid .g { border: 1px solid var(--line-2); border-radius: 8px; }
+.hw-grid .g.cur { border-color: var(--ink-1); box-shadow: 2px 2px 0 var(--lime); color: var(--ink-1); }
+.sec-title { color: var(--ink-3); }
+.course-chip { border: 1.5px dashed var(--ink-1); background: var(--surface); }
+.course-chip.on { border-style: solid; border-color: var(--ink-1); background: var(--lime); color: var(--on-lime); }
+#fieldsBody input.fp-auto { border-inline-start: 4px solid var(--violet); background: linear-gradient(90deg, var(--violet-soft), transparent 24%); }
+.fp-clear-auto { color: var(--ink-1); border-color: var(--ink-1); background: var(--violet-soft); }
+.pat-dd { border: 1.5px solid var(--ink-1); box-shadow: var(--hard); border-radius: 14px; }
+.pat-dd-item:hover { background: var(--brand-soft); }
+.pat-dd-item.free { color: var(--violet); border-top: 1.5px solid var(--ink-1); }
+
+/* the empty state — a playful paper card with lime + violet shapes behind the illustration */
+.dropzone { border: 1.5px solid var(--ink-1); border-radius: 26px; box-shadow: var(--hard-lg); background: var(--surface); padding-top: 48px; }
+.dropzone.hot { border: 2px dashed var(--ink-1); background: var(--brand-soft); }
+.dropzone .big { position: relative; display: inline-block; margin-bottom: 14px; }
+.dropzone .big::before { content: ''; position: absolute; inset: 10px -22px -4px 26px; background: var(--lime); border: 1.5px solid var(--ink-1); border-radius: 26px; transform: rotate(-7deg); z-index: 0; }
+.dropzone .big::after { content: ''; position: absolute; width: 48px; height: 48px; right: -34px; top: -4px; background: var(--violet); border: 1.5px solid var(--ink-1); border-radius: 50%; z-index: 0; box-shadow: var(--hard-sm); }
+.dropzone .big svg { position: relative; z-index: 1; filter: drop-shadow(3px 3px 0 rgba(21,23,15,.18)); }
+.dropzone h2 { font-size: 27px; }
+.dz-step { border: 1.5px solid var(--ink-1); border-radius: 16px; box-shadow: var(--hard-sm); background: var(--surface); }
+.dz-step:hover { transform: translate(-1px, -1px); box-shadow: var(--hard); }
+.dz-step .n { background: var(--lime); color: var(--on-lime); border: 1.5px solid var(--ink-1); box-shadow: none; width: 26px; height: 26px; }
+.dz-step .t { color: var(--ink-1); }
+
+/* toasts, modals, floating cards */
+.toast { background: var(--ink-1); color: var(--canvas); border: 1.5px solid var(--ink-1); border-radius: 14px; border-inline-start: 6px solid var(--lime); box-shadow: var(--shadow-pop); font-weight: 600; }
+.toast.ok { border-inline-start-color: var(--lime); }
+.toast.err { border-inline-start-color: #FF6B5B; }
+.modal-back { background: rgba(21,23,15,.45); backdrop-filter: blur(3px); }
+.modal { border: 1.5px solid var(--ink-1); border-radius: 22px; box-shadow: var(--hard-lg); }
+.modal header { border-bottom: 1.5px solid var(--ink-1); background: var(--surface-2); font-weight: 800; }
+.modal footer { border-top: 1.5px solid var(--ink-1); }
+.gd-card { border: 1.5px solid var(--ink-1); border-radius: 22px; box-shadow: var(--hard-lg); }
+.cert-card.docked { box-shadow: var(--hard); }
+.gd-progwrap { background: var(--surface-3); height: 4px; }
+.gd-prog { background: var(--lime); }
+.gd-chip { border: 1.5px solid var(--ink-1); color: var(--ink-1); background: var(--surface); box-shadow: var(--hard-sm); }
+.gd-chip:hover { background: var(--lime); color: var(--on-lime); }
+.gd-in:focus { border-bottom-color: var(--ink-1); }
+.cert-row { border: 1.5px solid var(--line-2); border-radius: 12px; }
+.cert-row:hover { border-color: var(--ink-1); }
+.cert-row.on { background: var(--brand-soft); border-color: var(--ink-1); }
+.cert-where, .cert-fixed { border: 1.5px solid var(--line-2); border-radius: 9px; }
+.cert-arm { background: var(--ink-1); border: 1.5px solid var(--lime); color: var(--canvas); }
+.cert-thumbs img { border: 1.5px solid var(--ink-1); border-radius: 8px; box-shadow: var(--hard-sm); }
+.align-bar { border: 1.5px solid var(--ink-1); box-shadow: var(--hard); border-radius: 14px; }
+.align-btn:hover { background: var(--brand-soft); color: var(--ink-1); border-color: transparent; }
+.tour-hole { box-shadow: 0 0 0 9999px rgba(21,23,15,.6), 0 0 0 3px var(--lime), 0 0 0 4.5px var(--ink-1); }
+.tour-bubble { border: 1.5px solid var(--ink-1); box-shadow: var(--hard-lg); border-radius: 18px; }
+.tour-title { color: var(--ink-1); }
+
+/* export review */
+.ex-dot { background: var(--lime); box-shadow: 0 0 0 2px var(--ink-1); }
+.ex-name, .ex-pill { border: 1.5px solid var(--ink-1); background: var(--surface); color: var(--ink-1); }
+.ex-pill b { color: var(--violet); }
+.ex-stage { border-inline-start: 1.5px solid var(--ink-1); }
+.ex-pager { border-top: 1.5px solid var(--ink-1); }
+.ex-nav { border: 1.5px solid var(--ink-1); border-radius: 10px; }
+.ex-nav:hover:not(:disabled) { background: var(--lime); border-color: var(--ink-1); color: var(--on-lime); }
+.ex-chk { border-width: 1.5px; border-radius: 12px; }
+.ex-sum { border: 1.5px solid var(--ink-1); border-radius: 14px; }
+.ex-sum-row .v { color: var(--ink-1); }
+.ex-switch { border: 1.5px solid var(--ink-1); border-radius: 14px; background: var(--surface); }
+.ex-switch:hover { background: var(--brand-soft); border-color: var(--ink-1); }
+.ex-sw { width: 46px; height: 26px; background: var(--surface-3); border: 1.5px solid var(--ink-1); box-sizing: border-box; }
+.ex-sw::after { top: 2px; inset-inline-start: 2px; width: 19px; height: 19px; background: var(--surface); border: 1.5px solid var(--ink-1); box-sizing: border-box; box-shadow: none; }
+.ex-switch input:checked + .ex-sw { background: var(--lime); }
+.ex-switch input:checked + .ex-sw::after { transform: translateX(-19px); background: var(--ink-1); }
+:dir(ltr) .ex-switch input:checked + .ex-sw::after { transform: translateX(19px); }
+.ex-canvas { border: 1.5px solid var(--ink-1); box-shadow: var(--hard); }
+
+/* on-page elements */
+.el:hover { border-color: rgba(21,23,15,.45); }
+.el.selected { border-color: var(--ink-1); box-shadow: 0 0 0 2px rgba(198,241,53,.75); }
+.el.text .txt { caret-color: var(--ink-1); }
+.handle { border-color: var(--ink-1); background: var(--lime); }
+.el .mini-del { border-color: var(--ink-1); }
+.el[data-tag]::after { background: var(--ink-1); color: var(--lime); }
+.field-marker { background: rgba(198,241,53,.30); box-shadow: inset 0 0 0 1.5px rgba(21,23,15,.55); border-radius: 6px; }
+.field-marker:hover { background: rgba(198,241,53,.55) !important; box-shadow: inset 0 0 0 2px var(--ink-1); }
+.field-marker.active { background: rgba(109,74,255,.16) !important; box-shadow: inset 0 0 0 2px var(--violet), 0 0 0 4px rgba(109,74,255,.18); }
+.el.rect.selected { box-shadow: 0 0 0 2px var(--ink-1); }
+.pfs-marquee { border-color: var(--ink-1) !important; background: rgba(198,241,53,.25) !important; }
+::selection { background: var(--lime); color: var(--on-lime); }
+
+/* ===== TOPBAR THAT ALWAYS FITS =====
+ * The old 1fr / auto / 1fr grid gave both side columns the min-content width
+ * of the WIDER one (the action buttons), so on a 1280px laptop the bar grew
+ * to ~1500px and — in RTL — slid off the left edge with the export button on
+ * it. Brand and actions take what they need, the document bar gets the rest
+ * (centred inside it) and is allowed to shrink; ghost-button labels collapse
+ * to icons below 1400px, the two primary actions always keep their words. */
+.topbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+.tb-center { min-width: 0; overflow: hidden; display: flex; justify-content: center; }
+.docbar { min-width: 0; max-width: 100%; }
+.docbar .fname { flex: 0 1 auto; min-width: 40px; }
+@media (max-width: 1400px) {
+  .tb-left .btn.ghost .txt { display: none; }
+  .tb-left .btn.ghost { padding: 9px 10px; }
+  .tb-left { gap: 6px; }
+  .brand .sub { display: none; }
+}

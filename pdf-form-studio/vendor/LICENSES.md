@@ -13,7 +13,9 @@ and fonts so the app runs fully offline with no CDN. Each retains its own licens
 | tesseract.js-core (wasm) | — | Apache-2.0 | `tesseract/tesseract-core-simd-lstm.*` |
 | Hebrew traineddata (tessdata) | — | Apache-2.0 | `tesseract/tessdata/heb.traineddata` |
 | Heebo (via @fontsource/heebo) | — | SIL OFL 1.1 | `fonts/Heebo-*.woff2` |
+| Rubik (Google Fonts, variable) | v31 | SIL OFL 1.1 | `fonts/Rubik-*.woff2` |
 
 - pdf-lib — https://github.com/Hopding/pdf-lib (MIT)
 - pdf.js — https://github.com/mozilla/pdf.js (Apache-2.0)
 - Heebo — https://fonts.google.com/specimen/Heebo (SIL Open Font License 1.1)
+- Rubik — https://fonts.google.com/specimen/Rubik (SIL Open Font License 1.1)

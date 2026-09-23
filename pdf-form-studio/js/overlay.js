@@ -56,8 +56,8 @@
       const defW = placing.defW || 0.2, defH = placing.defH || 0.03;
       const box = document.createElement('div');
       box.className = 'pfs-marquee';
-      box.style.cssText = 'position:absolute;border:1.5px dashed var(--brand,#0E6E78);' +
-        'background:rgba(14,110,120,.12);pointer-events:none;z-index:9999;border-radius:2px;';
+      box.style.cssText = 'position:absolute;border:1.5px dashed var(--ink-1,#15170F);' +
+        'background:rgba(198,241,53,.25);pointer-events:none;z-index:9999;border-radius:2px;';
       overlayEl.appendChild(box);
       let cfx = sfx, cfy = sfy;
       const draw = () => {

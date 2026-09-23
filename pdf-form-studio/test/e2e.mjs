@@ -2089,27 +2089,97 @@ async function main() {
       : JSON.stringify({ healed, noDrift, innerScrolled, stillNoDrift });
   }) === true);
 
-  // ---- click-to-fill: tapping a marker on the form focuses its row ----
-  check('clicking a field marker on the form focuses its input row', await page.evaluate(async () => {
+  // ---- click-to-fill: tapping a marker on the form opens a caret IN the field, on the page ----
+  check('clicking a field marker on the form opens a caret in that field on the page (panel row lit, synced on blur)', await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const T = window.PFS.__test;
+    // detection must know these fields — the marker tap resolves through it
     const det = { tier: 'text', fields: [
       { page: 0, fieldKey: 'm_a', label: 'שדה א', fx: 0.2, fy: 0.2, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' },
       { page: 0, fieldKey: 'm_b', label: 'שדה ב', fx: 0.2, fy: 0.35, fw: 0.2, fh: 0.03, fontFrac: 0.02, type: 'text' }
     ] };
-    T.fieldsPanel.show(det);
+    T.setLastDet(det); T.fieldsPanel.show(det);
     await wait(100);
     const marker = document.querySelector('.field-marker[data-key="m_b"]');
     if (!marker) return 'no marker';
     const clickable = getComputedStyle(marker).pointerEvents !== 'none';
     marker.click();
     await wait(350);
-    const focused = document.activeElement && document.activeElement.__fkey === 'm_b';
-    // and focusing lights the marker (panel ↔ form link)
+    const el = T.overlay.getElements().find((c) => c.model.fieldKey === 'm_b');
+    if (!el) return 'marker tap created no element';
+    const caretOnPage = !!el && document.activeElement === el.node.querySelector('.txt');
     const active = marker.classList.contains('active');
-    T.fieldsPanel.clear(); T.overlay.clearElements();
-    return (clickable && focused && active) ? true : JSON.stringify({ clickable, focused, active });
+    // type on the page, blur → the panel row carries the value
+    document.execCommand('insertText', false, 'ערך מהדף');
+    await wait(80);
+    el.node.querySelector('.txt').blur();
+    await wait(120);
+    const row = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === 'm_b');
+    const synced = row && row.value === 'ערך מהדף';
+    T.fieldsPanel.clear(); T.overlay.clearElements(); T.setLastDet(null);
+    return (clickable && caretOnPage && active && synced) ? true : JSON.stringify({ clickable, caretOnPage, active, synced, rowVal: row && row.value });
   }) === true);
+
+  // ---- "לוחצים על המשבצת ומקלידים": a tap on empty paper opens a caret there ----
+  // the box reads the printed page: sits on a ruled line, walled by a table
+  // cell's borders; Hebrew grows leftward from the tap; a stray tap vanishes
+  {
+    const qt = await page.evaluate(async () => {
+      const T = window.PFS.__test, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const { PDFDocument, rgb } = window.PDFLib; const d = await PDFDocument.create();
+      const pg = d.addPage([595, 842]); pg.drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+      // a ruled line (y 30% down, x 20%→70%) and a table cell (x 40%→75%, y 55%→60%)
+      pg.drawLine({ start: { x: 119, y: 589 }, end: { x: 417, y: 589 }, thickness: 1.5, color: rgb(0.2, 0.2, 0.2) });
+      pg.drawRectangle({ x: 238, y: 337, width: 208, height: 42, borderColor: rgb(0.2, 0.2, 0.2), borderWidth: 1.5 });
+      await T.openPdfFile(new File([await d.save()], 'quick.pdf', { type: 'application/pdf' }));
+      await wait(1800);
+      T.overlay.clearElements(); T.fieldsPanel.clear(); T.setLastDet(null);
+      const ov = document.querySelector('.overlay'); const r = ov.getBoundingClientRect();
+      const tap = (fx, fy) => {
+        const x = r.left + fx * r.width, y = r.top + fy * r.height;
+        ov.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 }));
+        ov.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, button: 0, bubbles: true, pointerId: 1 }));
+      };
+      const out = {};
+      // 1) above the ruled line
+      tap(0.5, 0.285); await wait(120);
+      let el = T.overlay.getElements()[0];
+      if (!el) return { noEl: true };
+      out.line = el ? { focused: document.activeElement === el.node.querySelector('.txt'), bottom: el.model.fy + el.model.fh, size: el.model.fontFrac } : null;
+      document.execCommand('insertText', false, 'ישראל'); await wait(60);
+      const right1 = el.model.fx + el.model.fw;
+      document.execCommand('insertText', false, ' ישראלי הארוך'); await wait(60);
+      out.rtl = { right1, right2: el.model.fx + el.model.fw, text: el.model.text, grewLeft: el.model.fx < 0.5 - 0.02 };
+      el.node.querySelector('.txt').blur(); await wait(100);
+      // 2) inside the drawn cell → cell wall from the borders
+      tap(0.6, 0.575); await wait(120);
+      el = T.overlay.getElements()[1];
+      out.cell = el ? { cellX: el.model.cellX, cellW: el.model.cellW } : null;
+      document.execCommand('insertText', false, 'לימודי חוץ'); await wait(60);
+      el.node.querySelector('.txt').blur(); await wait(100);
+      // 3) a stray tap: nothing typed → the box is gone on blur
+      tap(0.5, 0.8); await wait(120);
+      const n3 = T.overlay.getElements().length;
+      const stray = T.overlay.getElements()[2]; if (stray) stray.node.querySelector('.txt').blur(); await wait(150);
+      out.stray = { during: n3, after: T.overlay.getElements().length };
+      // 4) a tap while something is selected opens the next caret at once (no "deselect click" first)
+      T.overlay.selectCtrl(T.overlay.getElements()[0]);
+      tap(0.5, 0.9); await wait(120);
+      const nxt = T.overlay.getElements()[2];
+      out.deselect = { n: T.overlay.getElements().length, caret: !!nxt && document.activeElement === nxt.node.querySelector('.txt') };
+      if (nxt) nxt.node.querySelector('.txt').blur(); await wait(150);
+      T.overlay.clearElements();
+      return out;
+    });
+    const near = (v, t, tol) => typeof v === 'number' && Math.abs(v - t) <= tol;
+    const ok = qt.line && qt.line.focused && near(qt.line.bottom, 0.30, 0.012) && qt.line.size >= 0.0135 - 1e-6
+      && qt.rtl.text === 'ישראל ישראלי הארוך' && near(qt.rtl.right2, qt.rtl.right1, 0.004) && qt.rtl.grewLeft
+      && qt.cell && near(qt.cell.cellX, 0.404, 0.01) && near(qt.cell.cellW, 0.34, 0.015)
+      && qt.stray.during === 3 && qt.stray.after === 2
+      && qt.deselect.n === 3 && qt.deselect.caret;
+    if (!ok) console.log('  [quick text debug]', JSON.stringify(qt));
+    check('tap on empty paper opens a caret there: sits on the ruled line, walled by the cell, Hebrew grows leftward, stray taps vanish', ok);
+  }
 
   // ---- document library: permanent one-click forms ----
   check('library stores, lists, opens and removes a form', await page.evaluate(async () => {

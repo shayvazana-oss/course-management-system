@@ -181,8 +181,18 @@
 
     if (!isBox) {
       inner.addEventListener('input', () => {
+        // Hebrew grows LEFTWARD from where it started: the right edge stays
+        // planted while typing (an unwrapped box is left-anchored by geometry,
+        // which made a value typed on the page creep past its cell's right side)
+        const rightBefore = model.fx + (model.fw || 0);
+        const rtlBefore = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
+        const rtlNow = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
+        if (rtlNow && (rtlBefore || model.align === 'right') && !model.wrapW) {
+          const nx = rightBefore - model.fw;
+          if (nx >= 0 && Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
+        }
         ctx.onChange && ctx.onChange();
       });
       inner.addEventListener('blur', () => {

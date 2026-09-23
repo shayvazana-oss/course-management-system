@@ -5026,8 +5026,18 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 
     if (!isBox) {
       inner.addEventListener('input', () => {
+        // Hebrew grows LEFTWARD from where it started: the right edge stays
+        // planted while typing (an unwrapped box is left-anchored by geometry,
+        // which made a value typed on the page creep past its cell's right side)
+        const rightBefore = model.fx + (model.fw || 0);
+        const rtlBefore = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
+        const rtlNow = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
+        if (rtlNow && (rtlBefore || model.align === 'right') && !model.wrapW) {
+          const nx = rightBefore - model.fw;
+          if (nx >= 0 && Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
+        }
         ctx.onChange && ctx.onChange();
       });
       inner.addEventListener('blur', () => {
@@ -5084,7 +5094,26 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
       pages[index] = { index, wrapEl, overlayEl };
       overlayEl.addEventListener('pointerdown', (e) => {
         if (e.target !== overlayEl) return; // clicked an element, not empty space
-        if (!placing) { deselectAll(); return; }
+        if (!placing) {
+          // a TAP on empty paper (no drag) is an invitation to type right
+          // there — the host decides what to create. Always, even with a box
+          // selected: finishing one cell and tapping the next must not cost a
+          // "deselect click" first (an empty box vanishes on blur anyway)
+          deselectAll();
+          if (e.button !== 0 || !opts.onEmptyTap) return;
+          const sx = e.clientX, sy = e.clientY, t0 = Date.now();
+          const up = (ev) => {
+            overlayEl.removeEventListener('pointerup', up);
+            overlayEl.removeEventListener('pointercancel', cancel);
+            if (Math.abs(ev.clientX - sx) > 6 || Math.abs(ev.clientY - sy) > 6 || Date.now() - t0 > 600) return;
+            const r = overlayEl.getBoundingClientRect();
+            opts.onEmptyTap(index, (ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height);
+          };
+          const cancel = () => { overlayEl.removeEventListener('pointerup', up); overlayEl.removeEventListener('pointercancel', cancel); };
+          overlayEl.addEventListener('pointerup', up);
+          overlayEl.addEventListener('pointercancel', cancel);
+          return;
+        }
         const r = overlayEl.getBoundingClientRect();
         const fx = (e.clientX - r.left) / r.width;
         const fy = (e.clientY - r.top) / r.height;
@@ -8284,15 +8313,21 @@ function recomputeFormulas() {
 // ---------- overlay manager ----------
 const overlay = PFS.createOverlayManager({
   onChange: () => { recomputeFormulas(); markDirty(); scheduleSnap(); },
+  // a tap on empty paper opens a caret right there ("לוחצים על המשבצת ומקלידים")
+  onEmptyTap: (page, fx, fy) => { try { quickTextAt(page, fx, fy); } catch (e) { console.warn('quick text failed', e); } },
   // a certificate field dropped near a printed underline settles onto it
   onDragEnd: (c) => { try { if (certMode && typeof certSnapToInk === 'function') certSnapToInk(c); } catch (e) {} },
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
   onDelete: () => { setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0); },
-  // click-to-fill: tapping an orange marker on the FORM jumps straight to its
-  // input row — the form itself becomes the index, no hunting in a long list
+  // click-to-fill: tapping an orange marker on the FORM opens a caret IN that
+  // field, right on the page (a tick box still jumps to its panel row)
   onMarkerClick: (f) => {
+    if (f && f.type === 'text') {
+      const c = quickTextAt(f.page, f.fx + (f.fw || 0) / 2, f.fy + (f.fh || 0.02) / 2);
+      if (c) return;
+    }
     activateTab('fill');
     if (isNarrow()) openPanel();
     fieldsPanel.focusField(f.fieldKey);
@@ -8435,7 +8470,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, liftSmallFills, templates, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -8846,6 +8881,92 @@ function liftSmallFills(reason) {
   return changed;
 }
 PFS.liftSmallFills = liftSmallFills;
+
+/* quickTextAt(page, fx, fy) — "לוחצים על המשבצת ומקלידים": a tap on empty
+ * paper opens a caret right there, no tool to pick first. What the tap lands
+ * on decides the box:
+ *   - inside a detected field's band → THAT field (panel-synced, remembered,
+ *     cell-walled) — the same element the panel would create
+ *   - otherwise a free box at the readable size that reads the printed page:
+ *     a ruled line just below → the text sits on it; vertical borders either
+ *     side → the cell is a hard wall (wraps inside, never spills)
+ * An empty box vanishes on blur, so a stray tap costs nothing. */
+function inkCellAt(page, fx, fy, fontFrac) {
+  const out = { lineY: null, left: null, right: null };
+  try {
+    const views = pdfView.viewList ? pdfView.viewList() : [];
+    const canvas = views[page] && views[page].canvas;
+    if (!canvas || !canvas.width) return out;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const W = canvas.width, H = canvas.height;
+    const lum = (d, j) => 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+    const cx = Math.round(fx * W), cy = Math.round(fy * H);
+    const fhPx = Math.max(6, Math.round(fontFrac * 1.15 * H));
+    // a ruled line under the tap: dark across a window around the tap
+    const x0 = Math.max(0, cx - Math.round(W * 0.06)), x1 = Math.min(W, cx + Math.round(W * 0.06));
+    for (let y = Math.max(0, cy - Math.round(fhPx * 0.3)); y < Math.min(H, cy + Math.round(fhPx * 1.4)); y++) {
+      const row = ctx.getImageData(x0, y, x1 - x0, 1).data; let d = 0, n = 0;
+      for (let i = 0; i < x1 - x0; i += 2) { if (lum(row, i * 4) < 140) d++; n++; }
+      if (d / n > 0.6) { out.lineY = y / H; break; }
+    }
+    // vertical borders left/right of the tap on the tap's own row band
+    const y0 = Math.max(0, cy - Math.round(fhPx * 0.4)), rows = Math.min(H - y0, Math.round(fhPx * 0.8));
+    // a 1pt table border renders as 2 anti-aliased grey columns — judge each
+    // row by the darkest of three neighbouring pixels, with a softer threshold
+    const darkCol = (px) => {
+      const x = Math.max(1, Math.min(W - 2, px));
+      const col = ctx.getImageData(x - 1, y0, 3, rows).data; let d = 0;
+      for (let i = 0; i < rows; i++) { const j = i * 12; if (Math.min(lum(col, j), lum(col, j + 4), lum(col, j + 8)) < 175) d++; }
+      return d / rows > 0.6;
+    };
+    const reach = Math.round(W * 0.45);
+    for (let x = cx - 2; x > Math.max(0, cx - reach); x--) { if (darkCol(x)) { out.left = (x + 1) / W; break; } }
+    for (let x = cx + 2; x < Math.min(W - 1, cx + reach); x++) { if (darkCol(x)) { out.right = x / W; break; } }
+    if (out.left == null || out.right == null || out.right - out.left < 0.03) { out.left = null; out.right = null; }
+  } catch (e) {}
+  return out;
+}
+function quickTextAt(page, fx, fy) {
+  if (!pdfView.hasDoc()) return null;
+  // 1) a detected field under the tap → its own element
+  const f = lastDet && lastDet.fields && lastDet.fields.find((d) => d.type === 'text' && d.page === page
+    && fx >= d.fx - 0.004 && fx <= d.fx + (d.fw || 0) + 0.004
+    && fy >= d.fy - (d.fh || 0.02) * 0.6 && fy <= d.fy + (d.fh || 0.02) * 1.6);
+  const afterBlur = (ctrl) => {
+    const inner = ctrl.node.querySelector('.txt');
+    if (inner) inner.addEventListener('blur', () => { setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0); }, { once: true });
+  };
+  if (f) {
+    const existing = overlay.getElements().find((c) => c.model.type === 'text' && c.model.fieldKey === f.fieldKey);
+    if (existing) { overlay.selectCtrl(existing); existing.focusText(); return existing; }
+    const size = Math.max(f.fontFrac || 0, MIN_FILL_FRAC * 0.85) || docUniformSize();
+    const align = /[֐-׿؀-ۿ]/.test(f.label || '') ? 'right' : 'left';
+    const fh = size * 1.15;
+    const ctrl = overlay.addModelAt('text', page, {
+      fx: align === 'right' ? f.fx + (f.fw || 0) : f.fx, fy: f.fy + Math.max(0, ((f.fh || fh) - fh) / 2),
+      fontFrac: size, align, fieldKey: f.fieldKey, cellW: f.fw || null, cellX: f.fx, text: '', quick: true
+    }, true);
+    if (ctrl) { afterBlur(ctrl); overlay.setFieldActive && overlay.setFieldActive(f.fieldKey); }
+    return ctrl;
+  }
+  // 2) free text that reads the paper under it
+  const size = docUniformSize();
+  const ink = inkCellAt(page, fx, fy, size);
+  const fh = size * 1.15;
+  const extra = { fx, fy: ink.lineY != null ? ink.lineY - fh + fh * 0.12 : fy - fh / 2, fontFrac: size, align: 'right', text: '', quick: true };
+  if (ink.left != null) { extra.cellX = ink.left + 0.004; extra.cellW = ink.right - ink.left - 0.008; extra.fx = Math.min(fx, ink.right - 0.004); }
+  const ctrl = overlay.addModelAt('text', page, extra, true);
+  if (ctrl) afterBlur(ctrl);
+  return ctrl;
+}
+// one-time nudge: the paper itself is the input
+function hintClickToType() {
+  try {
+    if (PFS.store.get('hint_clicktype', false)) return;
+    PFS.store.set('hint_clicktype', true);
+    PFS.toast('💡 לחיצה על כל מקום בטופס פותחת סמן — פשוט מקלידים. הטקסט מתיישב לבד על הקו ובתוך המשבצת.', 'ok', 6000);
+  } catch (e) {}
+}
 
 // heal learning slots poisoned before the bare-'שם' guard existed
 try { const n = PFS.patterns.purgePersonValues(); if (n) console.info('[patterns] purged', n, 'person-name values from learned slots'); } catch (e) {}
@@ -9277,6 +9398,7 @@ async function openPdfFile(file) {
       }
     }
     runDetection();
+    if (!certOpening) hintClickToType();
     // first-run guided tour — now that every zone on screen is alive
     if (!certOpening) PFS.tour && PFS.tour.maybeStart();   // the certificate wizard is its own guide
   } catch (e) {

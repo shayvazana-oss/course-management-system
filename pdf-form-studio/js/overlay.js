@@ -17,7 +17,26 @@
       pages[index] = { index, wrapEl, overlayEl };
       overlayEl.addEventListener('pointerdown', (e) => {
         if (e.target !== overlayEl) return; // clicked an element, not empty space
-        if (!placing) { deselectAll(); return; }
+        if (!placing) {
+          // a TAP on empty paper (no drag) is an invitation to type right
+          // there — the host decides what to create. Always, even with a box
+          // selected: finishing one cell and tapping the next must not cost a
+          // "deselect click" first (an empty box vanishes on blur anyway)
+          deselectAll();
+          if (e.button !== 0 || !opts.onEmptyTap) return;
+          const sx = e.clientX, sy = e.clientY, t0 = Date.now();
+          const up = (ev) => {
+            overlayEl.removeEventListener('pointerup', up);
+            overlayEl.removeEventListener('pointercancel', cancel);
+            if (Math.abs(ev.clientX - sx) > 6 || Math.abs(ev.clientY - sy) > 6 || Date.now() - t0 > 600) return;
+            const r = overlayEl.getBoundingClientRect();
+            opts.onEmptyTap(index, (ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height);
+          };
+          const cancel = () => { overlayEl.removeEventListener('pointerup', up); overlayEl.removeEventListener('pointercancel', cancel); };
+          overlayEl.addEventListener('pointerup', up);
+          overlayEl.addEventListener('pointercancel', cancel);
+          return;
+        }
         const r = overlayEl.getBoundingClientRect();
         const fx = (e.clientX - r.left) / r.width;
         const fy = (e.clientY - r.top) / r.height;

@@ -997,6 +997,26 @@ body.home #undoBtn, body.home #redoBtn, body.home #fillAllBtn, body.home #export
   :root:not([data-theme="light"]) .page-wrap { outline-color: rgba(255,255,255,.18); box-shadow: 0 18px 50px rgba(0,0,0,.6); }
 }
 
+/* ===== home lists: rows, not buttons =====
+ * Black-outlined cards with black pills read as a wall of buttons. A list
+ * row is a quiet hairline card; the date is small grey text; "open" is a
+ * blue cue at the far end; the delete ✕ appears only on hover. */
+.home-sec { display: flex; align-items: baseline; gap: 10px; font-size: 14px; font-weight: 800; color: var(--ink-1); margin: 0 4px 10px; }
+.home-sec-sub { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+#libStrip .home-item, #recentList .home-item { border: 1.5px solid var(--line-2); box-shadow: none; border-radius: 12px; padding: 10px 14px; gap: 10px; transition: border-color .12s, background .12s, transform .08s; }
+#libStrip .home-item:hover, #recentList .home-item:hover { border-color: var(--edge); background: var(--surface); box-shadow: none; transform: none; }
+.home-item .nm { font-weight: 600; font-size: 13.5px; }
+.home-item .nm .ic { margin-inline-end: 4px; }
+.home-item .go { font-size: 12.5px; font-weight: 700; color: var(--violet); white-space: nowrap; }
+.home-item .when { font-size: 11.5px; color: var(--ink-4); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.home-item .btn.del { color: var(--ink-4); opacity: 0; box-shadow: none; border: 0; }
+.home-item:hover .btn.del, .home-item .btn.del:focus-visible { opacity: 1; }
+.home-item .btn.del:hover { color: var(--danger); background: var(--danger-soft); }
+.home-item.filled .nm { color: var(--ink-1); }
+#recentList .more { border: 0; box-shadow: none; color: var(--violet); font-weight: 700; justify-content: center; }
+#recentList .more:hover { background: var(--violet-soft); }
+@media (hover: none) { .home-item .btn.del { opacity: .6; } }
+
 </style>
 <meta name="theme-color" content="#F3F3F0" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -1160,8 +1180,8 @@ body.home #undoBtn, body.home #redoBtn, body.home #fillAllBtn, body.home #export
             <div class="tile-d">הטפסים הקבועים שלך, בקליק אחד.</div>
           </button>
         </div>
-        <div id="libWrap" style="display:none"><div class="home-sec">📚 מהמאגר</div><div id="libStrip" class="tmpl-list"></div></div>
-        <div id="recentWrap" style="display:none"><div class="home-sec">⏱️ להמשיך מאיפה שעצרת</div><div id="recentList" class="tmpl-list"></div></div>
+        <div id="libWrap" style="display:none"><div class="home-sec">המאגר שלי <span class="home-sec-sub">טפסים קבועים ופורמטים של תעודות</span></div><div id="libStrip" class="tmpl-list"></div></div>
+        <div id="recentWrap" style="display:none"><div class="home-sec">נפתחו לאחרונה <span class="home-sec-sub">✅ מסמך שמולא ונשמר על שם הסטודנט · 📄 טופס ריק</span></div><div id="recentList" class="tmpl-list"></div></div>
         <div class="dz-steps">
           <div class="dz-step"><div class="n">1</div><div class="t">פתחו PDF</div><div class="d">גררו או בחרו קובץ</div></div>
           <div class="dz-step"><div class="n">2</div><div class="t">מלאו וחתמו</div><div class="d">לוחצים על המשבצת ומקלידים</div></div>
@@ -13419,8 +13439,10 @@ async function renderLibrary() {
     wrap.style.display = docs.length ? '' : 'none';
     strip.innerHTML = '';
     docs.slice(0, 6).forEach((d) => {
-      const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
-      row.innerHTML = '<div class="nm">📚 ' + d.name + '</div><span class="pill">פתח</span>';
+      const row = document.createElement('div'); row.className = 'tmpl-item home-item'; row.style.cursor = 'pointer';
+      row.innerHTML = '<div class="nm"><span class="ic">' + (d.kind === 'cert' ? '🎓' : '📄') + '</span> </div><span class="go">פתח ›</span>';
+      row.querySelector('.nm').append(String(d.name || '').replace(/\.pdf$/i, ''));
+      row.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
       row.addEventListener('click', () => openFromLibrary(d.id));
       strip.appendChild(row);
     });
@@ -13596,15 +13618,15 @@ async function renderRecent(filter) {
     list.appendChild(s);
   }
   shown.forEach((d) => {
-    const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
+    const row = document.createElement('div'); row.className = 'tmpl-item home-item' + (d.filled ? ' filled' : ''); row.style.cursor = 'pointer';
     const nm = document.createElement('div'); nm.className = 'nm';
-    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + (d.label || d.name);
+    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + String(d.label || d.name).replace(/\.pdf$/i, '');
     if (d.cloud) nm.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
     else if (d.filled) nm.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
-    const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = relDate(d.ts);
+    const pill = document.createElement('span'); pill.className = 'when'; pill.textContent = relDate(d.ts);
     const del = document.createElement('button');
-    del.className = 'btn sm ghost'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
-    del.style.cssText = 'color:var(--danger);flex:none;padding:2px 7px';
+    del.className = 'btn sm ghost del'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
+    del.style.cssText = 'flex:none;padding:2px 7px';
     del.addEventListener('click', async (e) => {
       e.stopPropagation();
       await PFS.recent.remove(d.id);
@@ -13640,9 +13662,9 @@ async function renderRecent(filter) {
   }
   if (docs.length > 5) {
     const more = document.createElement('button');
-    more.className = 'btn sm block';
-    more.style.marginTop = '4px';
-    more.textContent = recentExpanded ? 'הצג פחות' : '🕘 כל ההיסטוריה (' + docs.length + ')';
+    more.className = 'btn sm ghost block more';
+    more.style.marginTop = '2px';
+    more.textContent = recentExpanded ? 'הצג פחות ‹' : 'כל ההיסטוריה (' + docs.length + ') ›';
     more.addEventListener('click', () => { recentExpanded = !recentExpanded; renderRecent(); });
     list.appendChild(more);
   }

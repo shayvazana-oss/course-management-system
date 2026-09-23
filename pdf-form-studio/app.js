@@ -4848,8 +4848,10 @@ async function renderLibrary() {
     wrap.style.display = docs.length ? '' : 'none';
     strip.innerHTML = '';
     docs.slice(0, 6).forEach((d) => {
-      const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
-      row.innerHTML = '<div class="nm">📚 ' + d.name + '</div><span class="pill">פתח</span>';
+      const row = document.createElement('div'); row.className = 'tmpl-item home-item'; row.style.cursor = 'pointer';
+      row.innerHTML = '<div class="nm"><span class="ic">' + (d.kind === 'cert' ? '🎓' : '📄') + '</span> </div><span class="go">פתח ›</span>';
+      row.querySelector('.nm').append(String(d.name || '').replace(/\.pdf$/i, ''));
+      row.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
       row.addEventListener('click', () => openFromLibrary(d.id));
       strip.appendChild(row);
     });
@@ -5025,15 +5027,15 @@ async function renderRecent(filter) {
     list.appendChild(s);
   }
   shown.forEach((d) => {
-    const row = document.createElement('div'); row.className = 'tmpl-item'; row.style.cursor = 'pointer';
+    const row = document.createElement('div'); row.className = 'tmpl-item home-item' + (d.filled ? ' filled' : ''); row.style.cursor = 'pointer';
     const nm = document.createElement('div'); nm.className = 'nm';
-    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + (d.label || d.name);
+    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + String(d.label || d.name).replace(/\.pdf$/i, '');
     if (d.cloud) nm.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
     else if (d.filled) nm.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
-    const pill = document.createElement('span'); pill.className = 'pill'; pill.textContent = relDate(d.ts);
+    const pill = document.createElement('span'); pill.className = 'when'; pill.textContent = relDate(d.ts);
     const del = document.createElement('button');
-    del.className = 'btn sm ghost'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
-    del.style.cssText = 'color:var(--danger);flex:none;padding:2px 7px';
+    del.className = 'btn sm ghost del'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
+    del.style.cssText = 'flex:none;padding:2px 7px';
     del.addEventListener('click', async (e) => {
       e.stopPropagation();
       await PFS.recent.remove(d.id);
@@ -5069,9 +5071,9 @@ async function renderRecent(filter) {
   }
   if (docs.length > 5) {
     const more = document.createElement('button');
-    more.className = 'btn sm block';
-    more.style.marginTop = '4px';
-    more.textContent = recentExpanded ? 'הצג פחות' : '🕘 כל ההיסטוריה (' + docs.length + ')';
+    more.className = 'btn sm ghost block more';
+    more.style.marginTop = '2px';
+    more.textContent = recentExpanded ? 'הצג פחות ‹' : 'כל ההיסטוריה (' + docs.length + ') ›';
     more.addEventListener('click', () => { recentExpanded = !recentExpanded; renderRecent(); });
     list.appendChild(more);
   }

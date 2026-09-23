@@ -4,10 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Fillo · מילוי וחתימה על טפסי PDF</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23C6F135'/%3E%3Crect x='3' y='3' width='94' height='94' rx='21' fill='none' stroke='%2315170F' stroke-width='6'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff' stroke='%2315170F' stroke-width='5'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%2315170F' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23141414'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%232D5BFF' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="styles.css" />
 <link rel="manifest" href="manifest.webmanifest" />
-<meta name="theme-color" content="#F1F1E7" />
+<meta name="theme-color" content="#F3F3F0" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 </head>
 <body>
@@ -18,7 +18,7 @@
         <div class="logo" aria-label="Fillo">
           <svg viewBox="0 0 24 24" width="21" height="21" fill="none" aria-hidden="true">
             <path d="M12 3.2C15 7 18 10.6 18 13.7A6 6 0 1 1 6 13.7C6 10.6 9 7 12 3.2Z" fill="#fff"/>
-            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9.2 14.1l2.1 2.1 3.6-4.1" stroke="#2D5BFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         <div>
@@ -110,21 +110,21 @@
           <button class="tile tile-form" id="openBtn2" title="פתח PDF">
             <div class="tile-art"><svg viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <defs>
-                <linearGradient id="tfPaper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EDEEE3"/></linearGradient>
-                <linearGradient id="tfLime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E4FF7A"/><stop offset="1" stop-color="#A9D91F"/></linearGradient>
-                <linearGradient id="tfViolet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9B85FF"/><stop offset="1" stop-color="#5233E0"/></linearGradient>
+                <linearGradient id="tfPaper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EDEDEA"/></linearGradient>
+                <linearGradient id="tfLime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6F8CFF"/><stop offset="1" stop-color="#1E43D9"/></linearGradient>
+                <linearGradient id="tfViolet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3A3A3A"/><stop offset="1" stop-color="#141414"/></linearGradient>
               </defs>
-              <rect x="34" y="22" width="66" height="84" rx="10" fill="#15170F" transform="translate(6 6)"/>
-              <rect x="34" y="22" width="66" height="84" rx="10" fill="url(#tfPaper)" stroke="#15170F" stroke-width="2.5"/>
-              <g stroke="#15170F" stroke-width="3" stroke-linecap="round" opacity=".9"><path d="M46 40h28"/><path d="M46 52h42"/><path d="M46 64h42"/><path d="M46 76h22"/></g>
-              <circle cx="104" cy="34" r="17" fill="#15170F" transform="translate(3 3)"/>
-              <circle cx="104" cy="34" r="17" fill="url(#tfLime)" stroke="#15170F" stroke-width="2.5"/>
-              <path d="M96 34.5l5.5 5.5 11-12" stroke="#15170F" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="34" y="22" width="66" height="84" rx="10" fill="#141414" transform="translate(6 6)"/>
+              <rect x="34" y="22" width="66" height="84" rx="10" fill="url(#tfPaper)" stroke="#141414" stroke-width="2.5"/>
+              <g stroke="#141414" stroke-width="3" stroke-linecap="round" opacity=".9"><path d="M46 40h28"/><path d="M46 52h42"/><path d="M46 64h42"/><path d="M46 76h22"/></g>
+              <circle cx="104" cy="34" r="17" fill="#141414" transform="translate(3 3)"/>
+              <circle cx="104" cy="34" r="17" fill="url(#tfLime)" stroke="#141414" stroke-width="2.5"/>
+              <path d="M96 34.5l5.5 5.5 11-12" stroke="#141414" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
               <ellipse cx="98" cy="26" rx="6" ry="3" fill="#fff" opacity=".55" transform="rotate(-30 98 26)"/>
               <g transform="rotate(38 74 92)">
-                <rect x="60" y="86" width="42" height="13" rx="6.5" fill="#15170F" transform="translate(2 2)"/>
-                <rect x="60" y="86" width="42" height="13" rx="6.5" fill="url(#tfViolet)" stroke="#15170F" stroke-width="2.2"/>
-                <path d="M102 92.5l9-3v6l-9-3z" fill="#F2A93B" stroke="#15170F" stroke-width="2"/>
+                <rect x="60" y="86" width="42" height="13" rx="6.5" fill="#141414" transform="translate(2 2)"/>
+                <rect x="60" y="86" width="42" height="13" rx="6.5" fill="url(#tfViolet)" stroke="#141414" stroke-width="2.2"/>
+                <path d="M102 92.5l9-3v6l-9-3z" fill="#D9C28F" stroke="#141414" stroke-width="2"/>
                 <rect x="66" y="89" width="14" height="3" rx="1.5" fill="#fff" opacity=".6"/>
               </g>
             </svg></div>
@@ -134,16 +134,16 @@
           <button class="tile tile-cert" id="certBtn" title="פורמט תעודה + רשימת אקסל = תעודה מוכנה לכל סטודנט">
             <div class="tile-art"><svg viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <defs>
-                <linearGradient id="tcLime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E4FF7A"/><stop offset="1" stop-color="#A9D91F"/></linearGradient>
-                <linearGradient id="tcViolet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B85FF"/><stop offset="1" stop-color="#5233E0"/></linearGradient>
-                <linearGradient id="tcGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD37A"/><stop offset="1" stop-color="#E08F1C"/></linearGradient>
+                <linearGradient id="tcLime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6F8CFF"/><stop offset="1" stop-color="#1E43D9"/></linearGradient>
+                <linearGradient id="tcViolet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3A3A"/><stop offset="1" stop-color="#141414"/></linearGradient>
+                <linearGradient id="tcGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4EAD2"/><stop offset="1" stop-color="#D9C28F"/></linearGradient>
               </defs>
-              <path d="M52 70l-12 42 20-9 8 12 10-45z" fill="url(#tcViolet)" stroke="#15170F" stroke-width="2.5" stroke-linejoin="round"/>
-              <path d="M88 70l12 42-20-9-8 12-10-45z" fill="url(#tcViolet)" stroke="#15170F" stroke-width="2.5" stroke-linejoin="round" opacity=".92"/>
-              <circle cx="70" cy="50" r="36" fill="#15170F" transform="translate(5 5)"/>
-              <circle cx="70" cy="50" r="36" fill="url(#tcLime)" stroke="#15170F" stroke-width="2.5"/>
-              <circle cx="70" cy="50" r="26" fill="none" stroke="#15170F" stroke-width="2" stroke-dasharray="4 5" opacity=".7"/>
-              <path d="M70 30l6.4 13 14.3 2.1-10.4 10.1 2.5 14.3L70 62.8 57.2 69.5l2.5-14.3-10.4-10.1 14.3-2.1z" fill="url(#tcGold)" stroke="#15170F" stroke-width="2.4" stroke-linejoin="round"/>
+              <path d="M52 70l-12 42 20-9 8 12 10-45z" fill="url(#tcViolet)" stroke="#141414" stroke-width="2.5" stroke-linejoin="round"/>
+              <path d="M88 70l12 42-20-9-8 12-10-45z" fill="url(#tcViolet)" stroke="#141414" stroke-width="2.5" stroke-linejoin="round" opacity=".92"/>
+              <circle cx="70" cy="50" r="36" fill="#141414" transform="translate(5 5)"/>
+              <circle cx="70" cy="50" r="36" fill="url(#tcLime)" stroke="#141414" stroke-width="2.5"/>
+              <circle cx="70" cy="50" r="26" fill="none" stroke="#141414" stroke-width="2" stroke-dasharray="4 5" opacity=".7"/>
+              <path d="M70 30l6.4 13 14.3 2.1-10.4 10.1 2.5 14.3L70 62.8 57.2 69.5l2.5-14.3-10.4-10.1 14.3-2.1z" fill="url(#tcGold)" stroke="#141414" stroke-width="2.4" stroke-linejoin="round"/>
               <ellipse cx="54" cy="30" rx="9" ry="4" fill="#fff" opacity=".55" transform="rotate(-35 54 30)"/>
             </svg></div>
             <div class="tile-t">הנפקת תעודות</div>
@@ -152,17 +152,17 @@
           <button class="tile tile-lib" id="homeLibBtn" title="המאגר — הטפסים הקבועים שלכם, בקליק אחד">
             <div class="tile-art"><svg viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <defs>
-                <linearGradient id="tlCream" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EDEEE3"/></linearGradient>
-                <linearGradient id="tlLime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E4FF7A"/><stop offset="1" stop-color="#A9D91F"/></linearGradient>
-                <linearGradient id="tlAmber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD37A"/><stop offset="1" stop-color="#E08F1C"/></linearGradient>
+                <linearGradient id="tlCream" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EDEDEA"/></linearGradient>
+                <linearGradient id="tlLime" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6F8CFF"/><stop offset="1" stop-color="#1E43D9"/></linearGradient>
+                <linearGradient id="tlAmber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F4EAD2"/><stop offset="1" stop-color="#D9C28F"/></linearGradient>
               </defs>
-              <g transform="translate(6 6)"><path d="M28 40h30l8 8h46a6 6 0 0 1 6 6v46a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6V46a6 6 0 0 1 6-6z" fill="#15170F"/></g>
-              <path d="M28 40h30l8 8h46a6 6 0 0 1 6 6v46a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6V46a6 6 0 0 1 6-6z" fill="url(#tlAmber)" stroke="#15170F" stroke-width="2.5" stroke-linejoin="round"/>
-              <rect x="38" y="24" width="58" height="72" rx="7" fill="url(#tlCream)" stroke="#15170F" stroke-width="2.4" transform="rotate(-8 67 60)"/>
-              <rect x="50" y="18" width="58" height="72" rx="7" fill="url(#tlCream)" stroke="#15170F" stroke-width="2.4" transform="rotate(6 79 54)"/>
-              <g stroke="#15170F" stroke-width="2.6" stroke-linecap="round" opacity=".85" transform="rotate(6 79 54)"><path d="M60 34h26"/><path d="M60 44h38"/><path d="M60 54h38"/></g>
-              <path d="M22 66h96a6 6 0 0 1 6 6v34a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6z" fill="url(#tlLime)" stroke="#15170F" stroke-width="2.5" stroke-linejoin="round"/>
-              <rect x="58" y="80" width="26" height="6" rx="3" fill="#15170F" opacity=".85"/>
+              <g transform="translate(6 6)"><path d="M28 40h30l8 8h46a6 6 0 0 1 6 6v46a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6V46a6 6 0 0 1 6-6z" fill="#141414"/></g>
+              <path d="M28 40h30l8 8h46a6 6 0 0 1 6 6v46a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6V46a6 6 0 0 1 6-6z" fill="url(#tlAmber)" stroke="#141414" stroke-width="2.5" stroke-linejoin="round"/>
+              <rect x="38" y="24" width="58" height="72" rx="7" fill="url(#tlCream)" stroke="#141414" stroke-width="2.4" transform="rotate(-8 67 60)"/>
+              <rect x="50" y="18" width="58" height="72" rx="7" fill="url(#tlCream)" stroke="#141414" stroke-width="2.4" transform="rotate(6 79 54)"/>
+              <g stroke="#141414" stroke-width="2.6" stroke-linecap="round" opacity=".85" transform="rotate(6 79 54)"><path d="M60 34h26"/><path d="M60 44h38"/><path d="M60 54h38"/></g>
+              <path d="M22 66h96a6 6 0 0 1 6 6v34a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6z" fill="url(#tlLime)" stroke="#141414" stroke-width="2.5" stroke-linejoin="round"/>
+              <rect x="58" y="80" width="26" height="6" rx="3" fill="#141414" opacity=".85"/>
               <ellipse cx="36" cy="74" rx="8" ry="3" fill="#fff" opacity=".5"/>
             </svg></div>
             <div class="tile-t">המאגר שלי</div>

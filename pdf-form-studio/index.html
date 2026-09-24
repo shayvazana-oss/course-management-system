@@ -4,11 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Fillo · מילוי וחתימה על טפסי PDF</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23141414'/%3E%3Cpath d='M50 20C62 35 74 48 74 60A24 24 0 1 1 26 60C26 48 38 35 50 20Z' fill='%23fff'/%3E%3Cpath d='M39 60l8 8 14-16' fill='none' stroke='%232D5BFF' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="icons/fillo.svg" type="image/svg+xml" />
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192" />
 <link rel="stylesheet" href="styles.css" />
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#F3F3F0" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 </head>
 <body>
 <div class="app">
@@ -169,7 +170,7 @@
             <div class="tile-d">הטפסים הקבועים שלך, בקליק אחד.</div>
           </button>
         </div>
-        <div id="libWrap" style="display:none"><div class="home-sec">המאגר שלי <span class="home-sec-sub">טפסים קבועים ופורמטים של תעודות</span></div><div id="libStrip" class="tmpl-list"></div></div>
+        <div id="libWrap" style="display:none"><div class="home-sec">המאגר שלי <span class="home-sec-sub">טפסים קבועים ופורמטים של תעודות</span></div><div id="libChips" class="lib-chips" style="display:none"></div><div id="libStrip" class="tmpl-list"></div></div>
         <div id="recentWrap" style="display:none"><div class="home-sec">נפתחו לאחרונה <span class="home-sec-sub">✅ מסמך שמולא ונשמר על שם הסטודנט · 📄 טופס ריק</span></div><div id="recentList" class="tmpl-list"></div></div>
         <div class="dz-steps">
           <div class="dz-step"><div class="n">1</div><div class="t">פתחו PDF</div><div class="d">גררו או בחרו קובץ</div></div>
@@ -686,7 +687,8 @@
   <div class="modal" style="max-width:520px">
     <header>📚 המאגר — הטפסים הקבועים שלכם</header>
     <div class="m-body" style="max-height:64vh;overflow:auto">
-      <div class="hint muted">שמרו כאן פעם אחת את הטפסים שחוזרים (הצעת מחיר, נספח ה3, נספח ו…) — ומכאן והלאה קליק אחד פותח אותם, בלי לחפש קבצים. הכול נשמר מקומית בדפדפן.</div>
+      <div class="hint muted">שמרו כאן פעם אחת את הטפסים שחוזרים — ומכאן והלאה קליק אחד פותח אותם. סדרו בתיקיות (לפי קורס, סוג מסמך) ותנו תווית צבע.</div>
+      <div id="libModalChips" class="lib-chips" style="display:none"></div>
       <div id="libList" class="tmpl-list"></div>
       <div class="row">
         <button class="btn sm primary" id="libAddOpenBtn" style="flex:1" disabled>➕ שמור את הטופס הפתוח</button>

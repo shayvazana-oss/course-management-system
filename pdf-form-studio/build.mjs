@@ -38,6 +38,11 @@ html = html.replace(
 html = html.replace(/window\.PFS_TESS\s*=\s*\{[^}]*\};/, 'window.PFS_TESS = null; /* OCR omitted from single-file build */\n  window.PFS_SINGLE_FILE = true; /* no service worker / manifest here */');
 // strip PWA manifest link from the single-file build (no external files there)
 html = html.replace(/<link rel="manifest"[^>]*>\s*/, '');
+// icons: the single file carries its favicon inline (a data: URI of the SVG);
+// the PNG / apple-touch links would 404 from file://
+html = html.replace(/<link rel="icon" href="icons\/fillo\.svg"[^>]*>\s*/, `<link rel="icon" href="data:image/svg+xml;base64,${b64('icons/fillo.svg')}" type="image/svg+xml" />\n`);
+html = html.replace(/<link rel="icon" href="icons\/icon-192\.png"[^>]*>\s*/, '');
+html = html.replace(/<link rel="apple-touch-icon"[^>]*>\s*/, '');
 
 // 3) inline every <script src="..."> ; after pdf.min.js also inline the worker
 html = html.replace(/<script src="([^"]+)"><\/script>/g, (_m, src) => {

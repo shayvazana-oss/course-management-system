@@ -37,7 +37,9 @@
     if (bytes.byteLength > MAX_BYTES) throw new Error('הקובץ גדול מדי למאגר (עד 15MB)');
     const clean = String(name || 'מסמך').replace(/\.pdf$/i, '').trim() || 'מסמך';
     // extra.id / extra.added pin a cloud record being brought back to this computer
-    const rec = { id: (extra && extra.id) || uid(), name: clean, bytes, size: bytes.byteLength, added: (extra && extra.added) || Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '' };
+    // extra.folder / extra.color: where the document files and its colour label
+    const rec = { id: (extra && extra.id) || uid(), name: clean, bytes, size: bytes.byteLength, added: (extra && extra.added) || Date.now(), lastUsed: 0, kind: (extra && extra.kind) || '',
+      folder: String((extra && extra.folder) || '').trim(), color: String((extra && extra.color) || '') };
     const db = await open();
     await tx(db, 'readwrite', (s) => s.put(rec));
     return { id: rec.id, name: rec.name };
@@ -48,7 +50,7 @@
       const db = await open();
       const all = await tx(db, 'readonly', (s) => s.getAll());
       return (all || [])
-        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '' }))
+        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '', folder: r.folder || '', color: r.color || '' }))
         .sort((a, b) => (b.lastUsed || b.added) - (a.lastUsed || a.added));
     } catch (e) { return []; }
   }
@@ -71,6 +73,25 @@
     return true;
   }
 
+  // setMeta(id, {folder, color}) — file a document into a folder / give it a
+  // colour label (only the keys passed change)
+  async function setMeta(id, meta) {
+    const db = await open();
+    const rec = await tx(db, 'readonly', (s) => s.get(id));
+    if (!rec) return false;
+    if (meta && meta.folder !== undefined) rec.folder = String(meta.folder || '').trim();
+    if (meta && meta.color !== undefined) rec.color = String(meta.color || '');
+    if (meta && meta.kind !== undefined) rec.kind = String(meta.kind || '');
+    await tx(db, 'readwrite', (s) => s.put(rec));
+    return true;
+  }
+  // the folders in use, most-populated first
+  async function folders() {
+    const n = {};
+    (await list()).forEach((d) => { if (d.folder) n[d.folder] = (n[d.folder] || 0) + 1; });
+    return Object.keys(n).sort((a, b) => n[b] - n[a] || a.localeCompare(b, 'he'));
+  }
+
   async function remove(id) {
     const db = await open();
     await tx(db, 'readwrite', (s) => s.delete(id));
@@ -79,5 +100,5 @@
     try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); } catch (e) {}
   }
 
-  PFS.library = { add, list, get, rename, remove, clearAll };
+  PFS.library = { add, list, get, rename, remove, clearAll, setMeta, folders };
 })(window);

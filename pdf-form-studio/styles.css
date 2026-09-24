@@ -957,3 +957,23 @@ body.home #undoBtn, body.home #redoBtn, body.home #fillAllBtn, body.home #export
 #recentList .more { border: 0; box-shadow: none; color: var(--violet); font-weight: 700; justify-content: center; }
 #recentList .more:hover { background: var(--violet-soft); }
 @media (hover: none) { .home-item .btn.del { opacity: .6; } }
+
+/* ===== library folders + colour labels ===== */
+.lib-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.lib-chip { border: 1.5px solid var(--line-2); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.lib-chip:hover { border-color: var(--edge); }
+.lib-chip.on { background: var(--ink-1); border-color: var(--ink-1); color: #fff; }
+.lib-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px dashed var(--line-2); margin-inline-end: 6px; vertical-align: middle; flex: none; }
+.lib-dot[data-c="blue"] { background: #2D5BFF; border-color: #2D5BFF; }
+.lib-dot[data-c="green"] { background: #1C8A4C; border-color: #1C8A4C; }
+.lib-dot[data-c="amber"] { background: #D98C1F; border-color: #D98C1F; }
+.lib-dot[data-c="red"] { background: #D9463F; border-color: #D9463F; }
+.lib-dot[data-c="violet"] { background: #7C3AED; border-color: #7C3AED; }
+.lib-dot[data-c="grey"] { background: #8A8A86; border-color: #8A8A86; }
+.lib-dot-btn { cursor: pointer; width: 14px; height: 14px; }
+.lib-dot-btn:hover { transform: scale(1.2); }
+.lib-folder { font-size: 11px; color: var(--ink-4); margin-inline-start: 8px; font-weight: 500; }
+.lib-group { font-size: 12px; font-weight: 800; color: var(--ink-3); margin: 8px 2px 2px; }
+.lib-row { align-items: center; }
+.lib-row .lib-fold { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+:root[data-theme="dark"] .lib-chip.on { background: #F5F5F4; color: #141414; border-color: #F5F5F4; }

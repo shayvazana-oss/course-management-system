@@ -2181,6 +2181,38 @@ async function main() {
     check('tap on empty paper opens a caret there: sits on the ruled line, walled by the cell, Hebrew grows leftward, stray taps vanish', ok);
   }
 
+  // ---- library folders + colour labels: file it, label it, find it ----
+  check('📚 library: folders + colour labels — filed on add or later, chips filter the home strip, the modal groups by folder, a click cycles the label', await page.evaluate(async () => {
+    const T = window.PFS.__test, L = window.PFS.library, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const { PDFDocument, rgb } = window.PDFLib; const d = await PDFDocument.create(); d.addPage([300, 200]).drawRectangle({ x: 0, y: 0, width: 300, height: 200, color: rgb(1, 1, 1) }); const b = await d.save();
+    const a = await L.add('נספח ו', b.buffer.slice(0), { folder: 'חשמלאות', color: 'blue' });
+    const c = await L.add('הסכם', b.buffer.slice(0));
+    await L.setMeta(c.id, { folder: 'הסכמים', color: 'amber' });
+    const list = await L.list(); const fa = list.find((x) => x.id === a.id), fc = list.find((x) => x.id === c.id);
+    const folders = await L.folders();
+    await T.renderLibrary(); await wait(60);
+    const chips = [...document.querySelectorAll('#libChips .lib-chip')].map((x) => x.textContent);
+    const homeDot = !!document.querySelector('#libStrip .home-item .lib-dot[data-c="blue"]');
+    const chip = [...document.querySelectorAll('#libChips .lib-chip')].find((x) => /הסכמים/.test(x.textContent));
+    chip.click(); await wait(80);
+    const filtered = [...document.querySelectorAll('#libStrip .home-item .nm')].map((x) => x.textContent.trim());
+    [...document.querySelectorAll('#libChips .lib-chip')].find((x) => /^הכול/.test(x.textContent)).click(); await wait(80);
+    document.getElementById('libBtn').click(); await wait(120);
+    const groups = [...document.querySelectorAll('#libList .lib-group')].map((x) => x.textContent);
+    const row = document.querySelector('#libList .lib-row[data-id="' + a.id + '"]');
+    row.querySelector('.lib-dot').click(); await wait(120);
+    const cycled = (await L.list()).find((x) => x.id === a.id).color;
+    document.getElementById('libClose').click();
+    await L.remove(a.id); await L.remove(c.id); await T.renderLibrary();
+    const ok = fa.folder === 'חשמלאות' && fa.color === 'blue' && fc.folder === 'הסכמים' && fc.color === 'amber'
+      && JSON.stringify(folders.slice().sort()) === JSON.stringify(['הסכמים', 'חשמלאות'].sort())
+      && chips.some((t) => /^הכול/.test(t)) && chips.some((t) => /חשמלאות/.test(t)) && chips.some((t) => /הסכמים/.test(t))
+      && homeDot && filtered.length === 1 && /הסכם/.test(filtered[0])
+      && groups.some((g) => /חשמלאות/.test(g)) && groups.some((g) => /הסכמים/.test(g))
+      && cycled === 'green';
+    return ok ? true : JSON.stringify({ fa, fc, folders, chips, homeDot, filtered, groups, cycled });
+  }) === true);
+
   // ---- document library: permanent one-click forms ----
   check('library stores, lists, opens and removes a form', await page.evaluate(async () => {
     const { PDFDocument, rgb } = window.PDFLib;

@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -4609,7 +4609,7 @@ async function cloudHydrate() {
     for (const f of ACCT().fileIndex('lib')) {
       if (have.has(f.id)) continue;
       const bytes = await ACCT().getFile('lib', f.id); if (!bytes) continue;
-      await PFS.library.add(f.name || 'מסמך', bytes.buffer, { id: f.id, added: f.ts, kind: f.libKind || '' });
+      await PFS.library.add(f.name || 'מסמך', bytes.buffer, { id: f.id, added: f.ts, kind: f.libKind || '', folder: f.folder || '', color: f.color || '' });
     }
     for (const f of ACCT().fileIndex('comp')) {
       const has = await PFS.companions.getBytes(f.id); if (has) continue;
@@ -4725,7 +4725,7 @@ async function cloudBackfill() {
     for (const d of await PFS.library.list()) {
       if (lib.has(d.id)) continue;
       const rec = await PFS.library.get(d.id); if (!rec || !rec.bytes) continue;
-      await ACCT().putFile('lib', d.id, new Uint8Array(rec.bytes), { name: d.name, libKind: d.kind || '' }); n++;
+      await ACCT().putFile('lib', d.id, new Uint8Array(rec.bytes), { name: d.name, libKind: d.kind || '', folder: d.folder || '', color: d.color || '' }); n++;
     }
     const rc = has('recent');
     for (const d of await PFS.recent.list()) {
@@ -4839,26 +4839,77 @@ showOnboarding();
 // =====================================================================
 //  Document library ("המאגר") — the office's permanent forms, one click away
 // =====================================================================
+// ---- the library: folders + colour labels ("ארגון בקטגוריות ותוויות צבע") ----
+const LIB_COLORS = [['', 'ללא'], ['blue', 'כחול'], ['green', 'ירוק'], ['amber', 'כתום'], ['red', 'אדום'], ['violet', 'סגול'], ['grey', 'אפור']];
+let libFilter = '';     // '' = everything, '__none' = unfiled, else a folder name
+// cloud: the folder/colour ride in the vault's file index, so another
+// computer files the document the same way
+function cloudPatchLibMeta(id, meta) {
+  try {
+    const idx = PFS.store.get('cloud_files', []) || [];
+    let hit = false;
+    idx.forEach((f) => { if (f.kind === 'lib' && f.id === id) { Object.assign(f, meta); hit = true; } });
+    if (hit) PFS.store.set('cloud_files', idx);
+  } catch (e) {}
+}
+async function libSetMeta(id, meta) {
+  await PFS.library.setMeta(id, meta);
+  cloudPatchLibMeta(id, meta);
+  renderLibrary();
+}
+async function libPickFolder(current) {
+  const existing = await PFS.library.folders();
+  const opts = existing.filter((f) => f !== current);
+  // a tiny picker built from the app's own prompt: type a name; a known
+  // name is reused, "" clears the folder
+  const hint = opts.length ? 'תיקיות קיימות: ' + opts.join(' · ') : 'למשל: חשמלאות, תעודות, הסכמים';
+  const name = await PFS.ui.prompt('לאיזו תיקייה? (' + hint + ')', { value: current || '' });
+  if (name == null) return null;
+  return String(name).trim();
+}
+function libDot(color) { const d = document.createElement('span'); d.className = 'lib-dot'; d.dataset.c = color || ''; return d; }
+function libChips(host, folders, docs, onPick) {
+  host.innerHTML = '';
+  if (!folders.length) { host.style.display = 'none'; return; }
+  host.style.display = '';
+  const mk = (val, label, n) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'lib-chip' + (libFilter === val ? ' on' : '');
+    b.textContent = label + (n != null ? ' · ' + n : ''); b.addEventListener('click', () => { libFilter = libFilter === val ? '' : val; onPick(); });
+    host.appendChild(b);
+  };
+  mk('', 'הכול', docs.length);
+  folders.forEach((f) => mk(f, '📁 ' + f, docs.filter((d) => d.folder === f).length));
+  const unfiled = docs.filter((d) => !d.folder).length;
+  if (unfiled && unfiled !== docs.length) mk('__none', 'ללא תיקייה', unfiled);
+}
+const libVisible = (docs) => libFilter === '' ? docs : libFilter === '__none' ? docs.filter((d) => !d.folder) : docs.filter((d) => d.folder === libFilter);
 async function renderLibrary() {
   if (!PFS.library) return;
   const docs = await PFS.library.list();
-  // empty-state strip
-  const wrap = $('libWrap'), strip = $('libStrip');
+  const folders = await PFS.library.folders();
+  if (libFilter && libFilter !== '__none' && !folders.includes(libFilter)) libFilter = '';
+  // home strip: the everyday forms, filtered by folder chips when folders exist
+  const wrap = $('libWrap'), strip = $('libStrip'), chips = $('libChips');
   if (wrap && strip) {
     wrap.style.display = docs.length ? '' : 'none';
+    if (chips) libChips(chips, folders, docs, renderLibrary);
     strip.innerHTML = '';
-    docs.slice(0, 6).forEach((d) => {
+    libVisible(docs).slice(0, 9).forEach((d) => {
       const row = document.createElement('div'); row.className = 'tmpl-item home-item'; row.style.cursor = 'pointer';
       row.innerHTML = '<div class="nm"><span class="ic">' + (d.kind === 'cert' ? '🎓' : '📄') + '</span> </div><span class="go">פתח ›</span>';
-      row.querySelector('.nm').append(String(d.name || '').replace(/\.pdf$/i, ''));
+      const nm = row.querySelector('.nm');
+      if (d.color) nm.prepend(libDot(d.color));
+      nm.append(String(d.name || '').replace(/\.pdf$/i, ''));
+      if (d.folder && !libFilter) { const f = document.createElement('span'); f.className = 'lib-folder'; f.textContent = d.folder; nm.appendChild(f); }
       row.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
       row.addEventListener('click', () => openFromLibrary(d.id));
       strip.appendChild(row);
     });
   }
-  // modal list
-  const list = $('libList');
+  // the modal: file, label, rename, remove
+  const list = $('libList'), mchips = $('libModalChips');
   if (list) {
+    if (mchips) libChips(mchips, folders, docs, renderLibrary);
     list.innerHTML = '';
     if (!docs.length) {
       const empty = document.createElement('div');
@@ -4866,25 +4917,38 @@ async function renderLibrary() {
       empty.textContent = 'המאגר ריק — שמרו את הטופס הפתוח או העלו קובץ.';
       list.appendChild(empty);
     }
-    docs.forEach((d) => {
-      const row = document.createElement('div'); row.className = 'tmpl-item';
-      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = '📄 ' + d.name;
-      const openB = document.createElement('button'); openB.className = 'btn sm primary'; openB.textContent = 'פתח';
-      openB.addEventListener('click', () => { closeModal('libModal'); openFromLibrary(d.id); });
-      const renB = document.createElement('button'); renB.className = 'btn sm'; renB.textContent = '✎'; renB.title = 'שנה שם';
-      renB.addEventListener('click', async () => {
-        const name = await PFS.ui.prompt('שם המסמך במאגר', { value: d.name });
-        if (name && name.trim()) { await PFS.library.rename(d.id, name); renderLibrary(); }
+    const shown = libVisible(docs);
+    // grouped by folder when browsing everything
+    const groups = libFilter ? [[null, shown]] : [...folders.map((f) => [f, shown.filter((d) => d.folder === f)]), [null, shown.filter((d) => !d.folder)]];
+    groups.forEach(([folder, items]) => {
+      if (!items.length) return;
+      if (folder && !libFilter) { const h = document.createElement('div'); h.className = 'lib-group'; h.textContent = '📁 ' + folder; list.appendChild(h); }
+      else if (folder === null && folders.length && !libFilter && items.length) { const h = document.createElement('div'); h.className = 'lib-group'; h.textContent = 'ללא תיקייה'; list.appendChild(h); }
+      items.forEach((d) => {
+        const row = document.createElement('div'); row.className = 'tmpl-item lib-row'; row.dataset.id = d.id;
+        // colour label: click cycles through the palette
+        const dot = libDot(d.color); dot.title = 'תווית צבע — לחיצה מחליפה'; dot.classList.add('lib-dot-btn');
+        dot.addEventListener('click', () => { const i = LIB_COLORS.findIndex((c) => c[0] === (d.color || '')); libSetMeta(d.id, { color: LIB_COLORS[(i + 1) % LIB_COLORS.length][0] }); });
+        const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = (d.kind === 'cert' ? '🎓 ' : '📄 ') + d.name;
+        nm.title = 'לחיצה לפתיחה'; nm.style.cursor = 'pointer';
+        nm.addEventListener('click', () => { closeModal('libModal'); openFromLibrary(d.id); });
+        const fold = document.createElement('button'); fold.className = 'btn sm ghost lib-fold'; fold.textContent = d.folder ? '📁 ' + d.folder : '📁 תיקייה'; fold.title = 'העבר לתיקייה';
+        fold.addEventListener('click', async () => { const f = await libPickFolder(d.folder); if (f !== null) libSetMeta(d.id, { folder: f }); });
+        const renB = document.createElement('button'); renB.className = 'btn sm ghost'; renB.textContent = '✎'; renB.title = 'שנה שם';
+        renB.addEventListener('click', async () => {
+          const name = await PFS.ui.prompt('שם המסמך במאגר', { value: d.name });
+          if (name && name.trim()) { await PFS.library.rename(d.id, name); cloudPatchLibMeta(d.id, { name: name.trim() }); renderLibrary(); }
+        });
+        const delB = document.createElement('button'); delB.className = 'btn sm ghost'; delB.style.color = 'var(--danger)'; delB.textContent = '🗑'; delB.title = 'הסר מהמאגר';
+        delB.addEventListener('click', async () => {
+          if (await PFS.ui.confirm('הסרה מהמאגר', 'להסיר את "' + d.name + '" מהמאגר?')) { await PFS.library.remove(d.id); try { if (PFS.account && PFS.account.authed()) await PFS.account.deleteFile('lib', d.id); } catch (e) {} renderLibrary(); }
+        });
+        row.append(dot, nm, fold, renB, delB);
+        list.appendChild(row);
       });
-      const delB = document.createElement('button'); delB.className = 'btn sm'; delB.style.color = 'var(--danger)'; delB.textContent = '🗑'; delB.title = 'הסר מהמאגר';
-      delB.addEventListener('click', async () => {
-        if (await PFS.ui.confirm('הסרה מהמאגר', 'להסיר את "' + d.name + '" מהמאגר?')) { await PFS.library.remove(d.id); renderLibrary(); }
-      });
-      row.append(nm, openB, renB, delB);
-      list.appendChild(row);
     });
   }
-  if ($('libAddOpenBtn')) $('libAddOpenBtn').disabled = !pdfView.hasDoc();
+  const addBtn = $('libAddOpenBtn'); if (addBtn) addBtn.disabled = !pdfView.hasDoc();
 }
 async function openFromLibrary(id) {
   try {

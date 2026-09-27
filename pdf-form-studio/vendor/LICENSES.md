@@ -14,8 +14,12 @@ and fonts so the app runs fully offline with no CDN. Each retains its own licens
 | Hebrew traineddata (tessdata) | — | Apache-2.0 | `tesseract/tessdata/heb.traineddata` |
 | Heebo (via @fontsource/heebo) | — | SIL OFL 1.1 | `fonts/Heebo-*.woff2` |
 | Rubik (Google Fonts, variable) | v31 | SIL OFL 1.1 | `fonts/Rubik-*.woff2` |
+| Inter (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/Inter-*.woff2` |
+| Noto Sans Hebrew (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/NotoSansHebrew.woff2` |
 
 - pdf-lib — https://github.com/Hopding/pdf-lib (MIT)
 - pdf.js — https://github.com/mozilla/pdf.js (Apache-2.0)
 - Heebo — https://fonts.google.com/specimen/Heebo (SIL Open Font License 1.1)
 - Rubik — https://fonts.google.com/specimen/Rubik (SIL Open Font License 1.1)
+- Inter — https://fonts.google.com/specimen/Inter (SIL Open Font License 1.1)
+- Noto Sans Hebrew — https://fonts.google.com/noto/specimen/Noto+Sans+Hebrew (SIL Open Font License 1.1)

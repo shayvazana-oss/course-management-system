@@ -1103,3 +1103,25 @@ body.home .viewport::before { content: ''; position: absolute; left: 50%; top: 1
 /* logo: readable in both themes (drop = canvas, check = ink) */
 .brand .logo svg path[fill="#fff"] { fill: var(--canvas); }
 .brand .logo svg path[stroke] { stroke: var(--ink-1); }
+
+/* ===== type system: Inter + Noto Sans Hebrew, no emoji icons ===== */
+:root { --font: 'Inter', 'Noto Sans Hebrew', 'Heebo', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+body { font-family: var(--font); font-size: 14px; line-height: 1.5; font-feature-settings: "cv11", "ss03"; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.emo { display: none !important; }
+.hero h2 { font-weight: 640; letter-spacing: -.045em; font-size: 62px; }
+.hero p { font-size: 18px; font-weight: 400; }
+.tile-t, .card > h3, .gd-q, .modal header, .home-sec, .brand .title { font-weight: 600; letter-spacing: -.012em; }
+.tile-t { font-size: 16px; }
+.gd-q { font-size: 18px; }
+.btn, .gd-chip, .lib-chip, .tab { font-weight: 500; }
+.btn.primary { font-weight: 600; }
+.rail-head, .sec-title, .ex-lbl, .home-sec-sub, .field > label, .hint { font-weight: 400; }
+.rail-head { font-size: 11px; color: var(--ink-4); }
+.hint { font-size: 12.5px; color: var(--ink-3); }
+.pill, .when, .lib-folder, .ex-pill, .gd-count { font-variant-numeric: tabular-nums; }
+/* status of a saved document: a dot, not an emoji */
+.home-item .nm::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); margin-inline-end: 10px; vertical-align: 1px; }
+.home-item.filled .nm::before { background: #16A34A; }
+#libStrip .home-item .nm::before { display: none; }
+.hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #16A34A; display: inline-block; }
+input, select, textarea, button { font-family: inherit; }

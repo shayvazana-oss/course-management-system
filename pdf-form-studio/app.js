@@ -5144,6 +5144,66 @@ async function renderRecent(filter) {
 }
 renderRecent();
 document.body.classList.toggle('home', !pdfView.hasDoc());
+
+// ---- modern chrome: no emoji as icons ----
+// Emoji in UI labels read as dated next to the products this design follows.
+// A leading emoji in a label is WRAPPED in a hidden span (textContent stays
+// intact for scripts and tests); an icon-only button keeps its glyph. The
+// document overlay and toasts are left alone.
+const EMO_RE = /^(\s*(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|️|‍|⃣)+\s*)/u;
+const EMO_END = /(\s*(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D|\u20E3)+\s*)$/u;
+const EMO_SEL = '.lib-chip, .btn, .card > h3, .tab, .gd-chip, .rail-head, .home-sec, .hint, .gd-q, .gd-count, .cert-row-l, .lib-fold, .home-item .nm, .tmpl-item .nm, .ex-lbl, .sec-title, .modal header, .field > label, .hero-badge, .tile-d, .ex-chk b, .fp-tool, .course-chip, .ex-switch b, .lib-group, .qs-grid > label, .help-card b, .dz-step .t';
+function deEmoji(root) {
+  if (!root || !root.querySelectorAll) return;
+  const list = root.matches && root.matches(EMO_SEL) ? [root] : [];
+  list.push(...root.querySelectorAll(EMO_SEL));
+  list.forEach((el) => {
+    if (el.closest('.overlay, .toast-wrap, .el')) return;
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) {
+        if (!n.nodeValue.trim()) continue;
+        const m = EMO_RE.exec(n.nodeValue);
+        if (m && m[1].trim() && m[1].length < n.nodeValue.length) {
+          const span = document.createElement('span'); span.className = 'emo'; span.textContent = m[1];
+          n.nodeValue = n.nodeValue.slice(m[1].length); el.insertBefore(span, n);
+        }
+        break;
+      }
+      if (n.nodeType === 1) {
+        if (n.classList.contains('emo')) break;
+        if (n.classList.contains('lib-dot')) continue;
+        if (n.classList.contains('ic') && !n.querySelector('svg') && EMO_RE.test(n.textContent || '')) {
+          const rest = [...el.childNodes].filter((c) => c !== n).map((c) => c.textContent || '').join('').trim();
+          if (rest) n.classList.add('emo');
+        }
+        break;
+      }
+    }
+    // …and a trailing one (labels written "מילוי 🎯"), on the LAST text node
+    const last = [...el.childNodes].reverse().find((c) => c.nodeType === 3 ? !!c.nodeValue.trim() : c.nodeType === 1);
+    if (last && last.nodeType === 3) {
+      const m = EMO_END.exec(last.nodeValue);
+      if (m && m[1].trim() && m[1].length < last.nodeValue.length) {
+        const span = document.createElement('span'); span.className = 'emo'; span.textContent = m[1];
+        last.nodeValue = last.nodeValue.slice(0, -m[1].length); el.insertBefore(span, last.nextSibling);
+      }
+    }
+  });
+}
+try {
+  deEmoji(document.body);
+  // batches are ACCUMULATED until the next frame (dropping later batches
+  // while one was pending left labels rendered between frames untouched)
+  const emoQ = new Set(); let emoT = 0;
+  new MutationObserver((muts) => {
+    muts.forEach((m) => {
+      m.addedNodes.forEach((n) => { if (n.nodeType === 1) emoQ.add(n); else if (n.nodeType === 3 && n.parentElement) emoQ.add(n.parentElement); });
+      if (m.type === 'characterData' && m.target.parentElement) emoQ.add(m.target.parentElement);
+    });
+    if (emoT) return;
+    emoT = requestAnimationFrame(() => { emoT = 0; const q = [...emoQ]; emoQ.clear(); q.forEach((n) => { if (n.isConnected) deEmoji(n); }); });
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+} catch (e) {}
 $('homeLibBtn') && $('homeLibBtn').addEventListener('click', () => $('libBtn').click());
 
 // A PDF shared into the app (WhatsApp → share → Fillo): sw.js stashed it,

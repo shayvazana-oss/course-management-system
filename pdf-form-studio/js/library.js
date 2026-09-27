@@ -50,7 +50,7 @@
       const db = await open();
       const all = await tx(db, 'readonly', (s) => s.getAll());
       return (all || [])
-        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '', folder: r.folder || '', color: r.color || '' }))
+        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '', folder: r.folder || '', color: r.color || '', thumb: r.thumb || '' }))
         .sort((a, b) => (b.lastUsed || b.added) - (a.lastUsed || a.added));
     } catch (e) { return []; }
   }
@@ -85,6 +85,14 @@
     await tx(db, 'readwrite', (s) => s.put(rec));
     return true;
   }
+  async function setThumb(id, dataUrl) {
+    const db = await open();
+    const rec = await tx(db, 'readonly', (s) => s.get(id));
+    if (!rec) return false;
+    rec.thumb = dataUrl;
+    await tx(db, 'readwrite', (s) => s.put(rec));
+    return true;
+  }
   // the folders in use, most-populated first
   async function folders() {
     const n = {};
@@ -100,5 +108,5 @@
     try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); } catch (e) {}
   }
 
-  PFS.library = { add, list, get, rename, remove, clearAll, setMeta, folders };
+  PFS.library = { add, list, get, rename, remove, clearAll, setMeta, folders, setThumb };
 })(window);

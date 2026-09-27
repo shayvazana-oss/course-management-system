@@ -41,6 +41,7 @@
       const dup = all.find((d) => d.name === name);
       const id = (opts && opts.id) || (dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6));
       const rec = { id, name, ts: (opts && opts.ts) || Date.now(), bytes };
+      if (dup && dup.thumb && !(opts && opts.fill)) rec.thumb = dup.thumb;   // same bytes → same first page
       if (opts && opts.fill) rec.fill = opts.fill;
       if (opts && opts.label) rec.label = opts.label;
       await tx(db, 'readwrite', (s) => s.put(rec));
@@ -58,7 +59,7 @@
       const db = await open();
       const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
       db.close();
-      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts, label, fill }) => ({ id, name, ts, label: label || '', filled: !!fill }));
+      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts, label, fill, thumb }) => ({ id, name, ts, label: label || '', filled: !!fill, thumb: thumb || '' }));
     } catch (e) { return []; }
   }
   async function get(id) {
@@ -69,6 +70,16 @@
     } catch (e) { return null; }
   }
 
+  // a small first-page preview, rendered once and kept with the record
+  async function setThumb(id, dataUrl) {
+    try {
+      const db = await open();
+      const rec = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+      if (rec) { rec.thumb = dataUrl; await tx(db, 'readwrite', (s) => s.put(rec)); }
+      db.close(); return !!rec;
+    } catch (e) { return false; }
+  }
+
   async function remove(id) {
     try {
       const db = await open();
@@ -77,5 +88,5 @@
     } catch (e) { return false; }
   }
 
-  PFS.recent = { save, list, get, remove, clearAll };
+  PFS.recent = { save, list, get, remove, clearAll, setThumb };
 })(window);

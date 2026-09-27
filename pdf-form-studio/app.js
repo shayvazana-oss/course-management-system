@@ -4839,6 +4839,59 @@ showOnboarding();
 // =====================================================================
 //  Document library ("המאגר") — the office's permanent forms, one click away
 // =====================================================================
+// ---- document previews: the first page, small, rendered once ----
+// A card with a picture of the actual document is recognisable at a glance
+// (a name like "medical-certificate-aligned" is not). Rendered lazily with
+// pdf.js at ~260px wide, kept on the record so it never renders twice.
+const thumbBusy = new Set();
+async function renderThumbDataUrl(bytes) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+  try {
+    const pg = await doc.getPage(1);
+    const vp0 = pg.getViewport({ scale: 1 });
+    const scale = 260 / vp0.width;
+    const vp = pg.getViewport({ scale });
+    const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(Math.min(vp.height, vp.width * 1.1));
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+    return cv.toDataURL('image/jpeg', 0.82);
+  } finally { try { doc.destroy(); } catch (e) {} }
+}
+async function ensureThumb(kind, d, img) {
+  if (d.thumb || thumbBusy.has(kind + d.id)) return;
+  thumbBusy.add(kind + d.id);
+  try {
+    const rec = kind === 'lib' ? await PFS.library.get(d.id) : await PFS.recent.get(d.id);
+    if (!rec || !rec.bytes) return;
+    const url = await renderThumbDataUrl(new Uint8Array(rec.bytes));
+    if (kind === 'lib') await PFS.library.setThumb(d.id, url); else await PFS.recent.setThumb(d.id, url);
+    d.thumb = url; if (img && img.isConnected) { img.src = url; img.closest('.doc-thumb') && img.closest('.doc-thumb').classList.add('has'); }
+  } catch (e) { /* a preview is a bonus */ } finally { thumbBusy.delete(kind + d.id); }
+}
+// one card for a document on the home: preview on top, name + meta below
+function docCard({ kind, d, title, sub, dot, tag, onOpen, onDelete, extraClass }) {
+  const card = document.createElement('div'); card.className = 'tmpl-item home-item doc-card ' + (extraClass || ''); card.style.cursor = 'pointer';
+  const th = document.createElement('div'); th.className = 'doc-thumb' + (d.thumb ? ' has' : '');
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if (d.thumb) img.src = d.thumb;
+  th.appendChild(img);
+  if (!d.thumb) { const ph = document.createElement('div'); ph.className = 'doc-ph'; th.appendChild(ph); ensureThumb(kind, d, img); }
+  const meta = document.createElement('div'); meta.className = 'doc-meta';
+  const nm = document.createElement('div'); nm.className = 'nm';
+  if (dot) nm.appendChild(dot);
+  nm.append(title);
+  const s2 = document.createElement('div'); s2.className = 'doc-sub';
+  if (sub) s2.append(sub);
+  if (tag) { const t = document.createElement('span'); t.className = 'doc-tag'; t.textContent = tag; s2.appendChild(t); }
+  meta.append(nm, s2);
+  card.append(th, meta);
+  if (onDelete) {
+    const del = document.createElement('button'); del.className = 'btn sm ghost del'; del.textContent = '✕'; del.title = 'הסרה';
+    del.addEventListener('click', (e) => { e.stopPropagation(); onDelete(); });
+    card.appendChild(del);
+  }
+  card.addEventListener('click', onOpen);
+  return card;
+}
 // ---- the library: folders + colour labels ("ארגון בקטגוריות ותוויות צבע") ----
 const LIB_COLORS = [['', 'ללא'], ['blue', 'כחול'], ['green', 'ירוק'], ['amber', 'כתום'], ['red', 'אדום'], ['violet', 'סגול'], ['grey', 'אפור']];
 let libFilter = '';     // '' = everything, '__none' = unfiled, else a folder name
@@ -4894,16 +4947,14 @@ async function renderLibrary() {
     wrap.style.display = docs.length ? '' : 'none';
     if (chips) libChips(chips, folders, docs, renderLibrary);
     strip.innerHTML = '';
-    libVisible(docs).slice(0, 9).forEach((d) => {
-      const row = document.createElement('div'); row.className = 'tmpl-item home-item'; row.style.cursor = 'pointer';
-      row.innerHTML = '<div class="nm"><span class="ic">' + (d.kind === 'cert' ? '🎓' : '📄') + '</span> </div><span class="go">פתח ›</span>';
-      const nm = row.querySelector('.nm');
-      if (d.color) nm.prepend(libDot(d.color));
-      nm.append(String(d.name || '').replace(/\.pdf$/i, ''));
-      if (d.folder && !libFilter) { const f = document.createElement('span'); f.className = 'lib-folder'; f.textContent = d.folder; nm.appendChild(f); }
-      row.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
-      row.addEventListener('click', () => openFromLibrary(d.id));
-      strip.appendChild(row);
+    libVisible(docs).slice(0, 8).forEach((d) => {
+      const card = docCard({
+        kind: 'lib', d, title: String(d.name || '').replace(/\.pdf$/i, ''),
+        sub: d.kind === 'cert' ? 'פורמט תעודה' : 'טופס קבוע', tag: (d.folder && !libFilter) ? d.folder : '',
+        dot: d.color ? libDot(d.color) : null, onOpen: () => openFromLibrary(d.id)
+      });
+      card.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
+      strip.appendChild(card);
     });
   }
   // the modal: file, label, rename, remove
@@ -5091,23 +5142,20 @@ async function renderRecent(filter) {
     list.appendChild(s);
   }
   shown.forEach((d) => {
-    const row = document.createElement('div'); row.className = 'tmpl-item home-item' + (d.filled ? ' filled' : ''); row.style.cursor = 'pointer';
-    const nm = document.createElement('div'); nm.className = 'nm';
-    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + String(d.label || d.name).replace(/\.pdf$/i, '');
-    if (d.cloud) nm.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
-    else if (d.filled) nm.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
-    const pill = document.createElement('span'); pill.className = 'when'; pill.textContent = relDate(d.ts);
-    const del = document.createElement('button');
-    del.className = 'btn sm ghost del'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
-    del.style.cssText = 'flex:none;padding:2px 7px';
-    del.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await PFS.recent.remove(d.id);
-      try { if (PFS.account && PFS.account.authed()) await PFS.account.deleteFile('recent', d.id); } catch (e2) {}
-      renderRecent(filter);
+    const label = String(d.label || d.name).replace(/\.pdf$/i, '');
+    const row = docCard({
+      kind: 'recent', d, title: (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + label,
+      sub: relDate(d.ts), tag: d.cloud ? 'בענן' : (d.filled ? 'ממולא' : ''), extraClass: d.filled ? 'filled' : '',
+      onOpen: () => openRecent(d),
+      onDelete: async () => {
+        await PFS.recent.remove(d.id);
+        try { if (PFS.account && PFS.account.authed()) await PFS.account.deleteFile('recent', d.id); } catch (e2) {}
+        renderRecent(filter);
+      }
     });
-    row.append(nm, pill, del);
-    row.addEventListener('click', async () => {
+    if (d.cloud) row.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
+    else if (d.filled) row.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
+    const openRecent = async (d) => {
       let doc = await PFS.recent.get(d.id);
       if ((!doc || !doc.bytes) && d.cloud) {
         // history from another computer: fetch the bytes from the user's folder
@@ -5126,7 +5174,7 @@ async function renderRecent(filter) {
         markDirty(); dirty = false;
         PFS.toast('✅ נפתח המסמך השמור: ' + (d.label || d.name), 'ok', 3500);
       }
-    });
+    };
     list.appendChild(row);
   });
   if (q && !pool.length) {

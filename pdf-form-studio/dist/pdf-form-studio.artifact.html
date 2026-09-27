@@ -1192,6 +1192,28 @@ input, select, textarea, button { font-family: inherit; }
 .dot-legend { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); vertical-align: 1px; margin: 0 4px 0 8px; }
 .dot-legend.on { background: #16A34A; margin-inline-start: 0; }
 
+/* ===== document cards on the home: a picture of the document, not a file name ===== */
+#libStrip, #recentList { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 12px; align-items: stretch; }
+#recentList > .more, #recentList > .hint, #recentList > input { grid-column: 1 / -1; }
+.doc-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); position: relative; height: auto; }
+.doc-card:hover { box-shadow: var(--shadow-2); border-color: var(--line-2); }
+.doc-thumb { position: relative; aspect-ratio: 4 / 3; background: var(--surface-3); border-bottom: 1px solid var(--line); overflow: hidden; }
+.doc-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; opacity: 0; transition: opacity .25s; }
+.doc-thumb.has img { opacity: 1; }
+.doc-thumb .doc-ph { position: absolute; inset: 0; background: linear-gradient(180deg, var(--surface-2), var(--surface-3)); }
+.doc-thumb .doc-ph::after { content: ''; position: absolute; left: 22%; right: 22%; top: 18%; bottom: 0; background: var(--surface); border: 1px solid var(--line); border-bottom: 0; border-radius: 6px 6px 0 0; }
+.doc-meta { padding: 10px 12px 11px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.doc-card .nm { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.005em; }
+.doc-card .nm::before { content: none; }
+.doc-card.filled .nm::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #16A34A; margin-inline-end: 8px; vertical-align: 1px; }
+.doc-sub { font-size: 12px; color: var(--ink-4); display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+.doc-tag { font-size: 11px; color: var(--ink-3); background: var(--surface-3); border-radius: 6px; padding: 1px 7px; }
+.doc-card .btn.del { position: absolute; top: 6px; inset-inline-start: 6px; background: rgba(255,255,255,.9); border-radius: 8px; opacity: 0; }
+.doc-card:hover .btn.del { opacity: 1; }
+.doc-card .lib-dot { margin-inline-end: 8px; }
+@media (max-width: 820px) { #libStrip, #recentList { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+.home-sec { margin-top: 6px; }
+
 </style>
 
 <div class="app">
@@ -2136,6 +2158,7 @@ input, select, textarea, button { font-family: inherit; }
       const dup = all.find((d) => d.name === name);
       const id = (opts && opts.id) || (dup ? dup.id : 'd' + Date.now() + Math.random().toString(36).slice(2, 6));
       const rec = { id, name, ts: (opts && opts.ts) || Date.now(), bytes };
+      if (dup && dup.thumb && !(opts && opts.fill)) rec.thumb = dup.thumb;   // same bytes → same first page
       if (opts && opts.fill) rec.fill = opts.fill;
       if (opts && opts.label) rec.label = opts.label;
       await tx(db, 'readwrite', (s) => s.put(rec));
@@ -2153,7 +2176,7 @@ input, select, textarea, button { font-family: inherit; }
       const db = await open();
       const all = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
       db.close();
-      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts, label, fill }) => ({ id, name, ts, label: label || '', filled: !!fill }));
+      return all.sort((a, b) => b.ts - a.ts).map(({ id, name, ts, label, fill, thumb }) => ({ id, name, ts, label: label || '', filled: !!fill, thumb: thumb || '' }));
     } catch (e) { return []; }
   }
   async function get(id) {
@@ -2164,6 +2187,16 @@ input, select, textarea, button { font-family: inherit; }
     } catch (e) { return null; }
   }
 
+  // a small first-page preview, rendered once and kept with the record
+  async function setThumb(id, dataUrl) {
+    try {
+      const db = await open();
+      const rec = await new Promise((res) => { const r = db.transaction(STORE).objectStore(STORE).get(id); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+      if (rec) { rec.thumb = dataUrl; await tx(db, 'readwrite', (s) => s.put(rec)); }
+      db.close(); return !!rec;
+    } catch (e) { return false; }
+  }
+
   async function remove(id) {
     try {
       const db = await open();
@@ -2172,7 +2205,7 @@ input, select, textarea, button { font-family: inherit; }
     } catch (e) { return false; }
   }
 
-  PFS.recent = { save, list, get, remove, clearAll };
+  PFS.recent = { save, list, get, remove, clearAll, setThumb };
 })(window);
 
 </script>
@@ -4823,7 +4856,7 @@ input, select, textarea, button { font-family: inherit; }
       const db = await open();
       const all = await tx(db, 'readonly', (s) => s.getAll());
       return (all || [])
-        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '', folder: r.folder || '', color: r.color || '' }))
+        .map((r) => ({ id: r.id, name: r.name, size: r.size, added: r.added, lastUsed: r.lastUsed, kind: r.kind || '', folder: r.folder || '', color: r.color || '', thumb: r.thumb || '' }))
         .sort((a, b) => (b.lastUsed || b.added) - (a.lastUsed || a.added));
     } catch (e) { return []; }
   }
@@ -4858,6 +4891,14 @@ input, select, textarea, button { font-family: inherit; }
     await tx(db, 'readwrite', (s) => s.put(rec));
     return true;
   }
+  async function setThumb(id, dataUrl) {
+    const db = await open();
+    const rec = await tx(db, 'readonly', (s) => s.get(id));
+    if (!rec) return false;
+    rec.thumb = dataUrl;
+    await tx(db, 'readwrite', (s) => s.put(rec));
+    return true;
+  }
   // the folders in use, most-populated first
   async function folders() {
     const n = {};
@@ -4873,7 +4914,7 @@ input, select, textarea, button { font-family: inherit; }
     try { const db = await open(); await tx(db, 'readwrite', (s) => s.clear()); } catch (e) {}
   }
 
-  PFS.library = { add, list, get, rename, remove, clearAll, setMeta, folders };
+  PFS.library = { add, list, get, rename, remove, clearAll, setMeta, folders, setThumb };
 })(window);
 
 </script>
@@ -13624,6 +13665,59 @@ showOnboarding();
 // =====================================================================
 //  Document library ("המאגר") — the office's permanent forms, one click away
 // =====================================================================
+// ---- document previews: the first page, small, rendered once ----
+// A card with a picture of the actual document is recognisable at a glance
+// (a name like "medical-certificate-aligned" is not). Rendered lazily with
+// pdf.js at ~260px wide, kept on the record so it never renders twice.
+const thumbBusy = new Set();
+async function renderThumbDataUrl(bytes) {
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+  try {
+    const pg = await doc.getPage(1);
+    const vp0 = pg.getViewport({ scale: 1 });
+    const scale = 260 / vp0.width;
+    const vp = pg.getViewport({ scale });
+    const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(Math.min(vp.height, vp.width * 1.1));
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+    return cv.toDataURL('image/jpeg', 0.82);
+  } finally { try { doc.destroy(); } catch (e) {} }
+}
+async function ensureThumb(kind, d, img) {
+  if (d.thumb || thumbBusy.has(kind + d.id)) return;
+  thumbBusy.add(kind + d.id);
+  try {
+    const rec = kind === 'lib' ? await PFS.library.get(d.id) : await PFS.recent.get(d.id);
+    if (!rec || !rec.bytes) return;
+    const url = await renderThumbDataUrl(new Uint8Array(rec.bytes));
+    if (kind === 'lib') await PFS.library.setThumb(d.id, url); else await PFS.recent.setThumb(d.id, url);
+    d.thumb = url; if (img && img.isConnected) { img.src = url; img.closest('.doc-thumb') && img.closest('.doc-thumb').classList.add('has'); }
+  } catch (e) { /* a preview is a bonus */ } finally { thumbBusy.delete(kind + d.id); }
+}
+// one card for a document on the home: preview on top, name + meta below
+function docCard({ kind, d, title, sub, dot, tag, onOpen, onDelete, extraClass }) {
+  const card = document.createElement('div'); card.className = 'tmpl-item home-item doc-card ' + (extraClass || ''); card.style.cursor = 'pointer';
+  const th = document.createElement('div'); th.className = 'doc-thumb' + (d.thumb ? ' has' : '');
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; if (d.thumb) img.src = d.thumb;
+  th.appendChild(img);
+  if (!d.thumb) { const ph = document.createElement('div'); ph.className = 'doc-ph'; th.appendChild(ph); ensureThumb(kind, d, img); }
+  const meta = document.createElement('div'); meta.className = 'doc-meta';
+  const nm = document.createElement('div'); nm.className = 'nm';
+  if (dot) nm.appendChild(dot);
+  nm.append(title);
+  const s2 = document.createElement('div'); s2.className = 'doc-sub';
+  if (sub) s2.append(sub);
+  if (tag) { const t = document.createElement('span'); t.className = 'doc-tag'; t.textContent = tag; s2.appendChild(t); }
+  meta.append(nm, s2);
+  card.append(th, meta);
+  if (onDelete) {
+    const del = document.createElement('button'); del.className = 'btn sm ghost del'; del.textContent = '✕'; del.title = 'הסרה';
+    del.addEventListener('click', (e) => { e.stopPropagation(); onDelete(); });
+    card.appendChild(del);
+  }
+  card.addEventListener('click', onOpen);
+  return card;
+}
 // ---- the library: folders + colour labels ("ארגון בקטגוריות ותוויות צבע") ----
 const LIB_COLORS = [['', 'ללא'], ['blue', 'כחול'], ['green', 'ירוק'], ['amber', 'כתום'], ['red', 'אדום'], ['violet', 'סגול'], ['grey', 'אפור']];
 let libFilter = '';     // '' = everything, '__none' = unfiled, else a folder name
@@ -13679,16 +13773,14 @@ async function renderLibrary() {
     wrap.style.display = docs.length ? '' : 'none';
     if (chips) libChips(chips, folders, docs, renderLibrary);
     strip.innerHTML = '';
-    libVisible(docs).slice(0, 9).forEach((d) => {
-      const row = document.createElement('div'); row.className = 'tmpl-item home-item'; row.style.cursor = 'pointer';
-      row.innerHTML = '<div class="nm"><span class="ic">' + (d.kind === 'cert' ? '🎓' : '📄') + '</span> </div><span class="go">פתח ›</span>';
-      const nm = row.querySelector('.nm');
-      if (d.color) nm.prepend(libDot(d.color));
-      nm.append(String(d.name || '').replace(/\.pdf$/i, ''));
-      if (d.folder && !libFilter) { const f = document.createElement('span'); f.className = 'lib-folder'; f.textContent = d.folder; nm.appendChild(f); }
-      row.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
-      row.addEventListener('click', () => openFromLibrary(d.id));
-      strip.appendChild(row);
+    libVisible(docs).slice(0, 8).forEach((d) => {
+      const card = docCard({
+        kind: 'lib', d, title: String(d.name || '').replace(/\.pdf$/i, ''),
+        sub: d.kind === 'cert' ? 'פורמט תעודה' : 'טופס קבוע', tag: (d.folder && !libFilter) ? d.folder : '',
+        dot: d.color ? libDot(d.color) : null, onOpen: () => openFromLibrary(d.id)
+      });
+      card.title = d.kind === 'cert' ? 'פורמט תעודה — לחיצה פותחת את אשף התעודות' : 'טופס קבוע — לחיצה פותחת אותו';
+      strip.appendChild(card);
     });
   }
   // the modal: file, label, rename, remove
@@ -13876,23 +13968,20 @@ async function renderRecent(filter) {
     list.appendChild(s);
   }
   shown.forEach((d) => {
-    const row = document.createElement('div'); row.className = 'tmpl-item home-item' + (d.filled ? ' filled' : ''); row.style.cursor = 'pointer';
-    const nm = document.createElement('div'); nm.className = 'nm';
-    nm.textContent = (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + String(d.label || d.name).replace(/\.pdf$/i, '');
-    if (d.cloud) nm.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
-    else if (d.filled) nm.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
-    const pill = document.createElement('span'); pill.className = 'when'; pill.textContent = relDate(d.ts);
-    const del = document.createElement('button');
-    del.className = 'btn sm ghost del'; del.textContent = '✕'; del.title = 'הסרה מההיסטוריה';
-    del.style.cssText = 'flex:none;padding:2px 7px';
-    del.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await PFS.recent.remove(d.id);
-      try { if (PFS.account && PFS.account.authed()) await PFS.account.deleteFile('recent', d.id); } catch (e2) {}
-      renderRecent(filter);
+    const label = String(d.label || d.name).replace(/\.pdf$/i, '');
+    const row = docCard({
+      kind: 'recent', d, title: (d.cloud ? '☁️ ' : (d.filled ? '✅ ' : '📄 ')) + label,
+      sub: relDate(d.ts), tag: d.cloud ? 'בענן' : (d.filled ? 'ממולא' : ''), extraClass: d.filled ? 'filled' : '',
+      onOpen: () => openRecent(d),
+      onDelete: async () => {
+        await PFS.recent.remove(d.id);
+        try { if (PFS.account && PFS.account.authed()) await PFS.account.deleteFile('recent', d.id); } catch (e2) {}
+        renderRecent(filter);
+      }
     });
-    row.append(nm, pill, del);
-    row.addEventListener('click', async () => {
+    if (d.cloud) row.title = 'שמור בחשבון שלך — יורד למחשב הזה בלחיצה';
+    else if (d.filled) row.title = 'מסמך ממולא ששמרת — נפתח בדיוק כפי שיוצא';
+    const openRecent = async (d) => {
       let doc = await PFS.recent.get(d.id);
       if ((!doc || !doc.bytes) && d.cloud) {
         // history from another computer: fetch the bytes from the user's folder
@@ -13911,7 +14000,7 @@ async function renderRecent(filter) {
         markDirty(); dirty = false;
         PFS.toast('✅ נפתח המסמך השמור: ' + (d.label || d.name), 'ok', 3500);
       }
-    });
+    };
     list.appendChild(row);
   });
   if (q && !pool.length) {

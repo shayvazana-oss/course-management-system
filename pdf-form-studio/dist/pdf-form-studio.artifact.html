@@ -1189,6 +1189,9 @@ body { font-family: var(--font); font-size: 14px; line-height: 1.5; font-feature
 .hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #16A34A; display: inline-block; }
 input, select, textarea, button { font-family: inherit; }
 
+.dot-legend { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); vertical-align: 1px; margin: 0 4px 0 8px; }
+.dot-legend.on { background: #16A34A; margin-inline-start: 0; }
+
 </style>
 
 <div class="app">
@@ -1350,7 +1353,7 @@ input, select, textarea, button { font-family: inherit; }
           </button>
         </div>
         <div id="libWrap" style="display:none"><div class="home-sec">המאגר שלי <span class="home-sec-sub">טפסים קבועים ופורמטים של תעודות</span></div><div id="libChips" class="lib-chips" style="display:none"></div><div id="libStrip" class="tmpl-list"></div></div>
-        <div id="recentWrap" style="display:none"><div class="home-sec">נפתחו לאחרונה <span class="home-sec-sub">✅ מסמך שמולא ונשמר על שם הסטודנט · 📄 טופס ריק</span></div><div id="recentList" class="tmpl-list"></div></div>
+        <div id="recentWrap" style="display:none"><div class="home-sec">נפתחו לאחרונה <span class="home-sec-sub"><span class="dot-legend on"></span> מולא ונשמר על שם הסטודנט <span class="dot-legend"></span> טופס ריק</span></div><div id="recentList" class="tmpl-list"></div></div>
         <div class="dz-steps">
           <div class="dz-step"><div class="n">1</div><div class="t">פתחו PDF</div><div class="d">גררו או בחרו קובץ</div></div>
           <div class="dz-step"><div class="n">2</div><div class="t">מלאו וחתמו</div><div class="d">לוחצים על המשבצת ומקלידים</div></div>

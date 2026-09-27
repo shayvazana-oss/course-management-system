@@ -1125,3 +1125,6 @@ body { font-family: var(--font); font-size: 14px; line-height: 1.5; font-feature
 #libStrip .home-item .nm::before { display: none; }
 .hero-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #16A34A; display: inline-block; }
 input, select, textarea, button { font-family: inherit; }
+
+.dot-legend { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); vertical-align: 1px; margin: 0 4px 0 8px; }
+.dot-legend.on { background: #16A34A; margin-inline-start: 0; }

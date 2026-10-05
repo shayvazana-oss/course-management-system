@@ -793,6 +793,75 @@ async function main() {
     return mean < 70;      // dark like the banner (was ~200+ when it grabbed the light text)
   }));
 
+  // "זה משאיר סימנים": a tight cover around printed text, with a rule just
+  // above it, must come back as clean paper — no ghost of the erased glyphs,
+  // no grey rectangle, no false "crossing" from the rule in the ring
+  check('cover drawn tight around print leaves clean paper (no ghost, no grey patch)', await page.evaluate(() => {
+    const src = document.createElement('canvas'); src.width = 320; src.height = 140;
+    const cx = src.getContext('2d');
+    cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, 320, 140);
+    cx.fillStyle = '#333333'; cx.fillRect(20, 38, 280, 2);             // a table rule 2px above the value
+    cx.fillStyle = '#111111'; cx.font = 'bold 22px Arial'; cx.fillText('03/09/26', 90, 70);
+    // the drag: tight — clips the glyph tops and bottoms by a pixel or two
+    const patch = window.PFS.inpaint.patch(src, 86, 52, 110, 20);
+    if (!patch) return 'no patch';
+    const d = patch.getContext('2d').getImageData(0, 0, patch.width, patch.height).data;
+    let min = 255, sum = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; if (l < min) min = l; sum += l; n++; }
+    const mean = sum / n;
+    return (mean > 248 && min > 225) ? true : JSON.stringify({ mean, min });
+  }) === true);
+
+  // a cover / replacement finishes the glyph band vertically: a drag through
+  // the middle of a line of print grows to cover ascenders and descenders
+  check('cover grows to the whole glyph band — no digit tops or tails survive', await page.evaluate(async () => {
+    const T = window.PFS.__test;
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const d = await PDFDocument.create(); const pg = d.addPage([595, 842]);
+    pg.drawRectangle({ x: 0, y: 0, width: 595, height: 842, color: rgb(1, 1, 1) });
+    const f = await d.embedFont(StandardFonts.HelveticaBold);
+    pg.drawText('03/09/26', { x: 200, y: 600, size: 20, font: f, color: rgb(0.05, 0.05, 0.05) });
+    await T.openPdfFile(new File([await d.save()], 'band.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    T.overlay.clearElements(); T.fieldsPanel.clear();
+    const H = 842, W = 595;
+    // glyph band of 20pt Helvetica digits ≈ 14.4pt tall, top at y≈600+14.4 → fractions (top-origin)
+    const bandTop = 1 - (600 + 14.6) / H, bandBot = 1 - 599.5 / H;
+    // a drag that only covers the MIDDLE 50% of the digits
+    const fy = bandTop + (bandBot - bandTop) * 0.25, fh = (bandBot - bandTop) * 0.5;
+    const v = T.coverBandVertically(0, 195 / W, fy, 100 / W, fh);
+    const grew = v.fy <= bandTop + 0.0005 && v.fy + v.fh >= bandBot - 0.0005;
+    // and the replace tool's own cover is that tall too
+    T.placeReplacement(0, 195 / W, fy, 100 / W, fh);
+    const cover = T.overlay.getElements().find((e) => e.model.kind === 'whiteout');
+    const replOk = cover && cover.model.fy <= bandTop + 0.0005 && cover.model.fy + cover.model.fh >= bandBot - 0.0005;
+    T.overlay.clearElements();
+    return (grew && replOk) ? true : JSON.stringify({ v, bandTop, bandBot, cover: cover && { fy: cover.model.fy, fh: cover.model.fh } });
+  }) === true);
+
+  // the cover tools stay armed for the next cover; Esc or a second click ends the run
+  check('cover tool stays armed after a cover; Esc disarms', await page.evaluate(async () => {
+    const T = window.PFS.__test, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const btn = document.querySelector('.rail-btn.tool[data-tool="whiteout"]');
+    btn.click(); await wait(50);
+    const armed1 = T.overlay.isPlacing();
+    const ov = document.querySelector('.overlay'); const r = ov.getBoundingClientRect();
+    const drag = (x0, y0, x1, y1) => {
+      ov.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + x0 * r.width, clientY: r.top + y0 * r.height, button: 0, bubbles: true, pointerId: 1 }));
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + x1 * r.width, clientY: r.top + y1 * r.height, bubbles: true, pointerId: 1 }));
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: r.left + x1 * r.width, clientY: r.top + y1 * r.height, button: 0, bubbles: true, pointerId: 1 }));
+    };
+    drag(0.2, 0.2, 0.4, 0.24); await wait(80);
+    const n1 = T.overlay.getElements().filter((e) => e.model.kind === 'whiteout').length;
+    const armed2 = T.overlay.isPlacing();
+    drag(0.2, 0.3, 0.4, 0.34); await wait(80);
+    const n2 = T.overlay.getElements().filter((e) => e.model.kind === 'whiteout').length;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
+    const armed3 = T.overlay.isPlacing(), btnOff = !btn.classList.contains('active');
+    T.overlay.clearElements();
+    return (armed1 && n1 === 1 && armed2 && n2 === 2 && !armed3 && btnOff) ? true : JSON.stringify({ armed1, n1, armed2, n2, armed3, btnOff });
+  }) === true);
+
   // textured backgrounds (photos): the cover must keep TEXTURE and respect a
   // dark↔light boundary it crosses — not smear one mid-grey band with streaks
   check('cover crossing a photo boundary keeps each side, no smear band', await page.evaluate(() => {

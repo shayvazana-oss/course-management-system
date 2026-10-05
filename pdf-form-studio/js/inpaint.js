@@ -91,6 +91,16 @@
     };
     const medT = scan(tBand), medB = scan(bBand), medL = scan(lBand), medR = scan(rBand);
     if (!allLum.length) return null;
+    // robust colour of a whole band (median per channel) — the tone of a side
+    // that is NOT the background (the dark half of a photo↔paper crossing)
+    const bandRGB = (band) => {
+      if (!band) return null;
+      const { d } = band; const r = [], g = [], b = [];
+      for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 8) continue; r.push(d[i]); g.push(d[i + 1]); b.push(d[i + 2]); }
+      if (!r.length) return null;
+      const med = (a) => { a.sort((x, y) => x - y); return a[a.length >> 1]; };
+      return [med(r), med(g), med(b)];
+    };
     allLum.sort((a, b) => a - b);
     const q = (p) => allLum[clampi(Math.floor(allLum.length * p), 0, allLum.length - 1)];
     // The background is the MAJORITY tone, not the light tone. Classic paper is
@@ -113,6 +123,13 @@
     const T = mkArrays(w), B = mkArrays(w), L = mkArrays(h), R = mkArrays(h);
 
     let gpr = 0, gpg = 0, gpb = 0, gpn = 0, gsum = 0, gsum2 = 0;
+    const bgFrac = (band) => {
+      if (!band) return null;
+      const { d } = band; let n = 0, k = 0;
+      for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 8) continue; n++; if (isBg(lumOf(d[i], d[i + 1], d[i + 2]))) k++; }
+      return n ? k / n : null;
+    };
+    const fT = bgFrac(tBand), fB = bgFrac(bBand), fL = bgFrac(lBand), fR = bgFrac(rBand);
     // Walk a band. `axis` 0 → positions run along x (top/bottom), 1 → along y.
     // `innerLast` says which end of the ring's thickness touches the region.
     //
@@ -207,12 +224,35 @@
     // each side pure and confines the blend to the middle third.
     const dV = (medT != null && medB != null) ? Math.abs(medT - medB) : 0;
     const dH = (medL != null && medR != null) ? Math.abs(medL - medR) : 0;
-    const crossing = Math.max(dV, dH) > 45;
-    if (opts.debug) Object.assign(opts.debug, { medT, medB, medL, medR, dV, dH, crossing, sigma, bgLum, tol, w, h });
-    if (crossing || sigma > 10) {
-      const vertical = crossing ? dV >= dH : w >= h;
+    // a side is "other content" when most of it is not the background tone —
+    // a thin rule or a few glyph tips inside the ring are not a crossing
+    const sideOff = (f) => f != null && f < 0.3;
+    const sideOn = (f) => f != null && f > 0.65;
+    const crossV = (sideOff(fT) && sideOn(fB)) || (sideOn(fT) && sideOff(fB));
+    const crossH = (sideOff(fL) && sideOn(fR)) || (sideOn(fL) && sideOff(fR));
+    const crossing = (crossV || crossH) && Math.max(dV, dH) > 45;
+    // mirroring real pixels is only safe when the ring holds NO content at all
+    // — otherwise the erased value's own anti-aliased edges come back as a
+    // ghost inside the patch ("זה משאיר סימנים")
+    const ringClean = [fT, fB, fL, fR].every((f) => f == null || f > 0.97);
+    if (opts.debug) Object.assign(opts.debug, { medT, medB, medL, medR, dV, dH, fT, fB, fL, fR, crossing, ringClean, sigma, bgLum, tol, w, h });
+    if (crossing || (sigma > 10 && ringClean)) {
+      const vertical = crossing ? (crossV && (!crossH || dV >= dH)) : w >= h;
       const nearBand = vertical ? tBand : lBand;
       const farBand = vertical ? bBand : rBand;
+      // the tone each side paints with: a background side uses its paper
+      // profile (content excluded); a content side uses its own median colour
+      const nearF = vertical ? fT : fL, farF = vertical ? fB : fR;
+      const nearRGB = bandRGB(nearBand), farRGB = bandRGB(farBand);
+      // each side keeps ITS OWN grain (a photo side is far noisier than paper)
+      const bandSigma = (band) => {
+        if (!band) return 0;
+        const { d } = band; let s1 = 0, s2 = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 8) continue; const lu = lumOf(d[i], d[i + 1], d[i + 2]); s1 += lu; s2 += lu * lu; n++; }
+        if (n < 8) return 0; const m = s1 / n; return Math.sqrt(Math.max(0, s2 / n - m * m));
+      };
+      const gNear = Math.min(bandSigma(nearBand), 16), gFar = Math.min(bandSigma(farBand), 16);
+      const useRaw = !crossing && ringClean;        // photo texture: mirror pixels
       if (nearBand || farBand) {
         const thick = (band) => band ? (vertical ? band.gh : band.gw) : 0;
         const reflect = (k, n) => {
@@ -282,10 +322,20 @@
           const jitterF = farBand ? Math.round(rnd() * 4) : 0;
           for (let p = 0; p < breadth; p++) {
             const o = vertical ? ((s * w + p) * 4) : ((p * w + s) * 4);
+            const rr = rnd();                          // grain keeps a scan looking like a scan
+            const nzN = rr * 2 * gNear, nzF = rr * 2 * gFar;
             for (let c = 0; c < 3; c++) {
               let vNear = null, vFar = null;
-              if (nearBand) vNear = nearBand.d[px(nearBand, p + jitterN, s) + c];
-              if (farBand) vFar = farBand.d[px(farBand, p + jitterF, span - 1 - s) + c];
+              if (useRaw) {
+                if (nearBand) vNear = nearBand.d[px(nearBand, p + jitterN, s) + c];
+                if (farBand) vFar = farBand.d[px(farBand, p + jitterF, span - 1 - s) + c];
+              } else {
+                // paper side → its (content-free) profile; content side → its median tone
+                const prof = vertical ? [Tp, Bp] : [Lp, Rp];
+                if (nearBand) vNear = (sideOn(nearF) || nearF == null) ? prof[0][p * 3 + c] : nearRGB[c];
+                if (farBand) vFar = (sideOn(farF) || farF == null) ? prof[1][p * 3 + c] : farRGB[c];
+                if (vNear != null) vNear += nzN; if (vFar != null) vFar += nzF;
+              }
               const v = vNear == null ? vFar : vFar == null ? vNear : vNear * (1 - t) + vFar * t;
               img.data[o + c] = clampi(Math.round(v), 0, 255);
             }

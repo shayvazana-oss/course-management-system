@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -1332,8 +1332,11 @@ function activateTool(btn, tool) {
   // and replace auto-match the paper colour underneath so the cover is seamless;
   // replace also drops a fresh text box in place, ready to type the new value.
   if (RECT_TOOLS[tool] || tool === 'replace' || tool === 'clip') {
+    // covers and replacements come in runs (a form has several values to
+    // fix): the tool stays armed until Esc or a second click on its button
+    const stay = tool !== 'clip' ? true : stickyTools;
     overlay.setPlacing({
-      rect: true, sticky: stickyTools, defW: 0.2, defH: 0.03,
+      rect: true, sticky: stay, defW: 0.2, defH: 0.03,
       createRect: (pageIndex, fx, fy, fw, fh) => {
         if (tool === 'clip') { copyRegion(pageIndex, fx, fy, fw, fh); return; }
         if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
@@ -1343,11 +1346,19 @@ function activateTool(btn, tool) {
         // flat colour (which shows as a rectangle at full resolution)
         if (tool === 'whiteout') {
           extra.auto = true;
-          const bg = pdfView.sampleBg(pageIndex, fx, fy, fw, fh); if (bg) extra.color = bg;
+          // finish the word/number the drag only grazed, and the whole glyph band
+          try {
+            const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);
+            if (ink) { const c = extendCoverToInk(pageIndex, fx, fy, fw, fh, { top: ink.bandTopFrac, h: ink.bandFrac }); extra.fx = c.fx; extra.fw = c.fw; }
+            const vv = coverBandVertically(pageIndex, extra.fx, fy, extra.fw, fh); extra.fy = vv.fy; extra.fh = vv.fh;
+          } catch (e) {}
+          const bg = pdfView.sampleBg(pageIndex, extra.fx, extra.fy, extra.fw, extra.fh); if (bg) extra.color = bg;
         }
         overlay.addModelAt(tool, pageIndex, extra);
+        overlay.deselectAll();
       }
     });
+    if (stay && !PFS.store.get('hint_sticky_cover', false)) { PFS.store.set('hint_sticky_cover', true); PFS.toast('הכלי נשאר פעיל לכיסויים נוספים — Esc או לחיצה נוספת על הכלי מסיימת', 'ok', 4500); }
     return;
   }
   // text-like: arm placement — click on a page to drop it. In "repeat mode" the
@@ -1474,6 +1485,26 @@ function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
   return { fx: Math.max(0, left - 2) / cw, fw: Math.min(cw, right + 2 - left + 4) / cw };
 }
 
+/* coverBandVertically — a drag rarely catches a whole line of print: the tops
+ * of digits or the tails of ק/ך/ף poke out above/below and survive the cover
+ * ("משאיר סימנים"). Measure the glyph band in a slightly taller window and,
+ * when the band runs into the drag's top or bottom edge, grow the cover to
+ * the band plus a 2px margin. Returns {fy, fh}. */
+function coverBandVertically(pageIndex, fx, fy, fw, fh) {
+  const v = pdfView.viewList()[pageIndex];
+  if (!v || !v.canvas || !v.canvas.height) return { fy, fh };
+  const chh = v.canvas.height;
+  const pad = Math.max(0.006, fh * 0.6);
+  const y0 = Math.max(0, fy - pad), y1 = Math.min(1, fy + fh + pad);
+  const ink = measureReplacedInk(pageIndex, fx, y0, fw, y1 - y0);
+  if (!ink) return { fy, fh };
+  const bandTop = ink.bandTopFrac, bandBot = ink.bandTopFrac + ink.bandFrac;
+  const edge = 2 / chh;
+  // only a band that actually touches the drag counts (not a neighbouring line)
+  if (bandBot < fy - edge || bandTop > fy + fh + edge) return { fy, fh };
+  const top = Math.min(fy, bandTop - 2 / chh), bot = Math.max(fy + fh, bandBot + 2 / chh);
+  return { fy: Math.max(0, top), fh: Math.min(1 - Math.max(0, top), bot - top) };
+}
 // "Replace" — one gesture over existing content: cover it with a paper-matched
 // box (seamless erase), then drop an empty text box in the same spot, focused so
 // the new value can be typed immediately. The result reads like edited-in-place.
@@ -1482,8 +1513,9 @@ function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);   // before covering
   // the cover finishes any token the drag only grazed — no surviving slivers
   const cover = ink ? extendCoverToInk(pageIndex, fx, fy, fw, fh, { top: ink.bandTopFrac, h: ink.bandFrac }) : { fx, fw };
-  const bg = pdfView.sampleBg(pageIndex, cover.fx, fy, cover.fw, fh) || '#ffffff';
-  overlay.addModelAt('whiteout', pageIndex, { fx: cover.fx, fy, fw: cover.fw, fh, color: bg, auto: true });
+  const vert = coverBandVertically(pageIndex, cover.fx, fy, cover.fw, fh);
+  const bg = pdfView.sampleBg(pageIndex, cover.fx, vert.fy, cover.fw, vert.fh) || '#ffffff';
+  overlay.addModelAt('whiteout', pageIndex, { fx: cover.fx, fy: vert.fy, fw: cover.fw, fh: vert.fh, color: bg, auto: true });
   let fontFrac, textH, ty;
   if (ink) {
     // match the print that was just covered: same glyph size (a Hebrew/digit
@@ -2415,6 +2447,7 @@ document.querySelectorAll('.rail-btn.tool').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
     if (isNarrow()) closePanel(); // reveal the page so the placement click lands on it
+    if (btn.classList.contains('active') && overlay.isPlacing()) { overlay.setPlacing(null); btn.classList.remove('active'); return; }
     activateTool(btn, btn.dataset.tool);
   });
 });
@@ -2626,7 +2659,7 @@ document.addEventListener('keydown', (e) => {
   const sel = overlay.getSelected();
   const editing = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true';
   const inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
-  if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
+  if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active')); document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
   if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
     e.preventDefault();

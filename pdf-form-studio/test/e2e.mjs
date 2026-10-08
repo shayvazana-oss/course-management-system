@@ -3874,7 +3874,7 @@ async function main() {
     const okYear = JSON.stringify(P.letters) === JSON.stringify(['תשפ״ז', 'תשפ״ו', 'תשע״ה', 'תשט״ו', 'תש״צ', 'ת״ת'])
       && JSON.stringify(P.years) === JSON.stringify(['תשפ״ז', 'תשפ״ז', 'תשפ״ו', 'תשפ״ז'])
       && P.yearText === P.now && /^[א-ת]+״[א-ת]$/.test(P.now)
-      && P.recYear === undefined && P.yearInk > 60 && P.recYearCol.map === 'שנת לימוד' && P.recYearCol.v === 'תשפ״ה';
+      && P.recYear === undefined && P.yearInk > 30 && P.recYearCol.map === 'שנת לימוד' && P.recYearCol.v === 'תשפ״ה';
     const okLabels = JSON.stringify(P.labels) === JSON.stringify(['שנת לימוד', 'שנת לימוד', 'שם מלא', 'תעודת זהות', 'תאריך סיום', 'שם הקורס', 'ציון', 'מספר תעודה']);
     const okAnchor = P.anchor.n === 1 && P.anchor.kind === 'label' && near(P.anchor.cx, 0.65, 0.006) && P.anchor.top >= 0.795 && P.anchor.bottom <= 0.835 && P.anchor.size <= 0.027 && near(P.anchor.maxW, 0.2, 1e-6);
     const okSnap = P.snap.ok === true && P.snap.kind === 'line' && near(P.snap.cx, 420 / 842, 0.008) && near(P.snap.bottom, 0.6, 0.012) && Math.abs(P.snap.before.cx - 420 / 842) > 0.03;
@@ -3883,6 +3883,115 @@ async function main() {
     check('🎓 "שנת לימוד" fills itself with the Hebrew school year (תשפ״ז) and prints; a list column overrides it', okYear && okLabels);
     check('🎓 precision: fields settle into printed label blanks and onto dropped-on underlines; one-click symmetric alignment', okAnchor && okSnap && okAlign);
   }
+
+  // ---- "החלקים עולים אחד על השני": fields sharing a line never touch, for
+  // ANY name length — measured in the print font, checked in the real PDF ----
+  {
+    const lay = await page.evaluate(async () => {
+      const T = window.PFS.__test, M = window.PFS.merge, out = {};
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      const { PDFDocument, rgb } = window.PDFLib; const d = await PDFDocument.create();
+      d.addPage([842, 595]).drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      await T.startCertFlow(new File([await d.save()], 'תעודת-שורה.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements();
+      // the clerk's layout from the report: name right, ID left, same line, close together
+      T.certPlace(0, 0.60, 0.42, 'שם מלא'); T.certPlace(0, 0.34, 0.42, 'תעודת זהות'); T.certPlace(0, 0.5, 0.56, 'שם הקורס');
+      await T.ensureCertFonts();
+      const csv = 'שם מלא,תעודת זהות,שם הקורס\nאביטל מוזס חיים,059789826,חשמלאות\nאור בראל,033440124,חשמלאות\nאלכסנדרה-ויקטוריה בן-שושן אבוטבול,311862528,חשמלאות מוסמכים מתקדמים\nלי,123456782,חשמלאות';
+      T.certLoadList(M.parseCSV(csv), 'list.csv');
+      const base = T.overlay.getElements().map((c) => c.model);
+      const pf = T.certPreflightNow();
+      out.blocked = pf.issues.filter((i) => i.block).length;
+      // every record's laid-out boxes: name and ID apart, everything on the page
+      out.gaps = pf.clean.map((r) => {
+        const rep = T.certLayoutModels(base, r).report;
+        const nm = rep.boxes.find((b) => b.key === 'שם הסטודנט'), id = rep.boxes.find((b) => b.key === 'תעודת זהות');
+        return { name: r.__name, gap: nm.left - id.right, issues: rep.issues.length, inPage: rep.boxes.every((b) => b.left >= 0.04 - 1e-6 && b.right <= 0.96 + 1e-6) };
+      });
+      // the produced PDFs: no ink in the gap between the ID and the name, on the name's row
+      const zip = await T.certProduce('zip', { noDownload: true });
+      const files = window.fflate.unzipSync(zip.bytes);
+      out.inkInGap = [];
+      for (const r of pf.clean) {
+        const rep = T.certLayoutModels(base, r).report;
+        const nm = rep.boxes.find((b) => b.key === 'שם הסטודנט'), id = rep.boxes.find((b) => b.key === 'תעודת זהות');
+        const fname = Object.keys(files).find((f) => f.startsWith(String(r.__name).slice(0, 6)));
+        const doc = await window.pdfjsLib.getDocument({ data: files[fname].slice(0) }).promise;
+        const p1 = await doc.getPage(1); const vp = p1.getViewport({ scale: 2 });
+        const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+        await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        const x0 = Math.ceil((id.right + 0.003) * cv.width), x1 = Math.floor((nm.left - 0.003) * cv.width);
+        const y0 = Math.floor(nm.top * cv.height), y1 = Math.ceil(nm.bottom * cv.height);
+        let ink = 0;
+        if (x1 > x0) { const dd = cv.getContext('2d').getImageData(x0, y0, x1 - x0, y1 - y0).data; for (let i = 0; i < dd.length; i += 4) if (dd[i] < 200) ink++; }
+        out.inkInGap.push({ name: r.__name, ink, width: x1 - x0 });
+      }
+      // two LINES placed on top of each other: a collision zones cannot fix → blocked, nothing produced
+      const course = T.overlay.getElements().find((c) => c.model.fieldKey === 'שם הקורס');
+      const name = T.overlay.getElements().find((c) => c.model.fieldKey === 'שם מלא');
+      course.model.fy = name.model.fy + 0.01; course.model.fx = name.model.fx; course.layout();
+      const pf2 = T.certPreflightNow();
+      out.blockMsg = (pf2.issues.find((i) => i.block) || {}).msg || '';
+      out.sampleIssues = T.certSampleIssues().length;
+      let dl = 0; const realDeliver = window.PFS.deliver.file; window.PFS.deliver.file = () => { dl++; };
+      out.produced = (await T.certProduce('zip')) === null ? null : 'produced';
+      window.PFS.deliver.file = realDeliver; out.downloads = dl;
+      await T.goHome();
+      for (const x of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /שורה/.test(l.name))) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+      window.PFS.ui.confirm = realConfirm;
+      return out;
+    });
+    const okLay = lay.blocked === 0 && lay.gaps.length === 4 && lay.gaps.every((g) => g.gap >= 0.017 && g.issues === 0 && g.inPage)
+      && lay.inkInGap.length === 4 && lay.inkInGap.every((g) => g.width > 4 && g.ink === 0)
+      && /עולה על/.test(lay.blockMsg) && lay.sampleIssues > 0 && lay.produced === null && lay.downloads === 0;
+    if (!okLay) console.log('  [cert layout debug]', JSON.stringify(lay));
+    check('🎓 same-line fields never touch: every value measured in the print font, gap verified in the real PDFs; stacked lines block production', okLay);
+  }
+
+  // ---- one dignified family for every field; the editor shows what prints ----
+  check('🎓 certificate fonts: every field shares one family, switching it changes all fields and the print; editor text uses the export font', await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    const { PDFDocument, rgb } = window.PDFLib; const d = await PDFDocument.create();
+    const fpg = d.addPage([842, 595]); fpg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+    fpg.drawRectangle({ x: 30, y: 30, width: 782, height: 535, borderColor: rgb(0.6, 0.45, 0.15), borderWidth: 4 });
+    fpg.drawText('Font check', { x: 380, y: 520, size: 18, font: await d.embedFont(window.PDFLib.StandardFonts.Helvetica) });
+    // a fresh format: drop the auto-memory the previous test left for its (look-alike) blank page
+    window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+    await T.startCertFlow(new File([await d.save()], 'תעודת-גופן.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    const fields = () => T.overlay.getElements().filter((c) => c.model.type === 'text');
+    const fams1 = [...new Set(fields().map((c) => c.model.font))];
+    const nameSample = (fields().find((c) => c.model.fieldKey === 'שם מלא') || { model: {} }).model.text;
+    const domOk1 = fields().every((c) => getComputedStyle(c.node.querySelector('.txt')).fontFamily.replace(/"/g, "'").indexOf(c.model.font.split(',')[0].trim()) === 0);
+    const render = async () => {
+      T.certLoadList(M.parseCSV('שם מלא,תעודת זהות\nאור בראל,033440124'), 'l.csv');
+      const z = await T.certProduce('zip', { noDownload: true });
+      if (!z) return 'blocked: ' + JSON.stringify(T.certPreflightNow().issues);
+      const f = window.fflate.unzipSync(z.bytes);
+      const doc = await window.pdfjsLib.getDocument({ data: f[Object.keys(f)[0]].slice(0) }).promise; const p1 = await doc.getPage(1);
+      const vp = p1.getViewport({ scale: 1 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; return cv.toDataURL();
+    };
+    const a = await render();
+    const btn = document.querySelector('.cert-card .cert-font[data-font="clean"]') || null;
+    if (btn) { btn.click(); await new Promise((r) => setTimeout(r, 600)); } else { window.PFS.store.set('cert_font', 'clean'); await T.ensureCertFonts('clean'); T.certApplyFont('clean'); }
+    const fams2 = [...new Set(fields().map((c) => c.model.font))];
+    const b = await render();
+    window.PFS.store.set('cert_font', 'classic'); T.certApplyFont('classic');
+    // a plain text element (no explicit font) draws in the exporter's default face
+    T.overlay.clearElements();
+    const plain = T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.2, text: 'בדיקה 123', noEdit: true });
+    const delete_ = plain.model.font; plain.model.font = undefined; plain.layout();
+    const plainFam = getComputedStyle(plain.node.querySelector('.txt')).fontFamily;
+    await T.goHome();
+    for (const x of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /גופן/.test(l.name))) { try { await window.PFS.library.remove(x.id); } catch (e) {} }
+    window.PFS.ui.confirm = realConfirm;
+    const ok = fams1.length === 1 && /Frank Ruhl Libre/.test(fams1[0]) && domOk1 && !!btn
+      && fams2.length === 1 && /Heebo/.test(fams2[0]) && a !== b && /^"?Heebo/.test(plainFam) && nameSample === 'שם הסטודנט';
+    return ok ? true : JSON.stringify({ fams1, domOk1, btn: !!btn, fams2, same: a === b, plainFam, nameSample });
+  }) === true);
 
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----

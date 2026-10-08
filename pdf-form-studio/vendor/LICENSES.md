@@ -16,6 +16,9 @@ and fonts so the app runs fully offline with no CDN. Each retains its own licens
 | Rubik (Google Fonts, variable) | v31 | SIL OFL 1.1 | `fonts/Rubik-*.woff2` |
 | Inter (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/Inter-*.woff2` |
 | Noto Sans Hebrew (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/NotoSansHebrew.woff2` |
+| Frank Ruhl Libre (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/FrankRuhlLibre-*.woff2` |
+| Noto Serif Hebrew (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/NotoSerifHebrew-*.woff2` |
+| David Libre (Google Fonts) | — | SIL OFL 1.1 | `fonts/DavidLibre-*.woff2` |
 
 - pdf-lib — https://github.com/Hopding/pdf-lib (MIT)
 - pdf.js — https://github.com/mozilla/pdf.js (Apache-2.0)
@@ -23,3 +26,6 @@ and fonts so the app runs fully offline with no CDN. Each retains its own licens
 - Rubik — https://fonts.google.com/specimen/Rubik (SIL Open Font License 1.1)
 - Inter — https://fonts.google.com/specimen/Inter (SIL Open Font License 1.1)
 - Noto Sans Hebrew — https://fonts.google.com/noto/specimen/Noto+Sans+Hebrew (SIL Open Font License 1.1)
+- Frank Ruhl Libre — https://fonts.google.com/specimen/Frank+Ruhl+Libre (SIL Open Font License 1.1)
+- Noto Serif Hebrew — https://fonts.google.com/noto/specimen/Noto+Serif+Hebrew (SIL Open Font License 1.1)
+- David Libre — https://fonts.google.com/specimen/David+Libre (SIL Open Font License 1.1)

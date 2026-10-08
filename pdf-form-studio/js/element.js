@@ -106,7 +106,9 @@
           const s = /[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '');
           inner.dir = s && /[֐-׿؀-ۿ]/.test(s[0]) ? 'rtl' : 'ltr';
         }
-        inner.style.fontFamily = model.font || '';   // '' = inherit the app font
+        // the exporter's own default face — never the app's UI font, or the
+        // editor and the printed PDF disagree
+        inner.style.fontFamily = model.font || 'Heebo, sans-serif';
         inner.style.fontWeight = model.bold ? '700' : '400';
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes

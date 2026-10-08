@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -1202,8 +1202,10 @@ async function openPdfFile(file) {
     if (match) {
       templates.apply(match.tpl.id);
       PFS.toast('כבר מילאת את הטופס הזה — שחזרתי את מה שמילאת ✓', 'ok');
-      // one-click: also fill the active profile into the (now tagged) fields
-      const ap = profiles.active();
+      // one-click: also fill the active profile into the (now tagged) fields —
+      // never on a certificate format: its fields belong to the STUDENT LIST,
+      // and the clerk's own name must not land on the name sample
+      const ap = (certOpening || certMode) ? null : profiles.active();
       if (ap && ap.values && Object.keys(ap.values).length) {
         const n = smartFill(ap.values);
         if (n) PFS.toast(`מולאו אוטומטית ${n} שדות מהפרופיל`, 'ok');
@@ -3601,7 +3603,8 @@ function certPlaceSentence(pageIndex, fx, fy) {
   const maxW = PFS.clamp(2 * Math.min(fx, 1 - fx) - 0.06, 0.3, 0.92);
   const ctrl = overlay.addModelAt('text', pageIndex, {
     fx: fx - maxW / 2, fy: fy - 0.03, fw: maxW, fontFrac: 0.028, bold: false, align: 'center',
-    text: CERT_SENTENCE, wrapW: maxW, noEdit: true, certTag: 'משפט — לחיצה כפולה לעריכה'
+    text: CERT_SENTENCE, wrapW: maxW, noEdit: true, certTag: 'משפט — לחיצה כפולה לעריכה',
+    font: certFontCss()
   });
   if (!ctrl) return null;
   ctrl.node.dataset.tag = 'משפט — לחיצה כפולה לעריכה';
@@ -3618,7 +3621,8 @@ function certPlace(pageIndex, fx, fy, key) {
   const spec = CERT_FIELDS.find((f) => f.key === key) || { key, sample: key, size: 0.03, bold: false };
   const ctrl = overlay.addModelAt('text', pageIndex, {
     fx, fy: fy - spec.size * 0.6, fw: 0.3, fontFrac: spec.size, bold: spec.bold, align: 'center',
-    text: spec.sample, fieldKey: spec.key, noEdit: true, certTag: spec.label || spec.key
+    text: spec.sample, fieldKey: spec.key, noEdit: true, certTag: spec.label || spec.key,
+    font: certFontCss()   // ONE family for every field on the certificate
   });
   if (!ctrl) return null;
   ctrl.node.dataset.tag = spec.label || spec.key;   // the on-screen label ("תעודת זהות") — never printed
@@ -3634,6 +3638,166 @@ function certPlace(pageIndex, fx, fy, key) {
   if (certCard && certCard.__render) certCard.__render();   // the card reflects every placement
   return ctrl;
 }
+// ---- certificate typography: one dignified family for every field ----
+// Mixed faces (a Heebo-bold name beside Roboto digits) read as a form, not a
+// diploma. Every field on the certificate takes the SAME family; the clerk
+// picks one of four, the choice is remembered, and the editor shows exactly
+// what prints (the element and the exporter use the same CSS font string).
+const CERT_FONTS = [
+  { id: 'classic', label: 'קלאסי', css: "'Frank Ruhl Libre', 'David Libre', serif", family: 'Frank Ruhl Libre' },
+  { id: 'formal', label: 'רשמי', css: "'David Libre', 'Frank Ruhl Libre', serif", family: 'David Libre' },
+  { id: 'refined', label: 'עדין', css: "'Noto Serif Hebrew', 'Frank Ruhl Libre', serif", family: 'Noto Serif Hebrew' },
+  { id: 'clean', label: 'נקי', css: "'Heebo', sans-serif", family: 'Heebo' }
+];
+function certFontId() { const v = PFS.store.get('cert_font', 'classic'); return CERT_FONTS.some((f) => f.id === v) ? v : 'classic'; }
+function certFontCss(id) { return (CERT_FONTS.find((f) => f.id === (id || certFontId())) || CERT_FONTS[0]).css; }
+// a canvas measures with a fallback until the face has loaded — load both
+// weights and both scripts (Hebrew name, Latin digits) before any layout
+const certFontsLoaded = {};
+async function ensureCertFonts(id) {
+  const f = CERT_FONTS.find((x) => x.id === (id || certFontId())) || CERT_FONTS[0];
+  if (certFontsLoaded[f.id]) return true;
+  try {
+    await Promise.all(['400', '700'].map((w) => document.fonts.load(w + ' 40px "' + f.family + '"', 'אבגדהוזחטיכלמנסעפצקרשת 0123456789/.-"')));
+    certFontsLoaded[f.id] = true;
+  } catch (e) {}
+  return !!certFontsLoaded[f.id];
+}
+// every text field the certificate prints (fields, sentences, fixed values)
+function certTextCtrls() {
+  return overlay.getElements().filter((c) => c.model.type === 'text' && String(c.model.text || '').trim());
+}
+function certApplyFont(id) {
+  const css = certFontCss(id);
+  let n = 0;
+  certTextCtrls().forEach((c) => { if (c.model.font !== css) { c.model.font = css; c.layout(); n++; } });
+  if (n) { markDirty(); scheduleSnap(); }
+  return n;
+}
+
+/* ---- certificate layout: no field ever touches another ----
+ * Each value is MEASURED in the exact font string the exporter draws with,
+ * then placed inside its own horizontal zone. Fields sharing a line split
+ * the line where the clerk left the gap between them; a value keeps its
+ * centre when it fits, slides toward its own side when it would cross the
+ * boundary, and shrinks only when it is wider than the whole zone. Then
+ * every box on the page is checked against every other: an overlap that
+ * the zones cannot resolve (two lines placed on top of each other) is an
+ * error that blocks production. */
+const CERT_MARGIN = 0.04, CERT_GAP = 0.018;
+let __certMeasureCv = null;
+function certFontString(m, px) { return (m.bold ? '700 ' : '400 ') + px + 'px ' + (m.font || 'Heebo, sans-serif'); }
+function certTextWidthFrac(m, text, ratio) {
+  __certMeasureCv = __certMeasureCv || document.createElement('canvas');
+  const cx = __certMeasureCv.getContext('2d');
+  const px = Math.max(1, m.fontFrac * 1000);
+  cx.font = certFontString(m, px);
+  const w = Math.max(0, ...String(text == null ? '' : text).split('\n').map((ln) => cx.measureText(ln).width));
+  return (w * ratio) / 1000;              // px at page height 1000 → fraction of page width
+}
+function certPageRatio(page) {
+  try { const s = overlay.overlaySizeFor(page); if (s && s.w > 0 && s.h > 0) return s.h / s.w; } catch (e) {}
+  return 595 / 842;
+}
+// boxes of everything on one page: movable values and fixed obstacles
+function certItems(baseModels, models) {
+  const items = [];
+  models.forEach((m, i) => {
+    const b = baseModels[i];
+    if (!m || !b) return;
+    const ratio = certPageRatio(m.page);
+    if (m.type === 'image') {
+      items.push({ i, page: m.page, fixed: true, left: m.fx, right: m.fx + (m.fw || 0), top: m.fy, bottom: m.fy + (m.fh || 0), key: m.kind === 'stamp' ? 'חותמת' : 'חתימה' });
+      return;
+    }
+    if (m.type !== 'text' || !String(m.text || '').trim()) return;
+    const lines = String(m.text).split('\n').length;
+    const lineH = (m.fontFrac || 0.02) * 1.15;
+    const label = b.certTag || b.fieldKey || String(b.text || '').slice(0, 24);
+    if (m.wrapW) {
+      items.push({ i, page: m.page, fixed: true, left: m.fx, right: m.fx + m.wrapW, top: m.fy, bottom: m.fy + Math.max(b.fh || 0, lineH * lines), key: label });
+      return;
+    }
+    if (!b.fieldKey && !/\{[^{}]+\}/.test(b.text || '')) {
+      items.push({ i, page: m.page, fixed: true, left: m.fx, right: m.fx + (m.fw || 0), top: m.fy, bottom: m.fy + lineH * lines, key: label });
+      return;
+    }
+    const baseW = certTextWidthFrac(b, b.text, ratio);
+    const baseCx = b.fx + (b.fw || baseW) / 2;
+    items.push({ i, page: m.page, fixed: false, ratio, baseCx, baseLeft: baseCx - baseW / 2, baseRight: baseCx + baseW / 2,
+      top: m.fy, bottom: m.fy + lineH * lines, key: label, lineH: lineH * lines });
+  });
+  return items;
+}
+const certSameRow = (a, b) => {
+  const ov = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return ov > 0.25 * Math.min(a.bottom - a.top, b.bottom - b.top);
+};
+function certLayoutModels(baseModels, rec) {
+  const models = PFS.merge.applyRecord(baseModels, rec || {});
+  const items = certItems(baseModels, models);
+  const report = { boxes: [], issues: [], shrunk: [] };
+  // fields dropped ON TOP of each other (their samples already overlap by a
+  // third or more) are a layout mistake, not a line to share — never squeeze
+  // them side by side silently; report it so production stops
+  const stacked = new Set();
+  items.forEach((a, ai) => items.forEach((b, bi) => {
+    if (bi <= ai || a.fixed || b.fixed || a.page !== b.page || !certSameRow(a, b)) return;
+    const ov = Math.min(a.baseRight, b.baseRight) - Math.max(a.baseLeft, b.baseLeft);
+    const minW = Math.min(a.baseRight - a.baseLeft, b.baseRight - b.baseLeft);
+    if (ov > 0.33 * minW) { stacked.add(a); stacked.add(b); report.issues.push({ kind: 'overlap', keys: [a.key, b.key] }); }
+  }));
+  items.forEach((it) => {
+    if (it.fixed) { report.boxes.push(it); return; }
+    const m = models[it.i];
+    let left = CERT_MARGIN, right = 1 - CERT_MARGIN;
+    items.forEach((o) => {
+      if (o === it || o.page !== it.page || !certSameRow(it, o)) return;
+      if (stacked.has(it) && stacked.has(o)) return;
+      const oCx = o.fixed ? (o.left + o.right) / 2 : o.baseCx;
+      if (oCx <= it.baseCx) {            // neighbour on the LEFT
+        const edge = o.fixed ? o.right + CERT_GAP
+          : (o.baseRight <= it.baseLeft ? (o.baseRight + it.baseLeft) / 2 : (o.baseCx + it.baseCx) / 2) + CERT_GAP / 2;
+        left = Math.max(left, edge);
+      } else {                           // neighbour on the RIGHT
+        const edge = o.fixed ? o.left - CERT_GAP
+          : (it.baseRight <= o.baseLeft ? (it.baseRight + o.baseLeft) / 2 : (it.baseCx + o.baseCx) / 2) - CERT_GAP / 2;
+        right = Math.min(right, edge);
+      }
+    });
+    if (right - left < 0.05) { left = Math.max(CERT_MARGIN, it.baseLeft); right = Math.min(1 - CERT_MARGIN, it.baseRight); }
+    const natural = certTextWidthFrac(m, m.text, it.ratio);
+    const zoneW = right - left;
+    const w = Math.min(natural, zoneW);
+    const scale = natural > 0 ? w / natural : 1;
+    const c = PFS.clamp(it.baseCx, left + w / 2, right - w / 2);
+    Object.assign(m, { align: 'center', wrapW: null, cellW: null, cellX: null, fx: c - w / 2, fw: w, maxW: w * 1.0005 });
+    const box = { i: it.i, page: it.page, fixed: false, left: c - w / 2, right: c + w / 2, top: it.top, bottom: it.top + it.lineH, key: it.key, scale };
+    report.boxes.push(box);
+    if (scale < 0.8) report.shrunk.push({ key: it.key, scale });
+  });
+  // the guarantee: nothing touches anything, nothing leaves the page
+  const B = report.boxes;
+  for (let a = 0; a < B.length; a++) {
+    const p = B[a];
+    if (p.left < 0.005 || p.right > 0.995 || p.bottom > 0.995 || p.top < 0.005) report.issues.push({ kind: 'offpage', keys: [p.key] });
+    for (let b = a + 1; b < B.length; b++) {
+      const q = B[b];
+      if (p.page !== q.page) continue;
+      const ox = Math.min(p.right, q.right) - Math.max(p.left, q.left);
+      const oy = Math.min(p.bottom, q.bottom) - Math.max(p.top, q.top);
+      if (ox > 0.002 && oy > 0.002 && !report.issues.some((x) => x.kind === 'overlap' && x.keys.includes(p.key) && x.keys.includes(q.key))) report.issues.push({ kind: 'overlap', keys: [p.key, q.key] });
+    }
+  }
+  return { models, report };
+}
+// the sample layout as placed (no list yet) — for the live warning in step 1
+function certSampleIssues() {
+  const base = overlay.getElements().map((c) => c.model);
+  if (!base.some((m) => m.type === 'text')) return [];
+  return certLayoutModels(base, {}).report.issues;
+}
+
 // ---- precision: fields settle onto what the certificate already prints ----
 // A designed format usually carries its own labels and lines ("שנת לימוד:
 // ______"). Values must sit IN those blanks, centred, at the blank's size —
@@ -3877,6 +4041,8 @@ function showCertWizard() {
   mountCertCard(certCard);
   let step = certPlacedFields().length ? 2 : 1;
   const restored = step === 2;
+  certApplyFont();
+  ensureCertFonts().then(() => { overlay.relayoutAll && overlay.relayoutAll(); if (certCard && certCard.__render) certCard.__render(); });
   // zero-click start: a fresh format opens with the standard fields ALREADY on
   // it (name, ID, course, end date — centred, stacked). The clerk drags to
   // adjust and ticks/unticks; nothing has to be summoned first.
@@ -3926,11 +4092,15 @@ function showCertWizard() {
           '</div>';
       }).join('');
       const nOn = Object.keys(onPage).length;
+      let sampleIssues = []; try { sampleIssues = certSampleIssues(); } catch (e) {}
       body = '<div class="gd-q">' + (nOn ? nOn + ' שדות כבר על התעודה 👇' : 'מה מופיע על התעודה?') + '</div>' +
         '<div class="hint" style="margin:-2px 0 8px">' +
           (nOn ? 'סידרנו אותם במרכז. <b>גררו</b> כל שדה למקומו הנכון על התעודה. סימון ✓ מוסיף שדה, ביטול הסימון מסיר — מיד.'
                : 'סמנו ✓ ליד מה שצריך להופיע — זה מופיע על התעודה מיד. אחר כך פשוט <b>גוררים</b> למקום.') +
         '</div>' +
+        '<div class="cert-fonts-l">גופן התעודה <span>אחד לכל השדות</span></div>' +
+        '<div class="cert-fonts">' + CERT_FONTS.map((f) => '<button type="button" class="cert-font' + (f.id === certFontId() ? ' on' : '') + '" data-font="' + f.id + '" style="font-family:' + f.css.replace(/"/g, '&quot;') + '"><b>ישראל ישראלי</b><span>' + f.label + ' · 012345678</span></button>').join('') + '</div>' +
+        (sampleIssues.length ? '<div class="cert-warn">' + sampleIssues.map((iss) => iss.kind === 'overlap' ? '"' + escapeHtml(iss.keys[0]) + '" עולה על "' + escapeHtml(iss.keys[1]) + '". הרחיקו אותם זה מזה.' : '"' + escapeHtml(iss.keys[0]) + '" יוצא מהדף.').join('<br>') + '</div>' : '') +
         '<div class="cert-rows">' + rows + '</div>' +
         '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAlign" title="כל השדות על ציר אחד, ברווחים שווים">✨ יישור סימטרי</button><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
         '<div class="hint muted" style="margin-bottom:6px">שדה שמשחררים ליד קו מודפס מתיישב עליו לבד; תוויות מודפסות (״שנת לימוד: ___״) נתפסות אוטומטית.</div>' +
@@ -3952,13 +4122,16 @@ function showCertWizard() {
       const n = pf.clean.length, skipped = (certList ? certList.records.length : 0) - n;
       body = '<div class="gd-q">בדיקה אחרונה — ואז ' + n + ' תעודות</div>' +
         (pf.issues.length
-          ? '<div class="hint" style="margin:-2px 0 8px;color:var(--danger);font-weight:700">⚠ ' + pf.issues.length + ' דברים לבדוק ברשימה' + (skipped ? ' · ' + skipped + ' שורות בלי שם ידולגו' : '') + '</div>' +
+          ? '<div class="hint" style="margin:-2px 0 8px;color:var(--danger);font-weight:700">⚠ ' + pf.issues.length + ' דברים לבדוק' + (skipped ? ' · ' + skipped + ' שורות בלי שם ידולגו' : '') + '</div>' +
             '<ul class="cert-issues">' + pf.issues.slice(0, 8).map((i) => '<li>' + escapeHtml(i.msg) + '</li>').join('') + (pf.issues.length > 8 ? '<li>…ועוד ' + (pf.issues.length - 8) + '</li>' : '') + '</ul>'
           : '<div class="hint" style="margin:-2px 0 8px;color:var(--ok);font-weight:700">✓ הרשימה נקייה: שמות, ת"ז וכפילויות נבדקו</div>') +
         '<div class="hint" style="margin-bottom:4px">תצוגה מקדימה — הראשונה, השם הארוך ביותר, האחרונה:</div>' +
         '<div class="cert-thumbs" id="certThumbs"><span class="hint muted">מכין תצוגה מקדימה…</span></div>' +
-        '<div class="gd-chips" style="margin-top:8px"><button type="button" class="gd-chip" id="certZip">✅ אשר והפק ZIP — קובץ לכל סטודנט</button>' +
-        '<button type="button" class="gd-chip" id="certOne">🖨️ אשר והפק PDF אחד להדפסה</button></div>' +
+        (pf.issues.some((i) => i.block)
+          ? '<div class="cert-warn">ההפקה חסומה עד שהשדות לא נוגעים זה בזה. חזרו לשלב 1 והרחיקו אותם.</div>' +
+            '<div class="gd-chips" style="margin-top:8px"><button type="button" class="gd-chip" id="certFix">‹ חזרה לשדות לתיקון</button></div>'
+          : '<div class="gd-chips" style="margin-top:8px"><button type="button" class="gd-chip" id="certZip">✅ אשר והפק ZIP — קובץ לכל סטודנט</button>' +
+            '<button type="button" class="gd-chip" id="certOne">🖨️ אשר והפק PDF אחד להדפסה</button></div>') +
         '<div class="hint" id="certProg" style="min-height:16px"></div>' +
         '<div class="gd-foot"><button type="button" class="btn ghost sm" id="certBack2">‹ חזרה לרשימה</button></div>';
     }
@@ -3990,6 +4163,12 @@ function showCertWizard() {
         const c = certOnPageMap()[inp.dataset.key]; if (!c) return;
         c.model.text = inp.value; const t = c.node.querySelector('.txt'); if (t) t.textContent = inp.value;
         c.layout(); markDirty();
+      }));
+      certCard.querySelectorAll('.cert-font').forEach((b) => b.addEventListener('click', async () => {
+        PFS.store.set('cert_font', b.dataset.font);
+        await ensureCertFonts(b.dataset.font);
+        certApplyFont(b.dataset.font);
+        render();
       }));
       $c('certAlign').addEventListener('click', () => {
         const n = certAlignAll();
@@ -4026,8 +4205,9 @@ function showCertWizard() {
       $c('certNext').addEventListener('click', () => { step = 3; render(); });
     } else {
       $c('certBack2').addEventListener('click', () => { step = 2; render(); });
-      $c('certZip').addEventListener('click', () => certProduce('zip'));
-      $c('certOne').addEventListener('click', () => certProduce('single'));
+      if ($c('certZip')) $c('certZip').addEventListener('click', () => certProduce('zip'));
+      if ($c('certOne')) $c('certOne').addEventListener('click', () => certProduce('single'));
+      if ($c('certFix')) $c('certFix').addEventListener('click', () => { step = 1; render(); });
       certRenderPreviews($c('certThumbs'));
     }
   };
@@ -4099,10 +4279,31 @@ function certBuildRecords() {
   const records = certList.records.map((raw, i) => Object.assign({}, yearDefault, raw, mapped[i], { __name: nameHeader ? raw[nameHeader] : '' }));
   return { records, nameHeader, idHeader: certMap['תעודת זהות'] || null };
 }
+const certLayoutFn = (base, rec) => certLayoutModels(base, rec).models;
 function certPreflightNow() {
   if (!certList) return { issues: [], clean: [] };
   const { records, nameHeader, idHeader } = certBuildRecords();
   const pf = PFS.merge.preflight(records, { nameKey: nameHeader || '__name', idKey: idHeader });
+  // the layout check on EVERY certificate: a collision blocks production
+  try {
+    const base = overlay.getElements().map((c) => c.model);
+    const seen = new Map();
+    pf.clean.forEach((r) => {
+      const { report } = certLayoutModels(base, r);
+      report.issues.forEach((iss) => {
+        const sig = iss.kind + ':' + iss.keys.slice().sort().join('|');
+        if (!seen.has(sig)) seen.set(sig, { iss, names: [] });
+        seen.get(sig).names.push(String(r.__name || ''));
+      });
+      report.shrunk.forEach((sh) => pf.issues.push({ kind: 'shrunk', msg: (r.__name || '') + ': "' + sh.key + '" ארוך, הוקטן ל-' + Math.round(sh.scale * 100) + '% כדי לא לגעת בשדות אחרים' }));
+    });
+    seen.forEach(({ iss, names }) => {
+      const who = names.length === pf.clean.length ? 'בכל התעודות' : names.slice(0, 3).join(', ') + (names.length > 3 ? ' ועוד ' + (names.length - 3) : '');
+      pf.issues.unshift(iss.kind === 'overlap'
+        ? { kind: 'overlap', block: true, msg: '"' + iss.keys[0] + '" עולה על "' + iss.keys[1] + '" (' + who + ') — הרחיקו אותם בשלב 1' }
+        : { kind: 'offpage', block: true, msg: '"' + iss.keys[0] + '" יוצא מגבולות הדף (' + who + ') — הזיזו אותו בשלב 1' });
+    });
+  } catch (e) { console.warn('layout check failed', e); }
   // the registry remembers: a second certificate to the same ID from this
   // format is worth a look (a re-issue is legitimate, a duplicate is not)
   if (idHeader) {
@@ -4122,11 +4323,12 @@ async function certRenderPreviews(host) {
   if (!clean.length) { host.innerHTML = '<span class="hint muted">אין שורות תקינות להצגה</span>'; return; }
   const longest = clean.reduce((a, b) => (String(b.__name || '').length > String(a.__name || '').length ? b : a), clean[0]);
   const picks = [...new Map([clean[0], longest, clean[clean.length - 1]].map((r) => [r, r])).values()];
-  const baseModels = centerBatchModels(overlay.getElements().map((c) => c.model));
+  const baseModels = overlay.getElements().map((c) => c.model);
+  await ensureCertFonts();
   host.innerHTML = '';
   for (const rec of picks) {
     try {
-      const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), PFS.merge.applyRecord(baseModels, rec), { quality: 'draft' });
+      const bytes = await PFS.exporter.exportPdf(pdfView.getBytes(), certLayoutFn(baseModels, rec), { quality: 'draft' });
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
       const pg = await doc.getPage(1);
       const vp0 = pg.getViewport({ scale: 1 });
@@ -4153,13 +4355,16 @@ async function certProduce(kind, opts) {
   if (!records.length) { PFS.toast('אין שורות עם שם להפקה', 'err'); return null; }
   // serial numbers: one per certificate, in list order, committed only when
   // the batch really came out (a failed run must not burn numbers)
+  await ensureCertFonts();
+  const blocking = certPreflightNow().issues.filter((i) => i.block);
+  if (blocking.length) { PFS.toast('לא הופקו תעודות: ' + blocking[0].msg, 'err', 7000); return null; }
   const keys = certKeys();
   const wantsSerial = keys.includes('מספר תעודה');
   records.forEach((r, i) => { r['מספר תעודה'] = certNextSerial(i); });
   const format = String(currentFileName || '').replace(/-filled$/, '');
   const courseHeader = certMap['שם הקורס'] || certList.headers.find((h) => /קורס/.test(h)) || null;
-  // every sample stays centred on its spot for every real value
-  const baseModels = centerBatchModels(overlay.getElements().map((c) => c.model));
+  // every value measured and placed in its own zone (certLayoutModels)
+  const baseModels = overlay.getElements().map((c) => c.model);
   const prog = certCard && certCard.querySelector('#certProg');
   const onProgress = (d, t) => { if (prog) prog.textContent = 'מפיק ' + d + '/' + t + '…'; };
   let result = null;
@@ -4167,10 +4372,10 @@ async function certProduce(kind, opts) {
   const base = String(currentFileName || 'תעודות').replace(/-filled$/, '').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'תעודות';
   try {
     if (kind === 'single') {
-      const { pdf, count } = await PFS.merge.runBatchSingle({ originalBytes: pdfView.getBytes(), baseModels, records, quality: 'high', onProgress });
+      const { pdf, count } = await PFS.merge.runBatchSingle({ originalBytes: pdfView.getBytes(), baseModels, records, quality: 'high', onProgress, layout: certLayoutFn });
       result = { bytes: pdf, count, name: base + ' - כל התעודות.pdf', mime: 'application/pdf' };
     } else {
-      const { zip, count } = await PFS.merge.runBatch({ originalBytes: pdfView.getBytes(), baseModels, records, nameField: nameHeader ? '__name' : '', quality: 'high', onProgress });
+      const { zip, count } = await PFS.merge.runBatch({ originalBytes: pdfView.getBytes(), baseModels, records, nameField: nameHeader ? '__name' : '', quality: 'high', onProgress, layout: certLayoutFn });
       result = { bytes: zip, count, name: base + ' - תעודות.zip', mime: 'application/zip' };
     }
     if (!(opts && opts.noDownload)) PFS.deliver.file(result.bytes, result.name, result.mime);

@@ -277,13 +277,15 @@
 
   /* runBatch({ originalBytes, baseModels, records, nameField, onProgress, quality })
    * → returns { zip: Uint8Array, count }  (caller downloads it) */
-  async function runBatch({ originalBytes, baseModels, records, nameField, onProgress, quality }) {
+  // layout(baseModels, record) → models: a caller-supplied placement per
+  // record (certificates measure every value); default is applyRecord
+  async function runBatch({ originalBytes, baseModels, records, nameField, onProgress, quality, layout }) {
     if (!root.fflate) throw new Error('fflate (zip) not loaded');
     const files = {};
     const used = {};
     for (let idx = 0; idx < records.length; idx++) {
       const rec = records[idx];
-      const models = applyRecord(baseModels, rec);
+      const models = layout ? layout(baseModels, rec) : applyRecord(baseModels, rec);
       const bytes = await PFS.exporter.exportPdf(originalBytes, models, quality ? { quality } : {});
       let base = safe(nameField && rec[nameField] ? rec[nameField] : 'record-' + (idx + 1));
       used[base] = (used[base] || 0) + 1;
@@ -326,11 +328,11 @@
   /* runBatchSingle(...) → { pdf: Uint8Array, count } — every record's page(s)
    * in ONE PDF, in list order: the print-shop / "send to the printer once"
    * form of the same batch. */
-  async function runBatchSingle({ originalBytes, baseModels, records, onProgress, quality }) {
+  async function runBatchSingle({ originalBytes, baseModels, records, onProgress, quality, layout }) {
     const { PDFDocument } = root.PDFLib;
     const out = await PDFDocument.create();
     for (let idx = 0; idx < records.length; idx++) {
-      const models = applyRecord(baseModels, records[idx]);
+      const models = layout ? layout(baseModels, records[idx]) : applyRecord(baseModels, records[idx]);
       const bytes = await PFS.exporter.exportPdf(originalBytes, models, quality ? { quality } : {});
       const src = await PDFDocument.load(bytes);
       const pages = await out.copyPages(src, src.getPageIndices());

@@ -4082,6 +4082,74 @@ async function main() {
     }, pdfBytes)));
   }
 
+  // ---- certificates compose THEMSELVES on the format ----
+  // Nobody drags: the name lands between "הוראה מתקנת" and "סיימה בהצלחה
+  // קורס" with its ID under it, the course under "…קורס", the date further
+  // down. Measured on the PRINTED pixels: the black ink of each value sits in
+  // its space with equal room above and below — a very long name included.
+  check('🎓 automatic composition: every field in its own space on the format, equal room above and below in the print, long name included; "סידור אוטומטי" restores a dragged field', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+    await document.fonts.load("400 40px 'Suez One'", 'וזאתלתעודה 0123456789');
+    const c = document.createElement('canvas'); c.width = 1754; c.height = 1240;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = '#e9eef8'; x.fillRect(0, 0, 260, c.height);
+    x.strokeStyle = '#1f3c88'; x.lineWidth = 10; x.strokeRect(50, 50, c.width - 100, c.height - 100);
+    x.fillStyle = '#1f3c88'; x.direction = 'rtl'; x.textAlign = 'center';
+    const L = [['וזאת לתעודה', 130, 250], ['הוראה מתקנת', 70, 365], ['סיימה בהצלחה קורס', 50, 715], ['בהיקף של 30 שעות לימוד', 40, 890], ['היחידה ללימודי חוץ', 40, 1105]];
+    L.forEach(([t, px, y]) => { x.font = "400 " + px + "px 'Suez One'"; x.fillText(t, c.width / 2 + 60, y); });
+    const png = await new Promise((r) => c.toBlob(r, 'image/png'));
+    await T.startCertFlow(new File([png], 'תעודת-הרכבה.png', { type: 'image/png' }));
+    const on = () => Object.fromEntries(T.overlay.getElements().filter((e) => e.model.fieldKey).map((e) => [e.model.fieldKey, e]));
+    // wait until the fields have moved off the default stack (the format is read first)
+    const start = JSON.stringify(Object.values(on()).map((e) => e.model.fy));
+    for (let i = 0; i < 80 && JSON.stringify(Object.values(on()).map((e) => e.model.fy)) === start; i++) await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 300));
+    const out = {};
+    const fmt = await T.certReadFormat();
+    out.bands = fmt ? fmt.bands.length : 0;
+    // letters of every field clear of the format's own ink
+    const letters = (e) => { const sp = T.certInkSpan(e.model); return [e.model.fy + sp.top, e.model.fy + sp.bottom]; };
+    out.clear = Object.values(on()).every((e) => { const [a, b] = letters(e); return fmt.bands.every((bd) => b <= bd.y0 || a >= bd.y1); });
+    const band = (i) => fmt.bands[i];   // 0 title, 1 subtitle, 2 "סיימה…קורס", 3 "בהיקף…", 4 footer
+    const f = on();
+    const inGap = (k, i) => { const [a, b] = letters(f[k]); return a > band(i).y1 && b < band(i + 1).y0; };
+    out.slots = { name: inGap('שם מלא', 1), id: inGap('תעודת זהות', 1), course: inGap('שם הקורס', 2), date: inGap('תאריך סיום', 3) };
+    out.nameBelowId = letters(f['שם מלא'])[1] < letters(f['תעודת זהות'])[0];
+    // the print: rows with BLACK ink (the fields; the format itself is navy)
+    T.certLoadList(M.parseCSV('שם מלא,תעודת זהות,שם הקורס,תאריך סיום\nאביגיל בן-שמואל,033440124,הוראה מתקנת לגיל הרך,12/09/2026\nמריה-אלכסנדרה רוזנבלום-אבוטבול,123456782,ניהול כיתה,12/09/2026'), 'l.csv');
+    const z = await T.certProduce('zip', { noDownload: true });
+    out.produced = z ? z.count : JSON.stringify(T.certPreflightNow().issues);
+    out.balance = [];
+    if (z) {
+      const files = window.fflate.unzipSync(z.bytes);
+      for (const name of Object.keys(files)) {
+        const doc = await window.pdfjsLib.getDocument({ data: files[name].slice(0) }).promise; const p1 = await doc.getPage(1);
+        const vp = p1.getViewport({ scale: 2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+        const cx = cv.getContext('2d'); await p1.render({ canvasContext: cx, viewport: vp }).promise;
+        const d = cx.getImageData(0, 0, cv.width, cv.height).data, H = cv.height, W = cv.width;
+        const blackRow = (y) => { for (let xx = Math.round(W * 0.16); xx < W * 0.97; xx += 1) { const j = (y * W + xx) * 4; if (d[j] < 90 && d[j + 1] < 90 && d[j + 2] < 90 && Math.abs(d[j + 2] - d[j]) < 30) return true; } return false; };
+        const rowsIn = (i) => { const y0 = Math.ceil(band(i).y1 * H), y1 = Math.floor(band(i + 1).y0 * H); let a = -1, b = -1; for (let y = y0; y < y1; y++) if (blackRow(y)) { if (a < 0) a = y; b = y; } return a < 0 ? null : { above: (a - y0) / H, below: (y1 - b) / H }; };
+        const g1 = rowsIn(1), g2 = rowsIn(2);
+        out.balance.push(g1 && g2 ? [+(g1.above - g1.below).toFixed(4), +(g2.above - g2.below).toFixed(4)] : 'missing');
+      }
+    }
+    // a dragged field comes back with one press
+    const nm = f['שם מלא'].model, home = nm.fy;
+    nm.fy = 0.8; f['שם מלא'].layout();
+    const btn = document.querySelector('.cert-card #certAlign');
+    if (btn) { btn.click(); for (let i = 0; i < 30 && Math.abs(nm.fy - home) > 1e-3; i++) await new Promise((r) => setTimeout(r, 100)); }
+    out.restored = !!btn && Math.abs(nm.fy - home) < 1e-3;
+    await T.goHome();
+    for (const l of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /הרכבה/.test(l.name))) { try { await window.PFS.library.remove(l.id); } catch (e) {} }
+    window.PFS.ui.confirm = realConfirm;
+    const balanced = out.balance.length === 2 && out.balance.every((b) => Array.isArray(b) && b.every((v) => Math.abs(v) < 0.012));
+    const ok = out.bands === 5 && out.clear && Object.values(out.slots).every(Boolean) && out.nameBelowId && out.produced === 2 && balanced && out.restored;
+    return ok ? true : JSON.stringify(out);
+  })));
+
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----
   {

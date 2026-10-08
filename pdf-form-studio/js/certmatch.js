@@ -285,8 +285,17 @@
     try { await page.getOperatorList(); } catch (e) {}   // resolves the embedded font objects
     const names = [];
     const runs = [];
+    const words = [];
     tc.items.forEach((it) => {
       const s = String(it.str || '').trim();
+      // every printed run, as page fractions — what the format SAYS where
+      if (s) {
+        try {
+          const t = root.pdfjsLib.Util.transform(vp.transform, it.transform);
+          const h = Math.hypot(t[2], t[3]), ww = (it.width || 0) * vp.scale;
+          if (h > 0 && ww > 0) words.push({ text: s, x0: t[4] / canvas.width, x1: (t[4] + ww) / canvas.width, y0: (t[5] - h * 0.8) / canvas.height, y1: (t[5] + h * 0.2) / canvas.height });
+        } catch (e) {}
+      }
       if (!s || !hebCount(s)) return;
       try {
         const obj = page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName) : null;
@@ -306,7 +315,7 @@
       const s = sampleFromCanvas(canvas, run.r);
       if (s) samples.push(Object.assign(s, { text: run.text.replace(/\s+/g, ' ') }));
     }
-    return { names, samples };
+    return { names, samples, words };
   }
 
   // words the OCR read with confidence → cropped samples
@@ -314,6 +323,8 @@
     if (!(PFS.ocr && PFS.ocr.available && PFS.ocr.available() && PFS.ocr.recognizeWords)) return [];
     let words = [];
     try { words = await PFS.ocr.recognizeWords(canvas); } catch (e) { return []; }
+    ocrSamples.lastWords = words.filter((w) => w.bbox && (w.confidence == null || w.confidence >= 55)).map((w) => ({
+      text: String(w.text).trim(), x0: w.bbox.x0 / canvas.width, x1: w.bbox.x1 / canvas.width, y0: w.bbox.y0 / canvas.height, y1: w.bbox.y1 / canvas.height }));
     const good = words.filter((w) => w.bbox && (w.confidence == null || w.confidence >= 72) && pureHebrew((w.text || '').trim()));
     good.sort((a, b) => (b.bbox.y1 - b.bbox.y0) * hebCount(b.text) - (a.bbox.y1 - a.bbox.y0) * hebCount(a.text));
     const samples = [];
@@ -326,7 +337,9 @@
     return samples;
   }
 
-  /* detect(pdfDoc, {page}) → result | null. Never throws. */
+  /* detect(pdfDoc, {page}) → { family|null, weight, css, score, …, words } |
+   * null. words: the format's printed text with page-fraction boxes (text
+   * layer, or OCR for a flat image) — the layout reads it. Never throws. */
   async function detect(pdfDoc, opts) {
     opts = opts || {};
     try {
@@ -351,20 +364,23 @@
           if (r) weight = r.weight;
         }
         canvas.width = 0;
-        return { family, weight, css: cssFor(family), score: 1, margin: 1, ranked: [{ family, score: 1, share: 1, weight }], source: 'name' };
+        return { family, weight, css: cssFor(family), score: 1, margin: 1, ranked: [{ family, score: 1, share: 1, weight }], source: 'name', words: tl.words };
       }
       // 2. shapes from the text layer, 3. or from OCR words
       let samples = tl.samples;
       let res = samples.length ? await matchSamples(samples) : null;
+      let words = tl.words;
       if ((!res || res.score < 0.6) && opts.ocr !== false) {
+        ocrSamples.lastWords = null;
         const oc = await ocrSamples(canvas);
+        if (ocrSamples.lastWords && ocrSamples.lastWords.length > words.length) words = ocrSamples.lastWords;
         if (oc.length) {
           const r2 = await matchSamples(oc);
           if (r2 && (!res || r2.score > res.score)) res = Object.assign(r2, { source: 'ocr' });
         }
       }
       canvas.width = 0;
-      return res;
+      return Object.assign(res || { family: null }, { words });
     } catch (e) {
       return null;
     }

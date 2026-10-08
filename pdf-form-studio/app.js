@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -3691,23 +3691,36 @@ async function ensureCertFonts(id) {
   return !!certFontsLoaded[key];
 }
 // detect the format's face (cached per format); resolves to the match or null
-async function certDetectFont() {
-  if (!pdfView.hasDoc() || !PFS.certmatch) return null;
+// what the format says, and where (page-fraction boxes) — read with the font
+let certWords = null, certDetectP = null;
+const certWordsNow = () => (certMatchFp === certFpKey() ? (certWords || []) : []);
+function certDetectFont() {
+  if (!pdfView.hasDoc() || !PFS.certmatch) return Promise.resolve(null);
   const fp = certFpKey();
-  if (certMatchFp === fp) return certMatch;
+  if (certMatchFp === fp) return Promise.resolve(certMatch);
   const cached = PFS.store.get(certMatchKey(), null);
-  if (cached && 'family' in cached) { certMatch = cached.family ? cached : null; certMatchFp = fp; return certMatch; }
-  if (certMatchBusy) return null;
+  if (cached && 'family' in cached && Array.isArray(cached.words)) {
+    certMatch = cached.family ? cached : null; certWords = cached.words; certMatchFp = fp;
+    return Promise.resolve(certMatch);
+  }
+  if (certDetectP && certDetectP.fp === fp) return certDetectP;
   certMatchBusy = true;
-  try {
-    const res = await PFS.certmatch.detect(pdfView.getDoc(), { page: 0 });
-    certMatchFp = fp;
-    // a weak or ambiguous shape match is no match: the clerk's choice stands
-    const ok = res && (res.source === 'name' || (res.score >= 0.5 && res.margin >= 0.015));
-    certMatch = ok ? { family: res.family, weight: res.weight, css: res.css, score: res.score, source: res.source, ranked: res.ranked } : null;
-    PFS.store.set(certMatchKey(), certMatch || { family: null, at: Date.now() });
-    return certMatch;
-  } finally { certMatchBusy = false; }
+  const p = (async () => {
+    try {
+      const res = await PFS.certmatch.detect(pdfView.getDoc(), { page: 0 });
+      if (certFpKey() !== fp) return null;      // another format opened meanwhile
+      certMatchFp = fp;
+      // a weak or ambiguous shape match is no match: the clerk's choice stands
+      const ok = res && res.family && (res.source === 'name' || (res.score >= 0.5 && res.margin >= 0.015));
+      certMatch = ok ? { family: res.family, weight: res.weight, css: res.css, score: res.score, source: res.source, ranked: res.ranked } : null;
+      certWords = ((res && res.words) || []).slice(0, 160).map((w) => ({ text: w.text, x0: +w.x0.toFixed(4), x1: +w.x1.toFixed(4), y0: +w.y0.toFixed(4), y1: +w.y1.toFixed(4) }));
+      PFS.store.set(certMatchKey(), Object.assign({}, certMatch || { family: null, at: Date.now() }, { words: certWords }));
+      return certMatch;
+    } finally { certMatchBusy = false; if (certDetectP === p) certDetectP = null; }
+  })();
+  p.fp = fp;
+  certDetectP = p;
+  return p;
 }
 // every text field the certificate prints (fields, sentences, fixed values)
 function certTextCtrls() {
@@ -3823,6 +3836,14 @@ function certLayoutModels(baseModels, rec) {
     const scale = natural > 0 ? w / natural : 1;
     const c = PFS.clamp(it.baseCx, left + w / 2, right - w / 2);
     Object.assign(m, { align: 'center', wrapW: null, cellW: null, cellX: null, fx: c - w / 2, fw: w, maxW: w * 1.0005 });
+    // a long name shrinks around the CENTRE of its letters (not the top of
+    // its box): the space above and below stays equal whatever its length
+    if (scale < 0.999) {
+      const s0 = certInkSpan(m), mid = m.fy + (s0.top + s0.bottom) / 2;
+      m.fontFrac *= scale;
+      const s1 = certInkSpan(m);
+      m.fy = mid - (s1.top + s1.bottom) / 2;
+    }
     const box = { i: it.i, page: it.page, fixed: false, left: c - w / 2, right: c + w / 2, top: it.top, bottom: it.top + it.lineH, key: it.key, scale };
     report.boxes.push(box);
     if (scale < 0.8) report.shrunk.push({ key: it.key, scale });
@@ -3977,6 +3998,233 @@ function certAlignAll() {
   if (n) { markDirty(); scheduleSnap(); }
   return n;
 }
+/* ---- automatic composition: every field in its own space on the format ----
+ * The clerk should never set the distance between the student's name and the
+ * certificate's own text by hand. The format is read as a column of printed
+ * lines (bands of ink) with empty spaces between them. Each field goes to the
+ * space its meaning calls for: the name above "סיים/ה בהצלחה" (or below the
+ * title), the ID under the name, the course under "…קורס", the date further
+ * down. Inside its space a field is sized from the format's own type sizes and
+ * its letters are centred, so the space above and below is equal. */
+let certInkCache = { fp: null, v: null };
+// where a text model's LETTERS sit, relative to its box top (page fractions):
+// the same baseline arithmetic the exporter draws with (line-height 1.15)
+function certInkSpan(m) {
+  __certMeasureCv = __certMeasureCv || document.createElement('canvas');
+  const cx = __certMeasureCv.getContext('2d');
+  const P = Math.max(1, m.fontFrac * 1000);
+  cx.font = certFontString(m, P);
+  const pr = cx.measureText('אAg1');
+  const asc = pr.fontBoundingBoxAscent > 0 ? pr.fontBoundingBoxAscent : P * 0.9;
+  const desc = pr.fontBoundingBoxAscent > 0 ? (pr.fontBoundingBoxDescent || 0) : P * 0.25;
+  const base = (1.15 * P - (asc + desc)) / 2 + asc;
+  const heb = /[א-ת]/.test(m.text || '');
+  const body = cx.measureText(heb ? 'בדהמשת' : '0123456789');
+  return { top: (base - body.actualBoundingBoxAscent) / 1000, bottom: (base + Math.max(0, body.actualBoundingBoxDescent)) / 1000 };
+}
+// a full printed line's ink height (ascender ל to descender ק) per unit font size
+function certLineInkRatio(m) {
+  __certMeasureCv = __certMeasureCv || document.createElement('canvas');
+  const cx = __certMeasureCv.getContext('2d');
+  cx.font = certFontString(m, 100);
+  const a = cx.measureText('ל'), d = cx.measureText('ק');
+  const r = (a.actualBoundingBoxAscent + d.actualBoundingBoxDescent) / 100;
+  return r > 0.3 ? r : 1;
+}
+// the format's printed lines and the empty spaces between them
+function certAnalyzeInk(canvas) {
+  const W = canvas.width, H = canvas.height;
+  const d = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  // the paper: the most common colour (a cream or tinted format is still paper)
+  const counts = new Map();
+  for (let i = 0; i < W * H; i += 7) { const j = i * 4; const k = ((d[j] >> 3) << 10) | ((d[j + 1] >> 3) << 5) | (d[j + 2] >> 3); counts.set(k, (counts.get(k) || 0) + 1); }
+  let best = 0, bk = 0; counts.forEach((n, k) => { if (n > best) { best = n; bk = k; } });
+  const pr = ((bk >> 10) & 31) * 8 + 4, pg = ((bk >> 5) & 31) * 8 + 4, pb = (bk & 31) * 8 + 4;
+  const ink = new Uint8Array(W * H), col = new Uint32Array(W);
+  for (let i = 0, j = 0; i < W * H; i++, j += 4) {
+    if (Math.max(Math.abs(d[j] - pr), Math.abs(d[j + 1] - pg), Math.abs(d[j + 2] - pb)) > 60) { ink[i] = 1; col[i % W]++; }
+  }
+  // columns that are mostly ink are frame sides or coloured panels, not text
+  const longestRun = (n, ok) => { let bs = 0, be = 0, s = -1; for (let i = 0; i <= n; i++) { if (i < n && ok(i)) { if (s < 0) s = i; } else if (s >= 0) { if (i - s > be - bs) { bs = s; be = i; } s = -1; } } return [bs, be]; };
+  let [cx0, cx1] = longestRun(W, (x) => col[x] < 0.45 * H);
+  const inX = Math.round(0.015 * W); cx0 += inX; cx1 -= inX;
+  if (cx1 - cx0 < W * 0.25) return null;
+  const rc = new Uint32Array(H);
+  for (let y = 0; y < H; y++) { let n = 0; const o = y * W; for (let x = cx0; x < cx1; x++) n += ink[o + x]; rc[y] = n; }
+  // rows that are mostly ink across the content are the frame's top/bottom
+  let [cy0, cy1] = longestRun(H, (y) => rc[y] < 0.6 * (cx1 - cx0));
+  const inY = Math.round(0.015 * H); cy0 += inY; cy1 -= inY;
+  if (cy1 - cy0 < H * 0.25) return null;
+  const thr = Math.max(2, 0.003 * (cx1 - cx0)), merge = Math.max(2, Math.round(0.006 * H));
+  const bands = [];
+  let cur = null;
+  for (let y = cy0; y < cy1; y++) {
+    if (rc[y] < thr) continue;
+    if (cur && y - cur.y1 <= merge) cur.y1 = y + 1; else bands.push(cur = { y0: y, y1: y + 1 });
+  }
+  const out = [];
+  bands.forEach((b) => {
+    let x0 = cx1, x1 = cx0;
+    for (let y = b.y0; y < b.y1; y++) { const o = y * W; for (let x = cx0; x < cx1; x++) if (ink[o + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; } }
+    if (x1 < x0) return;
+    if (b.y1 - b.y0 < 0.004 * H && x1 - x0 < 0.02 * W) return;       // a speck
+    out.push({ y0: b.y0 / H, y1: b.y1 / H, x0: x0 / W, x1: (x1 + 1) / W, h: (b.y1 - b.y0) / H, cx: (x0 + x1 + 1) / 2 / W, text: '' });
+  });
+  return { bands: out, left: cx0 / W, right: cx1 / W, top: cy0 / H, bottom: cy1 / H };
+}
+async function certReadFormat() {
+  const fp = certFpKey();
+  if (certInkCache.fp === fp) return certInkCache.v;
+  let v = null;
+  try {
+    const pg = await pdfView.getDoc().getPage(1);
+    const { canvas } = await renderBaseForFlatten(0, 1100 / pg.getViewport({ scale: 1 }).width);
+    v = certAnalyzeInk(canvas);
+    canvas.width = 0;
+  } catch (e) { v = null; }
+  certInkCache = { fp, v };
+  return v;
+}
+const CERT_RX = {
+  after: /סיימ|סיים|השתתפ|השלימ|השלים|עמד[הו]?\b|למד[הו]?\b|בהצלחה|על\s+סיום/,
+  title: /תעודה|מוענק|הוענק|הננו|לכבוד|מאשר|מעניק/,
+  course: /קורס|השתלמות|תכנית|תוכנית|לימודי|סדנ|מסלול/,
+  date: /תאריך|ביום|בשנת/
+};
+async function certAutoCompose(ctrls, opts) {
+  opts = opts || {};
+  const F0 = await certReadFormat();
+  if (!F0) return 0;
+  const words = certWordsNow();
+  const bands = F0.bands.map((b) => {
+    const ws = words.filter((w) => { const c = (w.y0 + w.y1) / 2; return c >= b.y0 - 0.004 && c <= b.y1 + 0.004; });
+    // the line's centre from its WORDS: a seal or an ornament beside the
+    // text must not drag the axis sideways
+    const tcx = ws.length ? (Math.min(...ws.map((w) => w.x0)) + Math.max(...ws.map((w) => w.x1))) / 2 : b.cx;
+    return Object.assign({}, b, { tcx, text: ws.sort((a, b2) => b2.x1 - a.x1).map((w) => w.text).join(' ') });
+  });
+  const hasWords = bands.some((b) => b.text);
+  const textBands = bands.filter((b) => hasWords ? !!b.text : (b.h >= 0.012 && b.h <= 0.15 && b.x1 - b.x0 > 0.06));
+  if (!textBands.length) return 0;
+  // the format's type sizes from its WORDS (a seal or a signature merged into a
+  // line's band must not make the body text look huge); bands without words
+  // fall back to their own heights, the tall ones (art, seals) left out
+  const inside = (w) => w.y0 >= F0.top - 0.01 && w.y1 <= F0.bottom + 0.01 && /[\u05D0-\u05EA]{2}/.test(w.text);
+  let hs = (hasWords ? words.filter(inside).map((w) => w.y1 - w.y0) : textBands.map((b) => b.h).filter((h) => h < 0.1))
+    .filter((h) => h > 0.004).sort((a, b) => a - b);
+  if (!hs.length) hs = textBands.map((b) => b.h).sort((a, b) => a - b);
+  const bodyInk = hs[Math.floor((hs.length - 1) / 2)], titleInk = hs[hs.length - 1];
+  const centres = textBands.map((b) => b.tcx).sort((a, b) => a - b);
+  const axisAll = centres[Math.floor(centres.length / 2)];
+  // the empty spaces, top to bottom
+  const gaps = [];
+  for (let i = 0; i <= bands.length; i++) {
+    const y0 = i === 0 ? F0.top : bands[i - 1].y1, y1 = i === bands.length ? F0.bottom : bands[i].y0;
+    if (y1 - y0 > 0.02) gaps.push({ y0, y1, h: y1 - y0, above: bands[i - 1] || null, below: bands[i] || null, fields: [] });
+  }
+  if (!gaps.length) return 0;
+  const all = overlay.getElements();
+  let fields = (ctrls || certPlacedFields()).filter((c) => all.includes(c) && c.model.page === 0 && c.model.type === 'text'
+    && c.model.fieldKey && !c.model.certAnchor && c.model.fieldKey !== 'מספר תעודה');
+  if (opts.onlyUntouched) fields = fields.filter((c) => { const m = c.model; return m.certAuto && Math.abs(m.fx - m.certAuto[0]) < 1e-4 && Math.abs(m.fy - m.certAuto[1]) < 1e-4; });
+  if (!fields.length) return 0;
+  // fields anchored to a printed blank keep it; their space is taken
+  all.filter((c) => c.model.certAnchor && c.model.page === 0).forEach((c) => {
+    const mid = c.model.fy + (c.model.fh || 0) / 2;
+    gaps.forEach((g) => { if (mid > g.y0 && mid < g.y1) g.taken = true; });
+  });
+  const minGap = Math.max(0.045, bodyInk * 1.8);
+  const free = (g) => !g.taken && g.h >= minGap * (g.fields.length ? 2 : 1);
+  const gapAbove = (b) => gaps.find((g) => g.below === b);
+  const gapBelow = (b) => gaps.find((g) => g.above === b);
+  const span = F0.bottom - F0.top;
+  // the name's space
+  let nameGap = null;
+  const after = textBands.find((b) => CERT_RX.after.test(b.text));
+  if (after && gapAbove(after) && free(gapAbove(after))) nameGap = gapAbove(after);
+  if (!nameGap) {
+    const titles = textBands.filter((b) => CERT_RX.title.test(b.text) && b.y1 < F0.top + span * 0.6);
+    const t = titles[titles.length - 1];
+    if (t && gapBelow(t) && free(gapBelow(t))) nameGap = gapBelow(t);
+  }
+  if (!nameGap) {
+    const mid = gaps.filter((g) => free(g) && (g.y0 + g.y1) / 2 > F0.top + span * 0.2 && (g.y0 + g.y1) / 2 < F0.top + span * 0.72);
+    nameGap = mid.sort((a, b) => b.h - a.h)[0] || null;
+  }
+  const byKey = (k) => fields.find((c) => c.model.fieldKey === k);
+  const order = ['שם מלא', 'תעודת זהות', 'שם הקורס', 'תאריך סיום', 'תאריך התחלה', 'תאריך הנפקה', 'שנת לימוד', 'ציון'];
+  const rest = fields.filter((c) => !order.includes(c.model.fieldKey));
+  const queue = order.map(byKey).filter(Boolean).concat(rest);
+  let lastGap = nameGap;
+  const nextFreeBelow = (g) => gaps.find((x) => x !== g && (!g || x.y0 >= g.y1 - 1e-6) && free(x) && !x.fields.length);
+  queue.forEach((c) => {
+    const k = c.model.fieldKey;
+    let g = null;
+    if (k === 'שם מלא') g = nameGap;
+    else if (k === 'תעודת זהות') g = byKey('שם מלא') && nameGap ? nameGap : nextFreeBelow(lastGap);
+    else if (k === 'שם הקורס' && hasWords) {
+      const b = textBands.find((x) => CERT_RX.course.test(x.text) && (!nameGap || x.y0 >= nameGap.y1 - 1e-6));
+      if (b && gapBelow(b) && free(gapBelow(b)) && !gapBelow(b).fields.length) g = gapBelow(b);
+    } else if (/תאריך|שנת/.test(k) && hasWords) {
+      const b = textBands.find((x) => CERT_RX.date.test(x.text) && (!lastGap || x.y0 >= lastGap.y1 - 1e-6));
+      if (b && gapBelow(b) && free(gapBelow(b)) && !gapBelow(b).fields.length) g = gapBelow(b);
+    }
+    if (!g) g = nextFreeBelow(lastGap);
+    if (!g) g = lastGap;                    // no room left: share the last space
+    if (!g) return;
+    g.fields.push(c);
+    if (!lastGap || g.y0 >= lastGap.y0) lastGap = g;
+  });
+  // sizes from the format's own type: the name between body and title
+  const target = (k) => k === 'שם מלא' ? PFS.clamp(bodyInk * 2, bodyInk * 1.3, Math.max(bodyInk * 1.3, titleInk * 0.8))
+    : k === 'שם הקורס' ? bodyInk * 1.2 : bodyInk * 0.9;
+  let n = 0;
+  gaps.filter((g) => g.fields.length).forEach((g) => {
+    const ms = g.fields.map((c) => c.model);
+    ms.forEach((m) => {
+      m.align = 'center'; m.wrapW = null; m.cellW = null; m.cellX = null;
+      m.fontFrac = PFS.clamp(target(m.fieldKey) / certLineInkRatio(m), 0.012, 0.11);
+    });
+    // letters centred: equal space above and below (a stacked pair keeps a
+    // tighter gap between its own lines)
+    // two stacked fields also keep their whole line boxes apart — the rule
+    // production checks before it prints anything
+    let spans, sum, unit;
+    for (let k = 0; k < 10; k++) {
+      spans = ms.map((m) => certInkSpan(m));
+      sum = spans.reduce((s, sp) => s + (sp.bottom - sp.top), 0);
+      unit = (g.h - sum) / (2 + 0.6 * (ms.length - 1));
+      let ok = unit >= Math.max(0.01, bodyInk * 0.5), y = g.y0 + unit, prevEnd = -1;
+      ms.forEach((m, i) => {
+        const fy = y - spans[i].top;
+        if (prevEnd > 0 && fy < prevEnd + 0.004) ok = false;
+        prevEnd = fy + 1.15 * m.fontFrac;
+        y += (spans[i].bottom - spans[i].top) + 0.6 * unit;
+      });
+      if (ok) break;
+      ms.forEach((m) => { m.fontFrac = Math.max(0.012, m.fontFrac * 0.9); });
+    }
+    // the format's own axis; a line set off-centre (a right-aligned design)
+    // lends its axis to the space right under it
+    const near = g.above && textBands.includes(g.above) ? g.above.tcx : null;
+    const axis = near != null && Math.abs(near - axisAll) > 0.06 && g.below && textBands.includes(g.below) && Math.abs(g.below.tcx - near) < 0.03 ? near : axisAll;
+    const room = 2 * Math.min(axis - F0.left, F0.right - axis) * 0.92;
+    let y = g.y0 + Math.max(unit, 0);
+    g.fields.forEach((c, i) => {
+      const m = c.model, sp = spans[i];
+      m.maxW = PFS.clamp(room, 0.2, 0.92);
+      c.layout();
+      m.fx = PFS.clamp(axis - m.fw / 2, 0, 1 - m.fw);
+      m.fy = y - sp.top;
+      c.layout();
+      m.certAuto = [m.fx, m.fy];
+      y += (sp.bottom - sp.top) + 0.6 * Math.max(unit, 0);
+      n++;
+    });
+  });
+  if (n) { markDirty(); scheduleSnap(); if (certCard && certCard.__render) certCard.__render(); }
+  return n;
+}
 // a signature/stamp on a certificate: pick the saved one (or draw/upload a new
 // one); untagged, so it prints identically on every student's copy
 function certAddAsset(kind) {
@@ -4045,6 +4293,11 @@ function certApplyChecklist(wanted) {
   });
   // printed labels already known → the new fields go straight into their blanks
   if (added) { try { certAnchorToDetected(true); } catch (e) {} }
+  // the format already read → every untouched field (the new one too) takes
+  // its own space on it
+  if (added && certInkCache.fp === certFpKey() && certMatchFp === certFpKey()) {
+    certAutoCompose(null, { onlyUntouched: true }).catch(() => {});
+  }
   if (added || removed) markDirty();
   return { added, removed };
 }
@@ -4094,22 +4347,31 @@ function showCertWizard() {
   const restored = step === 2;
   certApplyFont();
   ensureCertFonts().then(() => { overlay.relayoutAll && overlay.relayoutAll(); if (certCard && certCard.__render) certCard.__render(); });
-  // then learn the format's own face; once known it becomes the default
-  if (!certMatchNow() && certMatchFp !== certFpKey()) {
-    const p = certDetectFont();
-    if (certCard && certCard.__render) certCard.__render();   // "מזהה את הגופן…"
-    p.then(async () => {
-      if (certFontId() === 'match') { await ensureCertFonts(); certApplyFont(); overlay.relayoutAll && overlay.relayoutAll(); }
-      if (certCard && certCard.__render) certCard.__render();
-    }).catch(() => {});
-  }
   // zero-click start: a fresh format opens with the standard fields ALREADY on
-  // it (name, ID, course, end date — centred, stacked). The clerk drags to
-  // adjust and ticks/unticks; nothing has to be summoned first.
+  // it (name, ID, course, end date). The clerk ticks/unticks; nothing has to
+  // be summoned first.
   let autoPlaced = 0;
   if (step === 1 && pdfView.hasDoc()) {
     autoPlaced = certApplyChecklist(certRowDefs().filter((r) => r.def).map((r) => r.key)).added;
   }
+  const autoCtrls = autoPlaced ? certPlacedFields() : [];
+  // then read the format: its own face becomes the default, and the fields
+  // just placed move into the empty spaces their meaning calls for, centred
+  // with equal room above and below — no dragging, no measuring
+  const fpAtOpen = certFpKey();
+  const detecting = !certMatchNow() && certMatchFp !== fpAtOpen;
+  const p = certDetectFont();
+  if (detecting && certCard && certCard.__render) certCard.__render();   // "קורא את התעודה…"
+  p.then(async () => {
+    if (certFpKey() !== fpAtOpen) return;
+    if (certFontId() === 'match') { await ensureCertFonts(); certApplyFont(); overlay.relayoutAll && overlay.relayoutAll(); }
+    if (autoCtrls.length) {
+      await ensureCertFonts();
+      const n = await certAutoCompose(autoCtrls, { onlyUntouched: true });
+      if (n) PFS.toast('✨ השדות סודרו על התעודה — כל אחד במקומו, במרווחים שווים', 'ok', 3500);
+    }
+    if (certCard && certCard.__render) certCard.__render();
+  }).catch(() => {});
   // a list dropped on the home screen rides in: load it and go straight to
   // the check-and-preview step (placements must exist for that)
   if (certPendingList && step === 2) {
@@ -4158,11 +4420,11 @@ function showCertWizard() {
           (nOn ? 'סידרנו אותם במרכז. <b>גררו</b> כל שדה למקומו הנכון על התעודה. סימון ✓ מוסיף שדה, ביטול הסימון מסיר — מיד.'
                : 'סמנו ✓ ליד מה שצריך להופיע — זה מופיע על התעודה מיד. אחר כך פשוט <b>גוררים</b> למקום.') +
         '</div>' +
-        '<div class="cert-fonts-l">גופן התעודה <span>' + (certMatchBusy ? 'מזהה את הגופן של התעודה…' : (certMatchNow() ? 'זוהה בתעודה: ' + escapeHtml(certMatchNow().family) : 'אחד לכל השדות')) + '</span></div>' +
+        '<div class="cert-fonts-l">גופן התעודה <span>' + (certMatchBusy ? 'קורא את התעודה — גופן ומקום לכל שדה…' : (certMatchNow() ? 'זוהה בתעודה: ' + escapeHtml(certMatchNow().family) : 'אחד לכל השדות')) + '</span></div>' +
         '<div class="cert-fonts">' + certFontList().map((f) => '<button type="button" class="cert-font' + (f.id === 'match' ? ' match' : '') + (f.id === certFontId() ? ' on' : '') + '" data-font="' + f.id + '" style="font-family:' + f.css.replace(/"/g, '&quot;') + (f.weight ? ';font-weight:' + f.weight : '') + '"><b' + (f.weight ? ' style="font-weight:' + f.weight + '"' : '') + '>ישראל ישראלי</b><span>' + f.label + ' · 012345678</span></button>').join('') + '</div>' +
         (sampleIssues.length ? '<div class="cert-warn">' + sampleIssues.map((iss) => iss.kind === 'overlap' ? '"' + escapeHtml(iss.keys[0]) + '" עולה על "' + escapeHtml(iss.keys[1]) + '". הרחיקו אותם זה מזה.' : '"' + escapeHtml(iss.keys[0]) + '" יוצא מהדף.').join('<br>') + '</div>' : '') +
         '<div class="cert-rows">' + rows + '</div>' +
-        '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAlign" title="כל השדות על ציר אחד, ברווחים שווים">✨ יישור סימטרי</button><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
+        '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAlign" title="כל שדה למקום שלו על התעודה, ממורכז ובמרווחים שווים">✨ סידור אוטומטי</button><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
         '<div class="hint muted" style="margin-bottom:6px">שדה שמשחררים ליד קו מודפס מתיישב עליו לבד; תוויות מודפסות (״שנת לימוד: ___״) נתפסות אוטומטית.</div>' +
         '<div class="gd-foot">' +
           '<button type="button" class="btn primary" id="certNext" ' + (keys.length ? '' : 'disabled') + '>✓ נראה טוב — לרשימת הסטודנטים ➜</button>' +
@@ -4231,9 +4493,11 @@ function showCertWizard() {
         certApplyFont(b.dataset.font);
         render();
       }));
-      $c('certAlign').addEventListener('click', () => {
-        const n = certAlignAll();
-        PFS.toast(n ? '✨ יושרו ' + n + ' שדות — ציר אחד, רווחים שווים' : 'השדות כבר מיושרים', 'ok');
+      $c('certAlign').addEventListener('click', async () => {
+        await certDetectFont(); await ensureCertFonts();
+        let n = await certAutoCompose(null);
+        if (!n) n = certAlignAll();
+        PFS.toast(n ? '✨ ' + n + ' שדות סודרו — כל אחד במקומו, במרווחים שווים' : 'השדות כבר מסודרים', 'ok');
       });
       $c('certAddOther').addEventListener('click', async () => {
         const name = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('שם השדה (כמו כותרת העמודה באקסל)', '') : Promise.resolve(window.prompt('שם השדה (כמו כותרת העמודה באקסל)')));

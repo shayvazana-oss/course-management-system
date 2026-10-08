@@ -146,5 +146,29 @@
     return { tier: 'ocr', fields };
   }
 
-  PFS.ocr = { available, runOcrDetect };
+  /* recognizeWords(canvas) → Tesseract words [{ text, confidence, bbox }] in
+   * the canvas's own pixels. The canvas is copied before it is enhanced, so
+   * the caller keeps its true colours. */
+  async function recognizeWords(canvas) {
+    if (!available()) throw new Error('OCR not available in this build');
+    const c = cfg();
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width; copy.height = canvas.height;
+    const ctx = copy.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    enhanceForOcr(copy, ctx);
+    const worker = await root.Tesseract.createWorker('heb', 1, {
+      workerPath: c.worker, corePath: c.core, langPath: c.lang, gzip: false, logger: () => {}
+    });
+    try {
+      const { data } = await worker.recognize(copy);
+      return (data.words || []).filter((w) => w.text && w.text.trim())
+        .map((w) => ({ text: w.text, confidence: w.confidence, bbox: w.bbox }));
+    } finally {
+      copy.width = 0;
+      try { await worker.terminate(); } catch (e) {}
+    }
+  }
+
+  PFS.ocr = { available, runOcrDetect, recognizeWords };
 })(window);

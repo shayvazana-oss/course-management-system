@@ -33,6 +33,8 @@ function findChromium() {
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.pfb': 'application/octet-stream', '.ttf': 'font/ttf', '.wasm': 'application/wasm', '.traineddata': 'application/octet-stream', '.pdf': 'application/pdf' };
 
 const results = [];
+// a check whose page code returns true or a JSON diagnosis: print the diagnosis
+const why = (r) => { if (r !== true) console.log('    ↳', r); return r === true; };
 const check = (name, ok) => { results.push({ name, ok: !!ok }); console.log(`  ${ok ? '✓' : '✗'} ${name}`); };
 
 async function main() {
@@ -3992,6 +3994,93 @@ async function main() {
       && fams2.length === 1 && /Heebo/.test(fams2[0]) && a !== b && /^"?Heebo/.test(plainFam) && nameSample === 'שם הסטודנט';
     return ok ? true : JSON.stringify({ fams1, domOk1, btn: !!btn, fams2, same: a === b, plainFam, nameSample });
   }) === true);
+
+  // ---- certificates print in the FORMAT'S OWN typeface ----
+  // A format designed in Canva arrives as a flat image set in Suez One. The
+  // wizard must find that face by itself, make it the default, put it on
+  // every field, and the PRINTED name must be measurably Suez One.
+  check('🎓 certificate font matching: an image format set in Suez One → found by shape, default for every field, and the printed name is Suez One', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge, CM = window.PFS.certmatch;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+    await document.fonts.load("400 40px 'Suez One'", 'וזאתלתעודה');
+    const c = document.createElement('canvas'); c.width = 1754; c.height = 1240;
+    const x = c.getContext('2d');
+    x.fillStyle = '#fbf7ee'; x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = '#b08d3a'; x.lineWidth = 14; x.strokeRect(40, 40, c.width - 80, c.height - 80);
+    x.fillStyle = '#1b2a4a'; x.direction = 'rtl'; x.textAlign = 'center';
+    [['וזאת לתעודה', 120, 230], ['הוראה מתקנת', 64, 340], ['סיימה בהצלחה קורס', 48, 760], ['היחידה ללימודי חוץ', 40, 1100]]
+      .forEach(([t, px, y]) => { x.font = "400 " + px + "px 'Suez One'"; x.fillText(t, c.width / 2, y); });
+    const png = await new Promise((r) => c.toBlob(r, 'image/png'));
+    await T.startCertFlow(new File([png], 'תעודת-סואץ.png', { type: 'image/png' }));
+    let m = null;
+    for (let i = 0; i < 60 && !(m = T.certMatchNow()); i++) await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 400));
+    const fields = () => T.overlay.getElements().filter((e) => e.model.type === 'text');
+    const out = { family: m && m.family, weight: m && m.weight, id: T.certFontId() };
+    out.fonts = [...new Set(fields().map((e) => e.model.font + '|' + (e.model.weight || '')))];
+    const chip = document.querySelector('.cert-card .cert-font.match');
+    out.chip = !!(chip && chip.classList.contains('on'));
+    out.label = (document.querySelector('.cert-card .cert-fonts-l span') || {}).textContent || '';
+    out.dom = fields().every((e) => /^'?"?Suez One/.test(getComputedStyle(e.node.querySelector('.txt')).fontFamily));
+    // print one student and read the printed NAME's letterforms back
+    T.certLoadList(M.parseCSV('שם מלא,תעודת זהות\nאביגיל שמואלי,033440124'), 'l.csv');
+    const nameM = Object.assign({}, (fields().find((e) => e.model.fieldKey === 'שם מלא') || {}).model);
+    const z = await T.certProduce('zip', { noDownload: true });
+    if (z) {
+      const f = window.fflate.unzipSync(z.bytes);
+      const doc = await window.pdfjsLib.getDocument({ data: f[Object.keys(f)[0]].slice(0) }).promise; const p1 = await doc.getPage(1);
+      const vp = p1.getViewport({ scale: 2.5 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const s = CM.sampleFromCanvas(cv, { x: 0.15 * cv.width, y: (nameM.fy - nameM.fh * 0.4) * cv.height, w: 0.7 * cv.width, h: nameM.fh * 1.8 * cv.height });
+      const r = s && await CM.matchSamples([Object.assign(s, { text: 'אביגיל שמואלי' })]);
+      out.printed = r && r.family;
+    } else out.printed = 'blocked: ' + JSON.stringify(T.certPreflightNow().issues);
+    out.cached = (window.PFS.store.get('cert_fm_' + T.certFpKey(), {}) || {}).family;
+    // an explicit choice for this format wins over the match, and is kept
+    const classic = document.querySelector('.cert-card .cert-font[data-font="classic"]');
+    if (classic) { classic.click(); await new Promise((r) => setTimeout(r, 500)); }
+    out.afterPick = T.certFontId();
+    out.pickFonts = [...new Set(fields().map((e) => e.model.font + '|' + (e.model.weight || '')))];
+    window.PFS.store.set('cert_font', 'classic'); window.PFS.store.set('cert_font_fp', '');
+    await T.goHome();
+    for (const l of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /סואץ/.test(l.name))) { try { await window.PFS.library.remove(l.id); } catch (e) {} }
+    window.PFS.ui.confirm = realConfirm;
+    const ok = out.family === 'Suez One' && out.weight === 400 && out.id === 'match' && out.fonts.length === 1 && /^'Suez One'/.test(out.fonts[0]) && out.chip
+      && /זוהה בתעודה: Suez One/.test(out.label) && out.dom && out.printed === 'Suez One' && out.cached === 'Suez One'
+      && out.afterPick === 'classic' && out.pickFonts.length === 1 && /^'Frank Ruhl Libre'.*\|$/.test(out.pickFonts[0]);
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // a PDF format with real text: the embedded font NAME decides, the strokes
+  // decide the weight (a variable font is embedded under one instance name)
+  {
+    const pp = await browser.newPage();
+    await pp.goto(base.replace('index.html', 'vendor/fonts/heebo.css'));
+    await pp.setContent(`<html><head><link rel="stylesheet" href="${base.replace('index.html', 'vendor/fonts/heebo.css')}"><style>body{margin:0;direction:rtl;text-align:center;font-family:'Frank Ruhl Libre';font-weight:700;color:#1b2a4a}h1{font-size:64px;margin:70px 0 10px}p{font-size:28px;margin:8px}</style></head><body><h1>וזאת לתעודה</h1><p>הוראה מתקנת</p><p>סיימה בהצלחה קורס</p><p style="margin-top:260px">היחידה ללימודי חוץ</p></body></html>`, { waitUntil: 'load' });
+    await pp.evaluate(() => document.fonts.ready);
+    const pdfBytes = Array.from(await pp.pdf({ format: 'A4', landscape: true, printBackground: true }));
+    await pp.close();
+    check('🎓 certificate font matching: a PDF format → the embedded name (Frank Ruhl Libre) and the stroke weight (700) carry to every field', why(await page.evaluate(async (bytes) => {
+      const T = window.PFS.__test;
+      const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+      await T.startCertFlow(new File([new Uint8Array(bytes)], 'תעודת-פרנק.pdf', { type: 'application/pdf' }));
+      let m = null;
+      for (let i = 0; i < 60 && !(m = T.certMatchNow()); i++) await new Promise((r) => setTimeout(r, 250));
+      await new Promise((r) => setTimeout(r, 300));
+      const out = { m: m && { family: m.family, weight: m.weight, source: m.source } };
+      out.fonts = [...new Set(T.overlay.getElements().filter((e) => e.model.type === 'text').map((e) => e.model.font + '|' + e.model.weight))];
+      out.domWeight = [...new Set(T.overlay.getElements().filter((e) => e.model.type === 'text').map((e) => getComputedStyle(e.node.querySelector('.txt')).fontWeight))];
+      window.PFS.store.set('cert_font', 'classic'); window.PFS.store.set('cert_font_fp', '');
+      await T.goHome();
+      for (const l of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /פרנק/.test(l.name))) { try { await window.PFS.library.remove(l.id); } catch (e) {} }
+      window.PFS.ui.confirm = realConfirm;
+      const ok = out.m && out.m.family === 'Frank Ruhl Libre' && out.m.weight === 700 && out.m.source === 'name'
+        && out.fonts.length === 1 && /^'Frank Ruhl Libre'.*\|700$/.test(out.fonts[0]) && out.domWeight.join() === '700';
+      return ok ? true : JSON.stringify(out);
+    }, pdfBytes)));
+  }
 
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----

@@ -29,3 +29,7 @@ and fonts so the app runs fully offline with no CDN. Each retains its own licens
 - Frank Ruhl Libre — https://fonts.google.com/specimen/Frank+Ruhl+Libre (SIL Open Font License 1.1)
 - Noto Serif Hebrew — https://fonts.google.com/noto/specimen/Noto+Serif+Hebrew (SIL Open Font License 1.1)
 - David Libre — https://fonts.google.com/specimen/David+Libre (SIL Open Font License 1.1)
+- Suez One, Secular One, Assistant, Alef, Bellefair, Bona Nova, Miriam Libre,
+  Varela Round, Karantina, Amatic SC, IBM Plex Sans Hebrew — fonts.google.com
+  (SIL Open Font License 1.1)
+- Tinos, Arimo — https://fonts.google.com/specimen/Tinos (Apache License 2.0)

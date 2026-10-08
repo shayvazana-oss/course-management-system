@@ -7,6 +7,10 @@
   'use strict';
   const PFS = (root.PFS = root.PFS || {});
   const clamp = PFS.clamp;
+  // the weight a text model prints in: a matched certificate face carries a
+  // numeric weight (Suez One has only 400, Frank Ruhl up to 900); the plain
+  // bold toggle is 700/400
+  PFS.weightOf = (m) => (m && m.weight) || (m && m.bold ? 700 : 400);
 
   let SEQ = 1;
   const uid = () => 'el' + (SEQ++) + '_' + Math.floor(performance.now());
@@ -109,7 +113,7 @@
         // the exporter's own default face — never the app's UI font, or the
         // editor and the printed PDF disagree
         inner.style.fontFamily = model.font || 'Heebo, sans-serif';
-        inner.style.fontWeight = model.bold ? '700' : '400';
+        inner.style.fontWeight = String(PFS.weightOf(model));
         inner.style.textAlign = model.align;
         // letter-spacing lets typed text line up with per-character boxes
         inner.style.letterSpacing = model.letterSpacing ? (model.letterSpacing * fontPx) + 'px' : '';

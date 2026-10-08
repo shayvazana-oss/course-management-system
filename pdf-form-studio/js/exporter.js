@@ -112,7 +112,7 @@
     ctx.fillStyle = m.color || '#111';
     // the element's own face when it adopted the document's (fontmatch), else
     // the app font — the exported raster must match what the editor showed
-    const fontCss = (px) => (m.bold ? '700 ' : '400 ') + px + 'px ' + (m.font || 'Heebo, sans-serif');
+    const fontCss = (px) => PFS.weightOf(m) + ' ' + px + 'px ' + (m.font || 'Heebo, sans-serif');
     ctx.font = fontCss(fontPx);
     // fit-to-width (certificates): a value longer than the room it has on the
     // page shrinks to stay on ONE line at its spot — a long name must never
@@ -187,7 +187,7 @@
       if (m.type === 'text' && !m.wrapW && String(m.text || '').trim()) {
         try {
           let fontPx = m.fontFrac * fullCh;
-          probe.font = (m.bold ? '700 ' : '400 ') + fontPx + 'px ' + (m.font || 'Heebo, sans-serif');
+          probe.font = PFS.weightOf(m) + ' ' + fontPx + 'px ' + (m.font || 'Heebo, sans-serif');
           let w = Math.max(...String(m.text).split('\n').map((ln) => probe.measureText(ln).width), 0);
           if (m.maxW && w > m.maxW * fullCw) w = m.maxW * fullCw;   // drawElement shrinks to this
           const fw = w / fullCw;

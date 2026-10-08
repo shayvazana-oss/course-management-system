@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -1563,7 +1563,7 @@ function tuneReplacementToInk(ctrl) {
   __tuneCanvas = __tuneCanvas || document.createElement('canvas');
   const cx = __tuneCanvas.getContext('2d');
   const meas = (px) => {
-    cx.font = (m.bold ? '700 ' : '400 ') + px.toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
+    cx.font = PFS.weightOf(m) + ' ' + px.toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
     cx.textBaseline = 'alphabetic';
     return cx.measureText(text);
   };
@@ -1830,7 +1830,7 @@ function renderProps(ctrl) {
     const rowBA = document.createElement('div'); rowBA.className = 'row';
     const bold = document.createElement('button'); bold.className = 'btn sm' + (m.bold ? ' active tool' : '');
     bold.textContent = 'מודגש'; bold.style.fontWeight = '700';
-    bold.addEventListener('click', () => { m.bold = !m.bold; ctrl.layout(); markDirty(); rememberTextStyle(m); renderProps(ctrl); });
+    bold.addEventListener('click', () => { m.bold = !m.bold; delete m.weight; ctrl.layout(); markDirty(); rememberTextStyle(m); renderProps(ctrl); });
     const seg = document.createElement('div'); seg.className = 'seg';
     [['right', '⇥'], ['center', '≡'], ['left', '⇤']].forEach(([a, label]) => {
       const b = document.createElement('button'); b.textContent = label; b.title = a;
@@ -3604,7 +3604,7 @@ function certPlaceSentence(pageIndex, fx, fy) {
   const ctrl = overlay.addModelAt('text', pageIndex, {
     fx: fx - maxW / 2, fy: fy - 0.03, fw: maxW, fontFrac: 0.028, bold: false, align: 'center',
     text: CERT_SENTENCE, wrapW: maxW, noEdit: true, certTag: 'משפט — לחיצה כפולה לעריכה',
-    font: certFontCss()
+    font: certFontCss(), weight: certFontWeight() || undefined
   });
   if (!ctrl) return null;
   ctrl.node.dataset.tag = 'משפט — לחיצה כפולה לעריכה';
@@ -3622,7 +3622,8 @@ function certPlace(pageIndex, fx, fy, key) {
   const ctrl = overlay.addModelAt('text', pageIndex, {
     fx, fy: fy - spec.size * 0.6, fw: 0.3, fontFrac: spec.size, bold: spec.bold, align: 'center',
     text: spec.sample, fieldKey: spec.key, noEdit: true, certTag: spec.label || spec.key,
-    font: certFontCss()   // ONE family for every field on the certificate
+    font: certFontCss(),   // ONE family for every field on the certificate
+    weight: certFontWeight() || undefined
   });
   if (!ctrl) return null;
   ctrl.node.dataset.tag = spec.label || spec.key;   // the on-screen label ("תעודת זהות") — never printed
@@ -3649,28 +3650,78 @@ const CERT_FONTS = [
   { id: 'refined', label: 'עדין', css: "'Noto Serif Hebrew', 'Frank Ruhl Libre', serif", family: 'Noto Serif Hebrew' },
   { id: 'clean', label: 'נקי', css: "'Heebo', sans-serif", family: 'Heebo' }
 ];
-function certFontId() { const v = PFS.store.get('cert_font', 'classic'); return CERT_FONTS.some((f) => f.id === v) ? v : 'classic'; }
-function certFontCss(id) { return (CERT_FONTS.find((f) => f.id === (id || certFontId())) || CERT_FONTS[0]).css; }
+// the face the certificate itself was designed in (certmatch.js), found once
+// per format and remembered: the name and ID print in the format's own
+// lettering, not beside it. While it exists it is the default choice, unless
+// the clerk picked another face for THIS format.
+let certMatch = null, certMatchBusy = false, certMatchFp = null;
+// the format's identity as a string: page count, size and its text hash (or,
+// for a flat image, its picture hash) — the same file reopened gets the same key
+function certFpKey() {
+  const f = currentFp;
+  return f ? [f.pages, Math.round(f.w || 0), Math.round(f.h || 0), f.textHash || f.ahash || ''].join(':') : '';
+}
+const certMatchKey = () => 'cert_fm_' + certFpKey();
+const certMatchNow = () => (certMatch && certMatchFp === certFpKey() ? certMatch : null);
+function certFontList() {
+  const m = certMatchNow();
+  if (!m) return CERT_FONTS;
+  return [{ id: 'match', label: 'כמו בתעודה', css: m.css, family: m.family, weight: m.weight }].concat(CERT_FONTS);
+}
+function certFontId() {
+  const v = PFS.store.get('cert_font', 'classic');
+  if (certMatchNow() && (v === 'match' || PFS.store.get('cert_font_fp', '') !== certFpKey())) return 'match';
+  return CERT_FONTS.some((f) => f.id === v) ? v : 'classic';
+}
+function certFontEntry(id) { const L = certFontList(); return L.find((f) => f.id === (id || certFontId())) || CERT_FONTS[0]; }
+function certFontCss(id) { return certFontEntry(id).css; }
+function certFontWeight(id) { return certFontEntry(id).weight || null; }
 // a canvas measures with a fallback until the face has loaded — load both
 // weights and both scripts (Hebrew name, Latin digits) before any layout
 const certFontsLoaded = {};
 async function ensureCertFonts(id) {
-  const f = CERT_FONTS.find((x) => x.id === (id || certFontId())) || CERT_FONTS[0];
-  if (certFontsLoaded[f.id]) return true;
+  const f = certFontEntry(id);
+  const key = f.family + '|' + (f.weight || '');
+  if (certFontsLoaded[key]) return true;
   try {
-    await Promise.all(['400', '700'].map((w) => document.fonts.load(w + ' 40px "' + f.family + '"', 'אבגדהוזחטיכלמנסעפצקרשת 0123456789/.-"')));
-    certFontsLoaded[f.id] = true;
+    const ws = f.weight ? [String(f.weight)] : ['400', '700'];
+    await Promise.all(ws.map((w) => document.fonts.load(w + ' 40px "' + f.family + '"', 'אבגדהוזחטיכלמנסעפצקרשת 0123456789/.-"')));
+    certFontsLoaded[key] = true;
   } catch (e) {}
-  return !!certFontsLoaded[f.id];
+  return !!certFontsLoaded[key];
+}
+// detect the format's face (cached per format); resolves to the match or null
+async function certDetectFont() {
+  if (!pdfView.hasDoc() || !PFS.certmatch) return null;
+  const fp = certFpKey();
+  if (certMatchFp === fp) return certMatch;
+  const cached = PFS.store.get(certMatchKey(), null);
+  if (cached && 'family' in cached) { certMatch = cached.family ? cached : null; certMatchFp = fp; return certMatch; }
+  if (certMatchBusy) return null;
+  certMatchBusy = true;
+  try {
+    const res = await PFS.certmatch.detect(pdfView.getDoc(), { page: 0 });
+    certMatchFp = fp;
+    // a weak or ambiguous shape match is no match: the clerk's choice stands
+    const ok = res && (res.source === 'name' || (res.score >= 0.5 && res.margin >= 0.015));
+    certMatch = ok ? { family: res.family, weight: res.weight, css: res.css, score: res.score, source: res.source, ranked: res.ranked } : null;
+    PFS.store.set(certMatchKey(), certMatch || { family: null, at: Date.now() });
+    return certMatch;
+  } finally { certMatchBusy = false; }
 }
 // every text field the certificate prints (fields, sentences, fixed values)
 function certTextCtrls() {
   return overlay.getElements().filter((c) => c.model.type === 'text' && String(c.model.text || '').trim());
 }
 function certApplyFont(id) {
-  const css = certFontCss(id);
+  const css = certFontCss(id), weight = certFontWeight(id);
   let n = 0;
-  certTextCtrls().forEach((c) => { if (c.model.font !== css) { c.model.font = css; c.layout(); n++; } });
+  certTextCtrls().forEach((c) => {
+    if (c.model.font === css && (c.model.weight || null) === weight) return;
+    c.model.font = css;
+    if (weight) c.model.weight = weight; else delete c.model.weight;
+    c.layout(); n++;
+  });
   if (n) { markDirty(); scheduleSnap(); }
   return n;
 }
@@ -3686,7 +3737,7 @@ function certApplyFont(id) {
  * error that blocks production. */
 const CERT_MARGIN = 0.04, CERT_GAP = 0.018;
 let __certMeasureCv = null;
-function certFontString(m, px) { return (m.bold ? '700 ' : '400 ') + px + 'px ' + (m.font || 'Heebo, sans-serif'); }
+function certFontString(m, px) { return PFS.weightOf(m) + ' ' + px + 'px ' + (m.font || 'Heebo, sans-serif'); }
 function certTextWidthFrac(m, text, ratio) {
   __certMeasureCv = __certMeasureCv || document.createElement('canvas');
   const cx = __certMeasureCv.getContext('2d');
@@ -4043,6 +4094,15 @@ function showCertWizard() {
   const restored = step === 2;
   certApplyFont();
   ensureCertFonts().then(() => { overlay.relayoutAll && overlay.relayoutAll(); if (certCard && certCard.__render) certCard.__render(); });
+  // then learn the format's own face; once known it becomes the default
+  if (!certMatchNow() && certMatchFp !== certFpKey()) {
+    const p = certDetectFont();
+    if (certCard && certCard.__render) certCard.__render();   // "מזהה את הגופן…"
+    p.then(async () => {
+      if (certFontId() === 'match') { await ensureCertFonts(); certApplyFont(); overlay.relayoutAll && overlay.relayoutAll(); }
+      if (certCard && certCard.__render) certCard.__render();
+    }).catch(() => {});
+  }
   // zero-click start: a fresh format opens with the standard fields ALREADY on
   // it (name, ID, course, end date — centred, stacked). The clerk drags to
   // adjust and ticks/unticks; nothing has to be summoned first.
@@ -4098,8 +4158,8 @@ function showCertWizard() {
           (nOn ? 'סידרנו אותם במרכז. <b>גררו</b> כל שדה למקומו הנכון על התעודה. סימון ✓ מוסיף שדה, ביטול הסימון מסיר — מיד.'
                : 'סמנו ✓ ליד מה שצריך להופיע — זה מופיע על התעודה מיד. אחר כך פשוט <b>גוררים</b> למקום.') +
         '</div>' +
-        '<div class="cert-fonts-l">גופן התעודה <span>אחד לכל השדות</span></div>' +
-        '<div class="cert-fonts">' + CERT_FONTS.map((f) => '<button type="button" class="cert-font' + (f.id === certFontId() ? ' on' : '') + '" data-font="' + f.id + '" style="font-family:' + f.css.replace(/"/g, '&quot;') + '"><b>ישראל ישראלי</b><span>' + f.label + ' · 012345678</span></button>').join('') + '</div>' +
+        '<div class="cert-fonts-l">גופן התעודה <span>' + (certMatchBusy ? 'מזהה את הגופן של התעודה…' : (certMatchNow() ? 'זוהה בתעודה: ' + escapeHtml(certMatchNow().family) : 'אחד לכל השדות')) + '</span></div>' +
+        '<div class="cert-fonts">' + certFontList().map((f) => '<button type="button" class="cert-font' + (f.id === 'match' ? ' match' : '') + (f.id === certFontId() ? ' on' : '') + '" data-font="' + f.id + '" style="font-family:' + f.css.replace(/"/g, '&quot;') + (f.weight ? ';font-weight:' + f.weight : '') + '"><b' + (f.weight ? ' style="font-weight:' + f.weight + '"' : '') + '>ישראל ישראלי</b><span>' + f.label + ' · 012345678</span></button>').join('') + '</div>' +
         (sampleIssues.length ? '<div class="cert-warn">' + sampleIssues.map((iss) => iss.kind === 'overlap' ? '"' + escapeHtml(iss.keys[0]) + '" עולה על "' + escapeHtml(iss.keys[1]) + '". הרחיקו אותם זה מזה.' : '"' + escapeHtml(iss.keys[0]) + '" יוצא מהדף.').join('<br>') + '</div>' : '') +
         '<div class="cert-rows">' + rows + '</div>' +
         '<div class="gd-chips" style="margin:8px 0 4px"><button type="button" class="gd-chip" id="certAlign" title="כל השדות על ציר אחד, ברווחים שווים">✨ יישור סימטרי</button><button type="button" class="gd-chip" id="certAddOther">+ שדה אחר…</button></div>' +
@@ -4166,6 +4226,7 @@ function showCertWizard() {
       }));
       certCard.querySelectorAll('.cert-font').forEach((b) => b.addEventListener('click', async () => {
         PFS.store.set('cert_font', b.dataset.font);
+        PFS.store.set('cert_font_fp', certFpKey());   // an explicit choice for THIS format
         await ensureCertFonts(b.dataset.font);
         certApplyFont(b.dataset.font);
         render();

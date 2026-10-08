@@ -4150,6 +4150,77 @@ async function main() {
     return ok ? true : JSON.stringify(out);
   })));
 
+  // ---- symmetry is not left to the hand ----
+  // A layout saved from hand-dragging (name a little left, ID a little right
+  // of the title) is reopened: it is composed once onto the format's axis.
+  // In the PRINT, the visible letters of the name and the ID share the
+  // title's centre. A field let go near the centre lands exactly on it, and
+  // Ctrl+Z gives the hand layout back.
+  check('🎓 symmetry: a hand-placed saved layout is re-composed on the axis, printed name + ID centred on the title to 0.3%, a drag near the centre snaps onto it, undo restores', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+    await document.fonts.load("500 40px 'Frank Ruhl Libre'", 'וזאתלתעודה 0123456789');
+    const c = document.createElement('canvas'); c.width = 1754; c.height = 1240;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = '#d9d9d9'; x.lineWidth = 2;   // a guilloche background, like a real format
+    for (let k = -20; k < 60; k++) { x.beginPath(); for (let X = 0; X <= c.width; X += 8) { const Y = k * 24 + 12 * Math.sin(X / 90) + X * 0.08; X ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.stroke(); }
+    x.fillStyle = '#111'; x.direction = 'rtl'; x.textAlign = 'center';
+    [['וזאת לתעודה', 150, 230], ['על השתתפותה והשלמתה בהצלחה של הקורס', 46, 640], ['בהיקף של 30 שעות', 50, 780], ['היחידה ללימודי חוץ', 40, 1080]]
+      .forEach(([t, px, y]) => { x.font = "500 " + px + "px 'Frank Ruhl Libre'"; x.fillText(t, c.width / 2, y); });
+    const png = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const file = () => new File([png], 'תעודת-סימטריה.png', { type: 'image/png' });
+    const on = () => T.overlay.getElements().filter((e) => e.model.fieldKey);
+    const byK = (k) => on().find((e) => e.model.fieldKey === k);
+    const sig = () => JSON.stringify(on().map((e) => [e.model.fieldKey, +e.model.fx.toFixed(4), +e.model.fy.toFixed(4)]));
+    const settle = async (before) => { for (let i = 0; i < 80 && sig() === before; i++) await new Promise((r) => setTimeout(r, 200)); await new Promise((r) => setTimeout(r, 300)); };
+    await T.startCertFlow(file());
+    let s0 = sig(); await settle(s0);
+    // the hand layout: off the axis, never composed, saved with the format
+    const hand = { 'שם מלא': [0.492, 0.225], 'תעודת זהות': [0.532, 0.30] };
+    on().forEach((e) => { delete e.model.certComposed; const h = hand[e.model.fieldKey]; if (h) { e.model.fx = h[0] - e.model.fw / 2; e.model.fy = h[1]; e.layout(); } });
+    await T.autoSaveNow();
+    await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+    await T.startCertFlow(file());
+    const restored = sig();
+    const out = { restoredHand: Math.abs(byK('שם מלא').model.fy - 0.225) < 1e-3 };
+    await settle(restored);
+    const FM = T.certFormatModel();
+    out.axis = FM && +FM.axisAll.toFixed(4);
+    out.moved = sig() !== restored;
+    // the print: ink centre of each black line vs the title's
+    T.certLoadList(M.parseCSV('שם מלא,תעודת זהות,שם הקורס,תאריך סיום\nשני אלימלך,066136037,הוראה מתקנת,12/09/2026'), 'l.csv');
+    const z = await T.certProduce('zip', { noDownload: true });
+    out.produced = z ? z.count : JSON.stringify(T.certPreflightNow().issues);
+    if (z) {
+      const f = window.fflate.unzipSync(z.bytes);
+      const doc = await window.pdfjsLib.getDocument({ data: f[Object.keys(f)[0]].slice(0) }).promise; const p1 = await doc.getPage(1);
+      const vp = p1.getViewport({ scale: 2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      const cx = cv.getContext('2d'); await p1.render({ canvasContext: cx, viewport: vp }).promise;
+      const d = cx.getImageData(0, 0, cv.width, cv.height).data, W = cv.width, H = cv.height;
+      const dark = (X, Y) => { const j = (Y * W + X) * 4; return d[j] + d[j + 1] + d[j + 2] < 330; };
+      const bands = []; let cur = null;
+      for (let y = 0; y < H; y++) { let n = 0; for (let X = 0; X < W; X++) if (dark(X, y)) n++; if (n >= 3) { if (cur && y - cur[1] <= 3) cur[1] = y; else bands.push(cur = [y, y]); } }
+      const ctr = bands.map(([a, b]) => { let x0 = W, x1 = 0; for (let y = a; y <= b; y++) for (let X = 0; X < W; X++) if (dark(X, y)) { x0 = Math.min(x0, X); x1 = Math.max(x1, X); } return (x0 + x1) / 2 / W; });
+      // bands top-down: title, name, ID, …
+      out.offsets = ctr.slice(1, 3).map((v) => +(v - ctr[0]).toFixed(4));
+    }
+    // a drag that ends near the centre lands on it
+    const id = byK('תעודת זהות'), home = id.model.fx;
+    id.model.fx += 0.035; id.layout();
+    out.snapped = T.certSnapToAxis(id) && Math.abs(id.model.fx - home) < 1e-3;
+    // Ctrl+Z walks back to the hand layout
+    let undone = false;
+    for (let i = 0; i < 6 && !undone; i++) { T.undo(); await new Promise((r) => setTimeout(r, 120)); undone = byK('שם מלא') && Math.abs(byK('שם מלא').model.fy - 0.225) < 1e-3; }
+    out.undo = undone;
+    await T.goHome();
+    for (const l of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /סימטריה/.test(l.name))) { try { await window.PFS.library.remove(l.id); } catch (e) {} }
+    window.PFS.ui.confirm = realConfirm;
+    const ok = out.restoredHand && out.moved && out.produced === 1 && out.offsets && out.offsets.length === 2 && out.offsets.every((v) => Math.abs(v) < 0.003) && out.snapped && out.undo;
+    return ok ? true : JSON.stringify(out);
+  })));
+
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----
   {

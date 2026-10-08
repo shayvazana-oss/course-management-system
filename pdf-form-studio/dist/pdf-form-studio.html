@@ -9551,7 +9551,7 @@ const overlay = PFS.createOverlayManager({
   // a tap on empty paper opens a caret right there ("לוחצים על המשבצת ומקלידים")
   onEmptyTap: (page, fx, fy) => { try { quickTextAt(page, fx, fy); } catch (e) { console.warn('quick text failed', e); } },
   // a certificate field dropped near a printed underline settles onto it
-  onDragEnd: (c) => { try { if (certMode && typeof certSnapToInk === 'function') certSnapToInk(c); } catch (e) {} },
+  onDragEnd: (c) => { try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
@@ -9705,7 +9705,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certSnapToAxis: (c) => certSnapToAxis(c), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -13257,7 +13257,11 @@ function certLayoutModels(baseModels, rec) {
     const zoneW = right - left;
     const w = Math.min(natural, zoneW);
     const scale = natural > 0 ? w / natural : 1;
-    const c = PFS.clamp(it.baseCx, left + w / 2, right - w / 2);
+    // optical centring: the value's visible letters land where the sample's
+    // were (each name's own side bearings are corrected, student by student)
+    const b0 = baseModels[it.i];
+    const optical = certInkOffset(b0, b0.text, it.ratio) - certInkOffset(Object.assign({}, m, { fontFrac: m.fontFrac * scale }), m.text, it.ratio);
+    const c = PFS.clamp(it.baseCx + optical, left + w / 2, right - w / 2);
     Object.assign(m, { align: 'center', wrapW: null, cellW: null, cellX: null, fx: c - w / 2, fw: w, maxW: w * 1.0005 });
     // a long name shrinks around the CENTRE of its letters (not the top of
     // its box): the space above and below stays equal whatever its length
@@ -13514,10 +13518,11 @@ const CERT_RX = {
   course: /קורס|השתלמות|תכנית|תוכנית|לימודי|סדנ|מסלול/,
   date: /תאריך|ביום|בשנת/
 };
-async function certAutoCompose(ctrls, opts) {
-  opts = opts || {};
-  const F0 = await certReadFormat();
-  if (!F0) return 0;
+// the format as the composer sees it: lines with their words, the type
+// sizes, and the AXIS the design is centred on. Synchronous once read.
+function certFormatModel() {
+  const F0 = certInkCache.fp === certFpKey() ? certInkCache.v : null;
+  if (!F0) return null;
   const words = certWordsNow();
   const bands = F0.bands.map((b) => {
     const ws = words.filter((w) => { const c = (w.y0 + w.y1) / 2; return c >= b.y0 - 0.004 && c <= b.y1 + 0.004; });
@@ -13528,7 +13533,7 @@ async function certAutoCompose(ctrls, opts) {
   });
   const hasWords = bands.some((b) => b.text);
   const textBands = bands.filter((b) => hasWords ? !!b.text : (b.h >= 0.012 && b.h <= 0.15 && b.x1 - b.x0 > 0.06));
-  if (!textBands.length) return 0;
+  if (!textBands.length) return null;
   // the format's type sizes from its WORDS (a seal or a signature merged into a
   // line's band must not make the body text look huge); bands without words
   // fall back to their own heights, the tall ones (art, seals) left out
@@ -13539,6 +13544,40 @@ async function certAutoCompose(ctrls, opts) {
   const bodyInk = hs[Math.floor((hs.length - 1) / 2)], titleInk = hs[hs.length - 1];
   const centres = textBands.map((b) => b.tcx).sort((a, b) => a - b);
   const axisAll = centres[Math.floor(centres.length / 2)];
+  return { F0, words, bands, hasWords, textBands, bodyInk, titleInk, axisAll };
+}
+// where a value's VISIBLE letters are centred relative to the point it is
+// centred on (page-width fraction). Glyph side bearings — a wide ך, a
+// narrow 1 — make advance-centred text sit visibly off its axis.
+function certInkOffset(m, text, ratio) {
+  __certMeasureCv = __certMeasureCv || document.createElement('canvas');
+  const cx = __certMeasureCv.getContext('2d');
+  const P = Math.max(1, (m.fontFrac || 0.02) * 1000);
+  cx.font = certFontString(m, P);
+  const lines = String(text == null ? '' : text).split('\n');
+  const ln = lines.reduce((a, b) => (b.length > a.length ? b : a), '');
+  if (!ln.trim()) return 0;
+  cx.direction = /[\u0590-\u05FF]/.test((/[A-Za-z\u0590-\u05FF]/.exec(ln) || [''])[0]) ? 'rtl' : 'ltr';
+  cx.textAlign = 'center';
+  const t = cx.measureText(ln);
+  cx.direction = 'inherit'; cx.textAlign = 'start';
+  if (!isFinite(t.actualBoundingBoxRight) || !isFinite(t.actualBoundingBoxLeft)) return 0;
+  return ((t.actualBoundingBoxRight - t.actualBoundingBoxLeft) / 2) * (ratio || certPageRatio(m.page)) / 1000;
+}
+// put a field's visible letters exactly on the axis
+function certCentreOnAxis(c, axis) {
+  const m = c.model;
+  m.align = 'center'; m.wrapW = null;
+  c.layout();
+  m.fx = PFS.clamp(axis - m.fw / 2 - certInkOffset(m, m.text), 0, 1 - m.fw);
+  c.layout();
+}
+async function certAutoCompose(ctrls, opts) {
+  opts = opts || {};
+  if (!(await certReadFormat())) return 0;
+  const FM = certFormatModel();
+  if (!FM) return 0;
+  const { F0, words, bands, hasWords, textBands, bodyInk, titleInk, axisAll } = FM;
   // the empty spaces, top to bottom
   const gaps = [];
   for (let i = 0; i <= bands.length; i++) {
@@ -13551,6 +13590,8 @@ async function certAutoCompose(ctrls, opts) {
     && c.model.fieldKey && !c.model.certAnchor && c.model.fieldKey !== 'מספר תעודה');
   if (opts.onlyUntouched) fields = fields.filter((c) => { const m = c.model; return m.certAuto && Math.abs(m.fx - m.certAuto[0]) < 1e-4 && Math.abs(m.fy - m.certAuto[1]) < 1e-4; });
   if (!fields.length) return 0;
+  // the layout before composing is a step Ctrl+Z can return to
+  clearTimeout(snapT); snapshot();
   // fields anchored to a printed blank keep it; their space is taken
   all.filter((c) => c.model.certAnchor && c.model.page === 0).forEach((c) => {
     const mid = c.model.fy + (c.model.fh || 0) / 2;
@@ -13636,17 +13677,30 @@ async function certAutoCompose(ctrls, opts) {
     g.fields.forEach((c, i) => {
       const m = c.model, sp = spans[i];
       m.maxW = PFS.clamp(room, 0.2, 0.92);
-      c.layout();
-      m.fx = PFS.clamp(axis - m.fw / 2, 0, 1 - m.fw);
+      certCentreOnAxis(c, axis);
       m.fy = y - sp.top;
       c.layout();
       m.certAuto = [m.fx, m.fy];
+      m.certComposed = 1;
       y += (sp.bottom - sp.top) + 0.6 * Math.max(unit, 0);
       n++;
     });
   });
   if (n) { markDirty(); scheduleSnap(); if (certCard && certCard.__render) certCard.__render(); }
   return n;
+}
+// a field let go NEAR the format's centre line lands exactly ON it: a hand
+// on a touchpad is never pixel-true, a certificate must be
+function certSnapToAxis(c) {
+  const m = c && c.model;
+  if (!m || m.type !== 'text' || !m.fieldKey || m.certAnchor) return false;
+  const FM = certFormatModel();
+  if (!FM) return false;
+  const cx = m.fx + (m.fw || 0) / 2 + certInkOffset(m, m.text);
+  if (Math.abs(cx - FM.axisAll) > 0.06 || Math.abs(cx - FM.axisAll) < 1e-4) return false;
+  certCentreOnAxis(c, FM.axisAll);
+  markDirty(); scheduleSnap();
+  return true;
 }
 // a signature/stamp on a certificate: pick the saved one (or draw/upload a new
 // one); untagged, so it prints identically on every student's copy
@@ -13778,6 +13832,9 @@ function showCertWizard() {
     autoPlaced = certApplyChecklist(certRowDefs().filter((r) => r.def).map((r) => r.key)).added;
   }
   const autoCtrls = autoPlaced ? certPlacedFields() : [];
+  // a layout saved before the format could be read (placed by hand, never
+  // composed) is composed once — symmetry is not left to the hand
+  const legacyCtrls = autoPlaced ? [] : certPlacedFields().filter((c) => c.model.fieldKey && !c.model.certAnchor && !c.model.certComposed && c.model.type === 'text');
   // then read the format: its own face becomes the default, and the fields
   // just placed move into the empty spaces their meaning calls for, centred
   // with equal room above and below — no dragging, no measuring
@@ -13792,6 +13849,12 @@ function showCertWizard() {
       await ensureCertFonts();
       const n = await certAutoCompose(autoCtrls, { onlyUntouched: true });
       if (n) PFS.toast('✨ השדות סודרו על התעודה — כל אחד במקומו, במרווחים שווים', 'ok', 3500);
+    } else if (legacyCtrls.length) {
+      await ensureCertFonts();
+      const n = await certAutoCompose(legacyCtrls);
+      if (n) PFS.toast('✨ השדות סודרו מחדש — סימטריים ובמרווחים שווים (לביטול: Ctrl+Z)', 'ok', 5000);
+    } else {
+      await certReadFormat();   // ready for the magnetic axis
     }
     if (certCard && certCard.__render) certCard.__render();
   }).catch(() => {});

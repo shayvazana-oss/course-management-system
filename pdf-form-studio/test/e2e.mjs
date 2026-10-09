@@ -3473,7 +3473,7 @@ async function main() {
       && wizRes.s2.step === 2 && wizRes.s2b.listN === 3 && wizRes.s2b.map['שם מלא'] === 'שם מלא' && wizRes.s2b.map['תאריך'] === 'תאריך סיום'
       && wizRes.s3.step === 3
       && JSON.stringify(wizRes.zipNames) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
-      && wizRes.onePages === 3 && wizRes.oneName === 'תעודת-גמר - כל התעודות.pdf'
+      && wizRes.onePages === 3 && wizRes.oneName === 'חשמלאות מוסמכים - 15.07.2026 - כל התעודות.pdf'
       && wizRes.again.step === 2 && wizRes.againPlaced === 2
       && wizRes.img.pages === 1 && wizRes.img.state.card && wizRes.img.state.step === 1;
     if (!ok) console.log('  [cert wizard debug]', JSON.stringify(wizRes));
@@ -3595,7 +3595,7 @@ async function main() {
       && J.multi && JSON.stringify(J.multi.keys) === JSON.stringify(['שם מלא', 'ציון', 'תאריך סיום', 'תעודת זהות'].sort())
       && J.multi.cardVisible && J.multi.listed && J.found
       && /3/.test(J.info || '') && J.mapped === 'שם מלא'
-      && /תעודות\.zip$/.test(J.zipName || '') && JSON.stringify(J.zipEntries) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
+      && J.zipName === 'חשמלאות מוסמכים - 15.07.2026.zip' && JSON.stringify(J.zipEntries) === JSON.stringify(['אורן פלד-כהן.pdf', 'ישראל ישראלי.pdf', 'מירב עמיר.pdf'].sort())
       && /כל התעודות\.pdf$/.test(J.oneName || '') && J.onePages === 3 && /הופקו 3/.test(J.done || '')
       && J.homeCardGone && J.again && J.again.step === 2 && J.again.placed === 1 && J.closed && J.plainNoCard;
     if (!okJ) console.log('  [cert journey debug]', JSON.stringify(J));
@@ -4218,6 +4218,111 @@ async function main() {
     for (const l of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /סימטריה/.test(l.name))) { try { await window.PFS.library.remove(l.id); } catch (e) {} }
     window.PFS.ui.confirm = realConfirm;
     const ok = out.restoredHand && out.moved && out.produced === 1 && out.offsets && out.offsets.length === 2 && out.offsets.every((v) => Math.abs(v) < 0.003) && out.snapped && out.undo;
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- the certificate archive: a folder per course, by code and date ----
+  // Three batches: two cohorts of one course (same מק"ט, different dates) and
+  // another course whose code is typed in step 3. Each is filed by itself,
+  // named after its course; the home screen shows the course folders; a
+  // batch prints again from the archive with NOTHING open and comes out
+  // identical; a student is found by ID and their single certificate
+  // downloads; a batch can be re-filed.
+  check('🎓 certificate archive: batches filed by course + code + date, home folders, identical re-print with nothing open, search by ID → single certificate, re-filing', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    const realDeliver = window.PFS.deliver.file; const got = [];
+    window.PFS.deliver.file = (bytes, name, mime) => { got.push({ bytes, name, mime }); };
+    const out = {};
+    try {
+      window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+      window.PFS.store.set('cert_registry', { batches: [] });
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([842, 595]);
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawRectangle({ x: 30, y: 30, width: 782, height: 535, borderColor: rgb(0.2, 0.3, 0.6), borderWidth: 5 });
+      pg.drawText('ARCHIVE FORMAT', { x: 300, y: 500, size: 30, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+      const fmt = await d.save();
+      await T.startCertFlow(new File([fmt.slice(0)], 'תעודת-מאגר.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      const step3 = () => { for (let i = 0; i < 3; i++) { const b = document.querySelector('.cert-card #certNext'); if (b && !b.disabled) b.click(); } };
+      const listA = 'שם מלא,תעודת זהות,שם הקורס,"מק""ט",תאריך סיום\nנועה ברק,033440124,הוראה מתקנת,HM-4021,12/09/2026\nיוסי כהן,123456782,הוראה מתקנת,HM-4021,12/09/2026';
+      // batch A: everything read from the list
+      T.certLoadList(M.parseCSV(listA), 'a.csv'); step3();
+      out.metaA = T.certMetaNow();
+      out.domA = [document.querySelector('#cfCourse'), document.querySelector('#cfCode'), document.querySelector('#cfDate')].map((x) => x && x.value);
+      const zA = await T.certProduce('zip', { noDownload: true });
+      out.nameA = zA && zA.name;
+      // batch B: the same course, a later cohort — the date corrected in step 3
+      T.certLoadList(M.parseCSV(listA.replace(/12\/09\/2026/g, '01/10/2026').replace('נועה ברק', 'דנה לוי')), 'b.csv'); step3();
+      const dt = document.querySelector('#cfDate'); dt.value = '2026-10-01'; dt.dispatchEvent(new Event('input'));
+      const zB = await T.certProduce('single', { noDownload: true });
+      out.nameB = zB && zB.name;
+      // batch C: another course, no code column — typed by the clerk
+      T.certLoadList(M.parseCSV('שם מלא,תעודת זהות,שם הקורס,תאריך סיום\nאבי מזרחי,000000018,ניהול כיתה,30/08/2026'), 'c.csv'); step3();
+      const cd = document.querySelector('#cfCode'); cd.value = 'NK-7'; cd.dispatchEvent(new Event('input'));
+      const zC = await T.certProduce('zip', { noDownload: true });
+      out.nameC = zC && zC.name;
+      const origFiles = window.fflate.unzipSync(zA.bytes);
+      // home: the course folders
+      await T.goHome(); await new Promise((r) => setTimeout(r, 400));
+      const chips = [...document.querySelectorAll('#certArchStrip .ca-chip')];
+      out.home = chips.map((c) => c.querySelector('b') && c.querySelector('b').textContent);
+      out.homeVisible = getComputedStyle(document.getElementById('certArchWrap')).display !== 'none';
+      chips[0].click(); await new Promise((r) => setTimeout(r, 200));
+      const modal = document.getElementById('certArchModal');
+      out.modal = !!(modal && modal.classList.contains('show'));
+      const openFolder = modal.querySelector('.ca-folder[open]');
+      out.openDates = openFolder ? [...openFolder.querySelectorAll('.ca-batch .ca-bh b')].map((b) => b.textContent.replace(/[^\d.]/g, '')) : null;
+      // re-print batch A with nothing open: same files, same pixels
+      const folders = T.certArchiveFolders();
+      const bA = folders.find((f) => f.code === 'HM-4021').batches.find((b) => b.date === '2026-09-12');
+      out.noDoc = !T.pdfView.hasDoc();
+      const again = window.fflate.unzipSync(await T.certArchiveBuild(bA, 'zip'));
+      out.sameNames = JSON.stringify(Object.keys(again).sort()) === JSON.stringify(Object.keys(origFiles).sort());
+      const px = async (bytes) => { const doc = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise; const p1 = await doc.getPage(1); const vp = p1.getViewport({ scale: 1.2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height; await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; return cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; };
+      const k0 = Object.keys(origFiles).sort()[0];
+      const p1 = await px(origFiles[k0]), p2 = await px(again[k0]);
+      let diff = 0; for (let i = 0; i < p1.length; i += 4) if (Math.abs(p1[i] - p2[i]) > 24 || Math.abs(p1[i + 2] - p2[i + 2]) > 24) diff++;
+      out.diffFrac = p1.length === p2.length ? diff / (p1.length / 4) : 1;
+      let ink = 0; for (let i = 0; i < p2.length; i += 4) if (p2[i] < 100) ink++;
+      out.reprintInk = ink;
+      // search by ID → that student → their certificate alone
+      const s = modal.querySelector('#caSearch'); s.value = '123456782'; s.dispatchEvent(new Event('input'));
+      const persons = [...modal.querySelectorAll('.ca-person')];
+      out.found = persons.map((p) => p.querySelector('.ca-pn').textContent);
+      got.length = 0;
+      const dl = persons[0] && persons[0].querySelector('button');
+      if (dl) { dl.click(); for (let i = 0; i < 60 && !got.length; i++) await new Promise((r) => setTimeout(r, 100)); }
+      out.single = got[0] ? { name: got[0].name, pages: (await PDFDocument.load(got[0].bytes)).getPageCount() } : null;
+      // re-file batch C under a corrected code
+      s.value = ''; s.dispatchEvent(new Event('input'));
+      const fC = [...modal.querySelectorAll('.ca-folder')].find((f) => /ניהול כיתה/.test(f.querySelector('summary').textContent));
+      fC.open = true;
+      const edit = [...fC.querySelectorAll('.ca-acts button')].find((b) => b.textContent === 'עריכה');
+      edit.click();
+      const ek = fC.querySelector('.ca-ek'); ek.value = 'NK-8';
+      fC.querySelector('.ca-es').click();
+      out.refiled = T.certArchiveFolders().map((f) => f.course + '|' + f.code).sort();
+      out.csvHead = window.PFS.__test.certRegistryCsv().split('\r\n')[0];
+      modal.classList.remove('show');
+    } finally {
+      window.PFS.deliver.file = realDeliver; window.PFS.ui.confirm = realConfirm;
+    }
+    for (const l of (await window.PFS.library.list()).filter((l) => l.kind === 'cert' && /מאגר/.test(l.name))) { try { await window.PFS.library.remove(l.id); } catch (e) {} }
+    window.PFS.store.set('cert_registry', { batches: [] });
+    const ok = out.metaA.course === 'הוראה מתקנת' && out.metaA.code === 'HM-4021' && out.metaA.date === '2026-09-12'
+      && out.domA.join('|') === 'הוראה מתקנת|HM-4021|2026-09-12'
+      && out.nameA === 'הוראה מתקנת - HM-4021 - 12.09.2026.zip'
+      && out.nameB === 'הוראה מתקנת - HM-4021 - 01.10.2026 - כל התעודות.pdf'
+      && out.nameC === 'ניהול כיתה - NK-7 - 30.08.2026.zip'
+      && out.homeVisible && out.home.join('|') === 'הוראה מתקנת|ניהול כיתה'
+      && out.modal && out.openDates && out.openDates.join('|') === '01.10.2026|12.09.2026'
+      && out.noDoc && out.sameNames && out.diffFrac < 0.001 && out.reprintInk > 200
+      && out.found.length === 2 && out.found.every((n) => n === 'יוסי כהן')
+      && out.single && out.single.pages === 1 && out.single.name === 'יוסי כהן - 123456782.pdf'
+      && out.refiled.join(',') === 'הוראה מתקנת|HM-4021,ניהול כיתה|NK-8'
+      && /מק""ט/.test(out.csvHead);
     return ok ? true : JSON.stringify(out);
   })));
 

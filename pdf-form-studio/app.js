@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certSnapToAxis: (c) => certSnapToAxis(c), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -3534,10 +3534,314 @@ function certAlreadyIssued(idValue, format) {
   return null;
 }
 function certRegistryCsv() {
-  const rows = [['מספר תעודה', 'שם מלא', 'תעודת זהות', 'קורס', 'פורמט', 'תאריך הנפקה']];
-  certRegistry().batches.forEach((b) => (b.entries || []).forEach((e) => rows.push([e.serial, e.name, e.id, e.course, b.format, new Date(b.at).toLocaleDateString('he-IL')])));
+  const rows = [['מספר תעודה', 'שם מלא', 'תעודת זהות', 'קורס', 'מק"ט', 'תאריך הקורס', 'פורמט', 'תאריך הנפקה']];
+  certRegistry().batches.forEach((b) => (b.entries || []).forEach((e) => rows.push([e.serial, e.name, e.id, e.course || certBatchCourse(b), b.code || '', certDateHe(certBatchDate(b)), b.format, new Date(b.at).toLocaleDateString('he-IL')])));
   const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   return '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
+}
+
+/* ---- the certificate archive: every batch filed by course, code and date ----
+ * Whoever issues certificates needs them in order, course by course: "the
+ * certificates of הוראה מתקנת, מק"ט 4021, from 12.09". Each batch is filed
+ * under its course name, course code and date (taken from the list or the
+ * certificate, editable in step 3) and keeps its RECIPE, not its PDFs: the
+ * format (a library record), the layout and the students' values. Any
+ * certificate can be printed again, identical, months later, on any computer
+ * the account signs in to, and the archive costs kilobytes, not megabytes. */
+const CERT_CODE_RX = /מק["״'׳]?ט|^מקט|קוד\s*(ה)?קורס|מספר\s*(ה)?קורס|סמל\s*(ה)?קורס|course\s*(code|id|no|number)|\bsku\b/i;
+let certMeta = null;          // the clerk's corrections in step 3; null = derived
+let certRatioOverride = null; // a re-print measures with ITS format's page ratio
+function certCommon(vals) {
+  const n = new Map();
+  vals.map((v) => String(v == null ? '' : v).trim()).filter(Boolean).forEach((v) => n.set(v, (n.get(v) || 0) + 1));
+  let best = '', bn = 0; n.forEach((c, v) => { if (c > bn) { bn = c; best = v; } });
+  return best;
+}
+function certParseDate(v) {
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  const s = String(v == null ? '' : v).trim(); if (!s) return null;
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/.exec(s);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2] - 1, +m[1]); }
+  if (/^\d{5}$/.test(s)) { const d = new Date(Date.UTC(1899, 11, 30) + (+s) * 864e5); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }
+  return null;
+}
+const certIso = (d) => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+const certDateHe = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '.' + m[2] + '.' + m[1] : ''; };
+// "מק"ט HM-4021 · 2 מחזורים" — each part isolated, so a Latin code never
+// drags its Hebrew neighbours out of order
+const certBidiJoin = (parts, sep) => parts.filter((x) => x !== '' && x != null).map((x) => '<bdi>' + escapeHtml(String(x)) + '</bdi>').join(sep || ' · ');
+const certSafeName = (s) => String(s || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+const certFolderParts = (meta) => certBidiJoin([meta.course, meta.code, certDateHe(meta.date)].map(certSafeName).filter(Boolean), ' / ');
+function certFolderName(meta) {
+  return [meta.course, meta.code, certDateHe(meta.date)].map(certSafeName).filter(Boolean).join(' - ');
+}
+// what the batch is, read from the list (or the certificate) — never typed twice
+function certDerivedMeta() {
+  const out = { course: '', code: '', date: '' };
+  if (!certList) return out;
+  const recs = certList.records, onPage = certOnPageMap();
+  const col = (h) => (h ? certCommon(recs.map((r) => r[h])) : '');
+  const courseH = certMap['שם הקורס'] || certList.headers.find((h) => /קורס|מסלול|course/i.test(h) && !CERT_CODE_RX.test(h));
+  const fixedCourse = onPage['שם הקורס'] && !certMap['שם הקורס'] ? String(onPage['שם הקורס'].model.text || '').trim() : '';
+  out.course = col(courseH) || (fixedCourse && fixedCourse !== 'שם הקורס' ? fixedCourse : '');
+  out.code = col(certList.headers.find((h) => CERT_CODE_RX.test(h)));
+  const dateH = certMap['תאריך סיום'] || certList.headers.find((h) => /תאריך|מועד/.test(h) && /סיום|גמר/.test(h));
+  const fixedDate = onPage['תאריך סיום'] && !certMap['תאריך סיום'] ? onPage['תאריך סיום'].model.text : '';
+  out.date = certIso(certParseDate(col(dateH) || fixedDate)) || certIso(new Date());
+  return out;
+}
+function certMetaNow() { return Object.assign(certDerivedMeta(), certMeta || {}); }
+// the layout as it was: images (a signature, a stamp) are kept once, by content
+function certArchiveModels(models) {
+  const imgs = PFS.store.get('cert_archive_imgs', {}) || {};
+  let added = false;
+  const out = JSON.parse(JSON.stringify(models)).map((m) => {
+    if (m.imgUrl && /^data:/.test(m.imgUrl)) {
+      let h = 5381; for (let i = 0; i < m.imgUrl.length; i += 7) h = ((h << 5) + h + m.imgUrl.charCodeAt(i)) | 0;
+      const key = 'im' + (h >>> 0).toString(36) + m.imgUrl.length.toString(36);
+      if (!imgs[key]) { imgs[key] = m.imgUrl; added = true; }
+      m.imgRef = key; m.imgUrl = null;
+    }
+    return m;
+  });
+  if (added) PFS.store.set('cert_archive_imgs', imgs);
+  return out;
+}
+function certArchiveModelsBack(b) {
+  const imgs = PFS.store.get('cert_archive_imgs', {}) || {};
+  return JSON.parse(JSON.stringify(b.models || [])).map((m) => { if (m.imgRef) m.imgUrl = imgs[m.imgRef] || null; return m; });
+}
+const certArchiveRecords = (b) => (b.rows || []).map((row) => Object.fromEntries((b.cols || []).map((c, i) => [c, row[i]])));
+const certArchivable = (b) => !!(b && b.models && b.rows && b.cols);
+async function certArchiveFormatBytes(b) {
+  let rec = null;
+  try { rec = b.lib ? await PFS.library.get(b.lib) : null; } catch (e) {}
+  if (!rec || !rec.bytes) {
+    const d = (await PFS.library.list()).find((x) => x.kind === 'cert' && x.name === b.format);
+    if (d) rec = await PFS.library.get(d.id);
+  }
+  return rec && rec.bytes ? rec.bytes : null;
+}
+async function certEnsureModelFonts(models) {
+  const want = new Set();
+  models.forEach((m) => { if (m.type === 'text') want.add(PFS.weightOf(m) + ' 40px ' + (m.font || 'Heebo, sans-serif')); });
+  await Promise.all([...want].map((f) => document.fonts.load(f, 'אבגדהוזחטיכלמנסעפצקרשת 0123456789/.-"').catch(() => null)));
+}
+/* print a filed batch again: 'zip' (a file per student), 'single' (one PDF),
+ * or one student (idx). Exactly the recipe it was produced with. */
+async function certArchiveBuild(b, kind, idx) {
+  if (!certArchivable(b)) throw new Error('המחזור הזה הופק לפני שהמאגר נוצר — יש לו רק רשימה');
+  const bytes = await certArchiveFormatBytes(b);
+  if (!bytes) throw new Error('פורמט התעודה של המחזור ("' + (b.format || '') + '") כבר לא נמצא במאגר');
+  const models = certArchiveModelsBack(b);
+  let records = certArchiveRecords(b);
+  if (idx != null) records = [records[idx]].filter(Boolean);
+  await certEnsureModelFonts(models);
+  certRatioOverride = b.ratio || null;
+  try {
+    if (kind === 'zip') return (await PFS.merge.runBatch({ originalBytes: bytes.slice(0), baseModels: models, records, nameField: '__name', quality: 'high', layout: certLayoutFn })).zip;
+    return (await PFS.merge.runBatchSingle({ originalBytes: bytes.slice(0), baseModels: models, records, quality: 'high', layout: certLayoutFn })).pdf;
+  } finally { certRatioOverride = null; }
+}
+const certBatchDate = (b) => b.date || certIso(new Date(b.at));
+const certBatchCourse = (b) => (b.course != null ? b.course : certCommon((b.entries || []).map((e) => e.course)));
+// the archive as folders: one per course (name + code), batches newest first
+function certArchiveFolders() {
+  const map = new Map();
+  certRegistry().batches.forEach((b) => {
+    const course = String(certBatchCourse(b) || '').trim(), code = String(b.code || '').trim();
+    const key = course + '|' + code;
+    if (!map.has(key)) map.set(key, { key, course, code, batches: [] });
+    map.get(key).batches.push(b);
+  });
+  const folders = [...map.values()];
+  folders.forEach((f) => {
+    f.batches.sort((a, b) => (certBatchDate(b) + b.at).localeCompare(certBatchDate(a) + a.at));
+    f.count = f.batches.reduce((n, b) => n + (b.count || 0), 0);
+    f.last = certBatchDate(f.batches[0]);
+  });
+  return folders.sort((a, b) => b.last.localeCompare(a.last) || a.course.localeCompare(b.course, 'he'));
+}
+function certBatchCsv(b) {
+  const rows = [['מספר תעודה', 'שם מלא', 'תעודת זהות', 'קורס', 'מק"ט', 'תאריך']];
+  (b.entries || []).forEach((e) => rows.push([e.serial, e.name, e.id, e.course || certBatchCourse(b), b.code || '', certDateHe(certBatchDate(b))]));
+  const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  return '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
+}
+function certUpdateBatch(id, patch) {
+  const reg = certRegistry();
+  const b = reg.batches.find((x) => x.id === id); if (!b) return null;
+  if (patch === null) reg.batches = reg.batches.filter((x) => x.id !== id); else Object.assign(b, patch);
+  PFS.store.set('cert_registry', reg);
+  return b;
+}
+
+// ---- the archive window ----
+let certArchState = { open: {}, people: {}, q: '' };
+const CA_FOLDER_SVG = '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+function openCertArchive(focusKey) {
+  let back = $('certArchModal');
+  if (!back) {
+    back = document.createElement('div');
+    back.className = 'modal-back'; back.id = 'certArchModal';
+    back.innerHTML = '<div class="modal ca-modal">' +
+      '<header>📁 מאגר התעודות <span class="ca-sub">לפי קורס, מק"ט ותאריך</span></header>' +
+      '<div class="m-body"><input type="search" id="caSearch" class="ca-search" placeholder="חיפוש: קורס, מק&quot;ט, שם סטודנט, ת&quot;ז או מספר תעודה">' +
+      '<div id="caList" class="ca-list"></div></div>' +
+      '<footer><button class="btn ghost" id="caClose">סגור</button><button class="btn sm ghost" id="caCsv">יומן מלא (CSV)</button></footer></div>';
+    document.body.appendChild(back);
+    back.addEventListener('click', (e) => { if (e.target === back) back.classList.remove('show'); });
+    back.querySelector('#caClose').addEventListener('click', () => back.classList.remove('show'));
+    back.querySelector('#caCsv').addEventListener('click', () => PFS.deliver.file(certRegistryCsv(), 'יומן תעודות.csv', 'text/csv;charset=utf-8'));
+    back.querySelector('#caSearch').addEventListener('input', (e) => { certArchState.q = e.target.value; renderCertArchive(); });
+  }
+  if (focusKey) { certArchState.open = { [focusKey]: true }; certArchState.q = ''; back.querySelector('#caSearch').value = ''; }
+  back.classList.add('show');
+  renderCertArchive();
+}
+function renderCertArchive() {
+  const list = $('caList'); if (!list) return;
+  const q = String(certArchState.q || '').trim().toLowerCase();
+  const folders = certArchiveFolders();
+  const hit = (s) => String(s == null ? '' : s).toLowerCase().includes(q);
+  list.innerHTML = '';
+  if (!folders.length) { list.innerHTML = '<div class="hint muted">עדיין לא הונפקו תעודות. כל הפקה מתויקת כאן לבד — לפי קורס, מק"ט ותאריך.</div>'; return; }
+  let shown = 0;
+  folders.forEach((f) => {
+    const folderHit = !q || hit(f.course) || hit(f.code);
+    const batches = f.batches.map((b) => {
+      const people = (b.entries || []).map((e, i) => ({ e, i })).filter(({ e }) => !q || folderHit || hit(e.name) || hit(e.id) || hit(e.serial));
+      return { b, people, match: !q || folderHit || hit(certDateHe(certBatchDate(b))) || people.length > 0 };
+    }).filter((x) => x.match);
+    if (!batches.length) return;
+    shown++;
+    const det = document.createElement('details');
+    det.className = 'ca-folder'; det.dataset.key = f.key;
+    det.open = !!q || !!certArchState.open[f.key];
+    det.addEventListener('toggle', () => { certArchState.open[f.key] = det.open; });
+    const sum = document.createElement('summary');
+    sum.innerHTML = '<span class="ca-ic" aria-hidden="true">' + CA_FOLDER_SVG + '</span><span class="ca-t"><b></b><small></small></span><span class="ca-last"></span>';
+    sum.querySelector('b').textContent = f.course || 'ללא שם קורס';
+    sum.querySelector('small').innerHTML = certBidiJoin([f.code ? 'מק"ט ' + f.code : '', f.batches.length + (f.batches.length === 1 ? ' מחזור' : ' מחזורים'), f.count + ' תעודות']);
+    sum.querySelector('.ca-last').textContent = certDateHe(f.last);
+    det.appendChild(sum);
+    batches.forEach(({ b, people }) => det.appendChild(certArchiveBatchRow(b, people, !!q && !hit(f.course) && !hit(f.code))));
+    if (f.batches.some(certArchivable)) {
+      const fa = document.createElement('div'); fa.className = 'ca-facts';
+      const all = document.createElement('button'); all.type = 'button'; all.className = 'btn sm'; all.textContent = 'הורדת כל התיקייה (ZIP — תת־תיקייה לכל תאריך)';
+      all.addEventListener('click', () => certArchiveFolderZip(f, all));
+      fa.appendChild(all); det.appendChild(fa);
+    }
+    list.appendChild(det);
+  });
+  if (!shown) list.innerHTML = '<div class="hint muted">לא נמצא דבר עבור "' + escapeHtml(certArchState.q) + '"</div>';
+}
+function certArchiveBatchRow(b, people, showPeople) {
+  const row = document.createElement('div'); row.className = 'ca-batch'; row.dataset.id = b.id;
+  const ok = certArchivable(b);
+  row.innerHTML = '<div class="ca-bh"><b></b><span></span></div><div class="ca-acts"></div><div class="ca-prog hint"></div>';
+  row.querySelector('.ca-bh b').textContent = certDateHe(certBatchDate(b));
+  row.querySelector('.ca-bh span').innerHTML = certBidiJoin([(b.count || 0) + ' תעודות', b.format || '', ok ? '' : 'רשימה בלבד (הופק לפני המאגר)']);
+  const acts = row.querySelector('.ca-acts'), prog = row.querySelector('.ca-prog');
+  const name = certFolderName({ course: certBatchCourse(b), code: b.code, date: certBatchDate(b) }) || certSafeName(b.format) || 'תעודות';
+  const btn = (label, title, fn, disabled) => {
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'btn sm ghost'; x.textContent = label; x.title = title;
+    if (disabled) x.disabled = true; else x.addEventListener('click', fn);
+    acts.appendChild(x); return x;
+  };
+  const run = async (label, fn) => {
+    prog.textContent = label;
+    try { await fn(); prog.textContent = ''; } catch (e) { prog.textContent = ''; PFS.toast(e.message || String(e), 'err', 6000); }
+  };
+  btn('ZIP', 'קובץ PDF לכל סטודנט', () => run('מפיק מחדש ' + (b.count || '') + ' תעודות…', async () => PFS.deliver.file(await certArchiveBuild(b, 'zip'), name + '.zip', 'application/zip')), !ok);
+  btn('PDF אחד', 'כל התעודות בקובץ אחד להדפסה', () => run('מפיק מחדש…', async () => PFS.deliver.file(await certArchiveBuild(b, 'single'), name + ' - כל התעודות.pdf', 'application/pdf')), !ok);
+  btn('רשימה', 'רשימת המקבלים (CSV)', () => PFS.deliver.file(certBatchCsv(b), name + ' - רשימה.csv', 'text/csv;charset=utf-8'));
+  const pBtn = btn('סטודנטים', 'הצג את המקבלים — ותעודה בודדת להורדה', () => { certArchState.people[b.id] = !certArchState.people[b.id]; renderCertArchive(); });
+  btn('עריכה', 'תיקון שם הקורס, המק"ט או התאריך', () => certArchiveEdit(row, b));
+  btn('מחיקה', 'מחיקת המחזור מהמאגר', async () => {
+    if (!(await PFS.ui.confirm('מחיקה מהמאגר', 'למחוק את המחזור מ־' + certDateHe(certBatchDate(b)) + ' (' + (b.count || 0) + ' תעודות)? התעודות שכבר נשלחו לא מושפעות, אבל הן לא ייבדקו יותר ככפולות.'))) return;
+    certUpdateBatch(b.id, null); renderCertArchive(); try { renderCertArchiveHome(); } catch (e) {}
+  });
+  if (showPeople || certArchState.people[b.id]) {
+    pBtn.classList.add('on');
+    const ul = document.createElement('div'); ul.className = 'ca-people';
+    const recs = ok ? certArchiveRecords(b) : [];
+    people.forEach(({ e, i }) => {
+      const li = document.createElement('div'); li.className = 'ca-person';
+      li.innerHTML = '<span class="ca-pn"></span><span class="ca-pid" dir="ltr"></span><span class="ca-ps" dir="ltr"></span>';
+      li.querySelector('.ca-pn').textContent = e.name || '—';
+      li.querySelector('.ca-pid').textContent = e.id || '';
+      li.querySelector('.ca-ps').textContent = e.serial || '';
+      if (ok && recs[i]) {
+        const d = document.createElement('button'); d.type = 'button'; d.className = 'btn sm ghost'; d.textContent = 'PDF'; d.title = 'התעודה של ' + (e.name || '') + ' (PDF)';
+        d.addEventListener('click', () => run('מפיק את התעודה של ' + (e.name || '') + '…', async () => PFS.deliver.file(await certArchiveBuild(b, 'single', i), certSafeName(e.name || 'תעודה') + (e.id ? ' - ' + e.id : '') + '.pdf', 'application/pdf')));
+        li.appendChild(d);
+      }
+      ul.appendChild(li);
+    });
+    row.appendChild(ul);
+  }
+  return row;
+}
+function certArchiveEdit(row, b) {
+  const bh = row.querySelector('.ca-bh');
+  const form = document.createElement('div'); form.className = 'ca-edit';
+  form.innerHTML = '<label>שם הקורס<input class="ca-ec"></label><label>מק"ט<input class="ca-ek" dir="ltr"></label><label>תאריך<input class="ca-ed" type="date"></label>' +
+    '<div class="ca-acts"><button type="button" class="btn sm primary ca-es">שמור</button><button type="button" class="btn sm ghost ca-ex">ביטול</button></div>';
+  form.querySelector('.ca-ec').value = certBatchCourse(b) || '';
+  form.querySelector('.ca-ek').value = b.code || '';
+  form.querySelector('.ca-ed').value = certBatchDate(b);
+  bh.replaceWith(form);
+  row.querySelector('.ca-acts:not(.ca-edit .ca-acts)').style.display = 'none';
+  form.querySelector('.ca-ex').addEventListener('click', renderCertArchive);
+  form.querySelector('.ca-es').addEventListener('click', () => {
+    const course = form.querySelector('.ca-ec').value.trim(), code = form.querySelector('.ca-ek').value.trim(), date = form.querySelector('.ca-ed').value;
+    certUpdateBatch(b.id, { course, code, date: date || certBatchDate(b) });
+    certArchState.open = { [course + '|' + code]: true };
+    renderCertArchive(); try { renderCertArchiveHome(); } catch (e) {}
+    PFS.toast('✓ תויק מחדש: ' + (certFolderName({ course, code, date }) || 'ללא שם'), 'ok');
+  });
+}
+async function certArchiveFolderZip(f, button) {
+  const old = button.textContent;
+  try {
+    const files = {};
+    const ok = f.batches.filter(certArchivable);
+    for (let i = 0; i < ok.length; i++) {
+      button.textContent = 'מפיק ' + (i + 1) + '/' + ok.length + '…'; button.disabled = true;
+      const b = ok[i];
+      const inner = window.fflate.unzipSync(await certArchiveBuild(b, 'zip'));
+      let sub = certDateHe(certBatchDate(b)) || 'מחזור';
+      while (Object.keys(files).some((k) => k.startsWith(sub + '/'))) sub += '+';
+      Object.keys(inner).forEach((k) => { files[sub + '/' + k] = inner[k]; });
+    }
+    const name = [f.course, f.code].map(certSafeName).filter(Boolean).join(' - ') || 'תעודות';
+    PFS.deliver.file(window.fflate.zipSync(files, { level: 6 }), name + '.zip', 'application/zip');
+  } catch (e) { PFS.toast(e.message || String(e), 'err', 6000); }
+  finally { button.textContent = old; button.disabled = false; }
+}
+// the home screen: the course folders at a glance, one click into each
+function renderCertArchiveHome() {
+  const wrap = $('certArchWrap'), strip = $('certArchStrip');
+  if (!wrap || !strip) return;
+  const folders = certArchiveFolders();
+  wrap.style.display = folders.length ? '' : 'none';
+  strip.innerHTML = '';
+  folders.slice(0, 8).forEach((f) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ca-chip';
+    b.innerHTML = '<span class="ca-ic" aria-hidden="true">' + CA_FOLDER_SVG + '</span><span class="ca-t"><b></b><small></small></span>';
+    b.querySelector('b').textContent = f.course || 'ללא שם קורס';
+    b.querySelector('small').innerHTML = certBidiJoin([f.code, certDateHe(f.last), f.count + ' תעודות']);
+    b.addEventListener('click', () => openCertArchive(f.key));
+    strip.appendChild(b);
+  });
+  if (folders.length > 8) {
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'ca-chip ca-more'; more.textContent = 'כל ' + folders.length + ' הקורסים ←';
+    more.addEventListener('click', () => openCertArchive());
+    strip.appendChild(more);
+  }
 }
 // which spreadsheet column feeds a date placement — by the date's MEANING
 const CERT_DATE_HINTS = {
@@ -3578,7 +3882,7 @@ async function startCertFlow(file) {
   certOpening = true;
   try { await openPdfFile(pdf); } finally { certOpening = false; }
   if (!pdfView.hasDoc()) return;
-  certMode = true; certList = null; certMap = {};
+  certMode = true; certList = null; certMap = {}; certMeta = null;
   showCertWizard();
 }
 // everything on the certificate that changes per student: tagged fields AND
@@ -3760,6 +4064,7 @@ function certTextWidthFrac(m, text, ratio) {
   return (w * ratio) / 1000;              // px at page height 1000 → fraction of page width
 }
 function certPageRatio(page) {
+  if (certRatioOverride) return certRatioOverride;
   try { const s = overlay.overlaySizeFor(page); if (s && s.w > 0 && s.h > 0) return s.h / s.w; } catch (e) {}
   return 595 / 842;
 }
@@ -4510,6 +4815,13 @@ function showCertWizard() {
           ? '<div class="hint" style="margin:-2px 0 8px;color:var(--danger);font-weight:700">⚠ ' + pf.issues.length + ' דברים לבדוק' + (skipped ? ' · ' + skipped + ' שורות בלי שם ידולגו' : '') + '</div>' +
             '<ul class="cert-issues">' + pf.issues.slice(0, 8).map((i) => '<li>' + escapeHtml(i.msg) + '</li>').join('') + (pf.issues.length > 8 ? '<li>…ועוד ' + (pf.issues.length - 8) + '</li>' : '') + '</ul>'
           : '<div class="hint" style="margin:-2px 0 8px;color:var(--ok);font-weight:700">✓ הרשימה נקייה: שמות, ת"ז וכפילויות נבדקו</div>') +
+        (() => {
+          const mt = certMetaNow();
+          return '<div class="cert-file"><div class="cert-file-l">יתויק במאגר התעודות <span id="cfName">' + (certFolderParts(mt) || 'ללא שם קורס') + '</span></div>' +
+            '<div class="cert-file-row"><label>שם הקורס<input id="cfCourse" value="' + escapeHtml(mt.course) + '" placeholder="למשל: הוראה מתקנת"></label>' +
+            '<label>מק"ט<input id="cfCode" dir="ltr" value="' + escapeHtml(mt.code) + '" placeholder="קוד הקורס"></label>' +
+            '<label>תאריך<input id="cfDate" type="date" value="' + escapeHtml(mt.date) + '"></label></div></div>';
+        })() +
         '<div class="hint" style="margin-bottom:4px">תצוגה מקדימה — הראשונה, השם הארוך ביותר, האחרונה:</div>' +
         '<div class="cert-thumbs" id="certThumbs"><span class="hint muted">מכין תצוגה מקדימה…</span></div>' +
         (pf.issues.some((i) => i.block)
@@ -4593,6 +4905,10 @@ function showCertWizard() {
       $c('certNext').addEventListener('click', () => { step = 3; render(); });
     } else {
       $c('certBack2').addEventListener('click', () => { step = 2; render(); });
+      ['cfCourse', 'cfCode', 'cfDate'].forEach((id) => $c(id) && $c(id).addEventListener('input', () => {
+        certMeta = { course: $c('cfCourse').value.trim(), code: $c('cfCode').value.trim(), date: $c('cfDate').value || certIso(new Date()) };
+        $c('cfName').innerHTML = certFolderParts(certMeta) || 'ללא שם קורס';
+      }));
       if ($c('certZip')) $c('certZip').addEventListener('click', () => certProduce('zip'));
       if ($c('certOne')) $c('certOne').addEventListener('click', () => certProduce('single'));
       if ($c('certFix')) $c('certFix').addEventListener('click', () => { step = 1; render(); });
@@ -4607,6 +4923,7 @@ function showCertWizard() {
 function certLoadList(parsed, fileName) {
   if (!parsed || !parsed.records.length) { PFS.toast('לא נמצאו שורות ברשימה', 'err'); return; }
   certList = parsed;
+  certMeta = null;   // a new list: the batch's course/code/date are read afresh
   const keys = certKeys();
   // auto-map: header ↔ placed field by exact name, then by shared meaning
   const inv = PFS.merge.mapHeaders(parsed.headers, keys);   // header → key
@@ -4750,50 +5067,71 @@ async function certProduce(kind, opts) {
   const wantsSerial = keys.includes('מספר תעודה');
   records.forEach((r, i) => { r['מספר תעודה'] = certNextSerial(i); });
   const format = String(currentFileName || '').replace(/-filled$/, '');
-  const courseHeader = certMap['שם הקורס'] || certList.headers.find((h) => /קורס/.test(h)) || null;
+  const courseHeader = certMap['שם הקורס'] || certList.headers.find((h) => /קורס/.test(h) && !CERT_CODE_RX.test(h)) || null;
   // every value measured and placed in its own zone (certLayoutModels)
   const baseModels = overlay.getElements().map((c) => c.model);
   const prog = certCard && certCard.querySelector('#certProg');
   const onProgress = (d, t) => { if (prog) prog.textContent = 'מפיק ' + d + '/' + t + '…'; };
   let result = null;
-  // the format's own name (never the sample text on it) heads the output name
-  const base = String(currentFileName || 'תעודות').replace(/-filled$/, '').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'תעודות';
+  // the batch's filing: course · code · date names the output, so the ZIP
+  // extracts straight into a folder named after the course
+  const meta = certMetaNow();
+  const folder = certFolderName(meta);
+  const base = folder || String(currentFileName || 'תעודות').replace(/-filled$/, '').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'תעודות';
   try {
     if (kind === 'single') {
       const { pdf, count } = await PFS.merge.runBatchSingle({ originalBytes: pdfView.getBytes(), baseModels, records, quality: 'high', onProgress, layout: certLayoutFn });
       result = { bytes: pdf, count, name: base + ' - כל התעודות.pdf', mime: 'application/pdf' };
     } else {
       const { zip, count } = await PFS.merge.runBatch({ originalBytes: pdfView.getBytes(), baseModels, records, nameField: nameHeader ? '__name' : '', quality: 'high', onProgress, layout: certLayoutFn });
-      result = { bytes: zip, count, name: base + ' - תעודות.zip', mime: 'application/zip' };
+      result = { bytes: zip, count, name: (folder ? base : base + ' - תעודות') + '.zip', mime: 'application/zip' };
     }
     if (!(opts && opts.noDownload)) PFS.deliver.file(result.bytes, result.name, result.mime);
-    if (prog) prog.textContent = '✓ הופקו ' + result.count + ' תעודות' + (wantsSerial ? ' · מספרים ' + records[0]['מספר תעודה'] + ' עד ' + records[records.length - 1]['מספר תעודה'] : '');
-    PFS.toast('🎓 הופקו ' + result.count + ' תעודות — נרשמו ביומן התעודות', 'ok');
-    // the registry: who got which certificate, when, from which format
+    // the format joins the certificate shelf (picked from the intro card next
+    // time) — and the archive needs it to print this batch again one day
+    let libId = null;
+    try {
+      const clean = String(currentFileName || '').replace(/-filled$/, '').trim();
+      const have = (await PFS.library.list()).find((d) => d.kind === 'cert' && d.name === clean);
+      if (have) libId = have.id;
+      else if (clean) {
+        const bytes = pdfView.getBytes().slice(0);
+        const rec = await PFS.library.add(clean, bytes, { kind: 'cert' });
+        libId = rec.id;
+        cloudPutDoc('lib', rec.id, bytes, { name: clean, libKind: 'cert' });
+      }
+    } catch (e) {}
+    // the registry and the archive: who got which certificate, filed by
+    // course, code and date, with the recipe to print it again
+    let batchId = null;
     try {
       const reg = certRegistry();
+      const cols = [...new Set([...keys, '__name', built.idHeader, 'מספר תעודה'].filter(Boolean))];
+      batchId = 'cb' + Date.now().toString(36);
       reg.batches.push({
-        id: 'cb' + Date.now().toString(36), at: Date.now(), format, count: records.length, kind,
-        entries: records.map((r) => ({ serial: r['מספר תעודה'], name: String(r.__name || ''), id: built.idHeader ? String(r[built.idHeader] || '') : '', course: courseHeader ? String(r[courseHeader] || '') : '' }))
+        id: batchId, at: Date.now(), format, count: records.length, kind,
+        course: meta.course, code: meta.code, date: meta.date, lib: libId, ratio: certPageRatio(0),
+        models: certArchiveModels(baseModels), cols,
+        rows: records.map((r) => cols.map((c) => (r[c] == null ? '' : String(r[c])))),
+        entries: records.map((r) => ({ serial: r['מספר תעודה'], name: String(r.__name || ''), id: built.idHeader ? String(r[built.idHeader] || '') : '', course: courseHeader ? String(r[courseHeader] || '') : meta.course }))
       });
-      if (reg.batches.length > 200) reg.batches = reg.batches.slice(-200);
+      if (reg.batches.length > 300) reg.batches = reg.batches.slice(-300);
       PFS.store.set('cert_registry', reg);
       certCommitSerials(records.length);
       PFS.store.set('cert_last_format', format);
     } catch (e) { console.warn('registry write failed', e); }
+    if (prog) {
+      prog.innerHTML = '';
+      prog.append('✓ הופקו ' + result.count + ' תעודות' + (wantsSerial ? ' · מספרים ' + records[0]['מספר תעודה'] + ' עד ' + records[records.length - 1]['מספר תעודה'] : '') + ' · תויקו במאגר: 📁 ' + (folder || 'ללא שם קורס') + ' ');
+      const go = document.createElement('button'); go.type = 'button'; go.className = 'btn sm ghost'; go.id = 'certOpenArch'; go.textContent = 'פתח במאגר';
+      go.addEventListener('click', () => openCertArchive(String(meta.course || '').trim() + '|' + String(meta.code || '').trim()));
+      prog.appendChild(go);
+    }
+    PFS.toast('🎓 הופקו ' + result.count + ' תעודות — תויקו במאגר התעודות', 'ok');
     // the placements are this format's memory — next cohort starts at the list
     try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
-    // …and the format itself joins the certificate shelf, so next time it is
-    // picked from the intro card instead of hunted for on disk
-    try {
-      const clean = String(currentFileName || '').replace(/-filled$/, '').trim();
-      const have = await PFS.library.list();
-      if (clean && !have.some((d) => d.kind === 'cert' && d.name === clean)) {
-        const bytes = pdfView.getBytes().slice(0);
-        const rec = await PFS.library.add(clean, bytes, { kind: 'cert' });
-        cloudPutDoc('lib', rec.id, bytes, { name: clean, libKind: 'cert' });
-      }
-    } catch (e) {}
+    try { renderCertArchiveHome(); } catch (e) {}
+    result.batchId = batchId; result.folder = folder;
   } catch (e) {
     console.error(e); PFS.toast('ההפקה נכשלה: ' + (e.message || e), 'err');
     if (prog) prog.textContent = '';
@@ -4821,14 +5159,14 @@ function showCertIntro() {
     '<div class="gd-foot"><button type="button" class="btn primary" id="certPick">📄 בחר את פורמט התעודה</button>' +
     '<span class="hint muted" style="flex:1">' + (certPendingList ? '📊 הרשימה שגררת מחכה — בחר פורמט והיא תיטען לבד' : 'את האקסל תבחר אחרי שתסמן איפה השם') + '</span></div>' +
     (certRegistry().batches.length
-      ? '<div class="hint" style="margin-top:8px"><button type="button" class="btn ghost sm" id="certReg">📒 יומן התעודות שהונפקו (' + certRegistry().batches.reduce((n, b) => n + (b.count || 0), 0) + ') — הורד CSV</button></div>'
+      ? '<div class="hint" style="margin-top:8px"><button type="button" class="btn ghost sm" id="certReg">📁 מאגר התעודות — ' + certRegistry().batches.reduce((n, b) => n + (b.count || 0), 0) + ' תעודות ב־' + certArchiveFolders().length + ' קורסים</button></div>'
       : '') +
     '<div class="hint muted" style="margin-top:6px">טיפ: אפשר גם לגרור קובץ אקסל של סטודנטים ישר למסך הבית — הפורמט האחרון ייבחר לבד.</div>';
   mountCertCard(certCard);
   certCard.querySelector('#certX').addEventListener('click', () => { certPendingList = null; closeCertWizard(); });
   certCard.querySelector('#certPick').addEventListener('click', () => $('certInput').click());
   const regBtn = certCard.querySelector('#certReg');
-  if (regBtn) regBtn.addEventListener('click', () => PFS.deliver.file(certRegistryCsv(), 'יומן תעודות.csv', 'text/csv;charset=utf-8'));
+  if (regBtn) regBtn.addEventListener('click', () => openCertArchive());
   // the certificate shelf: formats used before, one click each
   const card = certCard;
   PFS.library.list().then((docs) => {
@@ -5563,6 +5901,7 @@ function libChips(host, folders, docs, onPick) {
 }
 const libVisible = (docs) => libFilter === '' ? docs : libFilter === '__none' ? docs.filter((d) => !d.folder) : docs.filter((d) => d.folder === libFilter);
 async function renderLibrary() {
+  try { renderCertArchiveHome(); } catch (e) {}
   if (!PFS.library) return;
   const docs = await PFS.library.list();
   const folders = await PFS.library.folders();

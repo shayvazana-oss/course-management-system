@@ -160,5 +160,74 @@
   }
   function fileIndex(kind) { return (store.get('cloud_files', []) || []).filter((f) => !kind || f.kind === kind); }
 
-  PFS.account = { cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
+  // ---- the certificates department (shared, see SUPABASE.md §4) ----------
+  // Personal data stays personal; what the department shares is its
+  // certificate archive, its serial numbering and its certificate formats.
+  // The server decides who is a member (row-level security on every table),
+  // and numbers are handed out by ONE atomic counter, so two clerks producing
+  // at the same moment can never print the same serial.
+  async function rest(pathname, opts) {
+    if (!authed()) throw new Error('NOT_SIGNED_IN');
+    await ensureFresh();
+    const res = await api(pathname, Object.assign({ auth: true }, opts || {}));
+    if (res.status === 404) { const j = await res.json().catch(() => ({})); const e = new Error('DEPT_NOT_INSTALLED'); e.detail = j; throw e; }
+    if (!res.ok) throw new Error('HTTP_' + res.status);
+    if (res.status === 204) return null;
+    const t = await res.text();
+    return t ? JSON.parse(t) : null;
+  }
+  const me = () => String((user() && user().email) || '').toLowerCase();
+  const dept = {
+    // {installed, member, role, members:[{email, role}]}
+    async status() {
+      try {
+        const rows = await rest('/rest/v1/dept_members?select=email,role&order=email.asc', { headers: { Accept: 'application/json' } });
+        const mine = (rows || []).find((r) => r.email === me());
+        return { installed: true, member: !!mine, role: mine ? mine.role : null, members: rows || [] };
+      } catch (e) {
+        if (e.message === 'DEPT_NOT_INSTALLED') return { installed: false, member: false, role: null, members: [] };
+        throw e;
+      }
+    },
+    // the first person to set the department up becomes its admin
+    async claim() { return !!(await rest('/rest/v1/rpc/dept_claim', { method: 'POST', body: {} })); },
+    async addMember(email) {
+      return rest('/rest/v1/dept_members', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: { email: String(email).trim().toLowerCase(), role: 'member', added_by: me() } });
+    },
+    async removeMember(email) { return rest('/rest/v1/dept_members?email=eq.' + encodeURIComponent(String(email).toLowerCase()), { method: 'DELETE' }); },
+    async listBatches() {
+      const rows = await rest('/rest/v1/dept_batches?select=id,data,created_by,created_at&order=created_at.asc', { headers: { Accept: 'application/json' } });
+      return (rows || []).map((r) => Object.assign({}, r.data || {}, { id: r.id, by: r.created_by, shared: true }));
+    },
+    async putBatch(b) {
+      const data = Object.assign({}, b); delete data.by; delete data.shared; delete data.pending;
+      return rest('/rest/v1/dept_batches', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: { id: b.id, data, updated_at: new Date().toISOString() } });
+    },
+    async deleteBatch(id) { return rest('/rest/v1/dept_batches?id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: { Prefer: 'return=representation' } }); },
+    // `count` consecutive numbers from the shared counter → the first one
+    async nextSerials(name, count) { return Number(await rest('/rest/v1/rpc/dept_next', { method: 'POST', body: { p_name: name, p_count: count } })); },
+    // the counter never goes below numbers already issued (only ever raises it)
+    async seedSerials(name, floor) { return Number(await rest('/rest/v1/rpc/dept_seed', { method: 'POST', body: { p_name: name, p_floor: floor } })); },
+    async listFormats() { return (await rest('/rest/v1/dept_formats?select=id,name,created_by,created_at&order=created_at.asc', { headers: { Accept: 'application/json' } })) || []; },
+    async putFormat(id, name, bytes) {
+      await ensureFresh();
+      const c = cfg();
+      const res = await fetch(c.url + '/storage/v1/object/' + BUCKET + '/dept/formats/' + id + '.pdf', {
+        method: 'POST', headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: bytes
+      });
+      if (!res.ok) throw new Error('HTTP_' + res.status);
+      await rest('/rest/v1/dept_formats', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: { id, name } });
+      return true;
+    },
+    async getFormat(id) {
+      await ensureFresh();
+      const c = cfg();
+      const res = await fetch(c.url + '/storage/v1/object/authenticated/' + BUCKET + '/dept/formats/' + id + '.pdf', { headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token } });
+      if (!res.ok) return null;
+      return new Uint8Array(await res.arrayBuffer());
+    }
+  };
+
+  PFS.account = {
+    dept, cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
 })(window);

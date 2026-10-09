@@ -4955,6 +4955,9 @@ async function main() {
         return json(res, 200, { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } });
       }
       const me = who(req);
+      // the department tables exist on this server; these users belong to none
+      if (p.startsWith('/rest/v1/dept_')) return json(res, 200, []);
+      if (p.startsWith('/rest/v1/rpc/dept_')) return json(res, 200, false);
       if (p === '/rest/v1/vaults') {
         if (!me) return json(res, 401, {});
         if (req.method === 'GET') { const q = /user_id=eq\.(\w+)/.exec(u.search || ''); const id = q && q[1]; if (id !== me) return json(res, 200, []); return json(res, 200, vaults[id] ? [{ data: vaults[id] }] : []); }
@@ -5059,6 +5062,205 @@ async function main() {
       && A.back.cloudRows.some((t) => /☁️ מסמך-של-א/.test(t)) && /מסמך-של-א/.test(A.opened || '');
     if (!okA) console.log('  [accounts debug]', JSON.stringify(A));
     check('👤 accounts: login gate → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);
+  }
+
+  // ===== the certificates department: one archive, one numbering, shared
+  // formats — each clerk signed in as themself =====
+  // A mock of the department's tables and functions WITH their row-level
+  // rules (members only; numbers from one atomic counter; a batch deleted
+  // only by its producer or the admin). The admin sets the department up,
+  // her earlier batch moves into it, she adds a clerk; the clerk sees the
+  // admin's batches, re-prints one from the shared format, gets numbers that
+  // never collide, cannot delete the admin's batch, is warned about a
+  // duplicate; an outsider sees nothing.
+  {
+    const users = {}, tokens = {}, vaults = {}, files = {};
+    const D = { installed: true, members: {}, batches: {}, formats: {}, counters: {} };
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const who = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); return m && tokens[m[1]] ? tokens[m[1]] : null; };
+    const emailOf = (id) => (Object.values(users).find((x) => x.id === id) || {}).email || '';
+    const issue = (usr) => { const tok = 'tok_' + usr.id + '_' + Math.random().toString(36).slice(2); tokens[tok] = usr.id; return { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } }; };
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/signup') { const b = JSON.parse((await body(req)).toString() || '{}'); const id = 'd' + (Object.keys(users).length + 1); users[b.email] = { id, password: b.password, email: b.email }; return json(res, 200, issue(users[b.email])); }
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (u.searchParams.get('grant_type') === 'refresh_token') { const id = String(b.refresh_token || '').replace(/^r_/, ''); return json(res, 200, issue({ id, email: emailOf(id) })); }
+        const usr = users[b.email]; if (!usr || usr.password !== b.password) return json(res, 400, { error_description: 'Invalid login credentials' });
+        return json(res, 200, issue(usr));
+      }
+      const meId = who(req); if (!meId) return json(res, 401, {});
+      const me = emailOf(meId).toLowerCase();
+      const member = !!D.members[me], admin = member && D.members[me].role === 'admin';
+      const eqv = (k) => { const m = new RegExp(k + '=eq\\.([^&]+)').exec(u.search); return m ? decodeURIComponent(m[1]) : null; };
+      if (p === '/rest/v1/vaults') { if (req.method === 'GET') return json(res, 200, vaults[meId] ? [{ data: vaults[meId] }] : []); const b = JSON.parse((await body(req)).toString() || '{}'); vaults[meId] = b.data; return json(res, 201); }
+      if (p.startsWith('/rest/v1/dept_') || p.startsWith('/rest/v1/rpc/dept_')) {
+        if (!D.installed) return json(res, 404, { code: 'PGRST205', message: 'relation does not exist' });
+        if (p === '/rest/v1/rpc/dept_claim') { await body(req); if (Object.values(D.members).some((m) => m.role === 'admin')) return json(res, 200, admin); D.members[me] = { email: me, role: 'admin' }; return json(res, 200, true); }
+        if (p === '/rest/v1/rpc/dept_seed') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!member) return json(res, 400, { message: 'not a department member' }); D.counters[b.p_name] = Math.max(D.counters[b.p_name] || 0, b.p_floor); return json(res, 200, D.counters[b.p_name]); }
+        if (p === '/rest/v1/rpc/dept_next') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!member) return json(res, 400, { message: 'not a department member' }); const v = (D.counters[b.p_name] || 0) + b.p_count; D.counters[b.p_name] = v; return json(res, 200, v - b.p_count + 1); }
+        if (p === '/rest/v1/dept_members') {
+          if (req.method === 'GET') return json(res, 200, member ? Object.values(D.members) : []);
+          if (req.method === 'POST') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!admin) return json(res, 403, {}); D.members[b.email] = { email: b.email, role: b.role || 'member' }; return json(res, 201); }
+          if (req.method === 'DELETE') { const e = eqv('email'); if (admin && e !== me) delete D.members[e]; return json(res, 204); }
+        }
+        if (p === '/rest/v1/dept_batches') {
+          if (req.method === 'GET') return json(res, 200, member ? Object.values(D.batches).sort((a, b) => a.seq - b.seq).map((r) => ({ id: r.id, data: r.data, created_by: r.created_by, created_at: r.created_at })) : []);
+          if (req.method === 'POST') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!member) return json(res, 403, {}); const old = D.batches[b.id]; D.batches[b.id] = { id: b.id, data: b.data, created_by: old ? old.created_by : me, created_at: old ? old.created_at : new Date().toISOString(), seq: old ? old.seq : Object.keys(D.batches).length }; return json(res, 201); }
+          if (req.method === 'DELETE') { const id = eqv('id'); const r = D.batches[id]; if (r && (admin || r.created_by === me)) { delete D.batches[id]; return json(res, 200, [{ id }]); } return json(res, 200, []); }
+        }
+        if (p === '/rest/v1/dept_formats') {
+          if (req.method === 'GET') return json(res, 200, member ? Object.values(D.formats) : []);
+          if (req.method === 'POST') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!member) return json(res, 403, {}); D.formats[b.id] = D.formats[b.id] || { id: b.id, name: b.name, created_by: me, created_at: new Date().toISOString() }; return json(res, 201); }
+        }
+        return json(res, 404, {});
+      }
+      if (p.startsWith('/storage/v1/object/')) {
+        const rest = p.replace('/storage/v1/object/', '');
+        const own = (path) => path.startsWith(meId + '/') || (path.startsWith('dept/') && member);
+        if (req.method === 'POST' && rest.startsWith('docs/')) { const path = decodeURIComponent(rest.slice(5)); if (!own(path)) return json(res, 403, {}); files[path] = await body(req); return json(res, 200, { Key: path }); }
+        if (req.method === 'GET' && rest.startsWith('authenticated/docs/')) { const path = decodeURIComponent(rest.slice('authenticated/docs/'.length)); if (!own(path) || !files[path]) return json(res, 404, {}); res.writeHead(200, { 'content-type': 'application/pdf', 'access-control-allow-origin': '*' }); return res.end(files[path]); }
+        if (req.method === 'DELETE') { await body(req); return json(res, 200, {}); }
+      }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const R = {};
+    const signIn = async (email, pass, up) => {
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      await page.fill('#loginBody #acctEmail', email); await page.fill('#loginBody #acctPass', pass);
+      await page.click(up ? '#loginBody #acctUp' : '#loginBody #acctIn');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      await page.waitForTimeout(500);
+    };
+    const signOut = async () => { await page.evaluate(() => window.PFS.__test.acct.signOut()); };
+    // one batch through the real wizard; returns what came out
+    const produce = (args) => page.evaluate(async ({ list, fmtName }) => {
+      const T = window.PFS.__test, M = window.PFS.merge;
+      const c0 = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+      try {
+        window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+        const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+        const d = await PDFDocument.create(); const pg = d.addPage([842, 595]);
+        pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+        pg.drawText('DEPARTMENT FORMAT', { x: 280, y: 500, size: 30, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+        await T.startCertFlow(new File([await d.save()], fmtName + '.pdf', { type: 'application/pdf' }));
+        await new Promise((r) => setTimeout(r, 1200));
+        T.overlay.clearElements();
+        T.certPlace(0, 0.5, 0.45, 'שם מלא'); T.certPlace(0, 0.5, 0.6, 'תעודת זהות'); T.certPlace(0, 0.85, 0.9, 'מספר תעודה');
+        T.certLoadList(M.parseCSV(list), 'l.csv');
+        for (let i = 0; i < 3; i++) { const b = document.querySelector('.cert-card #certNext'); if (b && !b.disabled) b.click(); }
+        const issues = T.certPreflightNow().issues.filter((i) => i.kind === 'already_issued').length;
+        const z = await T.certProduce('zip', { noDownload: true });
+        await T.goHome();
+        return { ok: !!z, count: z && z.count, name: z && z.name, issues };
+      } finally { window.PFS.ui.confirm = c0; }
+    }, args);
+    try {
+      await page.evaluate(async (url) => {
+        const T = window.PFS.__test; T.overlay.clearElements();
+        await window.PFS.recent.clearAll(); await window.PFS.library.clearAll();
+        window.PFS.store.remove('cloud_files'); window.PFS.store.set('cert_registry', { batches: [] });
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+        T.acct.gate();
+      }, mockUrl);
+      // the admin signs in and, before any department exists, produces a batch (personal)
+      await signIn('admin@fillo.test', 'pw-admin', true);
+      R.before = await produce({ list: 'שם מלא,תעודת זהות,שם הקורס,תאריך סיום\nנועה ברק,033440124,הוראה מתקנת,12/09/2026\nיוסי כהן,123456782,הוראה מתקנת,12/09/2026', fmtName: 'תעודת-מחלקה' });
+      R.localBefore = await page.evaluate(() => (window.PFS.store.get('cert_registry', { batches: [] }) || { batches: [] }).batches.length);
+      R.localNext = await page.evaluate(() => window.PFS.store.get('cert_serial_next_' + new Date().getFullYear(), 1));
+      // settings → the department panel → set it up; add a clerk
+      R.claim = await page.evaluate(async () => {
+        const T = window.PFS.__test;
+        T.acct.render();
+        for (let i = 0; i < 40 && !document.querySelector('#acctBody #deptClaim'); i++) await new Promise((r) => setTimeout(r, 100));
+        const btn = document.querySelector('#acctBody #deptClaim'); if (!btn) return { btn: false, html: (document.querySelector('#acctBody .dept-panel') || {}).innerText };
+        btn.click();
+        for (let i = 0; i < 60 && !document.querySelector('#acctBody #deptAdd'); i++) await new Promise((r) => setTimeout(r, 100));
+        document.querySelector('#acctBody #deptAddEmail').value = 'clerk@fillo.test';
+        document.querySelector('#acctBody #deptAdd').click();
+        for (let i = 0; i < 60 && !/clerk@fillo\.test/.test((document.querySelector('#acctBody .dept-members') || {}).textContent || ''); i++) await new Promise((r) => setTimeout(r, 100));
+        const st = T.deptState();
+        return { btn: true, role: st.role, members: st.members.map((m) => m.email + ':' + m.role).sort(), shared: st.batches.length, localLeft: (window.PFS.store.get('cert_registry', { batches: [] }) || { batches: [] }).batches.length };
+      });
+      R.serverAfterClaim = { batches: Object.keys(D.batches).length, formats: Object.keys(D.formats).length, formatFile: Object.keys(files).some((f) => f.startsWith('dept/formats/')) };
+      // the admin produces a department batch — numbers from the server counter
+      R.adminBatch = await produce({ list: 'שם מלא,תעודת זהות,שם הקורס,תאריך סיום\nמיכל אברהם,000000018,הוראה מתקנת,01/10/2026', fmtName: 'תעודת-מחלקה' });
+      R.adminSerial = (Object.values(D.batches).find((b) => b.data.date === '2026-10-01') || { data: { entries: [{}] } }).data.entries[0].serial;
+      await signOut();
+      // the clerk: her own user, the department's archive
+      await signIn('clerk@fillo.test', 'pw-clerk', true);
+      R.clerk = await page.evaluate(async () => {
+        const T = window.PFS.__test;
+        const st = T.deptState();
+        const folders = T.certArchiveFolders();
+        const f = folders.find((x) => x.course === 'הוראה מתקנת');
+        // re-print the admin's first batch: the format comes from the department shelf
+        const libBefore = (await window.PFS.library.list()).length;
+        const b0 = f && f.batches.find((b) => b.date === '2026-09-12');
+        let reprint = null;
+        try { const z = await T.certArchiveBuild(b0, 'zip'); reprint = Object.keys(window.fflate.unzipSync(z)).sort(); } catch (e) { reprint = 'ERR ' + e.message; }
+        // two productions at the same moment never share numbers
+        const [s1, s2] = await Promise.all([window.PFS.account.dept.nextSerials('serial_race', 5), window.PFS.account.dept.nextSerials('serial_race', 5)]);
+        // the admin's batch cannot be deleted by the clerk
+        const reg0 = T.certRegistry().batches.length;
+        const adminB = T.certRegistry().batches.find((b) => b.by === 'admin@fillo.test');
+        const c0 = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+        T.openCertArchive();
+        await new Promise((r) => setTimeout(r, 600));
+        document.getElementById('certArchModal').classList.remove('show');
+        window.PFS.ui.confirm = c0;
+        return { member: st.member, role: st.role, n: st.batches.length, byShown: !!adminB, folderBatches: f ? f.batches.length : 0, reprint, libBefore, libAfter: (await window.PFS.library.list()).length, race: [s1, s2], reg0, adminBId: adminB && adminB.id };
+      });
+      R.clerkDelete = await page.evaluate(async (id) => {
+        const T = window.PFS.__test;
+        T.deptState();   // the refusal comes from the server's rule
+        const before = Object.keys(window.__x || {}).length;
+        window.PFS.account.dept.deleteBatch(id).then((rows) => { window.__delRows = rows; });
+        for (let i = 0; i < 30 && window.__delRows === undefined; i++) await new Promise((r) => setTimeout(r, 100));
+        return { rows: window.__delRows };
+      }, R.clerk.adminBId);
+      R.serverStillHas = !!D.batches[R.clerk.adminBId];
+      // the clerk issues to a student the admin already certified → warned; her batch joins the department
+      R.clerkBatch = await produce({ list: 'שם מלא,תעודת זהות,שם הקורס,תאריך סיום\nנועה ברק,033440124,הוראה מתקנת,20/10/2026', fmtName: 'תעודת-מחלקה' });
+      R.clerkFiled = Object.values(D.batches).filter((b) => b.created_by === 'clerk@fillo.test').length;
+      R.clerkSerial = (Object.values(D.batches).find((b) => b.created_by === 'clerk@fillo.test') || { data: { entries: [{}] } }).data.entries[0].serial;
+      await signOut();
+      // an outsider: signed in, not a member → sees none of it
+      await signIn('outsider@fillo.test', 'pw-out', true);
+      R.outsider = await page.evaluate(() => { const st = window.PFS.__test.deptState(); return { member: st.member, archive: window.PFS.__test.certRegistry().batches.length }; });
+      await signOut();
+    } catch (e) { R.error = String(e && e.message || e); }
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      window.PFS.store.remove('acct:cfg'); window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+      window.PFS.store.set('cert_registry', { batches: [] });
+      document.getElementById('loginModal').classList.remove('show');
+      const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; }
+      T.acct.render();
+    });
+    mock.close();
+    const yr = new Date().getFullYear();
+    const okD = !R.error && R.before.ok && R.localBefore === 1
+      && R.claim.btn && R.claim.role === 'admin' && JSON.stringify(R.claim.members) === JSON.stringify(['admin@fillo.test:admin', 'clerk@fillo.test:member'])
+      && R.claim.shared === 1 && R.claim.localLeft === 0
+      && R.serverAfterClaim.batches === 1 && R.serverAfterClaim.formats === 1 && R.serverAfterClaim.formatFile
+      && R.adminBatch.ok && R.adminSerial === yr + '-' + String(R.localNext).padStart(4, '0')
+      && R.clerk.member && R.clerk.role === 'member' && R.clerk.n === 2 && R.clerk.byShown && R.clerk.folderBatches === 2
+      && Array.isArray(R.clerk.reprint) && R.clerk.reprint.join() === ['יוסי כהן.pdf', 'נועה ברק.pdf'].sort().join() && R.clerk.libAfter === R.clerk.libBefore + 1
+      && R.clerk.race[0] !== R.clerk.race[1] && Math.abs(R.clerk.race[0] - R.clerk.race[1]) === 5
+      && Array.isArray(R.clerkDelete.rows) && R.clerkDelete.rows.length === 0 && R.serverStillHas
+      && R.clerkBatch.ok && R.clerkBatch.issues === 1 && R.clerkFiled === 1 && R.clerkSerial === yr + '-' + String(R.localNext + 1).padStart(4, '0')
+      && R.outsider.member === false && R.outsider.archive === 0;
+    if (!okD) console.log('  [department debug]', JSON.stringify(R));
+    check('🏢 department: the admin sets it up (her earlier batch moves in) and adds a clerk; the clerk sees and re-prints the admin\'s batches from the shared format, numbers never collide, she cannot delete the admin\'s batch, a duplicate is flagged; an outsider sees nothing', okD);
   }
 
   check('exporter library present', await page.evaluate(() => !!(window.PFS.exporter && window.PFS.exporter.exportPdf)));

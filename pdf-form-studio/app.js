@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -3514,7 +3514,14 @@ PFS.hebrewAcademicYear = hebrewAcademicYear; PFS.hebrewYearLetters = hebrewYearL
 // A serial (2026-0041) prints on the certificate when the 🔢 field/{מספר תעודה}
 // token is used; the registry exports as CSV and warns before a second
 // certificate goes to the same ID from the same format.
-function certRegistry() { return PFS.store.get('cert_registry', { batches: [] }) || { batches: [] }; }
+// the archive in view: the department's when signed in as a member (plus
+// anything filed here that has not reached the server yet), else this user's
+function certRegistry() {
+  const local = PFS.store.get('cert_registry', { batches: [] }) || { batches: [] };
+  if (!deptOn()) return local;
+  const ids = new Set(dept.batches.map((b) => b.id));
+  return { batches: dept.batches.concat(local.batches.filter((b) => !ids.has(b.id)).map((b) => Object.assign({}, b, { pending: true }))) };
+}
 function certNextSerial(offset) {
   const y = new Date().getFullYear();
   const n = (PFS.store.get('cert_serial_next_' + y, 1) || 1) + (offset || 0);
@@ -3622,6 +3629,9 @@ async function certArchiveFormatBytes(b) {
     const d = (await PFS.library.list()).find((x) => x.kind === 'cert' && x.name === b.format);
     if (d) rec = await PFS.library.get(d.id);
   }
+  if ((!rec || !rec.bytes) && b.deptFormat && deptOn()) {
+    try { const bytes = await deptFetchFormat(b.deptFormat, b.format || 'פורמט'); if (bytes) return bytes; } catch (e) {}
+  }
   return rec && rec.bytes ? rec.bytes : null;
 }
 async function certEnsureModelFonts(models) {
@@ -3671,7 +3681,20 @@ function certBatchCsv(b) {
   return '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
 }
 function certUpdateBatch(id, patch) {
-  const reg = certRegistry();
+  const shared = deptOn() ? dept.batches.find((x) => x.id === id) : null;
+  if (shared) {
+    if (patch === null) {
+      dept.batches = dept.batches.filter((x) => x.id !== id);
+      ACCT().dept.deleteBatch(id).then((rows) => {
+        if (Array.isArray(rows) && !rows.length) { PFS.toast('רק מי שהפיק/ה את המחזור או מנהל/ת המחלקה יכולים למחוק אותו', 'err', 6000); deptRefresh(); }
+      }).catch((e) => { PFS.toast('המחיקה נכשלה: ' + (e.message || e), 'err'); deptRefresh(); });
+      return null;
+    }
+    Object.assign(shared, patch);
+    deptPutBatch(shared).catch((e) => { PFS.toast('השמירה במאגר המחלקה נכשלה: ' + (e.message || e), 'err'); deptRefresh(); });
+    return shared;
+  }
+  const reg = certLocalRegistry();
   const b = reg.batches.find((x) => x.id === id); if (!b) return null;
   if (patch === null) reg.batches = reg.batches.filter((x) => x.id !== id); else Object.assign(b, patch);
   PFS.store.set('cert_registry', reg);
@@ -3700,6 +3723,7 @@ function openCertArchive(focusKey) {
   if (focusKey) { certArchState.open = { [focusKey]: true }; certArchState.q = ''; back.querySelector('#caSearch').value = ''; }
   back.classList.add('show');
   renderCertArchive();
+  if (PFS.account && PFS.account.authed()) deptRefresh();   // what colleagues filed since
 }
 function renderCertArchive() {
   const list = $('caList'); if (!list) return;
@@ -3743,7 +3767,7 @@ function certArchiveBatchRow(b, people, showPeople) {
   const ok = certArchivable(b);
   row.innerHTML = '<div class="ca-bh"><b></b><span></span></div><div class="ca-acts"></div><div class="ca-prog hint"></div>';
   row.querySelector('.ca-bh b').textContent = certDateHe(certBatchDate(b));
-  row.querySelector('.ca-bh span').innerHTML = certBidiJoin([(b.count || 0) + ' תעודות', b.format || '', ok ? '' : 'רשימה בלבד (הופק לפני המאגר)']);
+  row.querySelector('.ca-bh span').innerHTML = certBidiJoin([(b.count || 0) + ' תעודות', b.format || '', b.by ? 'הופק ע״י ' + b.by.split('@')[0] : '', b.pending ? 'ממתין להעלאה למאגר המחלקה' : '', ok ? '' : 'רשימה בלבד (הופק לפני המאגר)']);
   const acts = row.querySelector('.ca-acts'), prog = row.querySelector('.ca-prog');
   const name = certFolderName({ course: certBatchCourse(b), code: b.code, date: certBatchDate(b) }) || certSafeName(b.format) || 'תעודות';
   const btn = (label, title, fn, disabled) => {
@@ -3821,6 +3845,136 @@ async function certArchiveFolderZip(f, button) {
     PFS.deliver.file(window.fflate.zipSync(files, { level: 6 }), name + '.zip', 'application/zip');
   } catch (e) { PFS.toast(e.message || String(e), 'err', 6000); }
   finally { button.textContent = old; button.disabled = false; }
+}
+/* ---- the department: ONE archive for everyone who issues certificates ----
+ * Each clerk signs in as themself; the certificate archive, the serial
+ * numbering and the certificate formats belong to the department (shared on
+ * the server, members only — SUPABASE.md §4). Personal data stays personal.
+ * A batch that cannot reach the server is kept here and goes up on the next
+ * refresh; serial numbers come only from the server's atomic counter. */
+let dept = { installed: false, member: false, role: null, members: [], batches: [], formats: [], loaded: false };
+const deptOn = () => !!(PFS.account && PFS.account.authed() && dept.member);
+const deptMe = () => String(((PFS.account && PFS.account.user()) || {}).email || '').toLowerCase();
+function deptReset() { dept = { installed: false, member: false, role: null, members: [], batches: [], formats: [], loaded: false }; }
+const certLocalRegistry = () => PFS.store.get('cert_registry', { batches: [] }) || { batches: [] };
+// a format's identity across computers: its bytes
+function certFormatId(bytes) {
+  const u = new Uint8Array(bytes);
+  let h = 5381; for (let i = 0; i < u.length; i += Math.max(1, Math.floor(u.length / 4096))) h = ((h << 5) + h + u[i]) | 0;
+  return 'fmt' + (h >>> 0).toString(36) + u.length.toString(36);
+}
+// the batch's format on the department shelf (uploaded once, by content)
+async function deptEnsureFormat(b) {
+  if (b.deptFormat && dept.formats.some((f) => f.id === b.deptFormat)) return b.deptFormat;
+  let rec = null;
+  try { rec = b.lib ? await PFS.library.get(b.lib) : null; } catch (e) {}
+  if (!rec || !rec.bytes) { const d = (await PFS.library.list()).find((x) => x.kind === 'cert' && x.name === b.format); if (d) rec = await PFS.library.get(d.id); }
+  if (!rec || !rec.bytes) return b.deptFormat || null;
+  const id = certFormatId(rec.bytes);
+  if (!dept.formats.some((f) => f.id === id)) {
+    await ACCT().dept.putFormat(id, b.format || rec.name || 'פורמט', new Uint8Array(rec.bytes).slice());
+    dept.formats.push({ id, name: b.format || rec.name, created_by: deptMe() });
+  }
+  b.deptFormat = id;
+  return id;
+}
+// what goes to the server: images inline (another clerk has no local copy)
+function deptBatchPayload(b) {
+  const out = Object.assign({}, b);
+  if (out.models) out.models = certArchiveModelsBack(out);
+  delete out.pending;
+  return out;
+}
+async function deptPutBatch(b) {
+  await deptEnsureFormat(b);
+  const payload = deptBatchPayload(b);
+  await ACCT().dept.putBatch(payload);
+  const i = dept.batches.findIndex((x) => x.id === b.id);
+  const row = Object.assign({}, payload, { by: (i >= 0 && dept.batches[i].by) || deptMe(), shared: true });
+  if (i >= 0) dept.batches[i] = row; else dept.batches.push(row);
+}
+// everything filed on this computer (before joining, or while offline) goes up
+async function deptFlushLocal() {
+  const reg = certLocalRegistry();
+  if (!reg.batches.length) return 0;
+  const left = [];
+  let n = 0;
+  for (const b of reg.batches) {
+    try { await deptPutBatch(b); n++; } catch (e) { left.push(b); }
+  }
+  reg.batches = left;
+  PFS.store.set('cert_registry', reg);
+  return n;
+}
+async function deptRefresh() {
+  if (!(PFS.account && PFS.account.authed() && PFS.account.dept)) { deptReset(); return dept; }
+  try {
+    const st = await ACCT().dept.status();
+    Object.assign(dept, st, { error: null });
+    if (st.member) {
+      dept.formats = await ACCT().dept.listFormats();
+      dept.batches = await ACCT().dept.listBatches();
+      const n = await deptFlushLocal();
+      if (n) PFS.toast('📁 ' + n + ' מחזורי תעודות עברו למאגר המחלקה', 'ok', 4000);
+      // numbers issued before the department (here, or in the archive) are
+      // never handed out again: the shared counter starts above them
+      const y = new Date().getFullYear();
+      let floor = (PFS.store.get('cert_serial_next_' + y, 1) || 1) - 1;
+      dept.batches.forEach((b) => (b.entries || []).forEach((e) => { const m = new RegExp('^' + y + '-(\\d+)$').exec(String(e.serial || '')); if (m) floor = Math.max(floor, +m[1]); }));
+      if (floor > 0) { try { await ACCT().dept.seedSerials('serial_' + y, floor); } catch (e) {} }
+    } else { dept.batches = []; dept.formats = []; }
+    dept.loaded = true;
+  } catch (e) { dept.error = e.message || String(e); }
+  try { renderCertArchiveHome(); } catch (e) {}
+  if ($('certArchModal') && $('certArchModal').classList.contains('show')) renderCertArchive();
+  return dept;
+}
+// a format another clerk uploaded: fetched once, then it is on this shelf too
+async function deptFetchFormat(id, name) {
+  const bytes = await ACCT().dept.getFormat(id);
+  if (!bytes) return null;
+  const have = (await PFS.library.list()).find((d) => d.kind === 'cert' && d.name === name);
+  if (!have) { try { await PFS.library.add(name, bytes.slice().buffer, { kind: 'cert' }); } catch (e) {} }
+  return bytes.buffer.slice(0);
+}
+function renderDeptPanel(host) {
+  if (!host) return;
+  if (!(PFS.account && PFS.account.authed())) { host.innerHTML = ''; return; }
+  const esc = escapeHtml;
+  let h = '<div class="dept-h">מחלקת תעודות <span>מאגר, מספור ופורמטים משותפים</span></div>';
+  if (!dept.loaded && !dept.error) h += '<div class="hint muted">בודק…</div>';
+  else if (dept.error && !dept.installed) h += '<div class="hint muted">אין חיבור לשרת כרגע (' + esc(dept.error) + ').</div>';
+  else if (!dept.installed) h += '<div class="hint muted">המאגר המשותף עוד לא הופעל בשרת. מריצים פעם אחת את קוד ה־SQL שבשלב 4 של SUPABASE.md.</div>';
+  else if (!dept.member) h += '<div class="hint">אתם עדיין לא חלק מהמחלקה. מנהל/ת המחלקה מוסיפ/ה אתכם לפי המייל — או, אם אתם הראשונים:</div>' +
+    '<button class="btn sm primary" id="deptClaim">הקמת מחלקת התעודות — אני המנהל/ת</button>';
+  else {
+    h += '<div class="hint" style="color:var(--ok,#1a7f4b);font-weight:600">✓ ' + (dept.role === 'admin' ? 'מנהל/ת המחלקה' : 'חבר/ה במחלקה') + ' · ' + dept.batches.length + ' מחזורים במאגר המשותף</div>';
+    h += '<div class="dept-members">' + dept.members.map((m) => '<div class="dept-m"><bdi dir="ltr">' + esc(m.email) + '</bdi><span>' + (m.role === 'admin' ? 'מנהל/ת' : 'חבר/ה') + '</span>' +
+      (dept.role === 'admin' && m.email !== deptMe() ? '<button class="btn sm ghost" data-rm="' + esc(m.email) + '" title="הסרה מהמחלקה">הסר</button>' : '') + '</div>').join('') + '</div>';
+    if (dept.role === 'admin') h += '<div class="row" style="gap:6px"><input id="deptAddEmail" type="email" dir="ltr" placeholder="המייל של העובד/ת" style="flex:1"><button class="btn sm primary" id="deptAdd">הוסף למחלקה</button></div>' +
+      '<div class="hint muted">העובד/ת נכנס/ת עם המשתמש שפתחתם ב־Supabase — ורואה מיד את המאגר המשותף.</div>';
+  }
+  host.innerHTML = h;
+  const q = (id) => host.querySelector('#' + id);
+  q('deptClaim') && q('deptClaim').addEventListener('click', async () => {
+    try {
+      const ok = await ACCT().dept.claim();
+      if (!ok) PFS.toast('למחלקה כבר יש מנהל/ת — בקשו שיוסיפו את המייל שלכם', 'err', 6000);
+      else PFS.toast('✓ המחלקה הוקמה — אתם המנהלים. הוסיפו את העובדים לפי המייל', 'ok', 5000);
+    } catch (e) { PFS.toast('ההקמה נכשלה: ' + (e.message || e), 'err'); }
+    await deptRefresh(); renderDeptPanel(host);
+  });
+  q('deptAdd') && q('deptAdd').addEventListener('click', async () => {
+    const em = String(q('deptAddEmail').value || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { PFS.toast('כתובת מייל לא תקינה', 'err'); return; }
+    try { await ACCT().dept.addMember(em); PFS.toast('✓ ' + em + ' נוסף/ה למחלקה', 'ok'); } catch (e) { PFS.toast('ההוספה נכשלה: ' + (e.message || e), 'err'); }
+    await deptRefresh(); renderDeptPanel(host);
+  });
+  host.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', async () => {
+    if (!(await PFS.ui.confirm('הסרה מהמחלקה', 'להסיר את ' + b.dataset.rm + ' מהמחלקה? המחזורים שהפיק/ה נשארים במאגר.'))) return;
+    try { await ACCT().dept.removeMember(b.dataset.rm); } catch (e) { PFS.toast('ההסרה נכשלה: ' + (e.message || e), 'err'); }
+    await deptRefresh(); renderDeptPanel(host);
+  }));
 }
 // the home screen: the course folders at a glance, one click into each
 function renderCertArchiveHome() {
@@ -5065,7 +5219,21 @@ async function certProduce(kind, opts) {
   if (blocking.length) { PFS.toast('לא הופקו תעודות: ' + blocking[0].msg, 'err', 7000); return null; }
   const keys = certKeys();
   const wantsSerial = keys.includes('מספר תעודה');
-  records.forEach((r, i) => { r['מספר תעודה'] = certNextSerial(i); });
+  const serialYear = new Date().getFullYear();
+  if (deptOn()) {
+    // the department's numbers come from ONE counter on the server: two
+    // clerks producing at the same moment get two different ranges
+    try {
+      const first = await ACCT().dept.nextSerials('serial_' + serialYear, records.length);
+      if (!(first > 0)) throw new Error('BAD_SERIAL');
+      records.forEach((r, i) => { r['מספר תעודה'] = serialYear + '-' + String(first + i).padStart(4, '0'); });
+    } catch (e) {
+      if (wantsSerial) { PFS.toast('אין חיבור לשרת המחלקה — ההפקה נעצרה כדי שלא יודפסו מספרי תעודה כפולים. נסו שוב בעוד רגע.', 'err', 8000); return null; }
+      records.forEach((r) => { r['מספר תעודה'] = ''; });
+    }
+  } else {
+    records.forEach((r, i) => { r['מספר תעודה'] = certNextSerial(i); });
+  }
   const format = String(currentFileName || '').replace(/-filled$/, '');
   const courseHeader = certMap['שם הקורס'] || certList.headers.find((h) => /קורס/.test(h) && !CERT_CODE_RX.test(h)) || null;
   // every value measured and placed in its own zone (certLayoutModels)
@@ -5103,21 +5271,27 @@ async function certProduce(kind, opts) {
     } catch (e) {}
     // the registry and the archive: who got which certificate, filed by
     // course, code and date, with the recipe to print it again
-    let batchId = null;
+    let batchId = null, filedShared = false;
     try {
-      const reg = certRegistry();
       const cols = [...new Set([...keys, '__name', built.idHeader, 'מספר תעודה'].filter(Boolean))];
-      batchId = 'cb' + Date.now().toString(36);
-      reg.batches.push({
+      batchId = 'cb' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      const batch = {
         id: batchId, at: Date.now(), format, count: records.length, kind,
         course: meta.course, code: meta.code, date: meta.date, lib: libId, ratio: certPageRatio(0),
         models: certArchiveModels(baseModels), cols,
         rows: records.map((r) => cols.map((c) => (r[c] == null ? '' : String(r[c])))),
         entries: records.map((r) => ({ serial: r['מספר תעודה'], name: String(r.__name || ''), id: built.idHeader ? String(r[built.idHeader] || '') : '', course: courseHeader ? String(r[courseHeader] || '') : meta.course }))
-      });
-      if (reg.batches.length > 300) reg.batches = reg.batches.slice(-300);
-      PFS.store.set('cert_registry', reg);
-      certCommitSerials(records.length);
+      };
+      // a member files into the department's archive; offline (or not a
+      // member) it stays here — and goes up on the next refresh
+      if (deptOn()) { try { await deptPutBatch(batch); filedShared = true; } catch (e) { console.warn('dept file failed', e); } }
+      if (!filedShared) {
+        const reg = certLocalRegistry();
+        reg.batches.push(batch);
+        if (reg.batches.length > 300) reg.batches = reg.batches.slice(-300);
+        PFS.store.set('cert_registry', reg);
+      }
+      if (!deptOn()) certCommitSerials(records.length);
       PFS.store.set('cert_last_format', format);
     } catch (e) { console.warn('registry write failed', e); }
     if (prog) {
@@ -5127,7 +5301,7 @@ async function certProduce(kind, opts) {
       go.addEventListener('click', () => openCertArchive(String(meta.course || '').trim() + '|' + String(meta.code || '').trim()));
       prog.appendChild(go);
     }
-    PFS.toast('🎓 הופקו ' + result.count + ' תעודות — תויקו במאגר התעודות', 'ok');
+    PFS.toast('🎓 הופקו ' + result.count + ' תעודות — תויקו במאגר ' + (filedShared ? 'המחלקה' : 'התעודות') + (deptOn() && !filedShared ? ' (יעלו לשרת כשיחזור החיבור)' : ''), 'ok');
     // the placements are this format's memory — next cohort starts at the list
     try { templates.autoSave(currentFp, currentFileName); } catch (e) {}
     try { renderCertArchiveHome(); } catch (e) {}
@@ -5173,12 +5347,26 @@ function showCertIntro() {
     if (card !== certCard) return;
     const shelf = card.querySelector('#certShelf');
     const certs = docs.filter((d) => d.kind === 'cert');
-    if (!certs.length) return;
-    const lab = document.createElement('span'); lab.className = 'hint'; lab.style.cssText = 'width:100%;margin-bottom:2px'; lab.textContent = '📚 הפורמטים שלך:';
+    // the department's formats that are not on this computer yet
+    const shared = deptOn() ? dept.formats.filter((f) => !certs.some((d) => d.name === f.name)) : [];
+    if (!certs.length && !shared.length) return;
+    const lab = document.createElement('span'); lab.className = 'hint'; lab.style.cssText = 'width:100%;margin-bottom:2px'; lab.textContent = deptOn() ? '📚 הפורמטים של המחלקה:' : '📚 הפורמטים שלך:';
     shelf.appendChild(lab);
     certs.forEach((d) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip'; b.textContent = '🎓 ' + d.name;
       b.addEventListener('click', () => certOpenFromShelf(d.id));
+      shelf.appendChild(b);
+    });
+    shared.forEach((f) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'gd-chip'; b.textContent = '🎓 ' + f.name;
+      b.title = 'פורמט של המחלקה' + (f.created_by ? ' (הועלה ע״י ' + f.created_by.split('@')[0] + ')' : '');
+      b.addEventListener('click', async () => {
+        try {
+          const bytes = await deptFetchFormat(f.id, f.name);
+          if (!bytes) { PFS.toast('הפורמט לא נמצא בשרת המחלקה', 'err'); return; }
+          await startCertFlow(new File([bytes], f.name + '.pdf', { type: 'application/pdf' }));
+        } catch (e) { PFS.toast('פתיחת הפורמט נכשלה: ' + (e.message || e), 'err'); }
+      });
       shelf.appendChild(b);
     });
     card.querySelector('#certPick').textContent = '📄 פורמט חדש מקובץ';
@@ -5637,6 +5825,11 @@ function renderAccount(target) {
       '<div class="hint acct-status" style="margin-top:6px"></div>';
     q('acctSaveNow').addEventListener('click', async () => { acctStatus('שומר…'); try { await ACCT().saveVault(); acctStatus('נשמר בענן ✓', 'ok'); } catch (e) { acctStatus('השמירה נכשלה', 'err'); } });
     q('acctOut').addEventListener('click', () => acctSignOut());
+    if (body.id === 'acctBody') {
+      const dh = document.createElement('div'); dh.className = 'dept-panel'; body.appendChild(dh);
+      renderDeptPanel(dh);
+      if (!dept.loaded) deptRefresh().then(() => renderDeptPanel(dh));
+    }
     return;
   }
   body.innerHTML = '<div class="field"><label>אימייל</label><input id="acctEmail" type="email" dir="ltr" placeholder="you@email.com" autocomplete="username" /></div>' +
@@ -5672,6 +5865,7 @@ async function acctAfterAuth() {
   await cloudHydrate();
   await cloudBackfill();
   try { renderCourses(); } catch (e) {}
+  await deptRefresh();
   hideLoginGate();
   renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הפרטים וההיסטוריה שלך זמינים', 'ok');
 }
@@ -5710,6 +5904,7 @@ async function cloudBackfill() {
 async function acctSignOut() {
   try { await ACCT().saveVault(); } catch (e) {}
   ACCT().signOut();
+  deptReset();
   // a shared computer: sign-out leaves nothing of this person behind
   await wipeLocalForUserSwitch();
   PFS.store.remove('acct:last_user');
@@ -5723,6 +5918,7 @@ async function acctAutoLoadOnStart() {
   try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {}
   await cloudHydrate();
   await cloudBackfill();
+  await deptRefresh();
   renderAccount();
 }
 acctAutoLoadOnStart();

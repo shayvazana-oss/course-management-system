@@ -1,0 +1,35 @@
+# Third-party components (vendored, offline)
+
+This folder contains unmodified redistributable builds of open-source libraries
+and fonts so the app runs fully offline with no CDN. Each retains its own license.
+
+| Component | Version | License | Files |
+|-----------|---------|---------|-------|
+| pdf-lib | 1.17.1 | MIT | `pdf-lib/pdf-lib.min.js` |
+| pdf.js (pdfjs-dist) | 3.11.174 (UMD) | Apache-2.0 | `pdfjs/pdf.min.js`, `pdfjs/pdf.worker.min.js` |
+| pdf.js standard fonts | 4.6.82 | Foxit / Liberation (see `pdfjs/standard_fonts/LICENSE_*`) | `pdfjs/standard_fonts/*` |
+| fflate | 0.8.2 | MIT | `fflate/fflate.min.js` |
+| Tesseract.js | 5.1.1 | Apache-2.0 | `tesseract/tesseract.min.js`, `tesseract/worker.min.js` |
+| tesseract.js-core (wasm) | — | Apache-2.0 | `tesseract/tesseract-core-simd-lstm.*` |
+| Hebrew traineddata (tessdata) | — | Apache-2.0 | `tesseract/tessdata/heb.traineddata` |
+| Heebo (via @fontsource/heebo) | — | SIL OFL 1.1 | `fonts/Heebo-*.woff2` |
+| Rubik (Google Fonts, variable) | v31 | SIL OFL 1.1 | `fonts/Rubik-*.woff2` |
+| Inter (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/Inter-*.woff2` |
+| Noto Sans Hebrew (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/NotoSansHebrew.woff2` |
+| Frank Ruhl Libre (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/FrankRuhlLibre-*.woff2` |
+| Noto Serif Hebrew (Google Fonts, variable) | — | SIL OFL 1.1 | `fonts/NotoSerifHebrew-*.woff2` |
+| David Libre (Google Fonts) | — | SIL OFL 1.1 | `fonts/DavidLibre-*.woff2` |
+
+- pdf-lib — https://github.com/Hopding/pdf-lib (MIT)
+- pdf.js — https://github.com/mozilla/pdf.js (Apache-2.0)
+- Heebo — https://fonts.google.com/specimen/Heebo (SIL Open Font License 1.1)
+- Rubik — https://fonts.google.com/specimen/Rubik (SIL Open Font License 1.1)
+- Inter — https://fonts.google.com/specimen/Inter (SIL Open Font License 1.1)
+- Noto Sans Hebrew — https://fonts.google.com/noto/specimen/Noto+Sans+Hebrew (SIL Open Font License 1.1)
+- Frank Ruhl Libre — https://fonts.google.com/specimen/Frank+Ruhl+Libre (SIL Open Font License 1.1)
+- Noto Serif Hebrew — https://fonts.google.com/noto/specimen/Noto+Serif+Hebrew (SIL Open Font License 1.1)
+- David Libre — https://fonts.google.com/specimen/David+Libre (SIL Open Font License 1.1)
+- Suez One, Secular One, Assistant, Alef, Bellefair, Bona Nova, Miriam Libre,
+  Varela Round, Karantina, Amatic SC, IBM Plex Sans Hebrew — fonts.google.com
+  (SIL Open Font License 1.1)
+- Tinos, Arimo — https://fonts.google.com/specimen/Tinos (Apache License 2.0)

@@ -5274,6 +5274,96 @@ async function main() {
     check('🏢 department: the admin sets it up (her earlier batch moves in) and adds a clerk; the clerk sees and re-prints the admin\'s batches from the shared format, numbers never collide, she cannot delete the admin\'s batch, a duplicate is flagged; an outsider sees nothing', okD);
   }
 
+  // ===== the first sign-in on a computer that already holds work =====
+  // The desktop holds layouts, a profile, certificates and a serial counter;
+  // the account already holds others in the cloud. Signing in must keep
+  // BOTH: lists united (the newer copy of a shared item wins), the counter
+  // never steps back — and the cloud then holds everything.
+  {
+    const users = { 'me@fillo.test': { id: 'm1', password: 'pw-me', email: 'me@fillo.test' } }, tokens = {};
+    const yr = new Date().getFullYear();
+    const J = (v) => JSON.stringify(v);
+    const vaults = { m1: {
+      'pfs:templates': J([{ id: 'tc', name: 'תבנית מהענן', ts: 100 }, { id: 'ts', name: 'משותפת — ישנה', ts: 100 }]),
+      'pfs:profiles': J([{ id: 'pc', name: 'פרופיל ענן' }]),
+      'pfs:cert_registry': J({ batches: [{ id: 'bc', course: 'קורס ענן', count: 2 }] }),
+      ['pfs:cert_serial_next_' + yr]: J(3),
+      'pfs:only_cloud': J('ענן')
+    } };
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        const usr = u.searchParams.get('grant_type') === 'refresh_token' ? users['me@fillo.test'] : users[b.email];
+        if (!usr || (b.password != null && usr.password !== b.password)) return json(res, 400, { error_description: 'Invalid login credentials' });
+        const tok = 'tok_' + Math.random().toString(36).slice(2); tokens[tok] = usr.id;
+        return json(res, 200, { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } });
+      }
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const me = m && tokens[m[1]];
+      if (!me) return json(res, 401, {});
+      if (p === '/rest/v1/vaults') { if (req.method === 'GET') return json(res, 200, vaults[me] ? [{ data: vaults[me] }] : []); const b = JSON.parse((await body(req)).toString() || '{}'); vaults[me] = b.data; return json(res, 201); }
+      if (p.startsWith('/rest/v1/dept_')) return json(res, 200, []);
+      if (p.startsWith('/rest/v1/rpc/dept_')) return json(res, 200, false);
+      if (p.startsWith('/storage/v1/object/')) { await body(req); return json(res, 200, {}); }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const M = {};
+    try {
+      // this computer's own work, never signed in here
+      await page.evaluate(async ({ url, yr }) => {
+        const S = window.PFS.store;
+        await window.PFS.recent.clearAll(); await window.PFS.library.clearAll();
+        S.set('templates', [{ id: 'tl', name: 'תבנית מהמחשב', ts: 200 }, { id: 'ts', name: 'משותפת — חדשה', ts: 300 }]);
+        S.set('profiles', [{ id: 'pl', name: 'פרופיל מחשב' }]);
+        S.set('cert_registry', { batches: [{ id: 'bl', course: 'קורס מחשב', count: 5 }] });
+        S.set('cert_serial_next_' + yr, 9);
+        S.remove('acct:session'); S.remove('acct:last_user');
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.__test.acct.gate();
+      }, { url: mockUrl, yr });
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      await page.fill('#loginBody #acctEmail', 'me@fillo.test'); await page.fill('#loginBody #acctPass', 'pw-me');
+      await page.click('#loginBody #acctIn');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      await page.waitForTimeout(800);
+      M.local = await page.evaluate((yr) => {
+        const S = window.PFS.store;
+        return {
+          templates: (S.get('templates', []) || []).map((t) => t.id + ':' + t.name).sort(),
+          profiles: (S.get('profiles', []) || []).map((p) => p.id).sort(),
+          batches: ((S.get('cert_registry', {}) || {}).batches || []).map((b) => b.id).sort(),
+          serial: S.get('cert_serial_next_' + yr, 0), onlyCloud: S.get('only_cloud', null)
+        };
+      }, yr);
+      const v = vaults.m1;
+      M.cloud = { templates: JSON.parse(v['pfs:templates']).map((t) => t.id).sort(), batches: JSON.parse(v['pfs:cert_registry']).batches.map((b) => b.id).sort(), serial: JSON.parse(v['pfs:cert_serial_next_' + yr]) };
+      // a later load on the same computer: the cloud leads again (no merge)
+      M.second = await page.evaluate(async () => (await window.PFS.account.loadVault({ merge: false })) === true);
+    } catch (e) { M.error = String(e && e.message || e); }
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      ['acct:cfg', 'acct:session', 'acct:last_user', 'only_cloud'].forEach((k) => window.PFS.store.remove(k));
+      window.PFS.store.set('cert_registry', { batches: [] });
+      document.getElementById('loginModal').classList.remove('show');
+      T.acct.render();
+    });
+    mock.close();
+    const okM = !M.error
+      && JSON.stringify(M.local.templates) === JSON.stringify(['tc:תבנית מהענן', 'tl:תבנית מהמחשב', 'ts:משותפת — חדשה'])
+      && M.local.profiles.join() === 'pc,pl' && M.local.batches.join() === 'bc,bl' && M.local.serial === 9 && M.local.onlyCloud === 'ענן'
+      && M.cloud.templates.join() === 'tc,tl,ts' && M.cloud.batches.join() === 'bc,bl' && M.cloud.serial === 9 && M.second;
+    if (!okM) console.log('  [merge debug]', JSON.stringify(M));
+    check('👤 first sign-in on a computer with its own work: computer + cloud merged — nothing lost (lists united, newer copy wins, counter never steps back), the cloud then holds it all', okM);
+  }
+
   check('exporter library present', await page.evaluate(() => !!(window.PFS.exporter && window.PFS.exporter.exportPdf)));
   if (jsErrors.length) console.log('  [js errors]', JSON.stringify(jsErrors.slice(0, 6)));
   check('no uncaught JS errors during run', jsErrors.length === 0);

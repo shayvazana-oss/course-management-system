@@ -5885,8 +5885,14 @@ async function acctAfterAuth() {
   const last = PFS.store.get('acct:last_user', '');
   if (last && last !== uid) await wipeLocalForUserSwitch();
   PFS.store.set('acct:last_user', uid);
-  try { const had = await ACCT().loadVault(); if (had) refreshAllFromStore(); else await ACCT().saveVault(); }
-  catch (e) { /* keep local data; will auto-save */ }
+  // the first sign-in on this computer MERGES its work with the account's —
+  // nothing on either side is lost; after that the cloud leads
+  try {
+    const had = await ACCT().loadVault({ merge: !last });
+    if (had) refreshAllFromStore();
+    if (had !== true) await ACCT().saveVault();
+    if (had === 'merged') PFS.toast('✓ המידע שהיה במחשב הזה אוחד עם החשבון — שום דבר לא נמחק', 'ok', 5000);
+  } catch (e) { /* keep local data; will auto-save */ }
   await cloudHydrate();
   await cloudBackfill();
   try { renderCourses(); } catch (e) {}

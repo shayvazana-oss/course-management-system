@@ -91,12 +91,58 @@
     Object.keys(all).forEach((k) => { if (k.indexOf('pfs:acct:') !== 0) out[k] = all[k]; });
     return out;
   }
-  async function loadVault() {
+  /* The FIRST sign-in on a computer that already holds work must lose
+   * nothing — neither this computer's work nor what the account already has
+   * in the cloud. Everything is merged, key by key:
+   *   lists      → union (by id; the newer copy of the same item wins)
+   *   objects    → field by field, lists inside merged the same way
+   *   numbers    → the larger (a serial counter never steps back)
+   *   the rest   → this computer's value
+   * Later loads on the same computer take the cloud as the source of truth
+   * (a deletion made elsewhere must not come back from here). */
+  const STAMP = ['updatedAt', 'updated', 'ts', 'at', 'savedAt', 'added'];
+  const stampOf = (x) => { for (const k of STAMP) if (x && typeof x[k] === 'number') return x[k]; return 0; };
+  const idOf = (x) => (x && typeof x === 'object' && (x.id != null ? 'id:' + x.id : null));
+  function mergeLists(local, cloud) {
+    const out = [], seen = new Map();
+    const add = (item, fromLocal) => {
+      const k = idOf(item) || 'v:' + JSON.stringify(item);
+      if (!seen.has(k)) { seen.set(k, out.length); out.push(item); return; }
+      const i = seen.get(k), cur = out[i];
+      if (stampOf(item) > stampOf(cur) || (fromLocal && stampOf(item) === stampOf(cur))) out[i] = item;
+    };
+    cloud.forEach((x) => add(x, false));
+    local.forEach((x) => add(x, true));
+    return out;
+  }
+  function mergeValue(local, cloud, depth) {
+    if (Array.isArray(local) && Array.isArray(cloud)) return mergeLists(local, cloud);
+    if (typeof local === 'number' && typeof cloud === 'number') return Math.max(local, cloud);
+    if (local && cloud && typeof local === 'object' && typeof cloud === 'object' && !Array.isArray(local) && !Array.isArray(cloud) && depth < 3) {
+      const out = Object.assign({}, cloud);
+      Object.keys(local).forEach((k) => { out[k] = k in cloud ? mergeValue(local[k], cloud[k], depth + 1) : local[k]; });
+      return out;
+    }
+    return local === undefined ? cloud : local;
+  }
+  function mergeData(localRaw, cloudRaw) {
+    const out = Object.assign({}, cloudRaw);
+    Object.keys(localRaw).forEach((k) => {
+      if (!(k in cloudRaw) || localRaw[k] === cloudRaw[k]) { out[k] = localRaw[k]; return; }
+      let l, c;
+      try { l = JSON.parse(localRaw[k]); c = JSON.parse(cloudRaw[k]); } catch (e) { out[k] = localRaw[k]; return; }
+      out[k] = JSON.stringify(mergeValue(l, c, 0));
+    });
+    return out;
+  }
+  // → true (cloud loaded) | 'merged' (first sign-in here: both kept) | false (no cloud data yet)
+  async function loadVault(opts) {
     await ensureFresh();
     const res = await api('/rest/v1/vaults?select=data&user_id=eq.' + user().id, { auth: true, headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error('HTTP_' + res.status);
     const rows = await res.json().catch(() => []);
     if (rows && rows[0] && rows[0].data && typeof rows[0].data === 'object' && Object.keys(rows[0].data).length) {
+      if (opts && opts.merge) { store.restore(mergeData(localData(), rows[0].data)); return 'merged'; }
       store.restore(rows[0].data); return true;      // cloud is the source of truth
     }
     return false;                                     // no cloud data yet
@@ -229,5 +275,5 @@
   };
 
   PFS.account = {
-    dept, cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
+    dept, _mergeData: mergeData, cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
 })(window);

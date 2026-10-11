@@ -4992,6 +4992,17 @@ async function main() {
         T.acct.gate();
       }, mockUrl);
       A.gate = await page.evaluate(() => document.getElementById('loginModal').classList.contains('show') && !!document.querySelector('#loginBody #acctUp'));
+      // nobody signed in: there is NO way past the gate — a click beside it,
+      // Escape, code hiding it, a click on the app behind it
+      await page.mouse.click(8, 8);
+      await page.keyboard.press('Escape');
+      await page.evaluate(() => document.getElementById('loginModal').classList.remove('show'));
+      await page.waitForTimeout(150);
+      const tile = await page.$('#certBtn');
+      if (tile) { const bb = await tile.boundingBox(); if (bb) await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2); }
+      await page.waitForTimeout(300);
+      A.held = await page.evaluate(() => ({ shown: document.getElementById('loginModal').classList.contains('show'), locked: document.body.classList.contains('gate-locked'), certCard: !!document.querySelector('.cert-card') }));
+      A.typed = await page.evaluate(() => { const f = document.querySelector('#loginBody #acctEmail'); f.focus(); return document.activeElement === f; });
       // user A signs up through the gate's own form
       await page.fill('#loginBody #acctEmail', 'a@fillo.test'); await page.fill('#loginBody #acctPass', 'secret-a');
       await page.click('#loginBody #acctUp');
@@ -5053,7 +5064,7 @@ async function main() {
       T.acct.render();
     });
     mock.close();
-    const okA = !A.error && A.gate && A.loggedA
+    const okA = !A.error && A.gate && A.held && A.held.shown && A.held.locked && !A.held.certCard && A.typed && A.loggedA
       && JSON.stringify(A.work.idx) === JSON.stringify(['lib', 'lib', 'recent'])
       && A.server.vaultHasCourse && A.server.files.length === 3 && A.server.files.every((f) => f.startsWith('u01/'))
       && A.wiped.courses === 0 && A.wiped.recent === 0 && A.wiped.lib === 0 && !A.wiped.authed
@@ -5061,7 +5072,7 @@ async function main() {
       && JSON.stringify(A.back.courses) === JSON.stringify(['קורס של א']) && JSON.stringify([...A.back.lib].sort()) === JSON.stringify(['פורמט-ישן-מהמחשב:cert', 'פורמט-של-א:cert'].sort())
       && A.back.cloudRows.some((t) => /☁️ מסמך-של-א/.test(t)) && /מסמך-של-א/.test(A.opened || '');
     if (!okA) console.log('  [accounts debug]', JSON.stringify(A));
-    check('👤 accounts: login gate → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);
+    check('👤 accounts: login gate (cannot be dismissed signed out) → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);
   }
 
   // ===== the certificates department: one archive, one numbering, shared

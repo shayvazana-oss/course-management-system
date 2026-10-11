@@ -1217,3 +1217,7 @@ input, select, textarea, button { font-family: inherit; }
 .dept-m bdi { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dept-m span { color: var(--ink-3); font-size: 11.5px; }
 .dept-panel input[type=email] { font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--ink-1); min-width: 0; }
+
+/* the sign-in gate, held shut: nothing behind it is reachable */
+body.gate-locked > *:not(#loginModal):not(.toast-wrap):not(#toasts) { pointer-events: none !important; user-select: none; }
+body.gate-locked #loginModal { pointer-events: auto; }

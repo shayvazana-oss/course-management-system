@@ -2345,7 +2345,8 @@ $('tourBtn') && $('tourBtn').addEventListener('click', () => {
 function openModal(id) { $(id).classList.add('show'); }
 function closeModal(id) { $(id).classList.remove('show'); }
 document.querySelectorAll('.modal-back').forEach((mb) => {
-  mb.addEventListener('pointerdown', (e) => { if (e.target === mb) mb.classList.remove('show'); });
+  // a click beside a window closes it — never the sign-in gate while nobody is signed in
+  mb.addEventListener('pointerdown', (e) => { if (e.target === mb && !(mb.id === 'loginModal' && gateLocked())) mb.classList.remove('show'); });
 });
 
 // =====================================================================
@@ -2661,7 +2662,7 @@ document.addEventListener('keydown', (e) => {
   const sel = overlay.getSelected();
   const editing = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true';
   const inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
-  if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active')); document.querySelectorAll('.modal-back.show').forEach((m) => m.classList.remove('show')); }
+  if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active')); document.querySelectorAll('.modal-back.show').forEach((m) => { if (!(m.id === 'loginModal' && gateLocked())) m.classList.remove('show'); }); }
   if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {
     e.preventDefault();
@@ -5802,6 +5803,30 @@ function showLoginGate() {
   m.classList.add('show');
 }
 function hideLoginGate() { const m = $('loginModal'); if (m) m.classList.remove('show'); }
+/* The gate holds itself shut. While sign-in is required and nobody is signed
+ * in, the window cannot be dismissed (a click beside it, Escape, or any code
+ * path that hides it — it comes straight back), and the app behind it takes
+ * no keys and no dropped files. The data itself is guarded on the server;
+ * this keeps the app closed to whoever sits at an unattended computer. */
+function gateLocked() { try { return loginRequired() && !ACCT().authed(); } catch (e) { return false; } }
+(function holdTheGate() {
+  const m = $('loginModal'); if (!m) return;
+  new MutationObserver(() => {
+    const locked = gateLocked();
+    document.body.classList.toggle('gate-locked', locked && m.classList.contains('show'));
+    if (locked && !m.classList.contains('show')) showLoginGate();
+  }).observe(m, { attributes: true, attributeFilter: ['class'] });
+  const inGate = (e) => e.target && e.target.closest && e.target.closest('#loginModal');
+  document.addEventListener('keydown', (e) => {
+    if (!gateLocked() || inGate(e)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const f = m.querySelector('#acctEmail'); if (f) f.focus();
+  }, true);
+  ['dragenter', 'dragover', 'drop', 'paste'].forEach((ev) => document.addEventListener(ev, (e) => {
+    if (!gateLocked() || inGate(e)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true));
+})();
 function renderAccount(target) {
   const body = target || $('acctBody'); if (!body) return;
   if (!ACCT().configured()) {

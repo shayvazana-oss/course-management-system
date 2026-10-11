@@ -282,7 +282,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), showOnboarding: () => showOnboarding(), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -3977,6 +3977,87 @@ function renderDeptPanel(host) {
     await deptRefresh(); renderDeptPanel(host);
   }));
 }
+/* ---- hello, and a personal area: whoever signs in is greeted by name and
+ * has one place for themself — their details, what they produced, the
+ * department, save and sign out. The name lives in the account (synced),
+ * asked once, inline — never a popup. */
+const meName = () => String(PFS.store.get('me_name', '') || '').trim();
+function meGreeting(d) {
+  const h = (d || new Date()).getHours();
+  return h >= 5 && h < 12 ? 'בוקר טוב' : h >= 12 && h < 17 ? 'צהריים טובים' : h >= 17 && h < 22 ? 'ערב טוב' : 'לילה טוב';
+}
+const meInitial = () => { const n = meName() || deptMe(); return (n.trim()[0] || '?').toUpperCase(); };
+async function meAskName() {
+  const v = await (PFS.ui && PFS.ui.prompt ? PFS.ui.prompt('איך לקרוא לך?', { value: meName(), placeholder: 'השם שלך', okText: 'שמירה' }) : Promise.resolve(window.prompt('איך לקרוא לך?', meName())));
+  if (v == null) return;
+  PFS.store.set('me_name', String(v).trim().slice(0, 40));
+  renderMe();
+  if ($('meModal') && $('meModal').classList.contains('show')) openMe();
+}
+function renderMe() {
+  const authed = !!(PFS.account && PFS.account.authed());
+  const btn = $('meBtn'), av = $('meAv'), hello = $('heroHello'), badge = $('heroBadge');
+  if (btn) btn.classList.toggle('hidden', !authed);
+  if (av) av.textContent = meInitial();
+  if (badge) badge.textContent = authed ? '🔒 מחובר/ת — הכול נשמר בחשבון הפרטי שלך וזמין בכל מחשב' : '🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המחשב';
+  if (hello) {
+    hello.classList.toggle('hidden', !authed);
+    hello.innerHTML = '';
+    if (authed) {
+      hello.append(meGreeting() + (meName() ? ', ' + meName() : '') + ' 👋');
+      if (!meName()) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'hero-name'; b.textContent = 'איך לקרוא לך?';
+        b.addEventListener('click', meAskName); hello.appendChild(b);
+      }
+    }
+  }
+}
+async function openMe() {
+  let back = $('meModal');
+  if (!back) {
+    back = document.createElement('div'); back.className = 'modal-back'; back.id = 'meModal';
+    back.innerHTML = '<div class="modal me-modal"><div class="m-body" id="meBody"></div>' +
+      '<footer><button class="btn ghost" id="meClose">סגור</button><span style="flex:1"></span><button class="btn sm ghost" id="meSave">שמור עכשיו</button><button class="btn sm" id="meOut">התנתק</button></footer></div>';
+    document.body.appendChild(back);
+    back.addEventListener('pointerdown', (e) => { if (e.target === back) back.classList.remove('show'); });
+    back.querySelector('#meClose').addEventListener('click', () => back.classList.remove('show'));
+    back.querySelector('#meSave').addEventListener('click', async () => { try { await ACCT().saveVault(); PFS.toast('נשמר בענן ✓', 'ok'); } catch (e) { PFS.toast('השמירה נכשלה — בדקו חיבור', 'err'); } });
+    back.querySelector('#meOut').addEventListener('click', async () => {
+      if (!(await PFS.ui.confirm('התנתקות', 'להתנתק? המחשב הזה יתנקה מהנתונים שלך — הכול שמור בחשבון וחוזר בהתחברות הבאה.'))) return;
+      back.classList.remove('show'); acctSignOut();
+    });
+  }
+  const me = deptMe();
+  const esc = escapeHtml;
+  // what I produced: the department's batches filed by me, and this computer's own
+  const mine = certRegistry().batches.filter((b) => !b.by || b.by === me);
+  const certs = mine.reduce((n, b) => n + (b.count || 0), 0);
+  let docs = 0; try { docs = (await PFS.recent.list()).length; } catch (e) {}
+  let libN = 0; try { libN = (await PFS.library.list()).length; } catch (e) {}
+  const recentB = mine.slice().sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 5);
+  const role = dept.member ? (dept.role === 'admin' ? 'מנהל/ת מחלקת התעודות' : 'חבר/ה במחלקת התעודות') : '';
+  const body = back.querySelector('#meBody');
+  body.innerHTML =
+    '<div class="me-head"><span class="me-av me-av-lg">' + esc(meInitial()) + '</span><div class="me-id">' +
+      '<div class="me-name"><b>' + esc(meName() || 'בלי שם עדיין') + '</b><button type="button" class="btn sm ghost" id="meRename">' + (meName() ? 'שינוי' : 'הוספת שם') + '</button></div>' +
+      '<div class="me-mail" dir="ltr">' + esc(me) + '</div>' + (role ? '<div class="me-role">' + role + '</div>' : '') + '</div></div>' +
+    '<div class="me-stats"><div><b>' + certs + '</b><span>תעודות שהפקתי</span></div><div><b>' + mine.length + '</b><span>מחזורים</span></div><div><b>' + docs + '</b><span>מסמכים שמולאו</span></div><div><b>' + libN + '</b><span>במאגר שלי</span></div></div>' +
+    '<div class="me-sec">ההפקות האחרונות שלי</div>' +
+    (recentB.length ? '<div class="me-list">' + recentB.map((b) => '<button type="button" class="me-row" data-key="' + esc(String(certBatchCourse(b) || '').trim() + '|' + String(b.code || '').trim()) + '"><b>' + esc(certBatchCourse(b) || 'ללא שם קורס') + '</b><span>' + certBidiJoin([b.code || '', certDateHe(certBatchDate(b)), (b.count || 0) + ' תעודות']) + '</span></button>').join('') + '</div>'
+      : '<div class="hint muted">עדיין לא הפקת תעודות.</div>') +
+    '<div class="me-actions"><button type="button" class="btn sm" id="meCert">הנפקת תעודות</button><button type="button" class="btn sm" id="meArch">מאגר התעודות</button><button type="button" class="btn sm" id="meLib">המאגר שלי</button></div>' +
+    '<div class="dept-panel me-dept"></div>';
+  body.querySelector('#meRename').addEventListener('click', meAskName);
+  body.querySelectorAll('.me-row').forEach((r) => r.addEventListener('click', () => { back.classList.remove('show'); openCertArchive(r.dataset.key); }));
+  body.querySelector('#meCert').addEventListener('click', () => { back.classList.remove('show'); showCertIntro(); });
+  body.querySelector('#meArch').addEventListener('click', () => { back.classList.remove('show'); openCertArchive(); });
+  body.querySelector('#meLib').addEventListener('click', () => { back.classList.remove('show'); const b = $('libBtn'); b && b.click(); });
+  const dh = body.querySelector('.me-dept'); renderDeptPanel(dh);
+  if (!dept.loaded) deptRefresh().then(() => renderDeptPanel(dh));
+  back.classList.add('show');
+}
+$('meBtn') && $('meBtn').addEventListener('click', openMe);
+
 // the home screen: the course folders at a glance, one click into each
 function renderCertArchiveHome() {
   const wrap = $('certArchWrap'), strip = $('certArchStrip');
@@ -5828,6 +5909,7 @@ function gateLocked() { try { return loginRequired() && !ACCT().authed(); } catc
   }, true));
 })();
 function renderAccount(target) {
+  try { renderMe(); } catch (e) {}
   const body = target || $('acctBody'); if (!body) return;
   if (!ACCT().configured()) {
     body.innerHTML = '<div class="hint muted">סנכרון חשבונות בענן עדיין לא הופעל למוצר. כשתחברו Supabase — כל משתמש יתחבר עם אימייל וסיסמה, והכול יישמר וייטען אוטומטית בכל מכשיר.</div>' +

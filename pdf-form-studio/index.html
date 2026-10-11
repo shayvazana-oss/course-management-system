@@ -43,6 +43,7 @@
       </div>
     </div>
     <div class="tb-left">
+      <button class="me-btn hidden" id="meBtn" title="האזור האישי" aria-label="האזור האישי"><span class="me-av" id="meAv">?</span></button>
       <button class="btn ghost" id="helpBtn" title="עזרה וקיצורי מקלדת (?)" aria-label="עזרה וקיצורי מקלדת"><span class="ic">?</span></button>
       <button class="btn ghost" id="themeBtn" title="מצב תצוגה (בהיר/כהה)" aria-label="החלפת מצב תצוגה בהיר או כהה"><span class="ic" id="themeIc">🌙</span></button>
       <button class="btn ghost panel-toggle" id="panelToggle" title="פאנל" aria-label="פתיחת פאנל הצד">☰</button>
@@ -103,7 +104,8 @@
     <main class="viewport" id="viewport">
       <div class="dropzone" id="dropzone">
         <div class="hero">
-          <div class="hero-badge">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המחשב</div>
+          <div class="hero-badge" id="heroBadge">🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המחשב</div>
+          <div class="hero-hello hidden" id="heroHello"></div>
           <h2>מה מכינים היום?</h2>
           <p>גררו PDF לכאן, או בחרו פעולה. הטופס הבא של אותו סטודנט לוקח שניות.</p>
         </div>

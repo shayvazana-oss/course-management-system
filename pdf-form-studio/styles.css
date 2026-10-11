@@ -1223,3 +1223,34 @@ body.gate-locked > *:not(#loginModal):not(.toast-wrap):not(#toasts) { pointer-ev
 body.gate-locked #loginModal { pointer-events: auto; }
 /* the gate is above every other window — nothing can ever cover it */
 #loginModal { z-index: 1000; }
+
+/* ---- hello + the personal area ---- */
+.me-btn { border: 0; background: transparent; padding: 2px; cursor: pointer; border-radius: 999px; display: inline-flex; }
+.me-btn.hidden { display: none; }
+.me-av { width: 32px; height: 32px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent, #2D5BFF); color: #fff; font-weight: 700; font-size: 14px; font-family: inherit; }
+.me-btn:hover .me-av { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2D5BFF) 25%, transparent); }
+.hero-hello { font-size: 20px; font-weight: 600; color: var(--ink-2); margin: 6px 0 -2px; display: flex; gap: 10px; align-items: baseline; justify-content: center; flex-wrap: wrap; }
+.hero-hello.hidden { display: none; }
+.hero-name { font: inherit; font-size: 13px; font-weight: 500; color: var(--accent, #2D5BFF); background: none; border: 0; border-bottom: 1px dashed currentColor; padding: 0; cursor: pointer; }
+.me-modal { max-width: 520px; }
+.me-modal .m-body { max-height: 72vh; overflow: auto; gap: 14px; }
+.me-head { display: flex; gap: 14px; align-items: center; }
+.me-av-lg { width: 56px; height: 56px; font-size: 24px; flex: none; }
+.me-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.me-name { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.me-name b { font-size: 19px; color: var(--ink-1); }
+.me-mail { font-size: 12.5px; color: var(--ink-3); text-align: end; }
+.me-role { font-size: 12px; font-weight: 600; color: var(--ok, #1a7f4b); }
+.me-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.me-stats > div { border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--surface-2); }
+.me-stats b { font-size: 20px; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.me-stats span { font-size: 11px; color: var(--ink-3); text-align: center; }
+@media (max-width: 480px) { .me-stats { grid-template-columns: repeat(2, 1fr); } }
+.me-sec { font-weight: 700; font-size: 13px; color: var(--ink-1); margin-bottom: -6px; }
+.me-list { display: flex; flex-direction: column; border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; }
+.me-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 12px; border: 0; background: var(--surface); color: var(--ink-1); font: inherit; font-size: 13px; text-align: start; cursor: pointer; }
+.me-row + .me-row { border-top: 1px solid var(--line); }
+.me-row:hover { background: var(--surface-2); }
+.me-row span { color: var(--ink-3); font-size: 12px; }
+.me-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.me-dept { margin-top: 0; }

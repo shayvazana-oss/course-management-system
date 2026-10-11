@@ -5025,6 +5025,24 @@ async function main() {
         await new Promise((r) => setTimeout(r, 100));
         return { shown, gone: !document.querySelector('.ob-back'), onboarded: window.PFS.store.get('onboarded', false) };
       });
+      // greeted, and a personal area — the name asked once, inline
+      A.hello = await page.evaluate(async () => {
+        const T = window.PFS.__test;
+        for (let i = 0; i < 30 && document.querySelector('.ob-back'); i++) await new Promise((r) => setTimeout(r, 100));
+        const hello = document.getElementById('heroHello');
+        const out = { shown: !hello.classList.contains('hidden'), greet: hello.textContent, ask: !!hello.querySelector('.hero-name'), me: !document.getElementById('meBtn').classList.contains('hidden'), badge: document.getElementById('heroBadge').textContent };
+        hello.querySelector('.hero-name').click();
+        for (let i = 0; i < 20 && !document.querySelector('#uiDialog.show'); i++) await new Promise((r) => setTimeout(r, 50));
+        const inp = document.querySelector('#uiDialog input'); inp.value = 'דנה'; document.getElementById('uiDlgOk').click();
+        await new Promise((r) => setTimeout(r, 200));
+        out.named = hello.textContent; out.initial = document.getElementById('meAv').textContent;
+        document.getElementById('meBtn').click();
+        for (let i = 0; i < 30 && !document.querySelector('#meModal.show'); i++) await new Promise((r) => setTimeout(r, 100));
+        const mm = document.getElementById('meModal');
+        out.area = mm ? { name: mm.querySelector('.me-name b').textContent, mail: mm.querySelector('.me-mail').textContent, stats: mm.querySelectorAll('.me-stats > div').length } : null;
+        mm && mm.classList.remove('show');
+        return out;
+      });
       // A works: a course (vault data) + a document (history → private cloud folder) + a certificate format (library)
       A.work = await page.evaluate(async () => {
         const T = window.PFS.__test;
@@ -5044,7 +5062,7 @@ async function main() {
       // A signs out → the shared computer is clean, and the gate is back
       await page.evaluate(() => window.PFS.__test.acct.signOut());
       await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
-      A.wiped = await page.evaluate(async () => ({ courses: window.PFS.courses.all().length, recent: (await window.PFS.recent.list()).length, lib: (await window.PFS.library.list()).length, authed: window.PFS.account.authed() }));
+      A.wiped = await page.evaluate(async () => ({ courses: window.PFS.courses.all().length, recent: (await window.PFS.recent.list()).length, lib: (await window.PFS.library.list()).length, authed: window.PFS.account.authed(), meGone: document.getElementById('meBtn').classList.contains('hidden') && document.getElementById('heroHello').classList.contains('hidden') && /מקומי/.test(document.getElementById('heroBadge').textContent) }));
       // user B signs up: sees nothing of A's, makes her own course
       await page.fill('#loginBody #acctEmail', 'b@fillo.test'); await page.fill('#loginBody #acctPass', 'secret-b');
       await page.click('#loginBody #acctUp');
@@ -5082,6 +5100,9 @@ async function main() {
     });
     mock.close();
     const okA = !A.error && A.gate && A.held && A.held.shown && A.held.locked && !A.held.certCard && A.typed
+      && A.hello && A.hello.shown && /(בוקר טוב|צהריים טובים|ערב טוב|לילה טוב)/.test(A.hello.greet) && A.hello.ask && A.hello.me && /מחובר/.test(A.hello.badge)
+      && /דנה 👋/.test(A.hello.named) && A.hello.initial === 'ד' && A.hello.area && A.hello.area.name === 'דנה' && A.hello.area.mail === 'a@fillo.test' && A.hello.area.stats === 4
+      && A.wiped.meGone
       && A.obWait && A.obWait.noWelcome && A.obWait.gateOnTop && A.obAfter && A.obAfter.shown && A.obAfter.gone && A.obAfter.onboarded === true && A.loggedA
       && JSON.stringify(A.work.idx) === JSON.stringify(['lib', 'lib', 'recent'])
       && A.server.vaultHasCourse && A.server.files.length === 3 && A.server.files.every((f) => f.startsWith('u01/'))
@@ -5090,7 +5111,7 @@ async function main() {
       && JSON.stringify(A.back.courses) === JSON.stringify(['קורס של א']) && JSON.stringify([...A.back.lib].sort()) === JSON.stringify(['פורמט-ישן-מהמחשב:cert', 'פורמט-של-א:cert'].sort())
       && A.back.cloudRows.some((t) => /☁️ מסמך-של-א/.test(t)) && /מסמך-של-א/.test(A.opened || '');
     if (!okA) console.log('  [accounts debug]', JSON.stringify(A));
-    check('👤 accounts: login gate (cannot be dismissed signed out) → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);
+    check('👤 accounts: login gate (cannot be dismissed signed out) → greeted by name + personal area → each person\'s data + history in their own cloud folder → sign-out wipes the shared PC → another user sees nothing → sign in elsewhere restores it all', okA);
   }
 
   // ===== the certificates department: one archive, one numbering, shared

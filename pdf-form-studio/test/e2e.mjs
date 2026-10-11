@@ -5003,11 +5003,28 @@ async function main() {
       await page.waitForTimeout(300);
       A.held = await page.evaluate(() => ({ shown: document.getElementById('loginModal').classList.contains('show'), locked: document.body.classList.contains('gate-locked'), certCard: !!document.querySelector('.cert-card') }));
       A.typed = await page.evaluate(() => { const f = document.querySelector('#loginBody #acctEmail'); f.focus(); return document.activeElement === f; });
+      // a first visit: the welcome window must not open over the gate (it
+      // covered it, took no clicks, and the clerk was stuck) — it waits
+      A.obWait = await page.evaluate(() => {
+        window.PFS.store.set('onboarded', false);
+        window.PFS.__test.showOnboarding();
+        const r = document.getElementById('loginModal').querySelector('.modal').getBoundingClientRect();
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { noWelcome: !document.querySelector('.ob-back'), gateOnTop: !!(top && top.closest('#loginModal')) };
+      });
       // user A signs up through the gate's own form
       await page.fill('#loginBody #acctEmail', 'a@fillo.test'); await page.fill('#loginBody #acctPass', 'secret-a');
       await page.click('#loginBody #acctUp');
       await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
       A.loggedA = await page.evaluate(() => window.PFS.account.authed() && window.PFS.account.user().email === 'a@fillo.test');
+      // signed in → now the welcome window, and its "skip" works
+      A.obAfter = await page.evaluate(async () => {
+        for (let i = 0; i < 30 && !document.querySelector('.ob-back'); i++) await new Promise((r) => setTimeout(r, 100));
+        const shown = !!document.querySelector('.ob-back #obSkip');
+        if (shown) document.querySelector('.ob-back #obSkip').click();
+        await new Promise((r) => setTimeout(r, 100));
+        return { shown, gone: !document.querySelector('.ob-back'), onboarded: window.PFS.store.get('onboarded', false) };
+      });
       // A works: a course (vault data) + a document (history → private cloud folder) + a certificate format (library)
       A.work = await page.evaluate(async () => {
         const T = window.PFS.__test;
@@ -5064,7 +5081,8 @@ async function main() {
       T.acct.render();
     });
     mock.close();
-    const okA = !A.error && A.gate && A.held && A.held.shown && A.held.locked && !A.held.certCard && A.typed && A.loggedA
+    const okA = !A.error && A.gate && A.held && A.held.shown && A.held.locked && !A.held.certCard && A.typed
+      && A.obWait && A.obWait.noWelcome && A.obWait.gateOnTop && A.obAfter && A.obAfter.shown && A.obAfter.gone && A.obAfter.onboarded === true && A.loggedA
       && JSON.stringify(A.work.idx) === JSON.stringify(['lib', 'lib', 'recent'])
       && A.server.vaultHasCourse && A.server.files.length === 3 && A.server.files.every((f) => f.startsWith('u01/'))
       && A.wiped.courses === 0 && A.wiped.recent === 0 && A.wiped.lib === 0 && !A.wiped.authed

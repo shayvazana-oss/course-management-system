@@ -1221,3 +1221,5 @@ input, select, textarea, button { font-family: inherit; }
 /* the sign-in gate, held shut: nothing behind it is reachable */
 body.gate-locked > *:not(#loginModal):not(.toast-wrap):not(#toasts) { pointer-events: none !important; user-select: none; }
 body.gate-locked #loginModal { pointer-events: auto; }
+/* the gate is above every other window — nothing can ever cover it */
+#loginModal { z-index: 1000; }

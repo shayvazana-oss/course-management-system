@@ -380,6 +380,9 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .toast-wrap { position: fixed; bottom: 18px; inset-inline-start: 18px; z-index: 90; display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
 .toast { background: linear-gradient(180deg, #1B2536, var(--ink-1)); color: #fff; padding: 11px 15px; border-radius: 11px; font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow-pop); opacity: 0; transform: translateY(8px) scale(.98); transition: opacity .2s, transform .2s; display: flex; align-items: center; gap: 8px; border-inline-start: 3px solid var(--ink-3); }
 .toast.show { opacity: 1; transform: translateY(0) scale(1); }
+.toast.has-act { pointer-events: auto; flex-wrap: wrap; }
+.toast-act { font: inherit; font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.toast-act:hover { background: rgba(255,255,255,.24); }
 .toast.ok { border-inline-start-color: var(--ok); }
 .toast.err { border-inline-start-color: var(--danger); }
 
@@ -773,7 +776,7 @@ kbd { border: 1.5px solid var(--edge); border-bottom-width: 3px; border-radius: 
 .handle { border-color: var(--violet); background: #fff; }
 .el .mini-del { border-color: var(--edge); }
 .el[data-tag]::after { background: var(--ink-1); color: #fff; }
-.field-marker { background: rgba(45,91,255,.10); box-shadow: inset 0 0 0 1.5px rgba(45,91,255,.55); border-radius: 6px; }
+.field-marker { background: transparent; box-shadow: none; border-bottom: 1.5px dashed rgba(45,91,255,.45); border-radius: 0; animation: none; opacity: 1; }
 .field-marker:hover { background: rgba(45,91,255,.18) !important; box-shadow: inset 0 0 0 2px var(--violet); }
 .field-marker.active { background: rgba(109,74,255,.16) !important; box-shadow: inset 0 0 0 2px var(--violet), 0 0 0 4px rgba(109,74,255,.18); }
 .el.rect.selected { box-shadow: 0 0 0 2px var(--ink-1); }
@@ -1254,3 +1257,8 @@ body.gate-locked #loginModal { pointer-events: auto; }
 .me-row span { color: var(--ink-3); font-size: 12px; }
 .me-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .me-dept { margin-top: 0; }
+
+/* an empty detected field is a quiet hint, never a grey box sitting on the form:
+   a dashed underline where to write; the box shows only under the pointer */
+.field-marker { animation: none !important; }
+.field-marker:hover { border-bottom-color: transparent; border-radius: 6px; }

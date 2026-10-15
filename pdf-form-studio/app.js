@@ -15,15 +15,22 @@ if (window.PFS_WORKER_SRC && pdfjsLib.GlobalWorkerOptions) {
 
 // ---------- tiny helpers ----------
 const $ = (id) => document.getElementById(id);
-PFS.toast = function (msg, kind) {
+PFS.toast = function (msg, kind, ms, action) {
   const wrap = $('toastWrap');
   const t = document.createElement('div');
   t.className = 'toast ' + (kind || '');
-  t.textContent = msg;
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
+  const close = () => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); };
+  // an optional action: {label, fn} — one button, the toast closes on use
+  if (action && action.label && typeof action.fn === 'function') {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-act'; b.textContent = action.label;
+    b.addEventListener('click', () => { close(); action.fn(); });
+    t.appendChild(b); t.classList.add('has-act');
+  }
   wrap.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  const ms = arguments.length > 2 && arguments[2] ? arguments[2] : 2200;
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, ms);
+  setTimeout(close, ms || 2200);
+  return t;
 };
 
 // ---------- state ----------
@@ -305,6 +312,9 @@ async function runOcr() {
     const nOcr = fieldsPanel.show(det, vaultPrefill(det));
     PFS.toast(nOcr ? `OCR זיהה ${det.fields.length} שדות — ${nOcr} מולאו אוטומטית מהפרטים שלך 🪄` : `OCR זיהה ${det.fields.length} שדות`, 'ok');
   } catch (e) {
+    // the document was closed (or another opened) while the OCR was reading
+    // it: nothing failed — that reading simply is not needed any more
+    if (gen !== loadGen) return;
     console.error('OCR failed', e);
     fieldsPanel.show({ tier: 'scanned', fields: [] });
     PFS.toast('OCR נכשל: ' + (e.message || e), 'err');
@@ -825,7 +835,9 @@ let lastDetFromCache = false;
 // string key, or every document would share the "[object Object]" slot
 function fpCacheKey(fp) {
   if (!fp || typeof fp !== 'object') return null;
-  const id = fp.textHash || (fp.ahash ? 'a:' + fp.ahash : null);
+  // a scan is keyed by its fine picture hash AND page size: the coarse 8×8
+  // hash alone let two different scanned forms share detected fields
+  const id = fp.textHash || (fp.ahash16 ? 'a16:' + fp.ahash16 + ':' + Math.round(fp.w || 0) + 'x' + Math.round(fp.h || 0) : null);
   return id ? [fp.pages, fp.w, fp.h, id].join('|') : null;
 }
 function detCacheGet(fp) {
@@ -1198,18 +1210,35 @@ async function openPdfFile(file) {
         }
       } catch (e) {}
     }
-    const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp);
-    if (match) {
+    // a certificate's layout belongs to the certificate wizard only, and a
+    // form's memory never to a certificate
+    const wantCert = !!(certOpening || certMode);
+    const isCertTpl = (t) => Array.isArray(t.elements) && t.elements.some((e) => e && e.certTag);
+    const match = (loadGen === myGen) && currentFp && templates.findMatch(currentFp, (t) => isCertTpl(t) === wantCert);
+    if (match && wantCert) {
+      // the certificate format's placements (samples, never a student's data)
       templates.apply(match.tpl.id);
       PFS.toast('כבר מילאת את הטופס הזה — שחזרתי את מה שמילאת ✓', 'ok');
-      // one-click: also fill the active profile into the (now tagged) fields —
-      // never on a certificate format: its fields belong to the STUDENT LIST,
-      // and the clerk's own name must not land on the name sample
-      const ap = (certOpening || certMode) ? null : profiles.active();
-      if (ap && ap.values && Object.keys(ap.values).length) {
-        const n = smartFill(ap.values);
-        if (n) PFS.toast(`מולאו אוטומטית ${n} שדות מהפרופיל`, 'ok');
-      }
+    } else if (match && Array.isArray(match.tpl.elements) && match.tpl.elements.length) {
+      // the same form, filled before — for whom? The next student must not
+      // find the previous one's details on it: it opens CLEAN, the page fixes
+      // (rotation, removed pages) come along, the last fill is one click away
+      templates.applyPages(match.tpl.id);
+      const tplId = match.tpl.id, gen = loadGen;
+      const when = match.tpl.ts ? new Date(match.tpl.ts).toLocaleDateString('he-IL') : '';
+      PFS.toast('הטופס הזה מולא כבר' + (when ? ' ב־' + when : '') + ' — הוא נפתח נקי, למילוי חדש.', 'ok', 10000, {
+        label: 'שחזור המילוי הקודם',
+        fn: () => {
+          if (gen !== loadGen) return;   // another document is open by now
+          templates.apply(tplId);
+          const ap = profiles.active();
+          if (ap && ap.values && Object.keys(ap.values).length) smartFill(ap.values);
+          markDirty();
+          PFS.toast('✓ המילוי הקודם שוחזר', 'ok');
+        }
+      });
+    } else if (match) {
+      templates.applyPages(match.tpl.id);
     }
     runDetection();
     if (!certOpening) hintClickToType();
@@ -4199,7 +4228,7 @@ let certMatch = null, certMatchBusy = false, certMatchFp = null;
 // for a flat image, its picture hash) — the same file reopened gets the same key
 function certFpKey() {
   const f = currentFp;
-  return f ? [f.pages, Math.round(f.w || 0), Math.round(f.h || 0), f.textHash || f.ahash || ''].join(':') : '';
+  return f ? [f.pages, Math.round(f.w || 0), Math.round(f.h || 0), f.textHash || f.ahash16 || f.ahash || ''].join(':') : '';
 }
 const certMatchKey = () => 'cert_fm_' + certFpKey();
 const certMatchNow = () => (certMatch && certMatchFp === certFpKey() ? certMatch : null);
@@ -5318,8 +5347,11 @@ async function certProduce(kind, opts) {
   }
   const format = String(currentFileName || '').replace(/-filled$/, '');
   const courseHeader = certMap['שם הקורס'] || certList.headers.find((h) => /קורס/.test(h) && !CERT_CODE_RX.test(h)) || null;
-  // every value measured and placed in its own zone (certLayoutModels)
-  const baseModels = overlay.getElements().map((c) => c.model);
+  // every value measured and placed in its own zone (certLayoutModels) —
+  // from a FROZEN copy of the layout: a field that moves while the batch is
+  // being produced (the automatic composition finishing) must not split the
+  // batch between two positions, and the archive keeps exactly what printed
+  const baseModels = overlay.getElements().map((c) => JSON.parse(JSON.stringify(c.model)));
   const prog = certCard && certCard.querySelector('#certProg');
   const onProgress = (d, t) => { if (prog) prog.textContent = 'מפיק ' + d + '/' + t + '…'; };
   let result = null;

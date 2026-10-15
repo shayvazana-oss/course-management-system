@@ -61,6 +61,18 @@
       PFS.toast('התבנית הוחלה', 'ok');
       opts.afterApply && opts.afterApply();
     }
+    // only the page fixes (rotation, removed/reordered pages) — the form's
+    // shape, never a previous person's values
+    function applyPages(id) {
+      const tpl = all().find((t) => t.id === id);
+      if (!tpl) return false;
+      const has = (tpl.rotations && Object.keys(tpl.rotations).length) || (tpl.removePages && tpl.removePages.length) || tpl.pageOrder;
+      if (!has) return false;
+      if (opts.applyRotations) opts.applyRotations(tpl.rotations);
+      if (opts.applyRemovedPages) opts.applyRemovedPages(tpl.removePages);
+      if (opts.applyPageOrder) opts.applyPageOrder(tpl.pageOrder);
+      return true;
+    }
     function remove(id) { persist(all().filter((t) => t.id !== id)); render(); }
 
     function exportAll() {
@@ -84,10 +96,10 @@
     }
 
     // best template whose stored fingerprint matches the given form fingerprint
-    function findMatch(fp) {
+    function findMatch(fp, accept) {
       if (!fp || !PFS.fingerprint) return null;
       let best = null, bestScore = 0;
-      all().forEach((t) => { if (!t.fp) return; const sc = PFS.fingerprint.score(fp, t.fp); if (sc > bestScore) { bestScore = sc; best = t; } });
+      all().forEach((t) => { if (!t.fp || (accept && !accept(t))) return; const sc = PFS.fingerprint.score(fp, t.fp); if (sc > bestScore) { bestScore = sc; best = t; } });
       return bestScore >= 0.9 ? { tpl: best, score: bestScore } : null;
     }
 
@@ -130,7 +142,7 @@
     }
 
     render();
-    return { save, autoSave, apply, remove, exportAll, importFile, render, all, findMatch, rename, setFilter };
+    return { save, autoSave, apply, applyPages, remove, exportAll, importFile, render, all, findMatch, rename, setFilter };
   }
 
   PFS.createTemplates = createTemplates;

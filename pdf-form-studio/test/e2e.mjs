@@ -4326,6 +4326,66 @@ async function main() {
     return ok ? true : JSON.stringify(out);
   })));
 
+  // ---- every new document opens clean ----
+  // A LANDSCAPE certificate was once taken for a PORTRAIT registration form
+  // (the 8×8 picture hash of two "mostly white" pages), and the certificate's
+  // fields landed on the form; reopening a form brought the previous
+  // student's details back. Now: no foreign layout, the same form opens
+  // clean with its last fill one click away, and the values a scan is
+  // auto-filled with are the label's size, all alike.
+  check('📄 new documents open clean: a certificate never lands on another form, the same form opens clean with "שחזור המילוי הקודם", scanned-form values are label-sized and uniform', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, FP = window.PFS.fingerprint;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    window.PFS.store.set('templates', []);
+    const out = {};
+    // 1. a certificate format (landscape image) with its fields, remembered
+    const c = document.createElement('canvas'); c.width = 1754; c.height = 1240;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = '#1f3c88'; x.lineWidth = 10; x.strokeRect(50, 50, c.width - 100, c.height - 100);
+    x.fillStyle = '#1f3c88'; x.font = 'bold 120px Heebo'; x.textAlign = 'center'; x.fillText('CERTIFICATE', c.width / 2, 260);
+    const png = await new Promise((r) => c.toBlob(r, 'image/png'));
+    await T.startCertFlow(new File([png], 'תעודת-בדיקה-נקייה.png', { type: 'image/png' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    await T.autoSaveNow();
+    const certFp = T.getFp();
+    await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+    // 2. a different SCANNED form (portrait), opened from home
+    const f = document.createElement('canvas'); f.width = 1240; f.height = 1754;
+    const y = f.getContext('2d'); y.fillStyle = '#fff'; y.fillRect(0, 0, f.width, f.height);
+    y.fillStyle = '#222'; y.direction = 'rtl'; y.textAlign = 'right'; y.font = 'bold 44px Heebo'; y.fillText('טופס הרשמה לקורס', 1140, 160);
+    y.font = '32px Heebo';
+    ['שם פרטי:', 'שם משפחה:', 'תעודת זהות:', 'טלפון:', 'כתובת:'].forEach((t, i) => { y.fillText(t, 1140, 320 + i * 150); y.fillRect(150, 330 + i * 150, 760, 3); });
+    const png2 = await new Promise((r) => f.toBlob(r, 'image/png'));
+    const doc = await window.PDFLib.PDFDocument.create(); const img = await doc.embedPng(await png2.arrayBuffer());
+    doc.addPage([595, 842]).drawImage(img, { x: 0, y: 0, width: 595, height: 842 });
+    const formBytes = await doc.save();
+    const openForm = async () => { await T.openPdfFile(new File([formBytes.slice(0)], 'טופס-הרשמה-סרוק.pdf', { type: 'application/pdf' })); for (let i = 0; i < 80 && !(T.getLastDet() && (T.getLastDet().fields || []).some((d) => d.ocr)); i++) await new Promise((r) => setTimeout(r, 250)); await new Promise((r) => setTimeout(r, 800)); };
+    await openForm();
+    out.score = FP.score(certFp, T.getFp());
+    out.certOnForm = T.overlay.getElements().filter((e) => e.model.certTag).length;
+    const det = T.getLastDet();
+    const sizes = det && det.fields ? det.fields.filter((d) => d.ocr).map((d) => +d.fontFrac.toFixed(4)) : [];
+    out.ocr = { n: sizes.length, uniform: new Set(sizes).size <= 1, minSize: sizes.length ? Math.min(...sizes) : 0 };
+    // 3. filled for one student, closed, opened again for the next
+    T.overlay.clearElements();
+    T.overlay.addModelAt('text', 0, { fx: 0.3, fy: 0.25, text: 'דנה כהן הקודמת', noEdit: true });
+    await T.autoSaveNow();
+    await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+    document.querySelectorAll('#toastWrap .toast').forEach((t) => t.remove());
+    await openForm();
+    out.cleanOnReopen = !T.overlay.getElements().some((e) => /דנה כהן הקודמת/.test(e.model.text || ''));
+    const act = [...document.querySelectorAll('#toastWrap .toast-act')].find((b) => /שחזור המילוי הקודם/.test(b.textContent));
+    out.offer = !!act;
+    if (act) { act.click(); await new Promise((r) => setTimeout(r, 300)); }
+    out.restored = T.overlay.getElements().some((e) => /דנה כהן הקודמת/.test(e.model.text || ''));
+    await T.goHome();
+    window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !/בדיקה-נקייה|הרשמה-סרוק/.test(t.name || '')));
+    window.PFS.ui.confirm = realConfirm;
+    const ok = out.score === 0 && out.certOnForm === 0 && out.ocr.n >= 3 && out.ocr.uniform && out.ocr.minSize >= 0.012
+      && out.cleanOnReopen && out.offer && out.restored;
+    return ok ? true : JSON.stringify(out);
+  })));
+
   // ---- certificates: serial numbers + the registry, and ONE-TOUCH: a list
   // dropped on the home screen opens the last format and lands on the check ----
   {
@@ -4518,9 +4578,13 @@ async function main() {
       const a = size('דנה לוי'), b1 = size('שורה א'), b2 = size('שורה ב'), big = size('ערך גדול');
       const rightEdgeA = a ? a.fx + a.fw : null;
       const applied = { a: a && a.fontFrac, b1: b1 && b1.fontFrac, b2: b2 && b2.fontFrac, big: big && big.fontFrac, rightEdgeA, rightEdgeBefore };
-      // 2) the silent reopen path: same form again → auto-memory → detection
+      // 2) the reopen path: same form again → it opens clean, and the last
+      // fill comes back through "שחזור המילוי הקודם" — at the readable size
+      document.querySelectorAll('#toastWrap .toast').forEach((t) => t.remove());
       await T.openPdfFile(new File([bytes.slice(0)], 'tiny-tpl.pdf', { type: 'application/pdf' }));
       await new Promise((r) => setTimeout(r, 2500));
+      const restoreBtn = [...document.querySelectorAll('#toastWrap .toast-act')].find((b) => /שחזור המילוי הקודם/.test(b.textContent));
+      if (restoreBtn) { restoreBtn.click(); await new Promise((r) => setTimeout(r, 300)); }
       const a2c = T.overlay.getElements().find((e) => e.model.fieldKey === 'שם מלא'); const a2 = a2c && a2c.model, b12 = size('שורה א');
       const reopened = { a: a2 && a2.fontFrac, b1: b12 && b12.fontFrac, n: T.overlay.getElements().length, texts: T.overlay.getElements().map((e) => e.model.text) };
       window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => t.id !== '__tiny_tpl__' && t.name !== '__tiny_tpl__'));
@@ -4533,7 +4597,7 @@ async function main() {
       && near(A.rightEdgeA, A.rightEdgeBefore, 0.004)
       && R.a != null && R.a >= 0.0135 - 0.0005 && near(R.b1, 0.0096, 0.0004) && R.n >= 4;
     if (!ok) console.log('  [tiny template debug]', JSON.stringify(tplRes));
-    check('templates: tiny remembered fills come back at the readable size (dense rows capped, right edge kept, large untouched), on apply AND on reopen', ok);
+    check('templates: tiny remembered fills come back at the readable size (dense rows capped, right edge kept, large untouched), on apply AND on restoring the last fill', ok);
   }
 
   // ---- "כל מסמך שאני שומר ישמר כבר עם שם הסטודנט" ----

@@ -92,21 +92,27 @@
       const label = (rtl ? labelWords.sort((a, b) => b.x - a.x) : labelWords.sort((a, b) => a.x - b.x))
         .map((o) => o.t).join(' ');
 
+      // the value is written in the LABEL's own size, on the label's baseline,
+      // a breath away from the colon. (The OCR box of a Hebrew word is about
+      // two thirds of the type size: sizing from it directly gave values half
+      // the label's size, glued to the colon — "הדבקות של טקסט".)
+      const em = h / 0.65, gap = h * 0.6;
       const defW = 0.30 * W;
       let fx, fw;
       if (rtl) {
         const left = sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2);
         const lb = left.length ? Math.max(...left.map((o) => o.bb.x1)) : Math.max(0, bb.x0 - defW);
-        fx = lb / W; fw = Math.max(24, bb.x0 - lb) / W;
+        fx = lb / W; fw = Math.max(24, bb.x0 - gap - lb) / W;
       } else {
         const right = sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2);
         const rb = right.length ? Math.min(...right.map((o) => o.bb.x0)) : Math.min(W, bb.x1 + defW);
-        fx = bb.x1 / W; fw = Math.max(24, rb - bb.x1) / W;
+        fx = (bb.x1 + gap) / W; fw = Math.max(24, rb - bb.x1 - gap) / W;
       }
+      const fontFrac = Math.min(0.03, Math.max(0.012, em / H));
       out.push({
         page: pageIndex, fieldKey: slug(label, out.length), label: label,
-        fx, fy: bb.y0 / H, fw, fh: h / H,
-        fontFrac: Math.min(0.03, (h * 0.8) / H), type: 'text', best: true, ocr: true,
+        fx, fy: Math.max(0, bb.y1 / H - 0.92 * fontFrac), fw, fh: fontFrac * 1.15,
+        fontFrac, _base: bb.y1 / H, type: 'text', best: true, ocr: true,
         conf: w.conf, _yc: yc
       });
     });
@@ -118,6 +124,18 @@
       const dup = kept.find((k) => k.label === f.label && k.page === f.page && Math.abs(k._yc - f._yc) < (f.fh * H) * 1.5);
       if (!dup) kept.push(f);
     });
+    // one form, one body size: a label the OCR boxed taller (a colon, a
+    // descender) must not make its value bigger than its neighbours'
+    if (kept.length >= 2) {
+      const sizes = kept.map((f) => f.fontFrac).sort((a, b) => a - b);
+      const med = sizes[Math.floor(sizes.length / 2)];
+      kept.forEach((f) => {
+        if (Math.abs(f.fontFrac - med) > med * 0.15) {
+          f.fontFrac = med; f.fh = med * 1.15; f.fy = Math.max(0, f._base - 0.92 * med);
+        }
+      });
+    }
+    kept.forEach((f) => { delete f._base; });
     return kept;
   }
 

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3D6BFF"/><stop offset="1" stop-color="#1E43D9"/></linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#ECECE8"/></linearGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D9D9D3"/><stop offset="1" stop-color="#F4F4F1"/></linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#0B1F6B" flood-opacity=".45"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <!-- back sheets -->
+  <rect x="168" y="112" width="220" height="292" rx="22" fill="#FFFFFF" opacity=".22" transform="rotate(8 278 258)"/>
+  <rect x="152" y="104" width="220" height="292" rx="22" fill="#FFFFFF" opacity=".38" transform="rotate(4 262 250)"/>
+  <!-- main sheet with a folded corner -->
+  <g filter="url(#sh)">
+    <path d="M134 118a22 22 0 0 1 22-22h136l84 84v210a22 22 0 0 1-22 22H156a22 22 0 0 1-22-22z" fill="url(#paper)"/>
+  </g>
+  <path d="M292 96v62a22 22 0 0 0 22 22h62z" fill="url(#fold)"/>
+  <!-- form lines -->
+  <g stroke="#BFC1BE" stroke-width="12" stroke-linecap="round">
+    <path d="M172 200h96"/><path d="M172 244h150"/><path d="M172 288h150"/>
+  </g>
+  <!-- the signature: one confident ink stroke -->
+  <path d="M176 352c22-30 34-44 46-44 14 0 6 40 20 40 12 0 20-34 34-34 12 0 8 30 22 30 10 0 16-12 34-16" fill="none" stroke="#141414" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- the check seal -->
+  <circle cx="372" cy="366" r="52" fill="#141414"/>
+  <circle cx="372" cy="366" r="52" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+  <path d="M346 368l18 18 36-40" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -19,6 +19,11 @@
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
     async function load(arrayBuffer) {
+      // the document this one replaces is released (a day of opening forms
+      // kept every one of them alive in the pdf.js worker) — a moment later,
+      // so work still finishing on it bails out instead of failing
+      const prev = pdfDoc;
+      if (prev && prev.destroy) setTimeout(() => { try { prev.destroy(); } catch (e) {} }, 5000);
       bytes = arrayBuffer.slice ? arrayBuffer.slice(0) : arrayBuffer; // keep a copy for export
       // pdf.js transfers/detaches the buffer it renders from, so give it its own copy
       const renderCopy = new Uint8Array(arrayBuffer.slice(0));

@@ -81,7 +81,12 @@ function restoreState(json) {
   overlay.clearElements();
   overlay.applyModels(st.els || (Array.isArray(st) ? st : []));
   // restore page rotation/deletion/order too, so undo covers page operations
-  if (st.pg && pdfView.setPageState) { pdfView.setPageState(st.pg); buildPageNav(); buildThumbnails(); }
+  // (only when the pages really differ — re-rendering every page on every
+  // undo blanked thumbnail 1, copied from a canvas mid-render; and rebuild
+  // the thumbnails once the pages are drawn)
+  if (st.pg && pdfView.setPageState && pdfView.getPageState && JSON.stringify(st.pg) !== JSON.stringify(pdfView.getPageState())) {
+    Promise.resolve(pdfView.setPageState(st.pg)).then(() => { buildPageNav(); buildThumbnails(); }).catch(() => {});
+  }
   // The fields panel must SURVIVE an undo. It used to be cleared here and
   // never re-rendered — one Ctrl+Z wiped the whole "שדות שזוהו" workspace,
   // which is why undo felt broken. syncValues refreshes the rows from the
@@ -843,7 +848,10 @@ function fpCacheKey(fp) {
   // a scan is keyed by its fine picture hash AND page size: the coarse 8×8
   // hash alone let two different scanned forms share detected fields
   const id = fp.textHash || (fp.ahash16 ? 'a16:' + fp.ahash16 + ':' + Math.round(fp.w || 0) + 'x' + Math.round(fp.h || 0) : null);
-  return id ? [fp.pages, fp.w, fp.h, id].join('|') : null;
+  // fields read on a turned page are cached apart from the unturned ones
+  let rot = '';
+  try { rot = Object.entries(pdfView.getRotations() || {}).filter(([, v]) => v % 360).map(([k, v]) => k + ':' + v).join(','); } catch (e) {}
+  return id ? [fp.pages, fp.w, fp.h, id].join('|') + (rot ? '|r' + rot : '') : null;
 }
 function detCacheGet(fp) {
   fp = fpCacheKey(fp);
@@ -1838,7 +1846,7 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
     const doc = pdfView.getDoc();
     if (!doc || !ctrl) return;
     const page = await doc.getPage(pageIndex + 1);
-    const vp = page.getViewport({ scale: 1, rotation: page.rotate });
+    const vp = page.getViewport({ scale: 1, rotation: ((page.rotate || 0) + PFS.userRotOf(pageIndex)) % 360 });
     const tc = await page.getTextContent();
     const resolveFont = PFS.fontmatch ? PFS.fontmatch.resolverFor(page, tc) : () => null;
     const W = vp.width, H = vp.height;
@@ -2265,6 +2273,10 @@ async function exBuild() {
       });
     if (my !== exState.token) return;                 // superseded by a newer build
     exState.bytes = bytes;
+    // the previous preview's document is released (each quality / secure
+    // toggle used to leave one behind)
+    const old = exState.doc;
+    if (old && old.destroy) setTimeout(() => { try { old.destroy(); } catch (e) {} }, 3000);
     exState.doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
     if (my !== exState.token) return;
     exState.pages = exState.doc.numPages;
@@ -2833,10 +2845,40 @@ function buildPageNav() {
   pj.innerHTML = '';
   vis.forEach((v, i) => { const o = document.createElement('option'); o.value = v.idx; o.textContent = 'עמ׳ ' + (i + 1) + '/' + vis.length; pj.appendChild(o); });
 }
+// what a page's content turned by: its own /Rotate + the user's turn —
+// detection, OCR and the replace tool read the page as it is SHOWN (a
+// straightened sideways scan used to be read sideways)
+PFS.userRotOf = (i) => ((pdfView.getRotations && pdfView.getRotations()[i]) || 0);
+// turning a page carries what is placed on it along with its content: each
+// element keeps its spot on the paper and its real size (they used to stay
+// put while the page turned under them)
+function rotateElementsOnPage(idx, W0, H0) {
+  overlay.getElements().forEach((c) => {
+    const m = c.model; if (m.page !== idx) return;
+    const fw = m.fw || 0, fh = m.fh || 0;
+    if (m.type === 'rect') {            // a cover turns with the content it covers
+      Object.assign(m, { fx: 1 - (m.fy + fh), fy: m.fx, fw: fh, fh: fw });
+    } else {                            // text and pictures stay upright, same size
+      const cx = m.fx + fw / 2, cy = m.fy + fh / 2;
+      const nfw = fw * W0 / H0, nfh = fh * H0 / W0;
+      if (m.type === 'text') m.fontFrac = (m.fontFrac || 0.02) * H0 / W0;
+      if (m.wrapW) m.wrapW = m.wrapW * W0 / H0;
+      if (m.cellW) m.cellW = m.cellW * W0 / H0;
+      m.cellX = null; m.anchorRight = null;
+      Object.assign(m, { fx: PFS.clamp(1 - cy - nfw / 2, 0, 1), fy: PFS.clamp(cx - nfh / 2, 0, 1), fw: nfw, fh: nfh });
+    }
+    c.layout();
+  });
+}
 $('rotateBtn') && $('rotateBtn').addEventListener('click', async () => {
   if (!pdfView.hasDoc()) return;
   const idx = currentPageIndex();
+  const v = pdfView.viewList().find((x) => x.idx === idx);
+  const W0 = (v && v.canvas && v.canvas.width) || 1, H0 = (v && v.canvas && v.canvas.height) || 1;
   await pdfView.rotatePage(idx, 90);
+  rotateElementsOnPage(idx, W0, H0);
+  // the detected fields were read on the unturned page: read it again
+  if (lastDet) { try { await runDetection(); } catch (e) {} }
   scheduleSnap();
   PFS.toast('עמוד ' + (idx + 1) + ' סובב — יישמר מסובב בייצוא', 'ok', 1600);
 });

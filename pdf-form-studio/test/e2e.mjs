@@ -4393,6 +4393,96 @@ async function main() {
     return ok ? true : JSON.stringify(out);
   })));
 
+  // ---- turning a page turns what is on it, and is read turned ----
+  // Before: the rotate button turned the page under its elements (a cover no
+  // longer covered its spot); field detection / OCR kept reading the page
+  // unturned, so its fields sat where the page USED to be.
+  check('🔄 rotating a page: a cover stays on the mark it covers, and the detected fields follow the turned page', why(await page.evaluate(async () => {
+    const T = window.PFS.__test; const out = {};
+    const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+    const d = await PDFDocument.create(); const p = d.addPage([595, 842]); const f = await d.embedFont(StandardFonts.Helvetica);
+    p.drawRectangle({ x: 80, y: 700, width: 40, height: 40, color: rgb(0, 0, 1) });
+    p.drawText('Name: ____________________', { x: 80, y: 500, size: 16, font: f });
+    await T.openPdfFile(new File([await d.save()], 'turn-me.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1500));
+    T.overlay.clearElements();
+    const blueBox = () => { const cv = document.querySelector('.page-wrap canvas.pdf'); const dd = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) { const i = (y * cv.width + x) * 4; if (dd[i + 2] > 200 && dd[i] < 60) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } } return [x0 / cv.width, y0 / cv.height, (x1 - x0) / cv.width, (y1 - y0) / cv.height]; };
+    const b0 = blueBox();
+    const cover = T.overlay.addModelAt('highlight', 0, { fx: b0[0], fy: b0[1], fw: b0[2], fh: b0[3], color: '#ff0000', opacity: 0.4 }, false);
+    const det0 = (T.getLastDet() || { fields: [] }).fields.find((x) => /name/i.test(x.label || ''));
+    document.getElementById('viewport').scrollTo(0, 0);
+    document.getElementById('rotateBtn').click();
+    await new Promise((r) => setTimeout(r, 2000));
+    const b1 = blueBox(), m = cover.model;
+    out.blue = b1.map((v) => +v.toFixed(3)); out.cover = [m.fx, m.fy, m.fw, m.fh].map((v) => +v.toFixed(3));
+    T.overlay.clearElements();
+    // a form scanned SIDEWAYS (its text runs bottom-to-top): straightened with
+    // the rotate button, its "Name:" field must lie on the text's line as shown
+    const d2 = await PDFDocument.create(); const p2 = d2.addPage([595, 842]); const f2 = await d2.embedFont(StandardFonts.Helvetica);
+    p2.drawText('Sideways name: ____________________', { x: 300, y: 120, size: 16, font: f2, rotate: window.PDFLib.degrees(90) });
+    await T.openPdfFile(new File([await d2.save()], 'sideways.pdf', { type: 'application/pdf' }));
+    T.pdfView.setScale && T.pdfView.setScale(1);   // earlier tests may leave the zoom tiny
+    await new Promise((r) => setTimeout(r, 1500));
+    document.getElementById('viewport').scrollTo(0, 0);
+    document.getElementById('rotateBtn').click();
+    await new Promise((r) => setTimeout(r, 2500));
+    const cv = document.querySelector('.page-wrap canvas.pdf'); const dd = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    let iy0 = 1e9, iy1 = -1, ix0 = 1e9; for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) { const i = (y * cv.width + x) * 4; if (dd[i] < 100 && dd[i + 3] > 200) { if (y < iy0) iy0 = y; if (y > iy1) iy1 = y; if (x < ix0) ix0 = x; } }
+    const line = [iy0 / cv.height, iy1 / cv.height];
+    out.rot = JSON.stringify(T.pdfView.getRotations()); out.dims = [cv.width, cv.height]; out.nWraps = document.querySelectorAll('.page-wrap').length;
+    const det1 = (T.getLastDet() || { fields: [] }).fields.find((x) => /name/i.test(x.label || ''));
+    out.line = line.map((v) => +v.toFixed(3));
+    out.field = det1 ? [det1.fx, det1.fy, det1.fw, det1.fh].map((v) => +v.toFixed(3)) : null;
+    T.overlay.clearElements();
+    const close = (a, b, tol) => a.every((v, i) => Math.abs(v - b[i]) < tol);
+    const mid = (line[0] + line[1]) / 2;
+    // (read unturned, the field came out a column ~0.07 of the page off the line)
+    const detOk = !!det1 && det1.fw > det1.fh && Math.abs(det1.fy + det1.fh / 2 - mid) < 0.08;
+    const ok = close(out.cover, out.blue, 0.012) && detOk;
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- undo never blanks a page thumbnail ----
+  // every undo re-rendered every page and copied thumbnail 1 from a canvas
+  // that had just been cleared: the first thumbnail went blank (transparent)
+  check('🖼 Ctrl+Z keeps the page thumbnails drawn', why(await page.evaluate(async () => {
+    const T = window.PFS.__test;
+    const d = await window.PDFLib.PDFDocument.create(); for (let i = 0; i < 2; i++) { const p = d.addPage([595, 842]); p.drawRectangle({ x: 60, y: 600, width: 300, height: 120 }); }
+    await T.openPdfFile(new File([await d.save()], 'thumbs.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 900));
+    T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.2, text: 'x', fontFrac: 0.02 }, false); T.snapshotNow();
+    const blank = () => [...document.querySelectorAll('#thumbs canvas')].map((c) => { const dd = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let a = 0; for (let i = 3; i < dd.length; i += 4) if (dd[i] === 0) a++; return a / (dd.length / 4); });
+    T.undo(); await new Promise((r) => setTimeout(r, 60));
+    const soon = blank(); await new Promise((r) => setTimeout(r, 1200));
+    const later = blank();
+    T.overlay.clearElements();
+    const ok = soon.length === 2 && soon.every((f) => f < 0.5) && later.every((f) => f < 0.5);
+    return ok ? true : JSON.stringify({ soon, later });
+  })));
+
+  // ---- the phone top bar ----
+  // With a document open on a phone, the document bar (home / file / page /
+  // zoom) ran past the screen edge and lay ON TOP of the action buttons.
+  {
+    const ph = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+    await ph.addInitScript(() => { window.__PFS_NO_GATE = true; try { localStorage.setItem('pfs:onboarded', 'true'); localStorage.setItem('pfs:tour_done', '1'); } catch (e) {} });
+    await ph.goto(base, { waitUntil: 'load' }); await ph.waitForTimeout(600);
+    await (await ph.$('#pdfInput')).setInputFiles(FIXTURE); await ph.waitForTimeout(3000);
+    const r = await ph.evaluate(() => {
+      document.getElementById('rightpanel').classList.remove('open');
+      const box = (s) => { const e = document.querySelector(s); const b = e.getBoundingClientRect(); return { s, l: b.left, r: b.right, t: b.top, b: b.bottom, w: b.width }; };
+      const ids = ['#homeBtn', '#fname', '#zoomctl', '#exportBtn', '#fillAllBtn', '#panelToggle', '.brand'];
+      const bx = ids.map(box);
+      const onScreen = bx.filter((x) => x.w > 0).every((x) => x.l >= -1 && x.r <= innerWidth + 1);
+      const overlaps = [];
+      for (let i = 0; i < bx.length; i++) for (let j = i + 1; j < bx.length; j++) { const a = bx[i], c = bx[j]; if (Math.min(a.r, c.r) - Math.max(a.l, c.l) > 2 && Math.min(a.b, c.b) - Math.max(a.t, c.t) > 2) overlaps.push(a.s + '×' + c.s); }
+      const pageTop = document.querySelector('.viewport').getBoundingClientRect().top, barBottom = document.querySelector('.topbar').getBoundingClientRect().bottom;
+      return { onScreen, overlaps, under: pageTop >= barBottom - 1, hscroll: document.documentElement.scrollWidth > innerWidth };
+    });
+    await ph.close();
+    check('📱 phone: with a document open, home / file / zoom / export / fill-all are all on screen and nothing in the top bar overlaps', why(r.onScreen && !r.overlaps.length && r.under && !r.hscroll ? true : JSON.stringify(r)));
+  }
+
   // ---- a round stamp stays round ----
   // fh = fw / aspect mixed a fraction of the page WIDTH with one of its
   // HEIGHT: on A4 every stamp/signature came out 1.41× too tall (a round

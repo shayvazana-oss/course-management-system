@@ -19,9 +19,10 @@
 
   async function renderPageCanvas(pdfDoc, n, targetW) {
     const page = await pdfDoc.getPage(n);
-    const base = page.getViewport({ scale: 1, rotation: page.rotate });
+    const rot = ((page.rotate || 0) + (PFS.userRotOf ? PFS.userRotOf(n - 1) : 0)) % 360;
+    const base = page.getViewport({ scale: 1, rotation: rot });
     const scale = Math.min(3, Math.max(1, targetW / base.width));
-    const vp = page.getViewport({ scale, rotation: page.rotate });
+    const vp = page.getViewport({ scale, rotation: rot });
     const c = document.createElement('canvas');
     c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     const ctx = c.getContext('2d');

@@ -443,7 +443,7 @@
     const textPages = [];
     for (let i = 1; i <= num; i++) {
       const page = await pdfDoc.getPage(i);
-      const vp = page.getViewport({ scale: 1, rotation: page.rotate });
+      const vp = page.getViewport({ scale: 1, rotation: ((page.rotate || 0) + (PFS.userRotOf ? PFS.userRotOf(i - 1) : 0)) % 360 });
       const W = vp.width, H = vp.height;
       // Tier A — form widgets
       let anns = [];

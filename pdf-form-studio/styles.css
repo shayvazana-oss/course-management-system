@@ -1266,3 +1266,24 @@ body.gate-locked #loginModal { pointer-events: auto; }
 /* an armed tool (replace, cover, text…) owns the page: the field hints must
    not swallow its drag — on a scan they sit exactly on the values to replace */
 .overlay.placing .field-marker { pointer-events: none !important; }
+
+/* Phone / narrow window with a document open: the document bar (home,
+   file name, page, zoom) gets its own second row. Squeezed into one row it
+   ran past the screen edge and lay on top of the action buttons. */
+@media (max-width: 900px) {
+  body:not(.home) { --topbar-h: 104px; }
+  body:not(.home) .topbar { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 58px 46px; row-gap: 0; padding-bottom: 0; }
+  body:not(.home) .tb-right { grid-column: 1; grid-row: 1; }
+  body:not(.home) .tb-left { grid-column: 2; grid-row: 1; justify-self: end; max-width: 100%; }
+  body:not(.home) .tb-center { display: flex; grid-column: 1 / -1; grid-row: 2; justify-self: stretch; justify-content: flex-start; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border-top: 1px solid var(--line); }
+  body:not(.home) .tb-center::-webkit-scrollbar { display: none; }
+  body:not(.home) .docbar { gap: 8px; flex-wrap: nowrap; padding: 0 2px; }
+  body:not(.home) .docbar .fname { max-width: 34vw; }
+  body.home .tb-center { display: none; }
+  /* the actions a phone needs first lead the row (the rest scrolls) */
+  body:not(.home) #exportBtn { order: -5; }
+  body:not(.home) #fillAllBtn { order: -4; }
+  body:not(.home) #panelToggle { order: -3; }
+  body:not(.home) #undoBtn { order: -2; }
+  body:not(.home) #redoBtn { order: -1; }
+}

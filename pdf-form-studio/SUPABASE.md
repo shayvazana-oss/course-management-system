@@ -7,11 +7,13 @@
 ## 1. פרויקט (5 דקות)
 1. https://supabase.com → Sign up → **New project**. שם: `fillo`. אזור: `eu-central-1` (פרנקפורט).
 2. **Settings → API**: העתיקו את **Project URL** ואת **anon public key**.
-3. **Authentication → Providers → Email**: אם רוצים שעובדים ייכנסו מיד בלי מייל אימות —
-   כבו את **Confirm email**. (אפשר להשאיר דלוק; אז כל עובד מאשר מייל פעם אחת.)
-4. **Authentication → Sign In / Providers**: אם רוצים שרק אתם תפתחו חשבונות —
-   כבו **Allow new users to sign up** אחרי שיצרתם את החשבונות של העובדים
-   (או תשאירו פתוח ותשלחו להם את הקישור).
+3. **Authentication → Providers → Email**: השאירו את **Confirm email** דלוק — כל עובד
+   מאשר את המייל שלו פעם אחת.
+4. **Authentication → Sign In / Providers**: **כבו את Allow new users to sign up**, ופתחו
+   את החשבונות בעצמכם (**Authentication → Users → Add user**).
+   ⚠️ חשוב כשיש מחלקת תעודות: ההרשאה למאגר המשותף ניתנת לפי כתובת מייל. כשההרשמה
+   פתוחה ואין אימות מייל, מי שיודע מייל של עובד שעוד לא נרשם יכול להירשם בשמו
+   ולראות את מאגר התעודות (שמות ות"ז של סטודנטים).
 
 ## 2. טבלה + הרשאות (הדבקה אחת)
 **SQL Editor → New query** → הדביקו והריצו:

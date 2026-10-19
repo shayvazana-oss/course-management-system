@@ -10,7 +10,9 @@
   // Which delimiter does this table use? Excel paste is TAB-separated, exports
   // are comma or semicolon — pick whichever splits the first line the most.
   function detectDelim(text) {
-    const line = String(text || '').replace(/^﻿/, '').split(/\r?\n/, 1)[0] || '';
+    // a few lines, not just the first: a pasted list whose first row is a
+    // lone name ("נועה ברק", then "יוסי כהן<TAB>123456782") is still TABs
+    const line = String(text || '').replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim()).slice(0, 5).join('\n');
     const counts = [['\t', (line.match(/\t/g) || []).length],
                     [',', (line.match(/,/g) || []).length],
                     [';', (line.match(/;/g) || []).length]];
@@ -34,7 +36,10 @@
         }
         field += c; i++; continue;
       }
-      if (c === '"') { inQ = true; i++; continue; }
+      // a quote OPENS a quoted cell only at its start: mid-cell it is a
+      // letter — Hebrew abbreviations (ת"ז, מק"ט, ד"ר) in a header used to
+      // swallow the rest of the file into one cell
+      if (c === '"' && field === '') { inQ = true; i++; continue; }
       if (c === delim) { row.push(field); field = ''; i++; continue; }
       if (c === '\r') { i++; continue; }
       if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
@@ -42,14 +47,33 @@
     }
     if (field.length || row.length) { row.push(field); rows.push(row); }
     // drop trailing empty rows
-    const clean = rows.filter((r) => r.some((x) => String(x).trim() !== ''));
+    let clean = rows.filter((r) => r.some((x) => String(x).trim() !== ''));
     if (!clean.length) return { headers: [], records: [] };
-    const headers = clean[0].map((h) => h.trim());
+    // the HEADER is the first row with two filled cells, as in an Excel file:
+    // a title line ("רשימת סטודנטים - מחזור 12,,") sits above it
+    const filled = (r) => r.filter((x) => String(x).trim() !== '').length;
+    const hi = clean.findIndex((r) => filled(r) >= 2);
+    // (only when that row reads as a header: a pasted list WITHOUT headers
+    // whose first student has one cell must keep that student)
+    const V = PFS.vault;
+    const isHeader = (r) => !!(V && V.matchKey) && r.some((x) => String(x).trim() && V.matchKey(String(x).trim()));
+    if (hi > 0 && clean.length > hi + 1 && clean.slice(0, hi).every((r) => filled(r) === 1) && isHeader(clean[hi])) clean = clean.slice(hi);
+    const headers = clean[0].map((h) => h.trim().replace(/\s+/g, ' '));
     const records = clean.slice(1).map((r) => {
-      const o = {}; headers.forEach((h, j) => { o[h] = (r[j] ?? '').trim(); }); return o;
+      const o = {}; headers.forEach((h, j) => { if (h) o[h] = (r[j] ?? '').trim(); }); return o;
     });
-    return { headers, records };
+    return { headers: headers.filter(Boolean), records: restoreLeadingZeros(headers, records) };
   }
+  // A CSV saved by Hebrew Excel ("CSV (Comma delimited)") is Windows-1255,
+  // not UTF-8: read as UTF-8 every Hebrew letter became "�". UTF-8 first
+  // (strict), the Hebrew code page when that fails.
+  function decodeText(bytes) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) {}
+    try { return new TextDecoder('windows-1255').decode(u8); } catch (e) {}
+    return new TextDecoder('utf-8').decode(u8);
+  }
+  async function readTextFile(file) { return decodeText(new Uint8Array(await file.arrayBuffer())); }
 
   /* parseXlsx(bytes) → { headers, records } — read a real Excel file locally.
    * An .xlsx is a ZIP of XML parts; fflate (already loaded for the batch ZIP)
@@ -112,17 +136,27 @@
     // cell styles: which indices mean DATE (builtin date formats + custom
     // codes that spell day/month/year and are not number masks), and which
     // are zero-padded number masks like 000000000 (an ID column)
-    const dateStyle = [], zeroPad = [];
+    const dateStyle = [], zeroPad = [], numFmt = [];
     try {
       const st = xml('xl/styles.xml');
       const custom = {};
       st && st.querySelectorAll('numFmts > numFmt').forEach((n) => { custom[n.getAttribute('numFmtId')] = n.getAttribute('formatCode') || ''; });
-      const builtin = new Set(['14', '15', '16', '17', '22']);
+      const builtin = new Set(['14', '15', '16', '17', '22', '27', '28', '29', '30', '31', '34', '35', '36', '50', '51', '52', '53', '54', '57', '58']);
+      const BUILTIN_NUM = { 1: '0', 2: '0.00', 3: '#,##0', 4: '#,##0.00', 9: '0%', 10: '0.00%' };
       st && st.querySelectorAll('cellXfs > xf').forEach((xf, i) => {
         const id = xf.getAttribute('numFmtId') || '0';
         const code = custom[id];
-        dateStyle[i] = builtin.has(id) || !!(code && /[dy]/i.test(code) && /m/i.test(code) && !/[#0]/.test(code));
+        // a locale tag ([$-40D]), a colour ([Red]) or quoted text holds 0s
+        // and letters that are not the mask: "[$-F800]dddd, mmmm dd, yyyy" is
+        // a DATE (it printed as the serial 46277)
+        const bare = String(code || '').replace(/\[[^\]]*\]/g, '').replace(/"[^"]*"/g, '').replace(/\\./g, '');
+        dateStyle[i] = builtin.has(id) || !!(code && /[dy]/i.test(bare) && /m/i.test(bare) && !/[#0]/.test(bare));
         zeroPad[i] = code && /^0{2,}$/.test(code) ? code.length : 0;
+        // how a NUMBER shows: decimals of its mask (a grade "87" was stored
+        // as 86.666666666666671 and printed that way), percent
+        const mask = (code ? bare : BUILTIN_NUM[id]) || '';
+        const sec = mask.split(';')[0];
+        numFmt[i] = /[0#]/.test(sec) ? { dec: ((sec.split('.')[1] || '').match(/[0#]/g) || []).length, pct: /%/.test(sec) } : null;
       });
     } catch (e) {}
     const serialDate = (n) => {
@@ -150,7 +184,13 @@
             else if (raw !== '' && dateStyle[sI] && isFinite(+raw) && +raw > 20000 && +raw < 80000) v = serialDate(+raw);
             else if (raw !== '' && zeroPad[sI] && /^\d+$/.test(raw)) v = raw.padStart(zeroPad[sI], '0');
             else if (/^-?\d+(\.\d+)?e[+-]?\d+$/i.test(raw)) v = Number(raw).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 10 });
-            else v = raw;
+            else if (raw !== '' && isFinite(+raw) && /\./.test(raw)) {
+              // what the cell SHOWS: its mask's decimals, or Excel's General
+              // (10 significant digits — no floating-point tail)
+              const f = numFmt[sI];
+              const n = f && f.pct ? +raw * 100 : +raw;
+              v = f ? n.toFixed(f.dec) + (f.pct ? '%' : '') : String(Number(n.toPrecision(10)));
+            } else v = raw;
           }
           const ci = ref ? colIdx(ref) : row.length;
           row[ci] = tidy(v);
@@ -224,7 +264,7 @@
     if (!(PFS.vault && PFS.vault.matchValues)) return record;
     const keys = [...new Set(models.filter((m) => m.type === 'text' && m.fieldKey).map((m) => m.fieldKey))];
     const fields = keys.map((k) => ({ fieldKey: k, label: k, type: 'text' }));
-    const out = Object.assign({}, record, PFS.vault.matchValues(fields, record, []));
+    const out = Object.assign({}, record, PFS.vault.matchValues(fields, record, [], { strictDates: true }));
     if (PFS.numwords) {
       keys.forEach((k) => {
         if (PFS.vault.matchKey(k) === 'amount_words' && out[k] === undefined) {
@@ -346,5 +386,5 @@
     PFS.deliver.file(zipBytes, filename || 'filled-forms.zip', 'application/zip');
   }
 
-  PFS.merge = { parseCSV, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, fillTokens, tokensIn, preflight, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
+  PFS.merge = { parseCSV, decodeText, readTextFile, parseXlsx, detectDelim, mapHeaders, remapRecords, applyRecord, enrichRecord, fillTokens, tokensIn, preflight, runBatch, runBatchSingle, downloadZip, israeliIdValid, restoreLeadingZeros };
 })(window);

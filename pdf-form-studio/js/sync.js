@@ -73,7 +73,7 @@
   async function push() {
     const c = getCfg();
     if (!configured()) throw new Error('NOT_CONFIGURED');
-    const payload = await encryptObj(c.code, store.dump());
+    const payload = await encryptObj(c.code, personalData(store.dump()));
     if (payload.length > 900 * 1024) throw new Error('TOO_BIG');
     const id = await docId(c.code);
     const body = { fields: { blob: { stringValue: payload }, ts: { integerValue: String(Date.now()) } } };
@@ -95,8 +95,15 @@
     const blob = doc && doc.fields && doc.fields.blob && doc.fields.blob.stringValue;
     if (!blob) throw new Error('EMPTY');
     const data = await decryptStr(c.code, blob);           // throws WRONG_CODE on mismatch
-    store.restore(data);
+    store.restore(personalData(data));
     return true;
+  }
+  // the account's session (its tokens) and this sync's own code never travel:
+  // a pull on a shared computer put the previous person's session back
+  function personalData(all) {
+    const out = {};
+    Object.keys(all || {}).forEach((k) => { if (k.indexOf('pfs:acct:') !== 0 && k !== 'pfs:sync:cfg') out[k] = all[k]; });
+    return out;
   }
 
   PFS.sync = { getCfg, setCfg, configured, push, pull, docId, _enc: encryptObj, _dec: decryptStr };

@@ -151,7 +151,8 @@
           // aspect-locked: drive by the larger relative delta
           let fw = clamp(start.fw + dxFrac, minFw, 2);
           model.fw = fw;
-          model.fh = fw / opts.aspect;
+          // fw/fh are fractions of different sides: carry the page's shape
+          model.fh = fw * (size.w / (size.h || 1)) / opts.aspect;
         } else {
           model.fw = clamp(start.fw + dxFrac, minFw, 2);
           model.fh = clamp(start.fh + dyFrac, minFh, 2);

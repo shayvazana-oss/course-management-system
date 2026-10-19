@@ -184,7 +184,11 @@
     }
     // a plain "תאריך:" field means "today" unless the profile says otherwise
     // (birth-date fields map to birth_date, a different canon — never touched)
-    if (canonVal.date === undefined) canonVal.date = new Date().toLocaleDateString('he-IL');
+    // A batch (certificates, mail merge) asks for strictDates: there "today"
+    // is wrong (a reprint would print the reprint's day over the typed
+    // completion date) and one date column must not fill every other date.
+    const strictDates = !!(opts && opts.strictDates);
+    if (canonVal.date === undefined && !strictDates) canonVal.date = new Date().toLocaleDateString('he-IL');
     // normalized-label fallback: when no canonical meaning is known for a key,
     // an identically-worded label still matches (a quote and its appendix
     // usually share field wording — that carry-over must work even for terms
@@ -221,6 +225,15 @@
         return;
       }
       const c = matchKey(f.label) || matchKey(f.fieldKey);
+      if (c === 'date' && strictDates) {
+        // a date bridges only with the same direction: "תאריך סיום" never
+        // lands in "תאריך התחלה" (nor a plain date in either)
+        const dirOf = (t) => (/סיום|סוף/.test(t) ? 'end' : (/תחילת|התחלה|פתיחה/.test(t) ? 'start' : (/הנפקה|הוצאה/.test(t) ? 'issue' : '')));
+        const want = dirOf(f.label + ' ' + f.fieldKey);
+        const k = Object.keys(values).find((kk) => matchKey(kk) === 'date' && dirOf(kk) === want && String(values[kk] || '').trim());
+        if (k) out[f.fieldKey] = values[k];
+        return;
+      }
       if (c && canonVal[c] !== undefined) out[f.fieldKey] = canonVal[c];
     });
     return out;

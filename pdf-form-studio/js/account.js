@@ -33,6 +33,22 @@
 
   let session = store.get(SESS, null);
   function saveSession(s) { session = s; s ? store.set(SESS, s) : store.remove(SESS); }
+  // Another tab of this app shares this computer's session. Tokens it
+  // refreshed are adopted here (Supabase rotates refresh tokens: reusing the
+  // old one got the session revoked); a sign-out or a different person signed
+  // in there means this tab's in-memory session is stale — it must not keep
+  // saving as the old user (that wiped or overwrote the vault).
+  try {
+    root.addEventListener('storage', (e) => {
+      if (e.key !== 'pfs:' + SESS) return;
+      let next = null; try { next = e.newValue ? JSON.parse(e.newValue) : null; } catch (er) {}
+      const was = session && session.user && session.user.id;
+      if (next && next.user && was && next.user.id === was) { session = next; return; }
+      if (!was && !next) return;
+      session = next;
+      root.dispatchEvent(new CustomEvent('pfs:acct-elsewhere', { detail: { signedOut: !next } }));
+    });
+  } catch (e) {}
   function user() { return session && session.user; }
   function authed() { return !!(session && session.access_token); }
 
@@ -71,9 +87,24 @@
   }
   async function refresh() {
     if (!session || !session.refresh_token) return false;
-    const res = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh_token } });
+    // another tab may have refreshed already: its newer tokens are the live ones
+    const stored = store.get(SESS, null);
+    if (stored && stored.refresh_token && stored.refresh_token !== session.refresh_token && stored.user && session.user && stored.user.id === session.user.id) {
+      session = stored;
+      if (Date.now() < (session.expires_at || 0) - 60000) return true;
+    }
+    let res;
+    try { res = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: session.refresh_token } }); }
+    catch (e) { return false; }   // offline: keep the session, try again later
     const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.access_token) { saveSession(null); return false; }
+    if (!res.ok || !j.access_token) {
+      if (res.status >= 500) return false;   // the server hiccuped: not a sign-out
+      saveSession(null);
+      // the person is signed out now: the app must show the sign-in screen
+      // (it used to lock the keyboard behind an invisible gate)
+      try { root.dispatchEvent(new CustomEvent('pfs:acct-lost')); } catch (e) {}
+      return false;
+    }
     storeAuth(j); return true;
   }
   async function ensureFresh() {
@@ -81,7 +112,7 @@
     if (Date.now() > (session.expires_at || 0) - 60000) return refresh();
     return true;
   }
-  function signOut() { saveSession(null); }
+  function signOut() { saveSession(null); loadedFor = null; }
 
   // ---- vault (the user's data row) ---------------------------------------
   // Everything the app persists locally (the pfs: store) is mirrored as one
@@ -136,26 +167,47 @@
     return out;
   }
   // → true (cloud loaded) | 'merged' (first sign-in here: both kept) | false (no cloud data yet)
+  // A save REPLACES the account's whole vault, so it is allowed only after
+  // this page has read the vault for this very person. When that read failed
+  // (offline at sign-in, a server error), saving this computer's — possibly
+  // just-wiped — store used to overwrite everything the account had.
+  let loadedFor = null;
+  // Changes not yet in the cloud (closed within the 2-second debounce,
+  // offline, a failed save): the next start MERGES them in instead of
+  // restoring the cloud copy over them.
+  const UNSYNCED = 'acct:unsynced';
+  let changeSeq = 0;
+  function noteLocalChange() { changeSeq++; if (!store.get(UNSYNCED, false)) store.set(UNSYNCED, true); }
+  function hasUnsynced() { return !!store.get(UNSYNCED, false); }
   async function loadVault(opts) {
-    await ensureFresh();
+    if (!(await ensureFresh())) throw new Error('NO_SESSION');
     const res = await api('/rest/v1/vaults?select=data&user_id=eq.' + user().id, { auth: true, headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error('HTTP_' + res.status);
-    const rows = await res.json().catch(() => []);
-    if (rows && rows[0] && rows[0].data && typeof rows[0].data === 'object' && Object.keys(rows[0].data).length) {
-      if (opts && opts.merge) { store.restore(mergeData(localData(), rows[0].data)); return 'merged'; }
-      store.restore(rows[0].data); return true;      // cloud is the source of truth
+    const rows = await res.json();   // unreadable ≠ "no cloud data": throw, never save over it
+    if (!Array.isArray(rows)) throw new Error('BAD_VAULT');
+    const uid = user().id;
+    if (rows[0] && rows[0].data && typeof rows[0].data === 'object' && Object.keys(rows[0].data).length) {
+      const merge = (opts && opts.merge) || hasUnsynced();
+      if (!store.restore(merge ? mergeData(localData(), rows[0].data) : rows[0].data)) throw new Error('RESTORE_FAILED');
+      loadedFor = uid;
+      return merge ? 'merged' : true;                 // cloud is the source of truth
     }
+    loadedFor = uid;
     return false;                                     // no cloud data yet
   }
+  function vaultLoaded() { return !!(session && session.user && loadedFor === session.user.id); }
   async function saveVault() {
     if (!authed()) return false;
-    await ensureFresh();
+    if (!vaultLoaded()) throw new Error('NOT_LOADED');
+    if (!(await ensureFresh())) throw new Error('NO_SESSION');
+    const seq = changeSeq;
     const body = { user_id: user().id, data: localData(), updated_at: new Date().toISOString() };
     const res = await api('/rest/v1/vaults', {
       method: 'POST', auth: true,
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body
     });
     if (!res.ok) throw new Error('HTTP_' + res.status);
+    if (seq === changeSeq) store.set(UNSYNCED, false);
     return true;
   }
 
@@ -178,7 +230,9 @@
     if (!res.ok) throw new Error('HTTP_' + res.status);
     // index entry (deduped by kind+id)
     const idx = (store.get('cloud_files', []) || []).filter((f) => !(f.kind === kind && f.id === id));
-    idx.push(Object.assign({ kind, id, ts: Date.now(), size: bytes.byteLength || bytes.length || 0 }, meta || {}));
+    const m = Object.assign({}, meta || {});
+    if (Array.isArray(m.fill)) m.fill = packFill(m.fill);
+    idx.push(Object.assign({ kind, id, ts: Date.now(), size: bytes.byteLength || bytes.length || 0 }, m));
     store.set('cloud_files', idx.slice(-120));
     return true;
   }
@@ -204,7 +258,30 @@
     store.set('cloud_files', (store.get('cloud_files', []) || []).filter((f) => !(f.kind === kind && f.id === id)));
     return true;
   }
-  function fileIndex(kind) { return (store.get('cloud_files', []) || []).filter((f) => !kind || f.kind === kind); }
+  function fileIndex(kind) {
+    return (store.get('cloud_files', []) || []).filter((f) => !kind || f.kind === kind)
+      .map((f) => (Array.isArray(f.fill) && f.fill.some((e) => e && e.imgRef) ? Object.assign({}, f, { fill: unpackFill(f.fill) }) : f));
+  }
+  // A history entry's fill carries its signature/stamp as an image. Stored in
+  // every entry, the same signature filled the browser's storage after enough
+  // exports (and then every save failed): each image is kept ONCE, by content.
+  const IMGS = 'cloud_imgs';
+  function imgKey(u) { let h = 0; for (let i = 0; i < u.length; i += Math.max(1, (u.length / 4096) | 0)) h = (h * 31 + u.charCodeAt(i)) | 0; return 'i' + (h >>> 0).toString(36) + '_' + u.length; }
+  function packFill(fill) {
+    const imgs = store.get(IMGS, {}) || {}; let added = false;
+    const out = fill.map((e) => {
+      if (!e || typeof e.imgUrl !== 'string' || e.imgUrl.indexOf('data:') !== 0) return e;
+      const k = imgKey(e.imgUrl);
+      if (imgs[k] !== e.imgUrl) { imgs[k] = e.imgUrl; added = true; }
+      const c = Object.assign({}, e); delete c.imgUrl; c.imgRef = k; return c;
+    });
+    if (added) store.set(IMGS, imgs);
+    return out;
+  }
+  function unpackFill(fill) {
+    const imgs = store.get(IMGS, {}) || {};
+    return fill.map((e) => (e && e.imgRef ? Object.assign({}, e, { imgUrl: imgs[e.imgRef] || null }) : e));
+  }
 
   // ---- the certificates department (shared, see SUPABASE.md §4) ----------
   // Personal data stays personal; what the department shares is its
@@ -275,5 +352,5 @@
   };
 
   PFS.account = {
-    dept, _mergeData: mergeData, cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
+    dept, _mergeData: mergeData, cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, vaultLoaded: () => vaultLoaded(), noteLocalChange: () => noteLocalChange(), hasUnsynced: () => hasUnsynced(), putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
 })(window);

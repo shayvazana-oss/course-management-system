@@ -4326,6 +4326,333 @@ async function main() {
     return ok ? true : JSON.stringify(out);
   })));
 
+  // ---- a form filled FOR a student carries none of the clerk's own details ----
+  // and a student list is text, never code, in the course binder
+  check('👩‍🎓 filling for a student: separate first/last name come from the STUDENT, the clerk\'s birth date stays out; a "<img onerror>" name in the binder stays text', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, S = window.PFS.store; const out = {};
+    const profs = S.get('profiles'), act = S.get('active_profile');
+    S.set('profiles', [{ id: 'clerk', name: 'clerk', values: { 'שם פרטי': 'פקידה', 'שם משפחה': 'משרדית', 'תאריך לידה': '01.01.1980', 'תעודת זהות': '000000018', 'שם המוסד': 'היחידה ללימודי חוץ' } }]);
+    S.set('active_profile', 'clerk');
+    try {
+      const f = (k, label) => ({ page: 0, fieldKey: k, label, fx: 0.1, fy: 0.1, fw: 0.2, fh: 0.02, fontFrac: 0.02, type: 'text' });
+      const det = { tier: 'text', fields: [f('a', 'שם פרטי'), f('b', 'שם משפחה'), f('c', 'תאריך לידה'), f('d', 'תעודת זהות'), f('e', 'שם המוסד')] };
+      T.setStudent({ 'שם מלא': 'נועה ברק', 'תעודת זהות': '033440124', 'טלפון': '' });
+      const r = T.vaultPrefillFor(det) || {};
+      out.fill = r.text || r;
+      // the binder: a course and a student with markup for a name
+      window.__xss = 0;
+      const c = window.PFS.courses.create('<img src=x onerror="window.__xss++">');
+      window.PFS.courses.addStudents(c.id, [{ name: '<img src=x onerror="window.__xss++">', tz: '<b>1</b>' }]);
+      document.getElementById('coursesBtn').click();                       // the course list
+      await new Promise((rr) => setTimeout(rr, 200));
+      const shownList = document.getElementById('coursesBody').textContent;
+      const row = [...document.querySelectorAll('#coursesBody .card')].find((r) => r.textContent.includes('<img'));
+      row && row.click();                                                   // the course's grid
+      await new Promise((rr) => setTimeout(rr, 300));
+      out.xss = window.__xss; out.shown = shownList + document.getElementById('coursesBody').textContent;
+      document.getElementById('coursesModal').classList.remove('show');
+      window.PFS.courses.remove(c.id);
+    } finally { S.set('profiles', profs); S.set('active_profile', act); }
+    const t = out.fill;
+    const ok = t.a === 'נועה' && t.b === 'ברק' && !t.c && t.d === '033440124' && t.e === 'היחידה ללימודי חוץ' && out.xss === 0 && /<img/.test(out.shown);
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- editing details that silently went wrong ----
+  // (1) Ctrl+Z right after opening a second document restored the FIRST
+  // document's page state (its page list collapsed to one page); (2) the
+  // props panel's text box changed the export but not the page; (3) undo
+  // dropped a certificate name's weight and a replacement's anchor;
+  // (4) Ctrl+D copied the field tie, so one profile fill overwrote both.
+  check('↩ editing: Ctrl+Z after opening another file keeps its pages; the panel\'s text box updates the page; undo keeps weight/anchor; Ctrl+D makes an independent copy', why(await page.evaluate(async () => {
+    const T = window.PFS.__test; const out = {};
+    const mk = async (n) => { const d = await window.PDFLib.PDFDocument.create(); for (let i = 0; i < n; i++) d.addPage([595, 842]).drawText('P' + (i + 1) + ' editing fixture ' + n, { x: 50, y: 700, size: 14 }); return d.save(); };
+    await T.openPdfFile(new File([await mk(1)], 'one.pdf', { type: 'application/pdf' }));
+    await T.openPdfFile(new File([await mk(3)], 'three.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 700));
+    T.undo(); await new Promise((r) => setTimeout(r, 300));
+    out.pagesAfterUndo = document.querySelectorAll('#pageJump option').length;
+    T.overlay.clearElements();
+    const c = T.overlay.addModelAt('text', 0, { fx: 0.2, fy: 0.3, fontFrac: 0.02, text: 'before', fieldKey: 'שם מלא', weight: 600, anchorRight: 0.5 }, false);
+    T.snapshotNow();
+    T.overlay.selectCtrl(c);
+    await new Promise((r) => setTimeout(r, 100));
+    const inp = [...document.querySelectorAll('#propsBody input[type=text], #propsBody textarea')].find((i) => i.value === 'before');
+    if (inp) { inp.value = 'after'; inp.dispatchEvent(new Event('input')); }
+    out.panel = !!inp; out.screen = c.node.querySelector('.txt').textContent;
+    c.model.text = 'moved'; T.snapshotNow(); T.undo(); await new Promise((r) => setTimeout(r, 100));
+    const back = T.overlay.getElements()[0].model;
+    out.kept = [back.weight, back.anchorRight];
+    T.overlay.selectCtrl(T.overlay.getElements()[0]); document.activeElement && document.activeElement.blur && document.activeElement.blur();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', code: 'KeyD', ctrlKey: true, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 100));
+    const els = T.overlay.getElements().map((e) => e.model);
+    out.copy = els.length === 2 ? [els[1].fieldKey, els[1].anchorRight] : els.length;
+    T.overlay.clearElements();
+    const ok = out.pagesAfterUndo === 3 && out.panel && out.screen === 'after' && out.kept[0] === 600 && out.kept[1] === 0.5 && Array.isArray(out.copy) && out.copy[0] === '' && out.copy[1] == null;
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- a round stamp stays round ----
+  // fh = fw / aspect mixed a fraction of the page WIDTH with one of its
+  // HEIGHT: on A4 every stamp/signature came out 1.41× too tall (a round
+  // stamp → a tall oval), on screen and in the exported PDF alike.
+  {
+    await page.evaluate(async () => { await window.PFS.__test.openPdfFile(new File([await (await fetch('test/fixtures/form.pdf')).arrayBuffer()], 'stamp-test.pdf', { type: 'application/pdf' })); window.PFS.__test.overlay.clearElements(); });
+    await page.waitForTimeout(1200);
+    const png = await page.evaluate(async () => { const c = document.createElement('canvas'); c.width = 300; c.height = 300; const x = c.getContext('2d'); x.fillStyle = '#1a3fa0'; x.beginPath(); x.arc(150, 150, 140, 0, Math.PI * 2); x.fill(); return Array.from(new Uint8Array(await (await new Promise((r) => c.toBlob(r, 'image/png'))).arrayBuffer())); });
+    const sp = path.join(HERE, 'zz-stamp.png'); fs.writeFileSync(sp, Buffer.from(png));
+    const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.evaluate(() => document.getElementById('upStampBtn').click())]);
+    await fc.setFiles(sp); await page.waitForTimeout(800); fs.unlinkSync(sp);
+    const pb = await page.evaluate(() => { document.getElementById('viewport').scrollTo(0, 0); const b = document.querySelector('.page-wrap canvas.pdf').getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+    await page.mouse.click(pb.x + pb.w * 0.4, pb.y + 220); await page.waitForTimeout(500);
+    const r = await page.evaluate(async () => {
+      const T = window.PFS.__test; const img = T.overlay.getElements().find((c) => c.model.type === 'image');
+      if (!img) return { none: true };
+      const b = img.node.getBoundingClientRect();
+      const screen = +(b.width / b.height).toFixed(3);
+      const bytes = await window.PFS.exporter.exportPdf(T.pdfView.getBytes(), [img.model], { quality: 'standard' });
+      const doc = await window.pdfjsLib.getDocument({ data: bytes }).promise; const p1 = await doc.getPage(1);
+      const vp = p1.getViewport({ scale: 1 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height; const cx = cv.getContext('2d');
+      await p1.render({ canvasContext: cx, viewport: vp }).promise;
+      const d = cx.getImageData(0, 0, cv.width, cv.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+      for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) { const i = (y * cv.width + x) * 4; if (d[i + 2] > 120 && d[i] < 80) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+      return { screen, exported: +((x1 - x0 + 1) / (y1 - y0 + 1)).toFixed(3), kind: img.model.kind };
+    });
+    check('🔵 a round stamp stays round — on screen and in the exported PDF (it used to come out a tall oval)', why(r.screen > 0.95 && r.screen < 1.05 && r.exported > 0.95 && r.exported < 1.05 ? true : JSON.stringify(r)));
+  }
+
+  // ---- a redesigned format with the SAME file name is a new format ----
+  // The shelf and the archive found formats by NAME: after "תעודה.pdf" was
+  // redesigned, reprints of the earlier class came out on the NEW design.
+  check('🎨 two designs both named "תעודה.pdf": each class reprints from the archive on its OWN design', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    const out = {};
+    try {
+      window.PFS.store.set('cert_registry', { batches: [] });
+      const { PDFDocument, rgb } = window.PDFLib;
+      const fmt = async (c) => { const d = await PDFDocument.create(); const pg = d.addPage([842, 595]); pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) }); pg.drawRectangle({ x: 20, y: 20, width: 802, height: 80, color: c }); return d.save(); };
+      const runClass = async (bytes, who) => {
+        await T.startCertFlow(new File([bytes.slice(0)], 'תעודה.pdf', { type: 'application/pdf' }));
+        await new Promise((r) => setTimeout(r, 1200));
+        T.overlay.clearElements(); T.certPlace(0, 0.5, 0.45, 'שם מלא');
+        const next = () => { const b = document.querySelector('.cert-card #certNext'); if (b && !b.disabled) b.click(); };
+        next(); T.certLoadList(M.parseCSV('שם מלא\n' + who), 'l.csv'); next(); next();
+        await T.certProduce('single', { noDownload: true });
+        await T.goHome(); await new Promise((r) => setTimeout(r, 300));
+      };
+      await runClass(await fmt(rgb(0.9, 0.1, 0.1)), 'אדום ראשון');
+      await runClass(await fmt(rgb(0.1, 0.2, 0.9)), 'כחול שני');
+      const bs = T.certRegistry().batches;
+      const colour = async (b) => {
+        const bytes = await T.certArchiveBuild(b, 'single');
+        const doc = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise; const p1 = await doc.getPage(1);
+        const vp = p1.getViewport({ scale: 0.5 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height; const cx = cv.getContext('2d');
+        await p1.render({ canvasContext: cx, viewport: vp }).promise;
+        const d = cx.getImageData(Math.round(cv.width / 2), cv.height - 20, 1, 1).data;
+        return d[0] > d[2] ? 'red' : 'blue';
+      };
+      out.c = [];
+      for (const b of bs) out.c.push((b.entries[0].name) + ':' + await colour(b));
+    } finally { window.PFS.ui.confirm = realConfirm; }
+    const ok = out.c.length === 2 && out.c.includes('אדום ראשון:red') && out.c.includes('כחול שני:blue');
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- a cropped PDF: values land where the screen shows them ----
+  // A form cropped in Acrobat (CropBox inside the MediaBox) is shown by its
+  // crop; the export drew on the full MediaBox — every value slid by the
+  // crop margin (and grew): ~4 cm off on this page.
+  check('✂️ a cropped PDF (CropBox): an exported value lands exactly where it shows on screen', why(await page.evaluate(async () => {
+    const { PDFDocument, rgb } = window.PDFLib;
+    const d = await PDFDocument.create(); const p = d.addPage([612, 792]);
+    p.drawRectangle({ x: 100, y: 600, width: 20, height: 20, color: rgb(0, 0, 1) });
+    p.setCropBox(50, 50, 512, 692);
+    const T = window.PFS.__test;
+    await T.openPdfFile(new File([await d.save()], 'cropped.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 1000));
+    T.overlay.clearElements();
+    const find = (cx, w, h, test) => { const dd = cx.getImageData(0, 0, w, h).data; let x0 = 1e9, y0 = 1e9; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; if (test(dd[i], dd[i + 1], dd[i + 2])) { if (x < x0) x0 = x; if (y < y0) y0 = y; } } return [x0 / w, y0 / h]; };
+    const cv = document.querySelector('.page-wrap canvas.pdf');
+    const [fx, fy] = find(cv.getContext('2d'), cv.width, cv.height, (r, g, b) => b > 200 && r < 60);
+    T.overlay.addModelAt('highlight', 0, { fx, fy, fw: 0.037, fh: 0.027, color: '#ff0000', opacity: 1 }, false);
+    const models = T.overlay.getElements().map((c) => c.model);
+    const ex = await window.PFS.exporter.exportPdf(T.pdfView.getBytes(), models, { quality: 'standard' });
+    const doc = await window.pdfjsLib.getDocument({ data: ex }).promise; const p1 = await doc.getPage(1);
+    const vp = p1.getViewport({ scale: 1 }); const c2 = document.createElement('canvas'); c2.width = vp.width; c2.height = vp.height;
+    await p1.render({ canvasContext: c2.getContext('2d'), viewport: vp }).promise;
+    const [rx, ry] = find(c2.getContext('2d'), c2.width, c2.height, (r, g, b) => r > 150 && b < 120);
+    T.overlay.clearElements();
+    const ok = models[0].type === 'rect' && Math.abs(rx - fx) < 0.01 && Math.abs(ry - fy) < 0.01;
+    return ok ? true : JSON.stringify({ type: models[0].type, screen: [fx, fy], exported: [rx, ry] });
+  })));
+
+  // ---- a redaction removes the text it covers ----
+  // השחרה painted a black box over the page and left the text layer under it:
+  // search/copy in the exported PDF still found the "blacked-out" ID number.
+  check('⬛ השחרה: the covered text is gone from the exported PDF (search/copy finds nothing), the rest of the page still prints', why(await page.evaluate(async () => {
+    const T = window.PFS.__test;
+    const { PDFDocument, StandardFonts } = window.PDFLib;
+    const d = await PDFDocument.create(); const pg = d.addPage([595, 842]); const f = await d.embedFont(StandardFonts.Helvetica);
+    pg.drawText('ID 012345678 SECRET', { x: 60, y: 700, size: 18, font: f });
+    pg.drawText('Visible line', { x: 60, y: 600, size: 18, font: f });
+    const bytes = await d.save();
+    const models = [{ type: 'rect', kind: 'redact', page: 0, fx: 0.09, fy: 1 - 720 / 842, fw: 0.5, fh: 30 / 842, color: '#000000' }];
+    const out = {};
+    // without the app's renderer (batch paths) and with it (the export window)
+    for (const withBase of [false, true]) {
+      const renderBase = withBase ? async (idx, sc) => { const dd = await window.pdfjsLib.getDocument({ data: bytes.slice(0) }).promise; const pp = await dd.getPage(idx + 1); const v = pp.getViewport({ scale: sc }); const c = document.createElement('canvas'); c.width = Math.round(v.width); c.height = Math.round(v.height); const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); await pp.render({ canvasContext: x, viewport: v }).promise; return { canvas: c }; } : undefined;
+      const ex = await window.PFS.exporter.exportPdf(bytes, models, { quality: 'standard', renderBase });
+      const doc = await window.pdfjsLib.getDocument({ data: ex.slice(0) }).promise; const p1 = await doc.getPage(1);
+      const txt = (await p1.getTextContent()).items.map((i) => i.str).join(' ');
+      const vp = p1.getViewport({ scale: 1 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+      const cx = cv.getContext('2d'); await p1.render({ canvasContext: cx, viewport: vp }).promise;
+      const dark = (x0, y0, w, h) => { const dd = cx.getImageData(x0, y0, w, h).data; let n = 0; for (let i = 0; i < dd.length; i += 4) if (dd[i] < 80) n++; return n / (w * h); };
+      out[withBase ? 'b' : 'a'] = { secret: /SECRET|012345678/.test(txt), box: +dark(70, 130, 200, 18).toFixed(2), visible: dark(55, 225, 120, 25) > 0.03, size: [Math.round(vp.width), Math.round(vp.height)] };
+    }
+    const ok = ['a', 'b'].every((k) => !out[k].secret && out[k].box > 0.9 && out[k].visible && out[k].size[0] === 595 && out[k].size[1] === 842);
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- student lists as offices really save them ----
+  // A CSV from Hebrew Excel is Windows-1255 (it loaded as "����"); a header
+  // with ת"ז / מק"ט unquoted swallowed the whole file into one cell; a title
+  // line above the header became the header; an ID typed into a number cell
+  // lost its leading zero (only Excel files got it back).
+  check('📋 student lists: Hebrew-Excel CSV (Windows-1255), ת"ז in a header, a title line, a lost leading zero — all read right', why(await page.evaluate(async () => {
+    const M = window.PFS.merge;
+    const cp1255 = (str) => new Uint8Array([...str].map((ch) => { const c = ch.charCodeAt(0); return c >= 0x5D0 && c <= 0x5EA ? 0xE0 + (c - 0x5D0) : c; }));
+    const out = {};
+    const a = M.parseCSV(M.decodeText(cp1255('שם מלא,תעודת זהות\r\nנועה ברק,033440124\r\n')));
+    out.cp = [a.headers.join('|'), a.records[0] && a.records[0]['שם מלא']];
+    const b = M.parseCSV('שם מלא,ת"ז,מק"ט\nיוסי כהן,123456782,HM-1\nדנה לוי,33440124,HM-1');
+    out.quote = [b.headers.join('|'), b.records.length, b.records[1] && b.records[1]['ת"ז']];
+    const c = M.parseCSV('רשימת סטודנטים - מחזור 12,,\nשם מלא,תעודת זהות,טלפון\nנועה ברק,033440124,0501234567');
+    out.title = [c.headers.join('|'), c.records.length];
+    const d = window.PFS.courses.parseStudentRows('נועה ברק\nיוסי כהן\t123456782');
+    out.noHeader = d.map((r) => r.name).join('|');
+    const e = M.parseCSV(M.decodeText(new TextEncoder().encode('﻿שם מלא;תעודת זהות\nאבי מזרחי;000000018')));
+    out.utf8 = [e.headers.join('|'), e.records[0] && e.records[0]['תעודת זהות']];
+    const ok = out.cp[0] === 'שם מלא|תעודת זהות' && out.cp[1] === 'נועה ברק'
+      && out.quote[0] === 'שם מלא|ת"ז|מק"ט' && out.quote[1] === 2 && out.quote[2] === '033440124'
+      && out.title[0] === 'שם מלא|תעודת זהות|טלפון' && out.title[1] === 1
+      && out.noHeader === 'נועה ברק|יוסי כהן' && out.utf8[0] === 'שם מלא|תעודת זהות' && out.utf8[1] === '000000018';
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- Excel cells read the way Excel SHOWS them ----
+  // A grade formatted "0" (=AVERAGE → 86.666666666666671) printed with its
+  // floating tail; a Long-Date cell ("[$-F800]dddd, mmmm dd, yyyy" — its
+  // locale tag holds a 0) printed as the serial 46277.
+  check('📊 Excel: a grade prints as shown ("87"), General drops float noise, a Long-Date cell is a date', why(await page.evaluate(() => {
+    const enc = (x) => new TextEncoder().encode(x);
+    const inl = (r, t) => `<c r="${r}" t="inlineStr"><is><t>${t}</t></is></c>`;
+    const files = {
+      '[Content_Types].xml': enc('<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>'),
+      'xl/styles.xml': enc('<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="[$-F800]dddd, mmmm dd, yyyy"/></numFmts><cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="165"/><xf numFmtId="2"/></cellXfs></styleSheet>'),
+      'xl/worksheets/sheet1.xml': enc('<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+        + '<row r="1">' + inl('A1', 'שם מלא') + inl('B1', 'ציון') + inl('C1', 'תאריך סיום') + inl('D1', 'ממוצע') + inl('E1', 'כללי') + '</row>'
+        + '<row r="2">' + inl('A2', 'נועה ברק') + '<c r="B2" s="1"><v>86.666666666666671</v></c><c r="C2" s="2"><v>46277</v></c><c r="D2" s="3"><v>91.256</v></c><c r="E2"><v>0.30000000000000004</v></c></row>'
+        + '</sheetData></worksheet>')
+    };
+    const r = window.PFS.merge.parseXlsx(window.fflate.zipSync(files)).records[0] || {};
+    const ok = r['ציון'] === '87' && r['תאריך סיום'] === '12.09.2026' && r['ממוצע'] === '91.26' && r['כללי'] === '0.3';
+    return ok ? true : JSON.stringify(r);
+  })));
+
+  // ---- a long name inside the certificate sentence ----
+  // The sentence wraps: a 40-letter name added a line its sample never had,
+  // running into the field under it with no warning (and past the export's
+  // crop when the sentence was lowest). It keeps the sample's line count.
+  check('📜 a very long name in the certificate sentence keeps the sentence to its lines (eases the size), nothing overlaps', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge; const out = {};
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    try {
+      const { PDFDocument, rgb } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([842, 595]); pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawText('SENTENCE FORMAT', { x: 300, y: 540, size: 20 });
+      await T.startCertFlow(new File([await d.save()], 'משפט.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1200));
+      T.overlay.clearElements();
+      const sen = T.certPlaceSentence(0, 0.32, 0.45);   // beside a seal: a narrower sentence
+      const course = T.certPlace(0, 0.32, 0.45 + (sen.model.fh || 0.08) + 0.03, 'תאריך סיום');
+      const base = T.overlay.getElements().map((c) => c.model);
+      const short = T.certLayoutModels(base, { 'שם מלא': 'נועה ברק', 'שם הקורס': 'הנהלת חשבונות', 'תאריך סיום': '12.09.2026' });
+      const long = T.certLayoutModels(base, { 'שם מלא': 'אלכסנדרה-מריה ולנטינה בן-שמעון אברהמסון-רוזנבלום', 'שם הקורס': 'הנהלת חשבונות', 'תאריך סיום': '12.09.2026' });
+      const si = base.indexOf(sen.model);
+      out.sizes = [short.models[si].fontFrac, long.models[si].fontFrac].map((v) => +v.toFixed(4));
+      const r0 = T.certPageRatio(0);
+      out.lines = [T.certWrapLines(sen.model, sen.model.text, r0), T.certWrapLines(Object.assign({}, long.models[si], { fontFrac: sen.model.fontFrac }), long.models[si].text, r0), T.certWrapLines(long.models[si], long.models[si].text, r0)];
+      out.text = long.models[si].text; out.wrapW = sen.model.wrapW;
+      out.issues = long.report.issues.map((x) => x.kind + ':' + x.keys.join('|'));
+      out.shortIssues = short.report.issues.length;
+      await T.goHome();
+    } finally { window.PFS.ui.confirm = realConfirm; }
+    const ok = out.shortIssues === 0 && out.issues.length === 0 && out.sizes[1] < out.sizes[0];
+    return ok ? true : JSON.stringify(out);
+  })));
+
+  // ---- a class produced as ZIP *and* as one PDF is ONE batch ----
+  // The clerk e-mails the ZIP and prints the PDF. Before: each run took new
+  // serial numbers (two different numbers per student, the class filed
+  // twice), a completion date typed once for everyone printed as TODAY (and
+  // a reprint as the reprint's day), and the archive's reprint blanked every
+  // value typed once (the course name).
+  check('🎓 ZIP + PDF of one class share serials and one archive entry; a date and a course typed once print as typed — also on a reprint', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, M = window.PFS.merge;
+    const realConfirm = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+    const out = {};
+    try {
+      window.PFS.store.set('templates', (window.PFS.store.get('templates', []) || []).filter((t) => !t.auto));
+      window.PFS.store.set('cert_registry', { batches: [] });
+      const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+      const d = await PDFDocument.create(); const pg = d.addPage([842, 595]);
+      pg.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(1, 1, 1) });
+      pg.drawText('ONE BATCH FORMAT', { x: 280, y: 500, size: 30, font: await d.embedFont(StandardFonts.TimesRomanBold) });
+      await T.startCertFlow(new File([(await d.save()).slice(0)], 'תעודת-אצווה.pdf', { type: 'application/pdf' }));
+      await new Promise((r) => setTimeout(r, 1500));
+      T.overlay.clearElements();
+      T.certPlace(0, 0.5, 0.35, 'שם מלא');
+      const course = T.certPlace(0, 0.5, 0.5, 'שם הקורס');
+      const end = T.certPlace(0, 0.3, 0.7, 'תאריך סיום');
+      const start = T.certPlace(0, 0.7, 0.7, 'תאריך התחלה');
+      T.certPlace(0, 0.5, 0.85, 'מספר תעודה');
+      // typed once for everyone (what the "ערך קבוע לכולם" box does)
+      [[course, 'הנהלת חשבונות'], [end, '12.09.2026'], [start, '01.03.2026']].forEach(([c, v]) => { c.model.text = v; c.layout(); });
+      const next = () => { const b = document.querySelector('.cert-card #certNext'); if (b && !b.disabled) b.click(); };
+      next();
+      T.certLoadList(M.parseCSV('שם מלא,תעודת זהות\nנועה ברק,033440124\nיוסי כהן,123456782'), 'class.csv');
+      next(); next();
+      const serialBefore = T.certNextSerial ? T.certNextSerial(0) : null;
+      const [zip, one] = [await T.certProduce('zip', { noDownload: true }), await T.certProduce('single', { noDownload: true })];
+      out.both = !!(zip && one);
+      const reg = T.certRegistry();
+      out.batches = reg.batches.length;
+      const b = reg.batches[0];
+      out.serials = b.entries.map((e) => e.serial);
+      out.nextAfter = T.certNextSerial ? T.certNextSerial(0) : null;
+      out.serialBefore = serialBefore;
+      // what prints, from the original layout and from the archive's recipe
+      const texts = (models) => Object.fromEntries(models.filter((m) => m.fieldKey).map((m) => [m.fieldKey, m.text]));
+      const live = T.certLayoutModels(T.overlay.getElements().map((c) => c.model), Object.assign({ 'שם מלא': 'נועה ברק' }, {}));
+      out.live = texts(live.models);
+      const rec = T.certArchiveRecords(b)[0];
+      out.reprint = texts(T.certLayoutModels(b.models, rec).models);
+      // a double-click on "ZIP" while it runs produces once
+      const [r1, r2] = await Promise.all([T.certProduce('zip', { noDownload: true }), T.certProduce('zip', { noDownload: true })]);
+      out.doubleClick = [!!r1, !!r2];
+      out.batchesAfter = T.certRegistry().batches.length;
+      await T.goHome();
+    } finally { window.PFS.ui.confirm = realConfirm; }
+    const ok = out.both && out.batches === 1 && out.serials.length === 2 && out.serials[0] !== out.serials[1]
+      && out.nextAfter === out.serialBefore.replace(/\d+$/, (n) => String(+n + 2).padStart(n.length, '0'))
+      && out.live['תאריך סיום'] === '12.09.2026' && out.live['תאריך התחלה'] === '01.03.2026'
+      && out.reprint['תאריך סיום'] === '12.09.2026' && out.reprint['שם הקורס'] === 'הנהלת חשבונות' && out.reprint['תאריך התחלה'] === '01.03.2026'
+      && out.doubleClick.filter(Boolean).length === 1 && out.batchesAfter === 1;
+    return ok ? true : JSON.stringify(out);
+  })));
+
   // ---- "החלפה" on a real form: the way a clerk uses it ----
   // A Hebrew form printed by Chrome (values on underlines, a sentence with a
   // price, a table). Real mouse drags and real typing, Esc after each value.
@@ -5587,6 +5914,111 @@ async function main() {
       && M.cloud.templates.join() === 'tc,tl,ts' && M.cloud.batches.join() === 'bc,bl' && M.cloud.serial === 9 && M.second;
     if (!okM) console.log('  [merge debug]', JSON.stringify(M));
     check('👤 first sign-in on a computer with its own work: computer + cloud merged — nothing lost (lists united, newer copy wins, counter never steps back), the cloud then holds it all', okM);
+  }
+
+  // ---- the cloud vault is never saved over blind ----
+  // Before: a sign-in whose vault READ failed (offline, a 500) left the
+  // just-wiped computer to "auto-save" — replacing the whole account with
+  // nothing; changes closed within the 2-second debounce were restored over
+  // on the next start; a session that could not be renewed locked the
+  // keyboard behind an invisible sign-in screen.
+  {
+    const yr = new Date().getFullYear();
+    const J = (v) => JSON.stringify(v);
+    const vaults = { u9: { 'pfs:profiles': J([{ id: 'keep', name: 'פרופיל חשוב' }]), 'pfs:templates': J([{ id: 'tk', name: 'תבנית ענן', ts: 1 }]) } };
+    let failGets = 1, posts = 0, badPosts = 0, refreshFails = false;
+    const errMark = jsErrors.length;   // the 500 / 400 below are this test's own doing
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const tokens = {};
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/token') {
+        await body(req);
+        if (u.searchParams.get('grant_type') === 'refresh_token' && refreshFails) return json(res, 400, { error_description: 'Invalid Refresh Token' });
+        const tok = 'tok_' + Math.random().toString(36).slice(2); tokens[tok] = 'u9';
+        return json(res, 200, { access_token: tok, refresh_token: 'r9', expires_in: 3600, user: { id: 'u9', email: 'safe@fillo.test' } });
+      }
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); const me = m && tokens[m[1]];
+      if (!me) return json(res, 401, {});
+      if (p === '/rest/v1/vaults') {
+        if (req.method === 'GET') { if (failGets > 0) { failGets--; return json(res, 500, {}); } return json(res, 200, vaults[me] ? [{ data: vaults[me] }] : []); }
+        posts++; const b = JSON.parse((await body(req)).toString() || '{}');
+        // a save that would drop the account's profile = saving over it blind
+        if (!/"keep"/.test(String((b.data || {})['pfs:profiles'] || ''))) badPosts++;
+        vaults[me] = b.data; return json(res, 201);
+      }
+      if (p.startsWith('/rest/v1/dept_')) return json(res, 200, []);
+      if (p.startsWith('/rest/v1/rpc/dept_')) return json(res, 200, false);
+      if (p.startsWith('/storage/v1/object/')) { await body(req); return json(res, 200, {}); }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const V = {};
+    try {
+      // a computer that was signed out (wiped): the same person signs in while the server stumbles
+      await page.evaluate(async ({ url }) => {
+        const S = window.PFS.store;
+        S.remove('acct:session'); S.set('acct:last_user', 'someone-else');
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.__test.acct.gate();
+      }, { url: mockUrl });
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      await page.fill('#loginBody #acctEmail', 'safe@fillo.test'); await page.fill('#loginBody #acctPass', 'pw');
+      await page.click('#loginBody #acctIn');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      // an edit right away: it must NOT replace the account's vault with this empty computer
+      await page.evaluate(() => window.PFS.store.set('theme_probe', 'x'));
+      await page.waitForTimeout(2600);
+      // the next save reads first (now OK), merges, then saves: the account's data is here AND kept
+      await page.waitForFunction(() => (window.PFS.store.get('profiles', []) || []).some((p) => p.id === 'keep'), { timeout: 25000 });
+      await page.waitForTimeout(2600);
+      V.afterFailedLoad = { posts, badPosts, cloudProfiles: JSON.parse(vaults.u9['pfs:profiles'] || '[]').map((x) => x.id) };
+      V.recovered = { local: (await page.evaluate(() => (window.PFS.store.get('profiles', []) || []).map((p) => p.id))), cloudProbe: vaults.u9['pfs:theme_probe'] || null, cloudProfiles: JSON.parse(vaults.u9['pfs:profiles']).map((x) => x.id) };
+      // history entries keep their signature image ONCE, not once per export
+      V.imgs = await page.evaluate(async () => {
+        const sig = 'data:image/png;base64,' + 'A'.repeat(20000);
+        for (let i = 0; i < 5; i++) await window.PFS.account.putFile('recent', 'h' + i, new Uint8Array([1, 2, 3]), { name: 'd' + i + '.pdf', fill: [{ type: 'image', kind: 'signature', imgUrl: sig, page: 0, fx: 0.1, fy: 0.1, fw: 0.2, fh: 0.05 }] });
+        const raw = JSON.stringify(window.PFS.store.get('cloud_files', []));
+        const back = window.PFS.account.fileIndex('recent').filter((f) => /^h\d$/.test(f.id));
+        return { indexKB: Math.round(raw.length / 1024), copies: (raw.match(/AAAA/g) || []).length, restored: back.length === 5 && back.every((f) => f.fill[0].imgUrl === sig) };
+      });
+      // a change closed before it reached the cloud: the next start merges it in
+      V.unsynced = await page.evaluate(async () => {
+        const S = window.PFS.store;
+        S.set('late_change', 'yes');                 // marks unsynced; the debounce has not fired
+        const r = await window.PFS.account.loadVault();   // what a fresh start does
+        return { r, kept: S.get('late_change', null) };
+      });
+      // the session cannot be renewed: the sign-in screen shows (not a dead keyboard)
+      refreshFails = true;
+      V.lost = await page.evaluate(async () => {
+        const S = window.PFS.store; const sess = S.get('acct:session'); sess.expires_at = 1; S.set('acct:session', sess);
+        // the in-memory session expires too
+        const ok = await window.PFS.account.refresh();
+        await new Promise((r) => setTimeout(r, 300));
+        return { ok, gate: document.getElementById('loginModal').classList.contains('show'), authed: window.PFS.account.authed() };
+      });
+    } catch (e) { V.error = String(e && e.message || e); }
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      ['acct:cfg', 'acct:session', 'acct:last_user', 'acct:unsynced', 'late_change', 'theme_probe', 'cloud_imgs', 'cloud_files'].forEach((k) => window.PFS.store.remove(k));
+      document.getElementById('loginModal').classList.remove('show');
+      T.acct.render();
+    });
+    mock.close();
+    const okV = !V.error && V.afterFailedLoad.posts > 0 && V.afterFailedLoad.badPosts === 0 && V.afterFailedLoad.cloudProfiles.includes('keep')
+      && V.recovered.local.includes('keep') && V.recovered.cloudProbe === '"x"' && V.recovered.cloudProfiles.includes('keep')
+      && V.unsynced.r === 'merged' && V.unsynced.kept === 'yes'
+      && V.lost.ok === false && V.lost.gate && !V.lost.authed
+      && V.imgs.copies === 0 && V.imgs.indexKB < 10 && V.imgs.restored;
+    for (let i = jsErrors.length - 1; i >= errMark; i--) if (/Failed to load resource: the server responded with a status of (500|400)/.test(jsErrors[i])) jsErrors.splice(i, 1);
+    check('☁️ the account is never saved over blind: a failed read at sign-in saves nothing, then retries + merges; an unsent change survives the next start; an expired session shows the sign-in screen', why(okV ? true : JSON.stringify(V)));
   }
 
   check('exporter library present', await page.evaluate(() => !!(window.PFS.exporter && window.PFS.exporter.exportPdf)));

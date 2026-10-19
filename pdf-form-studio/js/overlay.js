@@ -267,7 +267,10 @@
           text: m.text, imgUrl: m.imgUrl, aspect: m.aspect, fieldKey: m.fieldKey || '',
           opacity: m.opacity, auto: m.auto || undefined, formula: m.formula || '', format: m.format || '', letterSpacing: m.letterSpacing || 0,
           font: m.font || undefined, wrapW: m.wrapW || undefined, cellW: m.cellW || undefined,
-          cellX: m.cellX != null ? round(m.cellX) : undefined, maxW: m.maxW || undefined, certTag: m.certTag || undefined
+          cellX: m.cellX != null ? round(m.cellX) : undefined, maxW: m.maxW || undefined, certTag: m.certTag || undefined,
+          // the certificate face weight, a replacement's right anchor and
+          // handwriting spacing survive undo/redo and auto-memory
+          weight: m.weight || undefined, anchorRight: m.anchorRight != null ? round(m.anchorRight) : undefined, tracking: m.tracking || undefined
         };
       });
     }

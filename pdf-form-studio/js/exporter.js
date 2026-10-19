@@ -224,6 +224,33 @@
     return canvas;
   }
 
+  // the page as it looks (its own rotation + the user's), white paper under
+  // it — the app's renderer when given, else pdf.js straight from the bytes
+  // CropBox ∩ MediaBox — the area every viewer shows
+  function visibleBox(page) {
+    const m = page.getMediaBox();
+    let c = m; try { c = page.getCropBox() || m; } catch (e) {}
+    const x0 = Math.max(m.x, c.x), y0 = Math.max(m.y, c.y);
+    const x1 = Math.min(m.x + m.width, c.x + c.width), y1 = Math.min(m.y + m.height, c.y + c.height);
+    return x1 - x0 > 1 && y1 - y0 > 1 ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : { x: m.x, y: m.y, width: m.width, height: m.height };
+  }
+  let redactDoc = null;
+  async function renderPageForRedaction(originalBytes, idx, scale, rot, opts) {
+    if (opts.renderBase) {
+      try { const b = await opts.renderBase(idx, scale); const c = b && (b.canvas || b); if (c && c.width) return c; } catch (e) {}
+    }
+    if (!redactDoc || redactDoc.src !== originalBytes) {
+      const data = (originalBytes instanceof Uint8Array ? originalBytes : new Uint8Array(originalBytes)).slice(0);
+      redactDoc = { src: originalBytes, doc: await root.pdfjsLib.getDocument({ data }).promise };
+    }
+    const page = await redactDoc.doc.getPage(idx + 1);
+    const vp = page.getViewport({ scale: scale || EXPORT_SCALE, rotation: rot });
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(vp.width)); c.height = Math.max(1, Math.round(vp.height));
+    const cx = c.getContext('2d'); cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: cx, viewport: vp }).promise;
+    return c;
+  }
+
   /* exportPdf(originalBytes, models, opts)
    *   originalBytes : ArrayBuffer/Uint8Array of the source PDF
    *   models        : array of element models (page + fractions)
@@ -275,7 +302,10 @@
     for (const idx of pageIdxs) {
       const page = pages[idx];
       if (!page) continue;
-      const { width: Wpt, height: Hpt } = page.getSize();
+      // the VISIBLE page is the CropBox (what pdf.js shows, so what the editor's
+      // fractions measure), not the MediaBox: a form cropped in Acrobat drew
+      // every value off by the crop margin, and scaled
+      const { x: ox, y: oy, width: Wpt, height: Hpt } = visibleBox(page);
       const intrinsic = ((page.getRotation().angle % 360) + 360) % 360;
       const rot = (intrinsic + userR(idx)) % 360;
       if (userR(idx)) page.setRotation(degrees(rot)); // straighten the page itself
@@ -285,6 +315,23 @@
 
       const models = byPage.get(idx);
       if (!models || !models.length) { done++; opts.onProgress && opts.onProgress(done, pageIdxs.length); continue; }
+
+      // A REDACTION must remove what it covers. Painting a black box over the
+      // page left the text underneath: search / copy in the exported file
+      // still found the blacked-out ID number. A page carrying a redaction
+      // becomes one picture of itself (the text layer is gone with it).
+      if (models.some((m) => m.type === 'rect' && m.kind === 'redact')) {
+        const base = await renderPageForRedaction(originalBytes, idx, scale, rot, opts);
+        const over = rasterizePage(models, displayWpt, displayHpt, imgMap, scale, base);
+        const bx = base.getContext('2d'); bx.drawImage(over, 0, 0, base.width, base.height);
+        const img = await pdfDoc.embedJpg(base.toDataURL('image/jpeg', 0.92));
+        const flat = pdfDoc.insertPage(idx, [displayWpt, displayHpt]);
+        flat.drawImage(img, { x: 0, y: 0, width: displayWpt, height: displayHpt });
+        pdfDoc.removePage(idx + 1);
+        base.width = 0; over.width = 0;
+        done++; opts.onProgress && opts.onProgress(done, pageIdxs.length);
+        continue;
+      }
 
       // Background-matched covers need the page's own pixels to reconstruct
       // from, so render the base page (already rotated, at the export scale)
@@ -302,7 +349,7 @@
         const cr = rasterizeCropped(models, displayWpt, displayHpt, imgMap, scale, baseCanvas);
         const png = await pdfDoc.embedPng(cr.canvas.toDataURL('image/png'));
         page.drawImage(png, {
-          x: cr.fx0 * Wpt, y: Hpt - cr.fy1 * Hpt,
+          x: ox + cr.fx0 * Wpt, y: oy + Hpt - cr.fy1 * Hpt,
           width: (cr.fx1 - cr.fx0) * Wpt, height: (cr.fy1 - cr.fy0) * Hpt
         });
         cr.canvas.width = 0; cr.canvas.height = 0;
@@ -312,13 +359,13 @@
         const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
         switch (rot) {
           case 90:
-            page.drawImage(png, { x: Wpt, y: 0, width: displayWpt, height: displayHpt, rotate: degrees(90) });
+            page.drawImage(png, { x: ox + Wpt, y: oy, width: displayWpt, height: displayHpt, rotate: degrees(90) });
             break;
           case 180:
-            page.drawImage(png, { x: Wpt, y: Hpt, width: Wpt, height: Hpt, rotate: degrees(180) });
+            page.drawImage(png, { x: ox + Wpt, y: oy + Hpt, width: Wpt, height: Hpt, rotate: degrees(180) });
             break;
           case 270:
-            page.drawImage(png, { x: 0, y: Hpt, width: displayWpt, height: displayHpt, rotate: degrees(270) });
+            page.drawImage(png, { x: ox, y: oy + Hpt, width: displayWpt, height: displayHpt, rotate: degrees(270) });
             break;
         }
         canvas.width = 0; canvas.height = 0;

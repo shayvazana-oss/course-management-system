@@ -289,7 +289,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certWrapLines: (m, t, r) => certWrapLines(m, t, r), certPageRatio: (p) => certPageRatio(p), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveRecords: (b) => certArchiveRecords(b), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -340,7 +340,12 @@ function vaultPrefill(det) {
     const stu = pendingStudent; pendingStudent = null;   // one-shot
     // student values ride the same canon matching as the profile (a ת"ז column
     // fills every ת"ז-meaning field) and OUTRANK it — this form is THEIRS
-    const base = Object.assign({}, remembered, ap && ap.values, stu || {});
+    // Filled FOR a student, the clerk's own personal details stay out: a
+    // separate שם פרטי / שם משפחה / תאריך לידה field used to get the clerk's
+    // (the student list carries only the full name, ID and phone).
+    const PERSON = new Set(['full_name', 'first_name', 'last_name', 'id', 'birth_date', 'phone', 'email', 'address', 'house_no', 'city', 'zip', 'gender', 'marital_status', 'health_fund', 'occupation', 'male', 'female', 'single', 'married', 'divorced', 'widowed', 'separated', 'commonlaw', 'clalit', 'maccabi', 'meuhedet', 'leumit']);
+    const notPerson = (o) => { const r = {}; Object.keys(o || {}).forEach((k) => { if (!PERSON.has(PFS.vault.matchKey(k))) r[k] = o[k]; }); return r; };
+    const base = stu ? Object.assign({}, notPerson(remembered), notPerson(ap && ap.values), stu) : Object.assign({}, remembered, ap && ap.values);
     const skip = new Set(overlay.fieldKeys());
     // learned patterns: a value that keeps recurring fills itself (auto mode).
     // Lowest priority — an explicit profile value or carried value always wins.
@@ -1135,6 +1140,9 @@ async function openPdfFile(file) {
     mergeParsed = null;
     $('dropzone').style.display = 'none'; document.body.classList.remove('home');
     await pdfView.load(buf);
+    // the history starts from THIS document: recorded before the load it held
+    // the previous file's page state, and Ctrl+Z collapsed the new one to it
+    clearTimeout(snapT); resetHistory();
     // a phone screen never fits an A4 at 100% — start fitted so the whole
     // page is visible and fingers pan less
     if (window.innerWidth < 720) { try { pdfView.fit(); } catch (e) {} }
@@ -1926,6 +1934,15 @@ async function copyRegion(pageIndex, fx, fy, fw, fh) {
   PFS.toast('📋 האזור הועתק — לחצו על המקום שאליו להדביק (Ctrl+D משכפל שוב)', 'ok', 6000);
 }
 
+// An image keeps its own shape. fw is a fraction of the page's WIDTH and fh
+// of its HEIGHT, so fh = fw / aspect stretched every stamp and signature by
+// the page's proportions (a round stamp came out a tall oval on A4).
+function imgFh(pageIndex, fw, aspect) {
+  const v = pdfView.viewList && pdfView.viewList().find((x) => x.idx === (pageIndex || 0));
+  const r = v && v.canvas && v.canvas.width && v.canvas.height ? v.canvas.width / v.canvas.height : 1;
+  return fw * r / (aspect || 1);
+}
+PFS.imgFh = imgFh;
 function armImagePlacement(kind, item) {
   if (!pdfView.hasDoc()) { PFS.toast('פתח קודם קובץ PDF', 'err'); return; }
   overlay.setPlacing({
@@ -1936,7 +1953,7 @@ function armImagePlacement(kind, item) {
       const fw = item.fw || 0.22;
       overlay.addElementAt('image', pageIndex, fx, fy, {
         imgUrl: item.url, aspect: asp,
-        fw, fh: item.fh || (fw / asp), kind
+        fw, fh: item.fh || imgFh(pageIndex, fw, asp), kind
       });
       return null;
     }
@@ -2018,7 +2035,8 @@ function renderProps(ctrl) {
     // text content
     const f1 = field('טקסט');
     const input = document.createElement('input'); input.type = 'text'; input.value = m.text || '';
-    input.addEventListener('input', () => { m.text = input.value; ctrl.layout(); markDirty(); });
+    // the page shows what the panel says (it used to change only the export)
+    input.addEventListener('input', () => { m.text = input.value; const t = ctrl.node.querySelector('.txt'); if (t) t.textContent = m.text; ctrl.layout(); markDirty(); scheduleSnap(); });
     f1.appendChild(input); body.appendChild(f1);
 
     // field name (for auto-fill from profiles & mail-merge)
@@ -2085,7 +2103,7 @@ function renderProps(ctrl) {
   } else if (m.kind === 'handwriting') {
     const regen = () => {
       const r = PFS.handwriting.renderText(m.text || '', { fontPx: 72, color: m.color || '#000000', tracking: m.tracking });
-      m.imgUrl = r.url; m.aspect = r.w / r.h; m.fh = m.fw / m.aspect;
+      m.imgUrl = r.url; m.aspect = r.w / r.h; m.fh = imgFh(m.page, m.fw, m.aspect);
       const img = ctrl.node.querySelector('img'); if (img) img.src = r.url;
       ctrl.layout(); markDirty();
     };
@@ -2098,7 +2116,7 @@ function renderProps(ctrl) {
     const rowSC = document.createElement('div'); rowSC.className = 'row';
     const fSize = field('גודל'); fSize.style.flex = '1'; const size = document.createElement('input');
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1'; size.value = Math.round(m.fw * 100);
-    size.addEventListener('input', () => { m.fw = parseInt(size.value, 10) / 100; m.fh = m.fw / (m.aspect || 1); ctrl.layout(); markDirty(); });
+    size.addEventListener('input', () => { m.fw = parseInt(size.value, 10) / 100; m.fh = imgFh(m.page, m.fw, m.aspect); ctrl.layout(); markDirty(); });
     fSize.appendChild(size);
     const fCol = field('צבע'); const col = document.createElement('input'); col.type = 'color'; col.value = toHex(m.color || '#000000');
     col.addEventListener('input', () => { m.color = col.value; regen(); }); fCol.appendChild(col);
@@ -2149,7 +2167,7 @@ function renderProps(ctrl) {
     size.type = 'range'; size.min = '3'; size.max = '80'; size.step = '1';
     size.value = Math.round(m.fw * 100);
     size.addEventListener('input', () => {
-      m.fw = parseInt(size.value, 10) / 100; m.fh = m.fw / (m.aspect || 1); ctrl.layout(); markDirty();
+      m.fw = parseInt(size.value, 10) / 100; m.fh = imgFh(m.page, m.fw, m.aspect); ctrl.layout(); markDirty();
     });
     f.appendChild(size); body.appendChild(f);
   }
@@ -2724,7 +2742,7 @@ vp.addEventListener('drop', async (e) => {
     try {
       const parsed = /\.xlsx$/i.test(list.name)
         ? PFS.merge.parseXlsx(new Uint8Array(await list.arrayBuffer()))
-        : PFS.merge.parseCSV(await list.text());
+        : PFS.merge.parseCSV(await PFS.merge.readTextFile(list));
       await certAutoFromList(parsed, list.name);
     } catch (err) { console.error(err); PFS.toast('קריאת הרשימה נכשלה', 'err'); }
   }
@@ -2884,7 +2902,9 @@ $('thumbsBtn') && $('thumbsBtn').addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   const sel = overlay.getSelected();
   const editing = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true';
-  const inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+  // a dropdown counts as typing too: arrows pick an option, Backspace never
+  // deletes the selected element behind it
+  const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || !!document.activeElement?.isContentEditable;
   // Esc while typing in a box finishes THAT box only — a replace/cover run
   // stays armed for the next value (it used to end the run: the next drag did
   // nothing, "החלפה עושה בעיות"). A second Esc ends the run.
@@ -2932,6 +2952,10 @@ document.addEventListener('keydown', (e) => {
       if (sel) {
         e.preventDefault();
         const m = JSON.parse(JSON.stringify(sel.model)); delete m.id;
+        // a copy is its own value: not tied to the original's field (a
+        // profile fill would overwrite both) nor to its anchor (typing in the
+        // copy snapped it back over the original)
+        delete m.anchorRight; delete m.cellX; delete m.cellW; delete m.wrapW; m.fieldKey = '';
         m.fx = Math.min(0.95, m.fx + 0.02); m.fy = Math.min(0.95, m.fy + 0.02);
         const model = PFS.element.makeModel(m.kind || m.type, m.page, m);
         const c = overlay.instantiate(model); if (c) overlay.selectCtrl(c);
@@ -3152,7 +3176,7 @@ function renderCourses() {
     const row = document.createElement('div');
     row.className = 'card'; row.style.cssText = 'margin-bottom:8px;cursor:pointer';
     row.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
-      <div style="flex:1;min-width:0"><b>${c.name}</b>
+      <div style="flex:1;min-width:0"><b>${escH(c.name)}</b>
         <div class="hint muted">${c.students.length} תלמידים · ${c.forms.length} טפסים</div></div>
       ${miss ? `<span style="background:var(--danger-soft);color:var(--danger);font-weight:800;font-size:12px;border-radius:999px;padding:4px 10px;flex:none">חסרים ${miss}</span>`
              : (c.students.length && c.forms.length ? '<span style="color:var(--ok);font-weight:800;font-size:12px;flex:none">✓ הכול הוגש</span>' : '')}
@@ -3168,13 +3192,17 @@ function renderCourses() {
     body.appendChild(row);
   });
 }
+// course names, form file names and pasted student cells are typed by
+// people (or come from a registration sheet): they are TEXT, never markup —
+// a name cell holding <img onerror=…> used to run as code in the binder
+function escH(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 function renderCourseGrid(c) {
   const body = $('coursesBody');
   if (!c) { coursesView = null; renderCourses(); return; }
   const C = PFS.courses;
   const head = document.createElement('div');
   head.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap';
-  head.innerHTML = `<button class="btn sm" id="csBack">→ חזרה</button><b style="flex:1;font-size:15px">${c.name}</b>`;
+  head.innerHTML = `<button class="btn sm" id="csBack">→ חזרה</button><b style="flex:1;font-size:15px">${escH(c.name)}</b>`;
   const pasteB = document.createElement('button'); pasteB.className = 'btn sm'; pasteB.textContent = '📋 הדבק רשימת תלמידים';
   const photoB = document.createElement('button'); photoB.className = 'btn sm'; photoB.textContent = '📸 תלמיד מצילום ת״ז';
   const formB = document.createElement('button'); formB.className = 'btn sm'; formB.textContent = '➕ הוסף את הטופס הפתוח';
@@ -3262,22 +3290,22 @@ function renderCourseGrid(c) {
   let h = '<tr><th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);text-align:right">תלמיד/ה</th>';
   c.forms.forEach((f) => {
     const missN = c.students.filter((st) => !C.isSubmitted(c, C.studentKey(st), f.name)).length;
-    h += `<th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.name}">${f.name}
-      ${missN && f.libId ? `<button class="btn sm cs-produce" data-form="${f.name}" style="border:0;background:none;color:var(--accent-600);padding:0 2px;cursor:pointer;font-weight:800" title="⚡ הפק PDF מוכן לכל ${missN} החסרים — בלי לפתוח את הטופס">⚡${missN}</button>` : ''}
-      <button class="btn sm cs-form-del" data-form="${f.name}" style="border:0;background:none;color:var(--ink-4);padding:0 2px;cursor:pointer">✕</button></th>`;
+    h += `<th style="border:1px solid var(--line);padding:6px 8px;background:var(--surface-2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(f.name)}">${escH(f.name)}
+      ${missN && f.libId ? `<button class="btn sm cs-produce" data-form="${escH(f.name)}" style="border:0;background:none;color:var(--accent-600);padding:0 2px;cursor:pointer;font-weight:800" title="⚡ הפק PDF מוכן לכל ${missN} החסרים — בלי לפתוח את הטופס">⚡${missN}</button>` : ''}
+      <button class="btn sm cs-form-del" data-form="${escH(f.name)}" style="border:0;background:none;color:var(--ink-4);padding:0 2px;cursor:pointer">✕</button></th>`;
   });
   h += '<th style="border:1px solid var(--line);padding:6px;background:var(--surface-2)"></th></tr>';
   c.students.forEach((st) => {
     const k = C.studentKey(st);
-    h += `<tr><td style="border:1px solid var(--line);padding:6px 8px;white-space:nowrap"><b>${st.name}</b>${st.tz ? ` <span class="hint muted">${st.tz}</span>` : ''}</td>`;
+    h += `<tr><td style="border:1px solid var(--line);padding:6px 8px;white-space:nowrap"><b>${escH(st.name)}</b>${st.tz ? ` <span class="hint muted">${escH(st.tz)}</span>` : ''}</td>`;
     c.forms.forEach((f) => {
       const done = C.isSubmitted(c, k, f.name);
       h += `<td style="border:1px solid var(--line);padding:3px;text-align:center">
-        <button class="cs-cell" data-key="${k}" data-form="${f.name}" data-lib="${f.libId || ''}"
+        <button class="cs-cell" data-key="${escH(k)}" data-form="${escH(f.name)}" data-lib="${escH(f.libId || '')}"
           title="${done ? 'הוגש — קליק לביטול הסימון' : 'קליק: פתח ומלא עבור התלמיד/ה · Shift+קליק: סמן שהוגש'}"
           style="border:0;background:${done ? 'var(--ok-soft)' : 'transparent'};color:${done ? 'var(--ok)' : 'var(--ink-4)'};font-weight:800;cursor:pointer;border-radius:6px;padding:4px 12px">${done ? '✓' : '—'}</button></td>`;
     });
-    h += `<td style="border:1px solid var(--line);padding:3px;text-align:center"><button class="cs-st-del" data-key="${k}" style="border:0;background:none;color:var(--danger);cursor:pointer;font-size:11px">✕</button></td></tr>`;
+    h += `<td style="border:1px solid var(--line);padding:3px;text-align:center"><button class="cs-st-del" data-key="${escH(k)}" style="border:0;background:none;color:var(--danger);cursor:pointer;font-size:11px">✕</button></td></tr>`;
   });
   tbl.innerHTML = h; wrap.appendChild(tbl); body.appendChild(wrap);
 
@@ -3605,9 +3633,9 @@ function renderMergePreview(parsed) {
   if (!mapped.length) { pv.innerHTML = '<span class="muted">אין עמודות ממופות</span>'; return; }
   const rows = parsed.records.slice(0, 3);
   let html = '<table style="border-collapse:collapse;width:100%"><tr>' +
-    mapped.map((h) => `<th style="border:1px solid var(--line);padding:3px 6px;background:var(--surface-2);white-space:nowrap">${mergeMapping[h]}</th>`).join('') + '</tr>';
+    mapped.map((h) => `<th style="border:1px solid var(--line);padding:3px 6px;background:var(--surface-2);white-space:nowrap">${escH(mergeMapping[h])}</th>`).join('') + '</tr>';
   rows.forEach((r) => {
-    html += '<tr>' + mapped.map((h) => `<td style="border:1px solid var(--line);padding:3px 6px;white-space:nowrap">${(r[h] || '')}</td>`).join('') + '</tr>';
+    html += '<tr>' + mapped.map((h) => `<td style="border:1px solid var(--line);padding:3px 6px;white-space:nowrap">${escH(r[h] || '')}</td>`).join('') + '</tr>';
   });
   pv.innerHTML = html + '</table>' + (parsed.records.length > 3 ? `<div class="hint muted">…ועוד ${parsed.records.length - 3} שורות</div>` : '');
   $('mergePreviewWrap').classList.remove('hidden');
@@ -3651,7 +3679,7 @@ $('mergeFile').addEventListener('change', async (e) => {
     }
     return;
   }
-  $('mergeCsv').value = await f.text(); doParseMerge();
+  $('mergeCsv').value = await PFS.merge.readTextFile(f); doParseMerge();
 });
 $('mergeClose').addEventListener('click', () => closeModal('mergeModal'));
 $('mergeRun').addEventListener('click', async () => {
@@ -3850,12 +3878,28 @@ function certArchiveModelsBack(b) {
   const imgs = PFS.store.get('cert_archive_imgs', {}) || {};
   return JSON.parse(JSON.stringify(b.models || [])).map((m) => { if (m.imgRef) m.imgUrl = imgs[m.imgRef] || null; return m; });
 }
-const certArchiveRecords = (b) => (b.rows || []).map((row) => Object.fromEntries((b.cols || []).map((c, i) => [c, row[i]])));
+// a value the batch never had stays out of the record, so the layout's own
+// text (typed once for everyone) prints again; batches filed before v2 stored
+// those as '' — for them an empty value means the same
+const certArchiveRecords = (b) => (b.rows || []).map((row) => Object.fromEntries((b.cols || []).map((c, i) => [c, row[i]]).filter(([c, v]) => v != null && (b.v >= 2 || v !== '' || c === '__name'))));
 const certArchivable = (b) => !!(b && b.models && b.rows && b.cols);
+// a certificate format on the shelf whose BYTES are this design
+async function certLibraryByContent(fmtId) {
+  for (const d of (await PFS.library.list()).filter((x) => x.kind === 'cert')) {
+    try { const r = await PFS.library.get(d.id); if (r && r.bytes && certFormatId(r.bytes) === fmtId) return d; } catch (e) {}
+  }
+  return null;
+}
 async function certArchiveFormatBytes(b) {
   let rec = null;
   try { rec = b.lib ? await PFS.library.get(b.lib) : null; } catch (e) {}
-  if (!rec || !rec.bytes) {
+  if (rec && rec.bytes && b.fmt && certFormatId(rec.bytes) !== b.fmt) rec = null;   // that shelf entry was replaced
+  if ((!rec || !rec.bytes) && b.fmt) {
+    const d = await certLibraryByContent(b.fmt);
+    if (d) rec = await PFS.library.get(d.id);
+  }
+  if ((!rec || !rec.bytes) && !b.fmt) {
+    // batches filed before formats were known by content: by name
     const d = (await PFS.library.list()).find((x) => x.kind === 'cert' && x.name === b.format);
     if (d) rec = await PFS.library.get(d.id);
   }
@@ -4096,10 +4140,11 @@ function certFormatId(bytes) {
 // the batch's format on the department shelf (uploaded once, by content)
 async function deptEnsureFormat(b) {
   if (b.deptFormat && dept.formats.some((f) => f.id === b.deptFormat)) return b.deptFormat;
-  let rec = null;
-  try { rec = b.lib ? await PFS.library.get(b.lib) : null; } catch (e) {}
-  if (!rec || !rec.bytes) { const d = (await PFS.library.list()).find((x) => x.kind === 'cert' && x.name === b.format); if (d) rec = await PFS.library.get(d.id); }
-  if (!rec || !rec.bytes) return b.deptFormat || null;
+  // the batch's own design (by content), the same lookup a reprint uses
+  let bytes = null;
+  try { bytes = await certArchiveFormatBytes(Object.assign({}, b, { deptFormat: null })); } catch (e) {}
+  if (!bytes) return b.deptFormat || null;
+  const rec = { bytes, name: b.format };
   const id = certFormatId(rec.bytes);
   if (!dept.formats.some((f) => f.id === id)) {
     await ACCT().dept.putFormat(id, b.format || rec.name || 'פורמט', new Uint8Array(rec.bytes).slice());
@@ -4124,23 +4169,35 @@ async function deptPutBatch(b) {
   if (i >= 0) dept.batches[i] = row; else dept.batches.push(row);
 }
 // everything filed on this computer (before joining, or while offline) goes up
+// (only what went up leaves: a batch filed here WHILE the upload ran used to
+// be dropped when the stale list was written back)
+let deptFlushing = false;
 async function deptFlushLocal() {
-  const reg = certLocalRegistry();
-  if (!reg.batches.length) return 0;
-  const left = [];
-  let n = 0;
-  for (const b of reg.batches) {
-    try { await deptPutBatch(b); n++; } catch (e) { left.push(b); }
+  if (deptFlushing) return 0;
+  const pending = certLocalRegistry().batches.slice();
+  if (!pending.length) return 0;
+  deptFlushing = true;
+  const up = new Set();
+  try {
+    for (const b of pending) {
+      try { await deptPutBatch(b); up.add(b.id); } catch (e) {}
+    }
+  } finally { deptFlushing = false; }
+  if (up.size) {
+    const now = certLocalRegistry();
+    now.batches = now.batches.filter((b) => !up.has(b.id));
+    PFS.store.set('cert_registry', now);
   }
-  reg.batches = left;
-  PFS.store.set('cert_registry', reg);
-  return n;
+  return up.size;
 }
 async function deptRefresh() {
   if (!(PFS.account && PFS.account.authed() && PFS.account.dept)) { deptReset(); return dept; }
   try {
     const st = await ACCT().dept.status();
     Object.assign(dept, st, { error: null });
+    // remembered: a member whose department did not load (offline, a slow
+    // start) must never fall back to this computer's own serial counter
+    if (st.member) PFS.store.set('dept_member_of', deptMe()); else if (PFS.store.get('dept_member_of', '') === deptMe()) PFS.store.remove('dept_member_of');
     if (st.member) {
       dept.formats = await ACCT().dept.listFormats();
       dept.batches = await ACCT().dept.listBatches();
@@ -4163,8 +4220,7 @@ async function deptRefresh() {
 async function deptFetchFormat(id, name) {
   const bytes = await ACCT().dept.getFormat(id);
   if (!bytes) return null;
-  const have = (await PFS.library.list()).find((d) => d.kind === 'cert' && d.name === name);
-  if (!have) { try { await PFS.library.add(name, bytes.slice().buffer, { kind: 'cert' }); } catch (e) {} }
+  if (!(await certLibraryByContent(certFormatId(bytes)))) { try { await PFS.library.add(name, bytes.slice().buffer, { kind: 'cert' }); } catch (e) {} }
   return bytes.buffer.slice(0);
 }
 function renderDeptPanel(host) {
@@ -4528,6 +4584,22 @@ function certTextWidthFrac(m, text, ratio) {
   const w = Math.max(0, ...String(text == null ? '' : text).split('\n').map((ln) => cx.measureText(ln).width));
   return (w * ratio) / 1000;              // px at page height 1000 → fraction of page width
 }
+// how many lines a wrapped sentence takes — the exporter's own word wrap
+function certWrapLines(m, text, ratio) {
+  if (!m.wrapW) return String(text || '').split('\n').length;
+  let n = 0;
+  String(text || '').split('\n').forEach((ln) => {
+    const words = ln.split(/\s+/).filter(Boolean);
+    if (!words.length) { n++; return; }
+    let cur = words[0];
+    for (let i = 1; i < words.length; i++) {
+      const cand = cur + ' ' + words[i];
+      if (certTextWidthFrac(m, cand, ratio) <= m.wrapW) cur = cand; else { n++; cur = words[i]; }
+    }
+    n++;
+  });
+  return n;
+}
 function certPageRatio(page) {
   if (certRatioOverride) return certRatioOverride;
   try { const s = overlay.overlaySizeFor(page); if (s && s.w > 0 && s.h > 0) return s.h / s.w; } catch (e) {}
@@ -4545,11 +4617,19 @@ function certItems(baseModels, models) {
       return;
     }
     if (m.type !== 'text' || !String(m.text || '').trim()) return;
-    const lines = String(m.text).split('\n').length;
-    const lineH = (m.fontFrac || 0.02) * 1.15;
+    let lines = String(m.text).split('\n').length;
+    let lineH = (m.fontFrac || 0.02) * 1.15;
     const label = b.certTag || b.fieldKey || String(b.text || '').slice(0, 24);
     if (m.wrapW) {
-      items.push({ i, page: m.page, fixed: true, left: m.fx, right: m.fx + m.wrapW, top: m.fy, bottom: m.fy + Math.max(b.fh || 0, lineH * lines), key: label });
+      // a sentence wraps: a long name adds a LINE (into the course line
+      // below, or off the page) that its sample never had — it keeps the
+      // sample's line count by easing its size, like a long name in a field
+      const want = Math.max(certWrapLines(b, b.text, ratio), String(b.text || '').split('\n').length);
+      lines = certWrapLines(m, m.text, ratio);
+      let scale = 1;
+      while (lines > want && scale > 0.7) { scale *= 0.95; m.fontFrac = b.fontFrac * scale; lines = certWrapLines(m, m.text, ratio); }
+      lineH = (m.fontFrac || 0.02) * 1.15;
+      items.push({ i, page: m.page, fixed: true, left: m.fx, right: m.fx + m.wrapW, top: m.fy, bottom: m.fy + Math.max(lines <= want ? (b.fh || 0) : 0, lineH * lines), key: label, wrapScale: scale });
       return;
     }
     if (!b.fieldKey && !/\{[^{}]+\}/.test(b.text || '')) {
@@ -4582,7 +4662,7 @@ function certLayoutModels(baseModels, rec) {
     if (ov > 0.33 * minW) { stacked.add(a); stacked.add(b); report.issues.push({ kind: 'overlap', keys: [a.key, b.key] }); }
   }));
   items.forEach((it) => {
-    if (it.fixed) { report.boxes.push(it); return; }
+    if (it.fixed) { report.boxes.push(it); if (it.wrapScale && it.wrapScale < 0.8) report.shrunk.push({ key: it.key, scale: it.wrapScale }); return; }
     const m = models[it.i];
     let left = CERT_MARGIN, right = 1 - CERT_MARGIN;
     items.forEach((o) => {
@@ -5516,8 +5596,17 @@ async function certRenderPreviews(host) {
   }
   if (!host.children.length) host.innerHTML = '<span class="hint muted">התצוגה המקדימה נכשלה — אפשר להפיק בכל זאת</span>';
 }
+// The ZIP (to e-mail) and the one PDF (to print) of the SAME class are one
+// batch: the second run reuses the first run's numbers and filing instead of
+// taking a new range (each student used to get two different serials, and
+// the archive counted the class twice). A double-click waits for the run.
+let certProducing = false, certLastRun = null;
 async function certProduce(kind, opts) {
-  if (!certList) return null;
+  if (!certList || certProducing) return null;
+  certProducing = true;
+  try { return await certProduceRun(kind, opts); } finally { certProducing = false; }
+}
+async function certProduceRun(kind, opts) {
   const built = certBuildRecords();
   const nameHeader = built.nameHeader;
   // never print a blank certificate: rows without a name are skipped
@@ -5531,7 +5620,17 @@ async function certProduce(kind, opts) {
   const keys = certKeys();
   const wantsSerial = keys.includes('מספר תעודה');
   const serialYear = new Date().getFullYear();
-  if (deptOn()) {
+  const runSig = JSON.stringify([currentFp && certFpKey(), records.map((r) => Object.keys(r).sort().map((k) => k === 'מספר תעודה' ? '' : k + '=' + r[k])), overlay.getElements().map((c) => c.model), certMetaNow()]);
+  const again = certLastRun && certLastRun.sig === runSig && certLastRun.serials.length === records.length ? certLastRun : null;
+  // a known department member whose department is not loaded right now
+  // (offline, still starting): load it — never number from this computer
+  if (!again && !deptOn() && PFS.account && PFS.account.authed() && PFS.store.get('dept_member_of', '') === deptMe()) {
+    try { await deptRefresh(); } catch (e) {}
+    if (!deptOn() && wantsSerial) { PFS.toast('אין חיבור לשרת המחלקה — ההפקה נעצרה כדי שלא יודפסו מספרי תעודה כפולים. נסו שוב בעוד רגע.', 'err', 8000); return null; }
+  }
+  if (again) {
+    records.forEach((r, i) => { r['מספר תעודה'] = again.serials[i]; });
+  } else if (deptOn()) {
     // the department's numbers come from ONE counter on the server: two
     // clerks producing at the same moment get two different ranges
     try {
@@ -5572,9 +5671,12 @@ async function certProduce(kind, opts) {
     // the format joins the certificate shelf (picked from the intro card next
     // time) — and the archive needs it to print this batch again one day
     let libId = null;
+    const fmtId = certFormatId(pdfView.getBytes());
     try {
       const clean = String(currentFileName || '').replace(/-filled$/, '').trim();
-      const have = (await PFS.library.list()).find((d) => d.kind === 'cert' && d.name === clean);
+      // the SAME design, not just the same file name: a redesigned
+      // "תעודה.pdf" is a new format (reprints used to get the old background)
+      const have = await certLibraryByContent(fmtId);
       if (have) libId = have.id;
       else if (clean) {
         const bytes = pdfView.getBytes().slice(0);
@@ -5586,14 +5688,20 @@ async function certProduce(kind, opts) {
     // the registry and the archive: who got which certificate, filed by
     // course, code and date, with the recipe to print it again
     let batchId = null, filedShared = false;
-    try {
+    if (again) {
+      // the same class, the other output: already numbered and filed
+      batchId = again.batchId; filedShared = again.filedShared;
+    } else try {
       const cols = [...new Set([...keys, '__name', built.idHeader, 'מספר תעודה'].filter(Boolean))];
       batchId = 'cb' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
       const batch = {
         id: batchId, at: Date.now(), format, count: records.length, kind,
-        course: meta.course, code: meta.code, date: meta.date, lib: libId, ratio: certPageRatio(0),
+        course: meta.course, code: meta.code, date: meta.date, lib: libId, fmt: fmtId, ratio: certPageRatio(0),
         models: certArchiveModels(baseModels), cols,
-        rows: records.map((r) => cols.map((c) => (r[c] == null ? '' : String(r[c])))),
+        // v2: a value the list never had is null (the reprint keeps the
+        // layout's own text, e.g. a course name typed once for everyone);
+        // '' is a cell that really was empty
+        v: 2, rows: records.map((r) => cols.map((c) => (r[c] == null ? null : String(r[c])))),
         entries: records.map((r) => ({ serial: r['מספר תעודה'], name: String(r.__name || ''), id: built.idHeader ? String(r[built.idHeader] || '') : '', course: courseHeader ? String(r[courseHeader] || '') : meta.course }))
       };
       // a member files into the department's archive; offline (or not a
@@ -5607,6 +5715,7 @@ async function certProduce(kind, opts) {
       }
       if (!deptOn()) certCommitSerials(records.length);
       PFS.store.set('cert_last_format', format);
+      certLastRun = { sig: runSig, serials: records.map((r) => r['מספר תעודה']), batchId, filedShared };
     } catch (e) { console.warn('registry write failed', e); }
     if (prog) {
       prog.innerHTML = '';
@@ -5723,7 +5832,7 @@ $('certListInput') && $('certListInput').addEventListener('change', async (e) =>
   try {
     const parsed = /\.xlsx$/i.test(f.name)
       ? PFS.merge.parseXlsx(new Uint8Array(await f.arrayBuffer()))
-      : PFS.merge.parseCSV(await f.text());
+      : PFS.merge.parseCSV(await PFS.merge.readTextFile(f));
     certLoadList(parsed, f.name);
   } catch (err) {
     console.error(err); PFS.toast('קריאת הרשימה נכשלה — נסו לשמור כ-CSV ולטעון שוב', 'err', 6000);
@@ -5855,7 +5964,7 @@ function placeHandwriting(text, color) {
     sticky: false,
     create: (page, fx, fy) => {
       overlay.addElementAt('image', page, fx, fy, {
-        imgUrl: res.url, aspect, fw, fh: fw / aspect, kind: 'handwriting', text, color, tracking
+        imgUrl: res.url, aspect, fw, fh: imgFh(page, fw, aspect), kind: 'handwriting', text, color, tracking
       });
       return null;
     }
@@ -5925,7 +6034,7 @@ function placeAssetAtField(kind, f, { silent = false } = {}) {
   }
   const aspect = item.aspect || (item.w / item.h) || (kind === 'stamp' ? 1 : 3);
   const fw = Math.min(Math.max(f.fw || 0.2, 0.14), 0.32);
-  const fh = fw / aspect;
+  const fh = imgFh(f.page || 0, fw, aspect);
   // center on the blank and sit it a touch above the baseline
   const fx = Math.max(0, Math.min(1 - fw, (f.fx != null ? f.fx : 0.5) + ((f.fw || 0) - fw) / 2));
   const fy = Math.max(0, (f.fy != null ? f.fy : 0.82) - fh * 0.35);
@@ -5946,7 +6055,7 @@ function placeDefaultAsset(kind) {
   const item = assets.getDefault(kind);
   if (!item) return false;
   const aspect = item.aspect || (item.w / item.h) || 1;
-  const fw = 0.22, fh = fw / aspect;
+  const fw = 0.22, fh = imgFh(0, fw, aspect);
   const fx = kind === 'signature' ? 0.60 : 0.12, fy = 0.82;
   overlay.instantiate(PFS.element.makeModel('image', 0, { imgUrl: item.url, aspect, fx, fy, fw, fh, kind }));
   overlay.deselectAll();
@@ -6048,14 +6157,28 @@ let acctSaveTimer = null, acctBusy = false;
 function acctStatus(t, kind) {
   document.querySelectorAll('.acct-status').forEach((el) => { el.textContent = t || ''; el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--ok,#1a7f4b)' : 'var(--ink-3)'); });
 }
-function scheduleAccountSave() {
+function scheduleAccountSave(delay) {
   if (!ACCT().authed()) return;
   clearTimeout(acctSaveTimer);
   acctSaveTimer = setTimeout(async () => {
-    try { await ACCT().saveVault(); acctStatus('נשמר בענן ✓ ' + new Date().toLocaleTimeString('he-IL'), 'ok'); }
-    catch (e) { acctStatus('שמירה בענן נכשלה — בדקו חיבור', 'err'); }
-  }, 2000);
+    try {
+      // the vault was never read on this page (offline at sign-in): read and
+      // MERGE it first — saving blind would replace everything the account has
+      if (!ACCT().vaultLoaded()) { if (await ACCT().loadVault({ merge: true })) refreshAllFromStore(); }
+      await ACCT().saveVault(); acctStatus('נשמר בענן ✓ ' + new Date().toLocaleTimeString('he-IL'), 'ok');
+    } catch (e) {
+      acctStatus('שמירה בענן נכשלה — בדקו חיבור (ננסה שוב)', 'err');
+      // the change stays marked as unsynced; try again in a while
+      if (ACCT().authed()) scheduleAccountSave(60000);
+    }
+  }, delay || 2000);
 }
+// signed out elsewhere (another tab, or the session could not be renewed):
+// show the sign-in screen instead of a silently locked app
+window.addEventListener('pfs:acct-lost', () => { clearTimeout(acctSaveTimer); try { deptReset(); } catch (e) {} renderAccount(); if (loginRequired()) showLoginGate(); });
+// another tab signed out or switched person: this tab's data belongs to the
+// old session — start over from what this computer now holds
+window.addEventListener('pfs:acct-elsewhere', () => { clearTimeout(acctSaveTimer); location.reload(); });
 // ---- the user's documents in their private cloud folder --------------------
 // Every document that matters rides along: history (recent), the certificate
 // shelf / library (lib), linked appendices (comp). Uploads are fire-and-forget
@@ -6088,7 +6211,9 @@ async function cloudHydrate() {
 async function wipeLocalForUserSwitch() {
   try { closeCertWizard(); } catch (e) {}
   if (pdfView.hasDoc()) { try { await goHomeSilently(); } catch (e) {} }
-  PFS.store.clear(['acct:cfg', 'acct:session', 'acct:last_user', 'sync:cfg', 'onboarded', 'tour_done', 'export_quality']);
+  // (the personal sync's code goes too: it would pull this person's data —
+  // and session — back onto the computer for the next one)
+  PFS.store.clear(['acct:cfg', 'acct:session', 'acct:last_user', 'onboarded', 'tour_done', 'export_quality']);
   try { await PFS.recent.clearAll(); } catch (e) {}
   try { await PFS.library.clearAll(); } catch (e) {}
   try { await PFS.companions.clearAll(); } catch (e) {}
@@ -6158,7 +6283,7 @@ function renderAccount(target) {
   const q = (id) => body.querySelector('#' + id);   // scoped: the same form renders in the settings card AND the login gate
   if (ACCT().authed()) {
     const u = ACCT().user() || {};
-    body.innerHTML = '<div class="hint">מחובר/ת כ־<b dir="ltr">' + (u.email || '—') + '</b></div>' +
+    body.innerHTML = '<div class="hint">מחובר/ת כ־<b dir="ltr">' + escH(u.email || '—') + '</b></div>' +
       '<div class="hint muted">הכול נשמר בענן אוטומטית — פרטים, טפסים, היסטוריה — וזמין בכל מחשב שתתחברו בו.</div>' +
       '<div class="row" style="margin-top:6px"><button class="btn sm" id="acctSaveNow" style="flex:1">שמור עכשיו</button><button class="btn sm ghost" id="acctOut" style="flex:1">התנתק</button></div>' +
       '<div class="hint acct-status" style="margin-top:6px"></div>';
@@ -6206,7 +6331,13 @@ async function acctAfterAuth() {
     if (had) refreshAllFromStore();
     if (had !== true) await ACCT().saveVault();
     if (had === 'merged') PFS.toast('✓ המידע שהיה במחשב הזה אוחד עם החשבון — שום דבר לא נמחק', 'ok', 5000);
-  } catch (e) { /* keep local data; will auto-save */ }
+  } catch (e) {
+    // the account's data could not be read: never save over it — keep what
+    // is here, say so, and retry (a later save reads and merges first)
+    console.warn('vault load failed', e);
+    PFS.toast('טעינת הנתונים מהענן נכשלה — ננסה שוב אוטומטית. מה שבמחשב לא נמחק.', 'err', 6000);
+    scheduleAccountSave(15000);
+  }
   await cloudHydrate();
   await cloudBackfill();
   try { renderCourses(); } catch (e) {}
@@ -6248,7 +6379,20 @@ async function cloudBackfill() {
   return n;
 }
 async function acctSignOut() {
-  try { await ACCT().saveVault(); } catch (e) {}
+  // the open document's pending memory first, then everything to the cloud;
+  // what did not get there is NOT wiped without asking
+  try { closeCertWizard(); } catch (e) {}
+  if (pdfView.hasDoc()) { try { await goHomeSilently(); } catch (e) {} }
+  clearTimeout(acctSaveTimer);
+  let saved = false;
+  try {
+    if (!ACCT().vaultLoaded()) await ACCT().loadVault({ merge: true });
+    saved = await ACCT().saveVault();
+  } catch (e) { saved = false; }
+  if (!saved && !(await PFS.ui.confirm('השמירה בענן נכשלה', 'לא הצלחנו לשמור את השינויים האחרונים בענן (אין חיבור?). התנתקות תמחק אותם מהמחשב הזה. להתנתק בכל זאת?'))) {
+    acctStatus('לא התנתקת — נסו שוב כשיש חיבור', 'err');
+    return;
+  }
   ACCT().signOut();
   deptReset();
   // a shared computer: sign-out leaves nothing of this person behind
@@ -6277,7 +6421,7 @@ acctAutoLoadOnStart();
   PFS.store.set = function (k, v) {
     const r = _set(k, v);
     if (k !== 'sync:cfg') { try { syncAutoPush(); } catch (e) {} }
-    if (k.indexOf('acct:') !== 0) { try { scheduleAccountSave(); } catch (e) {} }
+    if (k.indexOf('acct:') !== 0) { try { if (ACCT().authed()) ACCT().noteLocalChange(); scheduleAccountSave(); } catch (e) {} }
     return r;
   };
 })();

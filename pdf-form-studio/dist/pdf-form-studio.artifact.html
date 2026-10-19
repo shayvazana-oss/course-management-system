@@ -8616,7 +8616,43 @@ body.gate-locked #loginModal { pointer-events: auto; }
     const ctx = c.getContext('2d');
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
     enhanceForOcr(c, ctx);   // grayscale + contrast stretch → better Hebrew OCR on faded scans
+    eraseRuledLines(c, ctx); // table borders / underlines out of the text's way
     return c;
+  }
+
+  // A label inside a table cell was unreadable: the OCR took the cell's
+  // borders for letters ("7", "0") and lost the words between them. Long
+  // straight runs of ink are rules, never letters (a letter stroke is a
+  // fraction of a line high) — they are whitened before reading. Fields come
+  // from the WORDS, and the page as shown keeps its lines.
+  function eraseRuledLines(canvas, ctx) {
+    try {
+      const W = canvas.width, H = canvas.height;
+      const im = ctx.getImageData(0, 0, W, H), d = im.data;
+      const dark = new Uint8Array(W * H);
+      for (let i = 0, p = 0; p < W * H; i += 4, p++) dark[p] = d[i] < 160 ? 1 : 0;
+      const minH = Math.round(W * 0.06), minV = Math.round(H * 0.03);
+      const white = (p) => { const i = p * 4; d[i] = d[i + 1] = d[i + 2] = 255; };
+      for (let y = 0; y < H; y++) {
+        let x = 0;
+        while (x < W) {
+          if (!dark[y * W + x]) { x++; continue; }
+          let e = x; while (e < W && dark[y * W + e]) e++;
+          if (e - x >= minH) for (let k = x; k < e; k++) white(y * W + k);
+          x = e;
+        }
+      }
+      for (let x = 0; x < W; x++) {
+        let y = 0;
+        while (y < H) {
+          if (!dark[y * W + x]) { y++; continue; }
+          let e = y; while (e < H && dark[e * W + x]) e++;
+          if (e - y >= minV) for (let k = y; k < e; k++) white(k * W + x);
+          y = e;
+        }
+      }
+      ctx.putImageData(im, 0, 0);
+    } catch (e) { /* the OCR still reads the page as drawn */ }
   }
 
   // Lift faint/photographed scans before OCR: grayscale + gamma darkening
@@ -10056,7 +10092,7 @@ const overlay = PFS.createOverlayManager({
   // a tap on empty paper opens a caret right there ("לוחצים על המשבצת ומקלידים")
   onEmptyTap: (page, fx, fy) => { try { quickTextAt(page, fx, fy); } catch (e) { console.warn('quick text failed', e); } },
   // a certificate field dropped near a printed underline settles onto it
-  onDragEnd: (c) => { try { if (c && c.model) c.model.__userMoved = true; } catch (e) {} try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
+  onDragEnd: (c) => { try { if (c && c.model) { c.model.__userMoved = true; if (c.model.anchorRight != null) c.model.anchorRight = c.model.fx + (c.model.fw || 0); } } catch (e) {} try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
@@ -10228,6 +10264,8 @@ async function runOcr() {
       PFS.toast('OCR לא זיהה שדות ברורים — נסו מילוי ידני', 'err');
       return;
     }
+    try { await seatFieldsInCells(det); } catch (e) {}   // a scanned table: the value goes in the empty cell
+    if (gen !== loadGen) return;
     lastDet = det;
     detCachePut(currentFp, det);   // scans win the most: no OCR wait next time
     const nOcr = fieldsPanel.show(det, vaultPrefill(det));
@@ -10322,12 +10360,83 @@ function vaultPrefill(det) {
  *      those glyphs (the answer cell);
  *   2. otherwise a ruling line just below → text bottom rests on it;
  *   3. nothing found → geometry placement stands. */
+/* seatFieldsInCells(det) — a label in a TABLE CELL ("כתובת:" | empty cell)
+ * is filled in the empty cell beside it. The label heuristic gave it a blank
+ * of a fixed width starting at the label, which crossed the cell's border,
+ * and the underline pass then read the row line as its underline: the hint
+ * sat on the border under the label, and a click on it opened the caret
+ * there — not in the cell ("לא מקפיץ אותי למקום הנכון"). Reads the drawn
+ * page: the border between the cells, the far border, the row lines. */
+async function seatFieldsInCells(det) {
+  if (!det || !det.fields || !det.fields.length) return 0;
+  // measured on the page drawn at a FIXED resolution: the on-screen canvas
+  // at a small zoom draws a 1pt border as a faint grey that reads as no line
+  const pagesAt = new Map();
+  for (const f of det.fields) {
+    if (f.type !== 'text' || f.inCell || pagesAt.has(f.page)) continue;
+    try { pagesAt.set(f.page, (await renderBaseForFlatten(f.page, 2)).canvas); } catch (e) { pagesAt.set(f.page, null); }
+  }
+  let seated = 0;
+  det.fields.forEach((f) => {
+    if (f.type !== 'text' || f.inCell) return;
+    const canvas = pagesAt.get(f.page);
+    if (!canvas || !canvas.width) return;
+    try {
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const W = canvas.width, H = canvas.height;
+      const fh = f.fh || 0.02, fhPx = Math.max(6, fh * H);
+      const cy = Math.round((f.fy + fh / 2) * H);
+      const rtl = /[\u0590-\u05FF]/.test(f.label || '');
+      const dir = rtl ? -1 : 1;                       // the blank's side of the label
+      const labelEdge = Math.round((rtl ? f.fx + (f.fw || 0) : f.fx) * W);
+      const lum = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const colDark = (x, y0, y1) => {
+        const d = ctx.getImageData(Math.max(0, Math.min(W - 3, x - 1)), y0, 3, y1 - y0).data; let n = 0;
+        for (let r = 0; r < y1 - y0; r++) { const j = r * 12; if (Math.min(lum(d, j), lum(d, j + 4), lum(d, j + 8)) < 140) n++; }
+        return n / Math.max(1, y1 - y0);
+      };
+      const rowDark = (y, x0, x1) => {
+        const d = ctx.getImageData(x0, Math.max(0, Math.min(H - 1, y)), x1 - x0, 1).data; let n = 0, t = 0;
+        for (let i = 0; i < x1 - x0; i += 2) { if (lum(d, i * 4) < 140) n++; t++; }
+        return n / Math.max(1, t);
+      };
+      const y0 = Math.max(0, Math.round(cy - fhPx * 0.5)), y1 = Math.min(H, Math.round(cy + fhPx * 0.5));
+      if (y1 - y0 < 4) return;
+      // the border between the label's cell and the next one: within the blank's reach
+      const reach = Math.round(Math.max(0.05, Math.abs(f.fw || 0.3)) * W);
+      let xb = null;
+      for (let k = 2; k < reach; k++) { const x = labelEdge + dir * k; if (x < 1 || x > W - 2) break; if (colDark(x, y0, y1) > 0.85) { xb = x; break; } }
+      if (xb == null) return;
+      // the next cell's far border (or the page's printed edge)
+      let xc = null;
+      for (let k = 4; k < W; k++) { const x = xb + dir * k; if (x < 1 || x > W - 2) break; if (colDark(x, y0, y1) > 0.85) { xc = x; break; } }
+      if (xc == null || Math.abs(xc - xb) < fhPx * 2) return;
+      const cx0 = Math.min(xb, xc), cx1 = Math.max(xb, xc);
+      // the row: ruled lines above and below, across that cell
+      const ix0 = cx0 + 4, ix1 = cx1 - 4;
+      let top = null, bot = null;
+      for (let y = cy; y > Math.max(0, cy - fhPx * 3); y--) if (rowDark(y, ix0, ix1) > 0.8) { top = y; break; }
+      for (let y = cy; y < Math.min(H - 1, cy + fhPx * 3); y++) if (rowDark(y, ix0, ix1) > 0.8) { bot = y; break; }
+      if (top == null || bot == null || bot - top < fhPx * 0.9) return;
+      // the cell must be EMPTY (a printed value there is not a blank)
+      const inner = ctx.getImageData(ix0, top + 3, Math.max(1, ix1 - ix0), Math.max(1, bot - top - 6)).data;
+      let ink = 0; for (let i = 0; i < inner.length; i += 16) if (lum(inner, i) < 160) ink++;
+      if (ink / (inner.length / 16) > 0.004) return;
+      const pad = Math.max(4, fhPx * 0.35);
+      f.fx = (cx0 + pad) / W; f.fw = (cx1 - cx0 - 2 * pad) / W;
+      f.fy = ((top + bot) / 2 - fhPx / 2) / H;
+      f.inCell = true; seated++;
+    } catch (e) {}
+  });
+  pagesAt.forEach((c) => { if (c) { c.width = 0; c.height = 0; } });
+  return seated;
+}
 function snapFieldsToInk(det) {
   if (!det || !det.fields || !det.fields.length) return 0;
   const views = pdfView.viewList ? pdfView.viewList() : [];
   let snapped = 0;
   det.fields.forEach((f) => {
-    if (f.type !== 'text') return;
+    if (f.type !== 'text' || f.inCell) return;   // a table cell was already seated
     const view = views[f.page];
     const canvas = view && view.canvas;
     if (!canvas || !canvas.width) return;
@@ -10690,10 +10799,21 @@ function quickTextAt(page, fx, fy) {
     const size = Math.max(f.fontFrac || 0, MIN_FILL_FRAC * 0.85) || docUniformSize();
     const align = /[֐-׿؀-ۿ]/.test(f.label || '') ? 'right' : 'left';
     const fh = size * 1.15;
+    // a Hebrew field is written from its RIGHT end: the box's right edge sits
+    // there and stays there while typing — Hebrew or digits. (The box used to
+    // START at the right end and grow rightward: the value landed past the
+    // blank, on the label or across the table border.)
+    // (a breath — 0.4 em — inside that end, so a line that starts right at the
+    // colon does not glue the value to it: "שם פרטי:נועה")
+    const pv = pdfView.viewList().find((v) => v.idx === page);
+    const hw = pv && pv.canvas && pv.canvas.width ? pv.canvas.height / pv.canvas.width : 1.414;
+    const right = f.fx + (f.fw || 0) - (f.inCell ? 0 : Math.min((f.fw || 0) * 0.2, size * 0.4 * hw));
     const ctrl = overlay.addModelAt('text', page, {
-      fx: align === 'right' ? f.fx + (f.fw || 0) : f.fx, fy: f.fy + Math.max(0, ((f.fh || fh) - fh) / 2),
-      fontFrac: size, align, fieldKey: f.fieldKey, cellW: f.fw || null, cellX: f.fx, text: '', quick: true
+      fx: align === 'right' ? Math.max(f.fx, right - 0.05) : f.fx, fy: f.fy + Math.max(0, ((f.fh || fh) - fh) / 2),
+      fontFrac: size, align, fieldKey: f.fieldKey, cellW: f.fw || null, cellX: f.fx, text: '', quick: true,
+      anchorRight: align === 'right' ? right : undefined
     }, true);
+    if (ctrl && align === 'right') { ctrl.model.fx = Math.max(f.fx, right - (ctrl.model.fw || 0)); ctrl.layout(); }
     if (ctrl) { afterBlur(ctrl); overlay.setFieldActive && overlay.setFieldActive(f.fieldKey); }
     return ctrl;
   }
@@ -10755,7 +10875,7 @@ function sweepNameLeaks() {
 // (ink-snapped, split, size-normalized, or OCR-produced) is stored per
 // document fingerprint and replayed instantly on the next open. The "זהה
 // שדות" button always forces a fresh run and overwrites the cache.
-const DET_CACHE_V = 1;
+const DET_CACHE_V = 2;   // 2: table-cell fields seated in their cell
 let lastDetFromCache = false;
 // currentFp is an OBJECT ({pages,w,h,textHash,ahash}) — flatten it to a
 // string key, or every document would share the "[object Object]" slot
@@ -10812,6 +10932,8 @@ async function runDetection(force) {
     }
     const det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
+    try { const n = await seatFieldsInCells(det); if (n) console.info('[cells] seated', n, 'fields in their table cells'); } catch (e) {}
+    if (gen !== loadGen) return;
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
     // ink-snap expands a field until it meets a border — on a table row that
     // can swallow the neighbouring columns, leaving several fields sharing one

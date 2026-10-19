@@ -4865,6 +4865,81 @@ async function main() {
     check('✏️ "החלפה" on a real form: Esc keeps the tool armed, underlines stay whole, the ₪ survives, the value starts where the old one did at the exact size in dark ink — digital AND scanned (field hints never swallow the drag)', why(okDig && okScan && okOcr ? true : JSON.stringify({ dig, scn, ocrRows })));
   }
 
+  // ---- a click on a field's hint writes IN that field ----
+  // A label in a table cell ("כתובת:" | empty cell): its hint sat on the
+  // cell border under the label, and on a scan the OCR could not read the
+  // labels at all (it took the borders for letters). And a click on ANY hint
+  // opened the box at the field's right end growing rightward — the value
+  // landed on the label ("לא מקפיץ אותי למקום הנכון").
+  {
+    const pp = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+    await pp.emulateMedia({ media: 'print' });
+    const css = base.replace('index.html', 'vendor/fonts/heebo.css');
+    await pp.goto(css);
+    await pp.setContent(`<html><head><link rel="stylesheet" href="${css}"><style>
+      body{margin:50px 60px;direction:rtl;font-family:'David Libre',serif;font-size:16px;color:#111}
+      .row{margin:16px 0}.val{display:inline-block;min-width:240px;border-bottom:1.2px solid #000}
+      table{border-collapse:collapse;width:100%;margin-top:20px}td{border:1.2px solid #000;padding:5px 8px;height:20px}td.l{width:30%;font-weight:bold}</style></head><body>
+      <h2 style="text-align:center">טופס הרשמה לקורס</h2>
+      <div class="row">שם פרטי: <span class="val" id="u">&nbsp;</span></div>
+      <table id="t"><tr><td class="l">כתובת:</td><td></td></tr><tr><td class="l">עיר:</td><td></td></tr><tr><td class="l">טלפון נייד:</td><td></td></tr><tr><td class="l">שם הקורס:</td><td></td></tr></table></body></html>`, { waitUntil: 'load' });
+    await pp.evaluate(() => document.fonts.ready);
+    const geo = await pp.evaluate(() => { const u = document.getElementById('u').getBoundingClientRect(); const cells = [...document.querySelectorAll('#t td:not(.l)')].map((c) => { const b = c.getBoundingClientRect(); return { l: b.left / 794, r: b.right / 794, t: b.top / 1123, b: b.bottom / 1123 }; }); return { u: { l: u.left / 794, r: u.right / 794, t: u.top / 1123, b: u.bottom / 1123 }, cells }; });
+    const pdfBytes = Array.from(await pp.pdf({ width: '794px', height: '1123px', printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 } }));
+    await pp.close();
+    const runCells = async (scan) => {
+      await page.evaluate(async ({ bytes, scan }) => {
+        let data = new Uint8Array(bytes);
+        if (scan) {
+          const doc = await pdfjsLib.getDocument({ data: data.slice(0) }).promise; const p1 = await doc.getPage(1);
+          const vp = p1.getViewport({ scale: 2.2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+          await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          const png = await new Promise((r) => cv.toBlob(r, 'image/png'));
+          const out = await PDFLib.PDFDocument.create(); const img = await out.embedPng(await png.arrayBuffer());
+          const vp1 = p1.getViewport({ scale: 1 }); out.addPage([vp1.width, vp1.height]).drawImage(img, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+          data = await out.save();
+        }
+        window.PFS.store.set('profiles', [{ id: 'blank', name: 'blank', values: {} }]); window.PFS.store.set('active_profile', 'blank');
+        // zoomed far out: a 1pt border then draws as faint grey on screen
+        // (the cells used to go unrecognised at a small zoom)
+        window.PFS.__test.pdfView.setScale(0.4);
+        await window.PFS.__test.openPdfFile(new File([data], scan ? 'הרשמה-סרוק.pdf' : 'הרשמה.pdf', { type: 'application/pdf' }));
+        window.PFS.__test.overlay.clearElements();
+      }, { bytes: pdfBytes, scan });
+      // until the page is READ (a scan's OCR can take a while on a busy machine)
+      for (let i = 0; i < 360; i++) { if (await page.evaluate((scan) => { const d = window.PFS.__test.getLastDet(); return !!d && (scan ? d.tier === 'ocr' : d.fields.length >= 5); }, scan)) break; await page.waitForTimeout(250); }
+      await page.waitForTimeout(500);
+      // the hint is found where a person sees it: on the line / in the cell
+      // (a scan's OCR may misspell a label — the key is not the point)
+      const typed = [[{ l: geo.u.l, r: geo.u.r, t: geo.u.t - 0.02, b: geo.u.b + 0.005 }, 'נועה'], [geo.cells[0], 'הרצל 5'], [geo.cells[1], 'חיפה'], [geo.cells[2], '050-1234567'], [geo.cells[3], 'הנהלת חשבונות']];
+      const out = [];
+      for (const [k, v] of typed) {
+        const pos = await page.evaluate((k) => {
+          const pc = document.querySelector('.page-wrap canvas.pdf').getBoundingClientRect();
+          const m = [...document.querySelectorAll('.field-marker')].filter((x) => x.offsetParent).find((x) => { const r = x.getBoundingClientRect(); const fx = (r.left + r.width / 2 - pc.left) / pc.width, fy = (r.top + r.height / 2 - pc.top) / pc.height; return fx > k.l && fx < k.r && fy > k.t - 0.006 && fy < k.b + 0.006; });
+          if (!m) return null; m.scrollIntoView({ block: 'center' }); const r = m.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }, k);
+        if (!pos) { out.push({ k, none: true }); continue; }
+        await page.mouse.click(pos.x, pos.y); await page.waitForTimeout(250);
+        await page.keyboard.type(v, { delay: 10 }); await page.waitForTimeout(150);
+        await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+        out.push(await page.evaluate((v) => { const c = window.PFS.__test.overlay.getElements().find((e) => e.model.text === v); if (!c) return { v, missing: true }; const m = c.model; return { v, l: m.fx, r: m.fx + m.fw, cy: m.fy + m.fh / 2 }; }, v));
+      }
+      return out;
+    };
+    const inside = (o, box, slack) => o && !o.none && !o.missing && o.l >= box.l - slack && o.r <= box.r + slack && o.cy >= box.t && o.cy <= box.b;
+    // (a scan's OCR may not read every label: its underline row counts only
+    // when it found it — every table cell must work)
+    const verdict = (res, scan) => {
+      const u = res[0], cells = res.slice(1);
+      return ((scan && u.none) || inside(u, { l: geo.u.l, r: geo.u.r, t: geo.u.t - 0.02, b: geo.u.b + 0.005 }, 0.004)) && cells.every((o, i) => inside(o, geo.cells[i], 0.002));
+    };
+    const dig = await runCells(false);
+    const scn = await runCells(true);
+    await page.evaluate(async () => { const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await window.PFS.__test.goHome(); } finally { window.PFS.ui.confirm = c; } window.PFS.store.set('profiles', [{ id: 'p', name: 'me', values: { 'שם משפחה': 'ישראלי', 'תעודת זהות': '123456782', 'טלפון': '0501234567' } }]); window.PFS.store.set('active_profile', 'p'); });
+    check('🎯 a click on a field\'s hint writes IN that field: an underline blank, and a label | empty table cell — digital AND scanned (the OCR reads labels inside table cells)', why(verdict(dig, false) && verdict(scn, true) ? true : JSON.stringify({ geo, dig, scn })));
+  }
+
   // ---- every new document opens clean ----
   // A LANDSCAPE certificate was once taken for a PORTRAIT registration form
   // (the 8×8 picture hash of two "mostly white" pages), and the certificate's

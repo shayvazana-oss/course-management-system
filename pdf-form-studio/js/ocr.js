@@ -28,7 +28,43 @@
     const ctx = c.getContext('2d');
     await page.render({ canvasContext: ctx, viewport: vp }).promise;
     enhanceForOcr(c, ctx);   // grayscale + contrast stretch → better Hebrew OCR on faded scans
+    eraseRuledLines(c, ctx); // table borders / underlines out of the text's way
     return c;
+  }
+
+  // A label inside a table cell was unreadable: the OCR took the cell's
+  // borders for letters ("7", "0") and lost the words between them. Long
+  // straight runs of ink are rules, never letters (a letter stroke is a
+  // fraction of a line high) — they are whitened before reading. Fields come
+  // from the WORDS, and the page as shown keeps its lines.
+  function eraseRuledLines(canvas, ctx) {
+    try {
+      const W = canvas.width, H = canvas.height;
+      const im = ctx.getImageData(0, 0, W, H), d = im.data;
+      const dark = new Uint8Array(W * H);
+      for (let i = 0, p = 0; p < W * H; i += 4, p++) dark[p] = d[i] < 160 ? 1 : 0;
+      const minH = Math.round(W * 0.06), minV = Math.round(H * 0.03);
+      const white = (p) => { const i = p * 4; d[i] = d[i + 1] = d[i + 2] = 255; };
+      for (let y = 0; y < H; y++) {
+        let x = 0;
+        while (x < W) {
+          if (!dark[y * W + x]) { x++; continue; }
+          let e = x; while (e < W && dark[y * W + e]) e++;
+          if (e - x >= minH) for (let k = x; k < e; k++) white(y * W + k);
+          x = e;
+        }
+      }
+      for (let x = 0; x < W; x++) {
+        let y = 0;
+        while (y < H) {
+          if (!dark[y * W + x]) { y++; continue; }
+          let e = y; while (e < H && dark[e * W + x]) e++;
+          if (e - y >= minV) for (let k = y; k < e; k++) white(k * W + x);
+          y = e;
+        }
+      }
+      ctx.putImageData(im, 0, 0);
+    } catch (e) { /* the OCR still reads the page as drawn */ }
   }
 
   // Lift faint/photographed scans before OCR: grayscale + gamma darkening

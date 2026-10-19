@@ -98,16 +98,25 @@
       // the label's size, glued to the colon — "הדבקות של טקסט".)
       const em = h / 0.65, gap = h * 0.6;
       const defW = 0.30 * W;
-      let fx, fw;
+      // a word written right after the label means the line is already
+      // filled ("תעודת זהות: 012345678"): no blank there, so no field. (A
+      // 24px minimum used to invent one, and a value auto-filled into it
+      // stacked its digits in a column beside the printed one.) A run of
+      // underscores/dots is the blank itself, not a word.
+      const solid = (o) => /[\p{L}\p{N}]/u.test(o.t);
+      let fx, fw, room;
       if (rtl) {
-        const left = sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2);
+        const left = sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2 && solid(o));
         const lb = left.length ? Math.max(...left.map((o) => o.bb.x1)) : Math.max(0, bb.x0 - defW);
-        fx = lb / W; fw = Math.max(24, bb.x0 - gap - lb) / W;
+        room = bb.x0 - gap - lb;
+        fx = lb / W; fw = room / W;
       } else {
-        const right = sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2);
+        const right = sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2 && solid(o));
         const rb = right.length ? Math.min(...right.map((o) => o.bb.x0)) : Math.min(W, bb.x1 + defW);
-        fx = (bb.x1 + gap) / W; fw = Math.max(24, rb - bb.x1 - gap) / W;
+        room = rb - bb.x1 - gap;
+        fx = (bb.x1 + gap) / W; fw = room / W;
       }
+      if (room < em * 2.5) return;
       const fontFrac = Math.min(0.03, Math.max(0.012, em / H));
       out.push({
         page: pageIndex, fieldKey: slug(label, out.length), label: label,
@@ -188,5 +197,5 @@
     }
   }
 
-  PFS.ocr = { available, runOcrDetect, recognizeWords };
+  PFS.ocr = { available, runOcrDetect, recognizeWords, fieldsFromWords };
 })(window);

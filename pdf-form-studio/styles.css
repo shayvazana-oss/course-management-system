@@ -1262,3 +1262,7 @@ body.gate-locked #loginModal { pointer-events: auto; }
    a dashed underline where to write; the box shows only under the pointer */
 .field-marker { animation: none !important; }
 .field-marker:hover { border-bottom-color: transparent; border-radius: 6px; }
+
+/* an armed tool (replace, cover, text…) owns the page: the field hints must
+   not swallow its drag — on a scan they sit exactly on the values to replace */
+.overlay.placing .field-marker { pointer-events: none !important; }

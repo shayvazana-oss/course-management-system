@@ -4326,6 +4326,128 @@ async function main() {
     return ok ? true : JSON.stringify(out);
   })));
 
+  // ---- "החלפה" on a real form: the way a clerk uses it ----
+  // A Hebrew form printed by Chrome (values on underlines, a sentence with a
+  // price, a table). Real mouse drags and real typing, Esc after each value.
+  // Before: Esc ended the run (the next drags did nothing), the cover erased
+  // the underline and left stubs, the new text floated left and high in grey,
+  // the "₪" beside the price was erased, and on a SCAN the field hints
+  // swallowed the drag altogether.
+  {
+    const pp = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+    await pp.emulateMedia({ media: 'print' });
+    const css = base.replace('index.html', 'vendor/fonts/heebo.css');
+    await pp.goto(css);
+    await pp.setContent(`<html><head><link rel="stylesheet" href="${css}"><style>
+      body{margin:60px 70px;direction:rtl;font-family:'David Libre','Frank Ruhl Libre',serif;font-size:19px;color:#111}
+      h1{font-size:28px;text-align:center;margin-bottom:30px}
+      .row{margin:22px 0}.val{display:inline-block;min-width:260px;border-bottom:1.5px solid #000;padding:0 8px}
+      table{border-collapse:collapse;width:100%;margin-top:26px}td,th{border:1.5px solid #000;padding:8px 10px;text-align:right}
+      p{line-height:1.7}</style></head><body>
+      <h1>אישור השתתפות בקורס</h1>
+      <div class="row">שם המשתתף: <span class="val" id="a">ישראל ישראלי</span></div>
+      <div class="row">תעודת זהות: <span class="val" id="b">012345678</span></div>
+      <div class="row">טלפון: <span class="val" id="d">&nbsp;</span></div>
+      <p id="p">הקורס יתקיים בתל אביב החל מיום ראשון, בהיקף של 120 שעות לימוד, ובעלות של 1,250 ₪ למשתתף.</p>
+      <table><tr><th>תאריך התחלה</th><th>תאריך סיום</th><th>שם המרצה</th></tr><tr><td id="c">12/03/2025</td><td>30/06/2025</td><td>ד"ר משה כהן</td></tr></table>
+    </body></html>`, { waitUntil: 'load' });
+    await pp.evaluate(() => document.fonts.ready);
+    const R = await pp.evaluate(() => {
+      const tr = (sel) => { const e = document.querySelector(sel); const rg = document.createRange(); rg.selectNodeContents(e); const b = rg.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; };
+      const word = (needle) => { const t = document.getElementById('p').firstChild; const i = t.textContent.indexOf(needle); const rg = document.createRange(); rg.setStart(t, i); rg.setEnd(t, i + needle.length); const b = rg.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; };
+      const ul = document.getElementById('a').getBoundingClientRect();
+      const bl = document.getElementById('d').getBoundingClientRect();
+      return { a: tr('#a'), b: tr('#b'), c: tr('#c'), d: { x: bl.left + 4, y: bl.top, w: bl.width - 8, h: bl.height }, tlv: word('תל אביב'), price: word('1,250'), shekel: word('₪'), ulA: { x0: ul.left, x1: ul.right, y: ul.bottom - 0.75 } };
+    });
+    const pdfBytes = Array.from(await pp.pdf({ width: '794px', height: '1123px', printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 } }));
+    await pp.close();
+    const runReplace = async (scan) => {
+      await page.evaluate(async ({ bytes, scan }) => {
+        window.PFS.store.set('templates', []);
+        let data = new Uint8Array(bytes);
+        if (scan) {
+          const doc = await pdfjsLib.getDocument({ data: data.slice(0) }).promise; const p1 = await doc.getPage(1);
+          const vp = p1.getViewport({ scale: 2.2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+          await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          const png = await new Promise((r) => cv.toBlob(r, 'image/png'));
+          const out = await PDFLib.PDFDocument.create(); const img = await out.embedPng(await png.arrayBuffer());
+          const vp1 = p1.getViewport({ scale: 1 }); out.addPage([vp1.width, vp1.height]).drawImage(img, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+          data = await out.save();
+        }
+        await window.PFS.__test.openPdfFile(new File([data], scan ? 'אישור-סרוק.pdf' : 'אישור-השתתפות.pdf', { type: 'application/pdf' }));
+        window.PFS.__test.overlay.clearElements();
+      }, { bytes: pdfBytes, scan });
+      // a scan: wait until the OCR has placed its field hints on the page
+      for (let i = 0; i < (scan ? 60 : 12); i++) { if (!scan || await page.evaluate(() => document.querySelectorAll('.field-marker').length > 0)) break; await page.waitForTimeout(250); }
+      await page.waitForTimeout(scan ? 600 : 1200);
+      const pb = await page.evaluate(() => { const b = document.querySelector('.page-wrap canvas.pdf').getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+      const scr = (r) => ({ x0: pb.x + (r.x - 2) / 794 * pb.w, y0: pb.y + (r.y - 1) / 1123 * pb.h, x1: pb.x + (r.x + r.w + 2) / 794 * pb.w, y1: pb.y + (r.y + r.h + 1) / 1123 * pb.h });
+      await page.click('.rail-btn.tool[data-tool="replace"]'); await page.waitForTimeout(150);
+      const armed = [];
+      // the blank phone line carries a field hint: on a scan the drag runs
+      // straight across it (a hint used to swallow the drag)
+      const onHint = scan ? await page.evaluate(() => document.querySelectorAll('.field-marker').length) : null;
+      for (const [r, text] of [[R.d, '050-1234567'], [R.a, 'דנה כהן'], [R.b, '987654321'], [R.tlv, 'חיפה'], [R.price, '980'], [R.c, '15/10/2026']]) {
+        const q = scr(r);
+        await page.mouse.move(q.x1, q.y0); await page.mouse.down(); await page.mouse.move((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, { steps: 3 }); await page.mouse.move(q.x0, q.y1, { steps: 3 }); await page.mouse.up();
+        await page.waitForTimeout(250);
+        await page.keyboard.type(text, { delay: 20 });
+        await page.waitForTimeout(450);
+        await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+        armed.push(await page.evaluate(() => window.PFS.__test.overlay.isPlacing()));
+      }
+      await page.keyboard.press('Escape');
+      return page.evaluate(async ({ R, armed, onHint }) => {
+        const T = window.PFS.__test;
+        const texts = T.overlay.getElements().filter((e) => e.model.type === 'text').map((e) => e.model);
+        // the five replacements (a scan may also carry a profile value the OCR placed)
+        const want = ['דנה כהן', '987654321', 'חיפה', '980', '15/10/2026'];
+        const out = { armed, onHint, phone: texts.filter((m) => m.text === '050-1234567').length, n: texts.filter((m) => want.includes(m.text)).length, texts: texts.map((m) => m.text) };
+        const a = texts.find((m) => m.text === 'דנה כהן');
+        out.startA = a ? +(a.fx + a.fw - (R.a.x + R.a.w) / 794).toFixed(4) : null;
+        out.sizes = texts.filter((m) => want.includes(m.text)).map((m) => +m.fontFrac.toFixed(4));
+        out.dark = texts.filter((m) => want.includes(m.text)).every((m) => m.color && parseInt(m.color.slice(1, 3), 16) < 0x30);
+        // the export: underline whole under the replaced name, ₪ still printed
+        const bytes = await window.PFS.exporter.exportPdf(T.pdfView.getBytes(), T.overlay.getElements().map((c) => c.model), { quality: 'high' });
+        const doc = await pdfjsLib.getDocument({ data: bytes }).promise; const p1 = await doc.getPage(1);
+        const vp = p1.getViewport({ scale: 2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+        const cx = cv.getContext('2d'); await p1.render({ canvasContext: cx, viewport: vp }).promise;
+        const W = cv.width, H = cv.height, d = cx.getImageData(0, 0, W, H).data;
+        const darkAt = (x, y) => { const i = (y * W + x) * 4; return (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 140; };
+        const yl = Math.round(R.ulA.y / 1123 * H), xa = Math.round((R.ulA.x0 + 3) / 794 * W), xb = Math.round((R.ulA.x1 - 3) / 794 * W);
+        let on = 0; for (let x = xa; x < xb; x++) { let hit = false; for (let dy = -2; dy <= 2; dy++) if (darkAt(x, yl + dy)) hit = true; if (hit) on++; }
+        out.underline = +(on / Math.max(1, xb - xa)).toFixed(3);
+        let sh = 0; const sx0 = Math.round(R.shekel.x / 794 * W), sx1 = Math.round((R.shekel.x + R.shekel.w) / 794 * W), sy0 = Math.round(R.shekel.y / 1123 * H), sy1 = Math.round((R.shekel.y + R.shekel.h) / 1123 * H);
+        for (let y = sy0; y < sy1; y++) for (let x = sx0; x < sx1; x++) if (darkAt(x, y)) sh++;
+        out.shekelInk = sh;
+        return out;
+      }, { R, armed, onHint });
+    };
+    const dig = await runReplace(false);
+    const scn = await runReplace(true);
+    await page.evaluate(async () => { const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await window.PFS.__test.goHome(); } finally { window.PFS.ui.confirm = c; } });
+    const em = 19 / 1123;
+    const okDig = dig.n === 5 && dig.phone === 1 && dig.armed.every(Boolean) && dig.startA != null && Math.abs(dig.startA) < 0.006
+      && dig.sizes.every((v) => Math.abs(v - em) / em < 0.04) && dig.dark && dig.underline > 0.97 && dig.shekelInk > 30;
+    // and on the scan, a value auto-filled where the ID is replaced gives way (no ends peeking out)
+    const okScan = scn.n === 5 && scn.phone === 1 && scn.onHint > 0 && scn.texts.length === 6 && scn.armed.every(Boolean) && scn.underline > 0.97 && scn.shekelInk > 30 && scn.dark;
+    // the OCR never invents a blank on a line that is already written: "תעודת זהות: 012345678"
+    // has no field (a 24px stand-in used to get the profile ID stacked in a column beside it),
+    // while "שם: ______" and "שם:            " still do
+    const ocrRows = await page.evaluate(() => {
+      const w = (t, x0, x1, y0 = 100, y1 = 120) => ({ text: t, confidence: 90, bbox: { x0, x1, y0, y1 } });
+      const f = (words) => window.PFS.ocr.fieldsFromWords(words, 1000, 1400, 0).map((d) => +(d.fw * 1000).toFixed(0));
+      return {
+        filled: f([w('זהות:', 700, 760), w('תעודת', 770, 830), w('012345678', 560, 692)]),
+        underscores: f([w('שם:', 720, 760), w('__________', 400, 712)]),
+        blank: f([w('שם:', 720, 760)]),
+        ltr: f([w('Name:', 100, 160), w('Dana', 168, 220)])
+      };
+    });
+    const okOcr = ocrRows.filled.length === 0 && ocrRows.ltr.length === 0 && ocrRows.underscores.length === 1 && ocrRows.underscores[0] > 250 && ocrRows.blank.length === 1;
+    check('✏️ "החלפה" on a real form: Esc keeps the tool armed, underlines stay whole, the ₪ survives, the value starts where the old one did at the exact size in dark ink — digital AND scanned (field hints never swallow the drag)', why(okDig && okScan && okOcr ? true : JSON.stringify({ dig, scn, ocrRows })));
+  }
+
   // ---- every new document opens clean ----
   // A LANDSCAPE certificate was once taken for a PORTRAIT registration form
   // (the 8×8 picture hash of two "mostly white" pages), and the certificate's

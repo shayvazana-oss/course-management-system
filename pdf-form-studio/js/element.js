@@ -122,6 +122,9 @@
         // size slider, the resize drag — it breaks into lines INSIDE the cell
         // ("שורה מתחת לשורה") instead of stretching past the border. The
         // decision lives here in layout so every mutation path obeys it.
+        // a "cell" narrower than two characters is no cell (a mis-detected
+        // gap): wrapping into it would stack the value one glyph per line
+        if (model.cellW && model.cellW * W < fontPx * 2) { model.cellW = null; model.wrapW = null; }
         if (model.cellW) {
           node.style.width = 'auto';
           inner.style.whiteSpace = 'pre';
@@ -195,7 +198,12 @@
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
         const rtlNow = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
-        if (rtlNow && (rtlBefore || model.align === 'right') && !model.wrapW) {
+        if (model.anchorRight != null && !model.wrapW) {
+          // a replacement starts where the print it replaced started — typed
+          // digits or Hebrew alike grow away from that edge, never over it
+          const nx = Math.max(0, model.anchorRight - model.fw);
+          if (Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
+        } else if (rtlNow && (rtlBefore || model.align === 'right') && !model.wrapW) {
           const nx = rightBefore - model.fw;
           if (nx >= 0 && Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
         }

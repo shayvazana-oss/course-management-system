@@ -1426,6 +1426,10 @@ body.gate-locked #loginModal { pointer-events: auto; }
 .field-marker { animation: none !important; }
 .field-marker:hover { border-bottom-color: transparent; border-radius: 6px; }
 
+/* an armed tool (replace, cover, text…) owns the page: the field hints must
+   not swallow its drag — on a scan they sit exactly on the values to replace */
+.overlay.placing .field-marker { pointer-events: none !important; }
+
 </style>
 
 <div class="app">
@@ -5985,6 +5989,9 @@ body.gate-locked #loginModal { pointer-events: auto; }
         // size slider, the resize drag — it breaks into lines INSIDE the cell
         // ("שורה מתחת לשורה") instead of stretching past the border. The
         // decision lives here in layout so every mutation path obeys it.
+        // a "cell" narrower than two characters is no cell (a mis-detected
+        // gap): wrapping into it would stack the value one glyph per line
+        if (model.cellW && model.cellW * W < fontPx * 2) { model.cellW = null; model.wrapW = null; }
         if (model.cellW) {
           node.style.width = 'auto';
           inner.style.whiteSpace = 'pre';
@@ -6058,7 +6065,12 @@ body.gate-locked #loginModal { pointer-events: auto; }
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
         const rtlNow = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
-        if (rtlNow && (rtlBefore || model.align === 'right') && !model.wrapW) {
+        if (model.anchorRight != null && !model.wrapW) {
+          // a replacement starts where the print it replaced started — typed
+          // digits or Hebrew alike grow away from that edge, never over it
+          const nx = Math.max(0, model.anchorRight - model.fw);
+          if (Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
+        } else if (rtlNow && (rtlBefore || model.align === 'right') && !model.wrapW) {
           const nx = rightBefore - model.fw;
           if (nx >= 0 && Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
         }
@@ -8460,16 +8472,25 @@ body.gate-locked #loginModal { pointer-events: auto; }
       // the label's size, glued to the colon — "הדבקות של טקסט".)
       const em = h / 0.65, gap = h * 0.6;
       const defW = 0.30 * W;
-      let fx, fw;
+      // a word written right after the label means the line is already
+      // filled ("תעודת זהות: 012345678"): no blank there, so no field. (A
+      // 24px minimum used to invent one, and a value auto-filled into it
+      // stacked its digits in a column beside the printed one.) A run of
+      // underscores/dots is the blank itself, not a word.
+      const solid = (o) => /[\p{L}\p{N}]/u.test(o.t);
+      let fx, fw, room;
       if (rtl) {
-        const left = sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2);
+        const left = sameLine.filter((o) => o.bb.x1 <= bb.x0 + 2 && solid(o));
         const lb = left.length ? Math.max(...left.map((o) => o.bb.x1)) : Math.max(0, bb.x0 - defW);
-        fx = lb / W; fw = Math.max(24, bb.x0 - gap - lb) / W;
+        room = bb.x0 - gap - lb;
+        fx = lb / W; fw = room / W;
       } else {
-        const right = sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2);
+        const right = sameLine.filter((o) => o.bb.x0 >= bb.x1 - 2 && solid(o));
         const rb = right.length ? Math.min(...right.map((o) => o.bb.x0)) : Math.min(W, bb.x1 + defW);
-        fx = (bb.x1 + gap) / W; fw = Math.max(24, rb - bb.x1 - gap) / W;
+        room = rb - bb.x1 - gap;
+        fx = (bb.x1 + gap) / W; fw = room / W;
       }
+      if (room < em * 2.5) return;
       const fontFrac = Math.min(0.03, Math.max(0.012, em / H));
       out.push({
         page: pageIndex, fieldKey: slug(label, out.length), label: label,
@@ -8550,7 +8571,7 @@ body.gate-locked #loginModal { pointer-events: auto; }
     }
   }
 
-  PFS.ocr = { available, runOcrDetect, recognizeWords };
+  PFS.ocr = { available, runOcrDetect, recognizeWords, fieldsFromWords };
 })(window);
 
 </script>
@@ -9815,7 +9836,7 @@ const overlay = PFS.createOverlayManager({
   // a tap on empty paper opens a caret right there ("לוחצים על המשבצת ומקלידים")
   onEmptyTap: (page, fx, fy) => { try { quickTextAt(page, fx, fy); } catch (e) { console.warn('quick text failed', e); } },
   // a certificate field dropped near a printed underline settles onto it
-  onDragEnd: (c) => { try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
+  onDragEnd: (c) => { try { if (c && c.model) c.model.__userMoved = true; } catch (e) {} try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
@@ -11092,8 +11113,26 @@ function activateTool(btn, tool) {
 // height, its vertical position, colour and stroke weight. The drag rectangle
 // is sloppy; the print underneath is not — matching the print is what makes a
 // replacement read as "edited in place" instead of a patch in the wrong size.
+/* what the replace helpers read: the page as shown on screen, or — while a
+ * replacement is being refined — the same page rendered at a fixed high
+ * resolution. On screen a thin underline or a fine stroke at low zoom blurs
+ * to grey: rules went undetected (the cover erased them) and black print
+ * measured grey. The result must not depend on how far the clerk zoomed. */
+let measureSrc = null;
+const measureView = (pageIndex) => (measureSrc && measureSrc.page === pageIndex ? { canvas: measureSrc.canvas } : pdfView.viewList()[pageIndex]);
+const hiResPages = new Map();
+async function hiResPage(pageIndex) {
+  const rot = ((pdfView.getRotations && pdfView.getRotations()) || {})[pageIndex] || 0;
+  const key = loadGen + ':' + rot;
+  const hit = hiResPages.get(pageIndex);
+  if (hit && hit.key === key) return hit.canvas;
+  const { canvas } = await renderBaseForFlatten(pageIndex, 3);
+  if (hiResPages.size > 3) hiResPages.clear();   // a few pages at most (memory)
+  hiResPages.set(pageIndex, { key, canvas });
+  return canvas;
+}
 function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
-  const v = pdfView.viewList()[pageIndex];
+  const v = measureView(pageIndex);
   if (!v || !v.canvas || !v.canvas.width) return null;
   const cw = v.canvas.width, chh = v.canvas.height;
   const x0 = Math.max(0, Math.round(fx * cw)), y0 = Math.max(0, Math.round(fy * chh));
@@ -11107,7 +11146,7 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
   // Stroke runs use the same strict cut: the AA halo widens every stem by a
   // pixel each side, which at small sizes made REGULAR text measure as bold.
   let rS = 0, gS = 0, bS = 0, inkN = 0, rL = 0, gL = 0, bL = 0, looseN = 0;
-  const runs = [];
+  const runs = [], darkPx = [];
   for (let y = 0; y < h; y++) {
     let run = 0;
     for (let x = 0; x < w; x++) {
@@ -11117,6 +11156,7 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
       const core = dark && lum < 120;
       if (dark) {
         rows[y]++;
+        darkPx.push(lum, data[i], data[i + 1], data[i + 2]);
         if (lum < 100) { rS += data[i]; gS += data[i + 1]; bS += data[i + 2]; inkN++; }
         else { rL += data[i]; gL += data[i + 1]; bL += data[i + 2]; looseN++; }
       }
@@ -11140,17 +11180,45 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
   }
   const bandPx = best.bot - best.top + 1;
   if (bandPx < 4) return null;
+  // the letters' BODY: the dense rows of the band. Ascenders (ל) and tails
+  // (ק ן ך ף ץ) are sparse; sizing and seating by the body makes a typed
+  // value match the print whatever letters either string happens to have
+  let maxRow = 0;
+  for (let y = best.top; y <= best.bot; y++) maxRow = Math.max(maxRow, rows[y]);
+  let bTop = best.top, bBot = best.bot;
+  while (bTop < best.bot && rows[bTop] < maxRow * 0.35) bTop++;
+  while (bBot > bTop && rows[bBot] < maxRow * 0.35) bBot--;
   // stroke weight ≈ median horizontal dark-run → regular vs bold
   runs.sort((a, b) => a - b);
   const stroke = runs.length ? runs[Math.floor(runs.length / 2)] : 0;
-  const n = inkN || looseN;
-  const sums = inkN ? [rS, gS, bS] : [rL, gL, bL];
-  const color = n
-    ? '#' + sums.map((s) => Math.max(0, Math.min(255, Math.round(s / n))).toString(16).padStart(2, '0')).join('')
-    : null;
+  // the ink's own colour: the darkest 15% of its pixels. Thin strokes at
+  // screen resolution never reach full darkness (anti-aliasing), so the mean
+  // of "dark" pixels read black print as grey (#373737 for #111)
+  let color = null;
+  if (darkPx.length >= 4) {
+    const idx = []; for (let k = 0; k < darkPx.length; k += 4) idx.push(k);
+    idx.sort((a, b) => darkPx[a] - darkPx[b]);
+    const take = idx.slice(0, Math.max(1, Math.round(idx.length * 0.15)));
+    const avg = [1, 2, 3].map((o) => take.reduce((t, k) => t + darkPx[k + o], 0) / take.length);
+    color = '#' + avg.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  }
+  // where the print STARTS and ends on the line (RTL: its right edge is where
+  // a replacement begins)
+  let inkL = w, inkR = -1;
+  for (let y = best.top; y <= best.bot; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] > 200 && (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) < 185) { if (x < inkL) inkL = x; if (x > inkR) inkR = x; }
+    }
+  }
   return {
     bandTopFrac: (y0 + best.top) / chh,
     bandFrac: bandPx / chh,
+    bodyTopFrac: (y0 + bTop) / chh,
+    bodyFrac: (bBot - bTop + 1) / chh,
+    baseFrac: (y0 + bBot + 1) / chh,
+    inkLeftFrac: inkR >= 0 ? (x0 + inkL) / cw : null,
+    inkRightFrac: inkR >= 0 ? (x0 + inkR + 1) / cw : null,
     color,
     // bold needs resolution to be judged: under ~10px of glyph height a single
     // AA'd stem already spans a quarter of the band. When unsure, regular —
@@ -11166,7 +11234,7 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
  * inter-word gap (or a sane cap), so a partially-covered word/number is always
  * erased whole. Returns {fx, fw} for the cover. */
 function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
-  const v = pdfView.viewList()[pageIndex];
+  const v = measureView(pageIndex);
   if (!v || !v.canvas || !v.canvas.width) return { fx, fw };
   const cw = v.canvas.width, chh = v.canvas.height;
   let data, gx0, gw;
@@ -11187,11 +11255,18 @@ function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
   // under it (same ratio the RTL line assembler uses to decide where words end)
   const gapPx = Math.max(3, Math.round(band.h * chh * 0.30));
   let left = Math.round(fx * cw), right = Math.round((fx + fw) * cw);
-  for (let x = left - 1, white = 0; x >= gx0 && left - x <= maxExt && white < gapPx; x--) {
-    if (colInk(x - gx0)) { left = x; white = 0; } else white++;
+  // an edge that sits in blank paper cut nothing: it must not reach over to
+  // the next word ("1,250" replaced, the "₪" beside it erased too)
+  const cuts = (x) => { for (let d = -1; d <= 1; d++) { const xx = x + d - gx0; if (xx >= 0 && xx < gw && colInk(xx)) return true; } return false; };
+  if (cuts(left)) {
+    for (let x = left - 1, white = 0; x >= gx0 && left - x <= maxExt && white < gapPx; x--) {
+      if (colInk(x - gx0)) { left = x; white = 0; } else white++;
+    }
   }
-  for (let x = right + 1, white = 0; x < gx0 + gw && x - right <= maxExt && white < gapPx; x++) {
-    if (colInk(x - gx0)) { right = x + 1; white = 0; } else white++;
+  if (cuts(right - 1)) {
+    for (let x = right + 1, white = 0; x < gx0 + gw && x - right <= maxExt && white < gapPx; x++) {
+      if (colInk(x - gx0)) { right = x + 1; white = 0; } else white++;
+    }
   }
   return { fx: Math.max(0, left - 2) / cw, fw: Math.min(cw, right + 2 - left + 4) / cw };
 }
@@ -11202,7 +11277,7 @@ function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
  * when the band runs into the drag's top or bottom edge, grow the cover to
  * the band plus a 2px margin. Returns {fy, fh}. */
 function coverBandVertically(pageIndex, fx, fy, fw, fh) {
-  const v = pdfView.viewList()[pageIndex];
+  const v = measureView(pageIndex);
   if (!v || !v.canvas || !v.canvas.height) return { fy, fh };
   const chh = v.canvas.height;
   const pad = Math.max(0.006, fh * 0.6);
@@ -11216,17 +11291,130 @@ function coverBandVertically(pageIndex, fx, fy, fw, fh) {
   const top = Math.min(fy, bandTop - 2 / chh), bot = Math.max(fy + fh, bandBot + 2 / chh);
   return { fy: Math.max(0, top), fh: Math.min(1 - Math.max(0, top), bot - top) };
 }
+/* keepRules — a value printed on an underline, or inside a table cell: the
+ * cover must take the LETTERS, not the line under them or the cell's border
+ * ("זה מוחק לי את הקו"). Rows that are ink across nearly the whole cover are
+ * a rule; the cover stops a pixel short of any rule at its top or bottom, and
+ * of any border column at its sides. Returns {fx, fy, fw, fh}. */
+function keepRules(pageIndex, r) {
+  const v = measureView(pageIndex);
+  if (!v || !v.canvas || !v.canvas.width) return r;
+  const cw = v.canvas.width, chh = v.canvas.height;
+  const x0 = Math.max(0, Math.round(r.fx * cw)), y0 = Math.max(0, Math.round(r.fy * chh));
+  const w = Math.min(cw - x0, Math.round(r.fw * cw)), h = Math.min(chh - y0, Math.round(r.fh * chh));
+  if (w < 6 || h < 4) return r;
+  let d; try { d = v.canvas.getContext('2d').getImageData(x0, y0, w, h).data; } catch (e) { return r; }
+  const dark = (x, y) => { const i = (y * w + x) * 4; return d[i + 3] > 200 && (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 170; };
+  const rowRule = (y) => { let n = 0; for (let x = 0; x < w; x++) if (dark(x, y)) n++; return n >= w * 0.85; };
+  const colRule = (x) => { let n = 0; for (let y = 0; y < h; y++) if (dark(x, y)) n++; return n >= h * 0.85; };
+  let top = 0, bot = h - 1, left = 0, right = w - 1;
+  // a rule in the bottom/top third of the cover → stop above/below it
+  for (let y = h - 1; y >= Math.floor(h * 0.6); y--) if (rowRule(y)) { bot = Math.min(bot, y - 2); }
+  for (let y = 0; y <= Math.ceil(h * 0.4); y++) if (rowRule(y)) { top = Math.max(top, y + 2); }
+  for (let x = 0; x <= Math.min(w - 1, 4); x++) if (colRule(x)) left = Math.max(left, x + 2);
+  for (let x = w - 1; x >= Math.max(0, w - 5); x--) if (colRule(x)) right = Math.min(right, x - 2);
+  if (bot - top < 3 || right - left < 3) return r;
+  if (top === 0 && bot === h - 1 && left === 0 && right === w - 1) return r;   // no rule: the cover as drawn
+  return { fx: (x0 + left) / cw, fy: (y0 + top) / chh, fw: (right - left + 1) / cw, fh: (bot - top + 1) / chh };
+}
+// the size and seat of typed text, from the print it replaces: its letters'
+// body height decides the size (the body of Hebrew letters, or of digits, in
+// THIS font), its baseline decides where the line box sits
+function replacementGeometry(m, text, ink) {
+  __tuneCanvas = __tuneCanvas || document.createElement('canvas');
+  const cx = __tuneCanvas.getContext('2d');
+  const REF = 1000;
+  const fontAt = (px) => PFS.weightOf(m) + ' ' + px.toFixed(2) + 'px ' + (m.font || 'Heebo, sans-serif');
+  const heb = /[\u0590-\u05FF]/.test(text || '') || !/[0-9]/.test(text || '');
+  cx.font = fontAt(100);
+  const ref = cx.measureText(heb ? 'בדהמשטת' : '0123456789');
+  const ratio = (ref.actualBoundingBoxAscent + Math.max(0, ref.actualBoundingBoxDescent)) / 100;
+  let fontFrac = m.fontFrac;
+  if (!m.__emExact && ratio > 0.2 && ink.bodyFrac > 0) fontFrac = PFS.clamp(ink.bodyFrac / ratio, 0.006, 0.08);
+  const px = fontFrac * REF;
+  cx.font = fontAt(px);
+  const pr = cx.measureText('אAg1');
+  const asc = pr.fontBoundingBoxAscent > 0 ? pr.fontBoundingBoxAscent : px * 0.95;
+  const desc = pr.fontBoundingBoxAscent > 0 ? (pr.fontBoundingBoxDescent || 0) : px * 0.25;
+  const baseInBox = ((px * 1.15 - (asc + desc)) / 2 + asc) / REF;
+  return { fontFrac, fy: PFS.clamp(ink.baseFrac - baseInBox, 0, 0.98), fh: fontFrac * 1.15 };
+}
+// keep a replacement's START where the print started (its right edge in a
+// Hebrew form), whatever was typed and whatever its size became
+function seatReplacement(ctrl) {
+  const m = ctrl.model;
+  if (m.anchorRight == null || m.wrapW) return;
+  ctrl.layout();
+  const nx = PFS.clamp(m.anchorRight - (m.fw || 0), 0, 1);
+  if (Math.abs(nx - m.fx) > 1e-5) { m.fx = nx; ctrl.layout(); }
+}
 // "Replace" — one gesture over existing content: cover it with a paper-matched
 // box (seamless erase), then drop an empty text box in the same spot, focused so
 // the new value can be typed immediately. The result reads like edited-in-place.
-function placeReplacement(pageIndex, fx, fy, fw, fh) {
-  const clamp = PFS.clamp;
+// the measured print under a drag, and the cover that takes exactly its letters
+function replacementPlan(pageIndex, fx, fy, fw, fh) {
   const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);   // before covering
   // the cover finishes any token the drag only grazed — no surviving slivers
   const cover = ink ? extendCoverToInk(pageIndex, fx, fy, fw, fh, { top: ink.bandTopFrac, h: ink.bandFrac }) : { fx, fw };
   const vert = coverBandVertically(pageIndex, cover.fx, fy, cover.fw, fh);
-  const bg = pdfView.sampleBg(pageIndex, cover.fx, vert.fy, cover.fw, vert.fh) || '#ffffff';
-  overlay.addModelAt('whiteout', pageIndex, { fx: cover.fx, fy: vert.fy, fw: cover.fw, fh: vert.fh, color: bg, auto: true });
+  // measure the print again over the WHOLE line height the cover found: a
+  // tight drag clips letter tops and bottoms, and a clipped body made the
+  // replacement smaller than its neighbours
+  const inkFull = ink ? (measureReplacedInk(pageIndex, cover.fx, vert.fy, cover.fw, vert.fh) || ink) : null;
+  if (inkFull && ink) { ink.bodyFrac = inkFull.bodyFrac; ink.baseFrac = inkFull.baseFrac; ink.bodyTopFrac = inkFull.bodyTopFrac; if (inkFull.inkRightFrac != null) ink.inkRightFrac = inkFull.inkRightFrac; if (inkFull.color) ink.color = inkFull.color; }
+  // the letters go, the underline / the cell's border stay
+  const kept = keepRules(pageIndex, { fx: cover.fx, fy: vert.fy, fw: cover.fw, fh: vert.fh });
+  return { ink, kept };
+}
+// the same plan on the page rendered at a fixed high resolution, applied to
+// the cover and the text just placed (unless the clerk already moved them)
+async function refineReplacementHiRes(pageIndex, fx, fy, fw, fh, coverCtrl, ctrl) {
+  try {
+    const gen = loadGen;
+    const canvas = await hiResPage(pageIndex);
+    if (gen !== loadGen || !canvas) return;
+    measureSrc = { page: pageIndex, canvas };
+    let plan;
+    try { plan = replacementPlan(pageIndex, fx, fy, fw, fh); } finally { measureSrc = null; }
+    if (!plan || !plan.ink) return;
+    if (coverCtrl && coverCtrl.node && coverCtrl.node.isConnected && !coverCtrl.model.__userMoved) {
+      Object.assign(coverCtrl.model, plan.kept);
+      const bg = pdfView.sampleBg(pageIndex, plan.kept.fx, plan.kept.fy, plan.kept.fw, plan.kept.fh);
+      if (bg) coverCtrl.model.color = bg;
+      coverCtrl.layout();
+    }
+    if (ctrl && ctrl.node && ctrl.node.isConnected) {
+      const m = ctrl.model, ink = plan.ink;
+      if (ink.color) m.color = ink.color;
+      if (!m.__emExact) m.bold = ink.bold;
+      m.__band = { top: ink.bandTopFrac, h: ink.bandFrac };
+      m.__ink = Object.assign({}, m.__ink || {}, { bodyFrac: ink.bodyFrac }, m.__emExact ? {} : { baseFrac: ink.baseFrac });
+      if (!m.__userMoved) {
+        if (ink.inkRightFrac != null) m.anchorRight = ink.inkRightFrac;
+        const g = replacementGeometry(m, String(m.text || '').trim() || 'בדהמשטת', m.__ink);
+        m.fontFrac = g.fontFrac; m.fy = g.fy; m.fh = g.fh;
+        seatReplacement(ctrl);
+      }
+    }
+    markDirty();
+  } catch (e) { /* the on-screen estimate stands */ }
+}
+function placeReplacement(pageIndex, fx, fy, fw, fh) {
+  const clamp = PFS.clamp;
+  const { ink, kept } = replacementPlan(pageIndex, fx, fy, fw, fh);
+  // a value already written at this spot (auto-filled, or typed earlier)
+  // gives way to the replacement: half-covered, its ends peeked out on both
+  // sides of the new value ("1 987654321 2"). Ctrl+Z brings it back.
+  const overlapOf = (m) => {
+    const mh = m.fh || (m.fontFrac || 0.02) * 1.15, mw = m.fw || 0;
+    const ix = Math.min(m.fx + mw, kept.fx + kept.fw) - Math.max(m.fx, kept.fx);
+    const iy = Math.min(m.fy + mh, kept.fy + kept.fh) - Math.max(m.fy, kept.fy);
+    return ix > 0 && iy > 0 && mw > 0 ? (ix * iy) / (mw * mh) : 0;
+  };
+  const inTheWay = overlay.getElements().filter((c) => c.model.type === 'text' && c.model.page === pageIndex && String(c.model.text || '').trim() && overlapOf(c.model) >= 0.3);
+  if (inTheWay.length) { clearTimeout(snapT); snapshot(); inTheWay.forEach((c) => overlay.deleteCtrl(c)); }
+  const bg = pdfView.sampleBg(pageIndex, kept.fx, kept.fy, kept.fw, kept.fh) || '#ffffff';
+  const coverCtrl = overlay.addModelAt('whiteout', pageIndex, { fx: kept.fx, fy: kept.fy, fw: kept.fw, fh: kept.fh, color: bg, auto: true });
   let fontFrac, textH, ty;
   if (ink) {
     // match the print that was just covered: same glyph size (a Hebrew/digit
@@ -11246,15 +11434,28 @@ function placeReplacement(pageIndex, fx, fy, fw, fh) {
   if (ink) {
     if (ink.color) extra.color = ink.color;
     extra.bold = ink.bold;
+    if (PFS.fontmatch && PFS.fontmatch.docCss()) extra.font = PFS.fontmatch.docCss();
     // the measured band of the ORIGINAL print — the visual truth the typed
     // replacement must land on (the closed-loop tuner below aims at it)
     extra.__band = { top: ink.bandTopFrac, h: ink.bandFrac };
-  } else if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
+    extra.__ink = { bodyFrac: ink.bodyFrac, baseFrac: ink.baseFrac };
+    // it starts where the print started — not at the edge of a sloppy drag
+    if (ink.inkRightFrac != null) extra.anchorRight = ink.inkRightFrac;
+    const g = replacementGeometry(extra, 'בדהמשטת', extra.__ink);
+    extra.fontFrac = g.fontFrac; extra.fy = g.fy; extra.fh = g.fh;
+  } else {
+    extra.anchorRight = fx + fw;
+    if (lastTextStyle) { extra.color = lastTextStyle.color; extra.bold = !!lastTextStyle.bold; }
+  }
   const ctrl = overlay.addModelAt('text', pageIndex, extra, true);
+  if (ctrl) seatReplacement(ctrl);
   // digital PDFs know better than pixels: the text layer carries the covered
   // run's EXACT em size and baseline — refine the estimate the moment it loads
   refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh);
-  if (ctrl && extra.__band) attachReplacementTuner(ctrl);
+  if (ctrl) attachReplacementTuner(ctrl);
+  // …and the exact measurement, independent of the screen (zoom, or a page
+  // canvas not drawn yet): it also rescues a drag the screen could not read
+  refineReplacementHiRes(pageIndex, fx, fy, fw, fh, coverCtrl, ctrl);
 }
 
 /* Closed-loop match: predictions (em size, family metrics) still leave a
@@ -11265,8 +11466,21 @@ function placeReplacement(pageIndex, fx, fy, fw, fh) {
 let __tuneCanvas = null;
 function tuneReplacementToInk(ctrl) {
   const m = ctrl.model, tgt = m.__band;
+  const text0 = String(m.text || '').trim();
+  if (m.__ink && text0) {
+    const probe = (__tuneCanvas = __tuneCanvas || document.createElement('canvas')).getContext('2d');
+    probe.font = '400 100px ' + (m.font || 'Heebo, sans-serif');
+    const t = probe.measureText('0123456789');
+    if (t.width > 10 && (t.actualBoundingBoxAscent + t.actualBoundingBoxDescent) > 20) {
+      const g = replacementGeometry(m, text0, m.__ink);
+      m.fontFrac = g.fontFrac; m.fh = g.fh; m.fy = g.fy;
+      m.__tuned = true;
+      seatReplacement(ctrl);
+      return true;
+    }
+  }
   if (!tgt || !(tgt.h > 0)) return false;
-  const text = String(m.text || '').trim();
+  const text = text0;
   if (!text) return false;
   const REF = 1000;                       // fractions are linear — any ref height works
   __tuneCanvas = __tuneCanvas || document.createElement('canvas');
@@ -11295,6 +11509,7 @@ function tuneReplacementToInk(ctrl) {
   m.fy = PFS.clamp(tgt.top - glyphTopInBox / REF, 0, 0.98);
   m.__tuned = true;
   ctrl.layout();
+  seatReplacement(ctrl);
   return true;
 }
 function attachReplacementTuner(ctrl) {
@@ -11332,22 +11547,22 @@ async function refineReplacementFromText(ctrl, pageIndex, fx, fy, fw, fh) {
       const oy = Math.min(y1, tx[5]) - Math.max(y0, top);
       if (ox <= 0 || oy <= 0) return;
       const score = ox * oy;
-      if (!best || score > best.score) best = { score, fontH, top, fontName: it.fontName };
+      if (!best || score > best.score) best = { score, fontH, top, base: tx[5], left, right: left + w, fontName: it.fontName };
     });
     if (!best) return;
-    const ff = PFS.clamp((best.fontH * 0.95) / H, 0.006, 0.08);
-    // same top/size convention as detected fields — exports land on the line.
-    // Never clobber a closed-loop tune that already ran (user typed fast).
-    if (!ctrl.model.__tuned) {
-      ctrl.model.fontFrac = ff;
-      ctrl.model.fh = (best.fontH * 1.2) / H;
-      ctrl.model.fy = PFS.clamp(best.top / H, 0, 1 - ctrl.model.fh);
-    }
-    // and the covered run's own typeface — the last thing that gave a
-    // replacement away once size, line and colour already matched
+    // the covered run's own typeface — the last thing that gave a replacement
+    // away once size, line and colour already matched
     const fm = resolveFont(best.fontName);
     if (fm && fm.css) { ctrl.model.font = fm.css; ctrl.model.bold = fm.bold || ctrl.model.bold; }
-    ctrl.layout();
+    // the EXACT em and baseline of the covered run: the text layer knows them,
+    // pixels only estimate — and the tuner keeps this size from now on
+    ctrl.model.fontFrac = PFS.clamp(best.fontH / H, 0.006, 0.08);
+    ctrl.model.__emExact = true;
+    ctrl.model.__ink = Object.assign({}, ctrl.model.__ink || {}, { baseFrac: best.base / H });
+    if (ctrl.model.anchorRight == null || !isFinite(ctrl.model.anchorRight)) ctrl.model.anchorRight = Math.min(1, best.right / W);
+    const g = replacementGeometry(ctrl.model, String(ctrl.model.text || '').trim() || 'בדהמשטת', ctrl.model.__ink);
+    ctrl.model.fy = g.fy; ctrl.model.fh = g.fh;
+    seatReplacement(ctrl);
   } catch (e) { /* scanned page / race with unload — the pixel estimate stands */ }
 }
 
@@ -12371,6 +12586,12 @@ document.addEventListener('keydown', (e) => {
   const sel = overlay.getSelected();
   const editing = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true';
   const inField = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || '');
+  // Esc while typing in a box finishes THAT box only — a replace/cover run
+  // stays armed for the next value (it used to end the run: the next drag did
+  // nothing, "החלפה עושה בעיות"). A second Esc ends the run.
+  if (e.key === 'Escape' && document.activeElement && document.activeElement.closest && document.activeElement.closest('.el.text') && document.activeElement.isContentEditable) {
+    e.preventDefault(); document.activeElement.blur(); overlay.deselectAll(); return;
+  }
   if (e.key === 'Escape') { overlay.setPlacing(null); overlay.deselectAll(); document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active')); document.querySelectorAll('.modal-back.show').forEach((m) => { if (!(m.id === 'loginModal' && gateLocked())) m.classList.remove('show'); }); }
   if (e.key === '?' && !editing && !inField) { e.preventDefault(); openModal('helpModal'); }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !editing && !inField) {

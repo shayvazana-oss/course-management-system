@@ -2144,7 +2144,10 @@ async function main() {
     await wait(400);
     const noDrift = d.scrollTop === 0 && document.body.scrollTop === 0;
     // 3) scoped scroller really scrolls the inner viewport, not the document
+    //    (focusing the row already brought the field into view — start from
+    //    the top again so the scroller has somewhere to go)
     const vp = document.querySelector('.viewport');
+    vp.scrollTop = 0; await wait(80);
     const before = vp.scrollTop;
     const rows = [...document.querySelectorAll('#fieldsBody input[type=text]')];
     const rb = rows.find((i) => i.__fkey === 's_b');
@@ -4863,6 +4866,151 @@ async function main() {
     });
     const okOcr = ocrRows.filled.length === 0 && ocrRows.ltr.length === 0 && ocrRows.underscores.length === 1 && ocrRows.underscores[0] > 250 && ocrRows.blank.length === 1;
     check('✏️ "החלפה" on a real form: Esc keeps the tool armed, underlines stay whole, the ₪ survives, the value starts where the old one did at the exact size in dark ink — digital AND scanned (field hints never swallow the drag)', why(okDig && okScan && okOcr ? true : JSON.stringify({ dig, scn, ocrRows })));
+  }
+
+  // ---- the page follows the panel ----
+  // A row focused in "שדות שזוהו" (a click, Enter / ↓ from the row above,
+  // the ⤓ button) brings the field's spot on the form into view. For an
+  // EMPTY field — the one to fill — nothing moved: "לא קופץ למקומות המסומנים".
+  {
+    await (await page.$('#pdfInput')).setInputFiles(FIXTURE); await page.waitForTimeout(3000);
+    await page.evaluate(() => { document.getElementById('viewport').scrollTo(0, 0); });
+    const rows = await page.evaluate(() => [...document.querySelectorAll('#fieldsBody input[type=text]')].map((i) => ({ key: i.__fkey, page: (window.PFS.__test.getLastDet().fields.find((f) => f.fieldKey === i.__fkey) || {}).page })));
+    const far = rows.find((r) => r.page === 1);
+    // the field's spot: its value when it has one (the hint hides then), else its hint
+    const seen = (key) => page.evaluate((k) => { const m = document.querySelector('.field-marker[data-key="' + CSS.escape(k) + '"]'); const c = window.PFS.__test.overlay.getElements().find((x) => x.model.fieldKey === k); const n = (c && c.node) || m; if (!n) return null; const r = n.getBoundingClientRect(), v = document.getElementById('viewport').getBoundingClientRect(); return { inView: r.height > 0 && r.top >= v.top && r.bottom <= v.bottom, lit: !m || m.classList.contains('active') }; }, key);
+    const out = { far };
+    if (far) {
+      out.before = await seen(far.key);
+      await page.evaluate((k) => { [...document.querySelectorAll('#fieldsBody input[type=text]')].find((x) => x.__fkey === k).focus(); }, far.key);
+      await page.waitForTimeout(900);
+      out.focus = await seen(far.key);
+      await page.evaluate(() => { document.activeElement.blur(); document.getElementById('viewport').scrollTo(0, 0); }); await page.waitForTimeout(200);
+      await page.evaluate((k) => { const i = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((x) => x.__fkey === k); const b = [...i.parentElement.parentElement.querySelectorAll('button')].find((x) => x.textContent === '⤓'); b.click(); }, far.key);
+      await page.waitForTimeout(900);
+      out.arrow = await seen(far.key);
+      await page.evaluate(() => document.getElementById('viewport').scrollTo(0, 0));
+      await page.evaluate((k) => { [...document.querySelectorAll('#fieldsBody input[type=text]')].find((x) => x.__fkey === k).focus(); }, rows[0].key);
+      out.walk = [];
+      for (let i = 1; i < rows.length; i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(450); const k = await page.evaluate(() => document.activeElement.__fkey); out.walk.push(await seen(k)); }
+      await page.evaluate(() => document.activeElement.blur());
+      // and that page-2 field, "הערות: ______" in ONE text run: its box is the
+      // underscores' part, on the line (the whole run made the label sit
+      // inside the field, and the ink pass pushed it under the line)
+      out.notes = await page.evaluate(async (k) => {
+        const T = window.PFS.__test; const f = T.getLastDet().fields.find((x) => x.fieldKey === k);
+        const pg = await T.pdfView.getDoc().getPage(2); const vp = pg.getViewport({ scale: 1 }); const tc = await pg.getTextContent();
+        const it = tc.items.map((i) => { const t = pdfjsLib.Util.transform(vp.transform, i.transform); return { s: i.str, base: t[5] / vp.height, w: i.width / vp.width }; }).find((i) => /הערות/.test(i.s));
+        return f && it ? { onLine: Math.abs((f.fy + f.fh) - it.base) < 0.006, narrow: f.fw < it.w * 0.6, fw: f.fw, runW: it.w, bottom: f.fy + f.fh, base: it.base } : { f: !!f, it: !!it };
+      }, far.key);
+    }
+    check('🧭 the page follows the panel: focusing a page-2 row, its ⤓, and Enter-walking the rows all bring the field\'s hint into view; "הערות: ____" in one run gets its box on the underscores', why(far && !out.before.inView && out.focus.inView && out.focus.lit && out.arrow.inView && out.walk.every((w) => w && w.inView) && out.notes && out.notes.onLine && out.notes.narrow ? true : JSON.stringify(out)));
+  }
+
+  // ---- "החלפה" as a clerk really uses it, part 2 ----
+  // A click (no drag) on a word replaces THAT word (it dropped a box a fifth
+  // of the page wide: the label beside went too); Enter finishes the value
+  // (it broke it onto a second line); a drag abandoned without typing leaves
+  // nothing (a white hole stayed); a click on blank paper or on the value
+  // just typed does not open stray boxes; a longer value grows its cover over
+  // blank paper only; a finger drag works (the page scrolled instead).
+  {
+    const pp = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+    await pp.emulateMedia({ media: 'print' });
+    const css = base.replace('index.html', 'vendor/fonts/heebo.css');
+    await pp.goto(css);
+    await pp.setContent(`<html><head><link rel="stylesheet" href="${css}"><style>
+      body{margin:60px 70px;direction:rtl;font-family:'David Libre','Frank Ruhl Libre',serif;font-size:19px;color:#111}
+      .row{margin:22px 0}.val{display:inline-block;min-width:260px;border-bottom:1.5px solid #000;padding:0 8px}
+      p{line-height:1.7}</style></head><body>
+      <div class="row">עיר: <span class="val" id="e">חיפה</span></div>
+      <div class="row">תעודת זהות: <span class="val" id="b">012345678</span></div>
+      <p id="p">הקורס יתקיים בתל אביב החל מיום ראשון, ובעלות של 1,250 ₪ למשתתף.</p>
+    </body></html>`, { waitUntil: 'load' });
+    await pp.evaluate(() => document.fonts.ready);
+    const R = await pp.evaluate(() => {
+      const box = (b) => ({ x: b.left / 794, y: b.top / 1123, w: b.width / 794, h: b.height / 1123 });
+      const tr = (sel) => { const rg = document.createRange(); rg.selectNodeContents(document.querySelector(sel)); return box(rg.getBoundingClientRect()); };
+      const word = (needle) => { const t = document.getElementById('p').firstChild; const i = t.textContent.indexOf(needle); const rg = document.createRange(); rg.setStart(t, i); rg.setEnd(t, i + needle.length); return box(rg.getBoundingClientRect()); };
+      return { e: tr('#e'), b: tr('#b'), tlv: word('תל אביב'), aviv: word('אביב'), price: word('1,250'), shekel: word('₪') };
+    });
+    const bytes = Array.from(await pp.pdf({ width: '794px', height: '1123px', printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 } }));
+    await pp.close();
+    const run = async (scan) => {
+      await page.evaluate(async ({ bytes, scan }) => {
+        let data = new Uint8Array(bytes);
+        if (scan) {
+          const doc = await pdfjsLib.getDocument({ data: data.slice(0) }).promise; const p1 = await doc.getPage(1);
+          const vp = p1.getViewport({ scale: 2.2 }); const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+          await p1.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          const png = await new Promise((r) => cv.toBlob(r, 'image/png'));
+          const out = await PDFLib.PDFDocument.create(); const img = await out.embedPng(await png.arrayBuffer());
+          const vp1 = p1.getViewport({ scale: 1 }); out.addPage([vp1.width, vp1.height]).drawImage(img, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+          data = await out.save();
+        }
+        window.PFS.store.set('templates', []); window.PFS.store.set('hint_sticky_cover', true);
+        await window.PFS.__test.openPdfFile(new File([data], scan ? 'החלפה-סרוק.pdf' : 'החלפה-2.pdf', { type: 'application/pdf' }));
+        window.PFS.__test.overlay.clearElements();
+        document.getElementById('viewport').scrollTo(0, 0);
+      }, { bytes, scan });
+      await page.waitForTimeout(scan ? 900 : 1500);
+      const pb = await page.evaluate(() => { const b = document.querySelector('.page-wrap canvas.pdf').getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+      const scr = (r) => ({ x0: pb.x + r.x * pb.w, y0: pb.y + r.y * pb.h, x1: pb.x + (r.x + r.w) * pb.w, y1: pb.y + (r.y + r.h) * pb.h, cx: pb.x + (r.x + r.w / 2) * pb.w, cy: pb.y + (r.y + r.h / 2) * pb.h });
+      const els = () => page.evaluate(() => window.PFS.__test.overlay.getElements().map((c) => ({ t: c.model.type === 'text' ? c.model.text : c.model.kind, fx: c.model.fx, fy: c.model.fy, fw: c.model.fw, fh: c.model.fh })));
+      const focused = () => page.evaluate(() => { const a = document.activeElement; return !!(a && a.isContentEditable && a.closest('.el.text')); });
+      const arm = async () => { await page.click('.rail-btn.tool[data-tool="replace"]'); await page.waitForTimeout(150); };
+      const reset = async () => { await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.evaluate(() => window.PFS.__test.overlay.clearElements()); };
+      const drag = async (q) => { await page.mouse.move(q.x1 + 2, q.y0 - 1); await page.mouse.down(); await page.mouse.move(q.cx, q.cy, { steps: 3 }); await page.mouse.move(q.x0 - 2, q.y1 + 1, { steps: 3 }); await page.mouse.up(); await page.waitForTimeout(250); };
+      const covers = (e) => e.filter((x) => x.t === 'whiteout');
+      const o = {};
+      // a click on "חיפה" → a cover over that word only
+      await arm(); let q = scr(R.e); await page.mouse.click(q.cx, q.cy); await page.waitForTimeout(600);
+      let e = await els(); let cv = covers(e)[0];
+      o.click = { focused: await focused(), n: e.length, cover: cv && [cv.fx, cv.fx + cv.fw], word: [R.e.x, R.e.x + R.e.w] };
+      await page.keyboard.type('טבריה'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+      e = await els(); o.enter = { focused: await focused(), armed: await page.evaluate(() => window.PFS.__test.overlay.isPlacing()), text: e.find((x) => x.t !== 'whiteout') };
+      await reset();
+      // a click inside running text takes one word
+      await arm(); q = scr(R.tlv); await page.mouse.click(q.x0 + 6, q.cy); await page.waitForTimeout(600);
+      cv = covers(await els())[0]; o.oneWord = { cover: cv && [cv.fx, cv.fx + cv.fw], aviv: [R.aviv.x, R.aviv.x + R.aviv.w], tlv: [R.tlv.x, R.tlv.x + R.tlv.w] };
+      await reset();
+      // abandoned: drag, click away without typing → nothing left
+      await arm(); await drag(scr(R.e)); q = scr(R.b); await page.mouse.click(pb.x + pb.w * 0.04, pb.y + pb.h * 0.5); await page.waitForTimeout(400);
+      o.abandoned = (await els()).length;
+      // a click on blank paper with nothing being typed: nothing, a hint
+      await page.mouse.click(pb.x + pb.w * 0.04, pb.y + pb.h * 0.6); await page.waitForTimeout(500);
+      o.blank = { n: (await els()).length, focused: await focused() };
+      await reset();
+      // a longer value: the cover grows over the blank underline, the text stays inside it
+      await arm(); await drag(scr(R.e)); await page.keyboard.type('קריית שמונה'); await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+      e = await els(); cv = covers(e)[0]; const tx = e.find((x) => x.t !== 'whiteout');
+      o.longer = { cover: cv && [cv.fx, cv.fx + cv.fw], text: tx && [tx.fx, tx.fx + tx.fw] };
+      // …and a click on that value edits it (no second cover)
+      q = scr(R.e); await page.mouse.click(q.x1 - 12, q.cy); await page.waitForTimeout(300); await page.keyboard.type('!'); await page.waitForTimeout(200);
+      e = await els(); o.editMine = { covers: covers(e).length, text: (e.find((x) => x.t !== 'whiteout') || {}).t };
+      await reset();
+      // a finger
+      await arm(); q = scr(R.e);
+      const cdp = await page.context().newCDPSession(page);
+      const tp = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+      await tp('touchStart', q.x1 + 2, q.y0 - 1); await tp('touchMove', q.cx, q.cy); await tp('touchMove', q.x0 - 2, q.y1 + 1); await tp('touchEnd'); await page.waitForTimeout(400);
+      o.touch = { focused: await focused(), n: (await els()).length, scrolled: await page.evaluate(() => document.getElementById('viewport').scrollTop) };
+      await cdp.detach();
+      await reset();
+      return o;
+    };
+    const within = (c, w, tol) => c && c[0] >= w[0] - tol && c[1] <= w[1] + tol && c[1] - c[0] >= (w[1] - w[0]) * 0.8;
+    const verdict = (o) => o.click.focused && o.click.n === 2 && within(o.click.cover, o.click.word, 0.012)
+      && !o.enter.focused && o.enter.armed && o.enter.text && o.enter.text.t === 'טבריה'
+      && within(o.oneWord.cover, o.oneWord.aviv, 0.012) && o.oneWord.cover[1] < o.oneWord.tlv[1] - 0.02
+      && o.abandoned === 0 && o.blank.n === 0 && !o.blank.focused
+      && o.longer.text && o.longer.cover && o.longer.cover[0] <= o.longer.text[0] + 0.004 && o.longer.cover[1] >= o.longer.text[1] - 0.004
+      && o.editMine.covers === 1 && /קריית שמונה!/.test(o.editMine.text || '')
+      && o.touch.focused && o.touch.n === 2 && o.touch.scrolled === 0;
+    const dig = await run(false);
+    const scn = await run(true);
+    await page.evaluate(async () => { const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await window.PFS.__test.goHome(); } finally { window.PFS.ui.confirm = c; } });
+    check('✏️ "החלפה" part 2: a click takes the word under it (one word in running text), Enter finishes, an abandoned drag leaves nothing, blank-paper and own-value clicks open no stray boxes, a longer value grows its cover, a finger drag works — digital AND scanned', why(verdict(dig) && verdict(scn) ? true : JSON.stringify({ dig, scn })));
   }
 
   // ---- a click on a field's hint writes IN that field ----

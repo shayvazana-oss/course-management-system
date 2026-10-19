@@ -42,7 +42,7 @@
         const fy = (e.clientY - r.top) / r.height;
         // rect tools (whiteout / redact / highlight / replace): drag to draw the
         // exact area to cover; a plain click drops a sensible default-sized box.
-        if (placing.rect) { startMarquee(index, overlayEl, fx, fy); return; }
+        if (placing.rect) { startMarquee(index, overlayEl, fx, fy, e); return; }
         const model = placing.create(index, fx, fy);
         if (model) instantiate(model);
         if (!placing.sticky) setPlacing(null);
@@ -51,9 +51,13 @@
 
     // Drag a marquee over the page to define a rect cover's exact bounds. The
     // active placing.createRect(pageIndex, fx, fy, fw, fh) receives page fractions.
-    function startMarquee(index, overlayEl, sfx, sfy) {
-      const cb = placing.createRect, sticky = !!placing.sticky;
+    function startMarquee(index, overlayEl, sfx, sfy, ev) {
+      const cb = placing.createRect, onClick = placing.onClick, sticky = !!placing.sticky;
       const defW = placing.defW || 0.2, defH = placing.defH || 0.03;
+      // a click that lands while a box is being typed in is a "finish" click
+      const wasEditing = !!(document.activeElement && document.activeElement.isContentEditable);
+      // a finger stays with the marquee (the page must not scroll instead)
+      try { if (ev && ev.pointerId != null) overlayEl.setPointerCapture(ev.pointerId); } catch (e) {}
       const box = document.createElement('div');
       box.className = 'pfs-marquee';
       box.style.cssText = 'position:absolute;border:1.5px dashed var(--ink-1,#15170F);' +
@@ -74,14 +78,22 @@
         cfy = PFS.clamp((e.clientY - r.top) / r.height, 0, 1);
         draw();
       };
-      const up = () => {
+      const done = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', cancel);
         box.remove();
+        try { if (ev && ev.pointerId != null) overlayEl.releasePointerCapture(ev.pointerId); } catch (e) {}
+      };
+      const cancel = () => done();   // the browser took the gesture (a scroll): nothing placed
+      const up = () => {
+        done();
         let fx = Math.min(sfx, cfx), fy = Math.min(sfy, cfy);
         let fw = Math.abs(cfx - sfx), fh = Math.abs(cfy - sfy);
-        if (fw < 0.02 || fh < 0.008) {            // treated as a click → default box
-          fw = defW; fh = defH;
+        if (fw < 0.02 || fh < 0.008) {            // treated as a click
+          // a tool that knows what a click means (replace: the word under it)
+          if (onClick) { if (!sticky) setPlacing(null); onClick(index, sfx, sfy, { wasEditing }); return; }
+          fw = defW; fh = defH;                   // → default box
           fx = PFS.clamp(sfx - fw / 2, 0, 1 - fw); fy = PFS.clamp(sfy - fh / 2, 0, 1 - fh);
         } else {
           fx = PFS.clamp(fx, 0, 1 - fw); fy = PFS.clamp(fy, 0, 1 - fh);
@@ -94,6 +106,7 @@
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', cancel);
     }
 
     function overlaySizeFor(pageIndex) {
@@ -112,6 +125,7 @@
         onChange: () => opts.onChange && opts.onChange(),
         onDragEnd: (c) => opts.onDragEnd && opts.onDragEnd(c),
         onDelete: (c) => deleteCtrl(c),
+        onDone: () => deselectAll(),
         // peer geometries on this page (excluding self) for drag snapping
         getPeers: () => elements.filter((c) => c.model !== model && c.model.page === model.page).map((c) => c.model)
       });
@@ -258,7 +272,9 @@
       // an EMPTY text element is a ghost: it renders the 'טקסט…' placeholder
       // on screen and nothing on paper. Never persist one — otherwise every
       // template/auto-memory restore litters the form with placeholders.
-      return elements.filter((c) => !(c.model.type === 'text' && !String(c.model.text || '').trim())).map((c) => {
+      // …nor is a replacement's cover before its value is typed (an abandoned
+      // drag then costs nothing, and Ctrl+Z takes cover and value together)
+      return elements.filter((c) => !(c.model.type === 'text' && !String(c.model.text || '').trim()) && !c.model.__provisional).map((c) => {
         const m = c.model;
         return {
           type: m.type, kind: m.kind, page: m.page,
@@ -270,7 +286,8 @@
           cellX: m.cellX != null ? round(m.cellX) : undefined, maxW: m.maxW || undefined, certTag: m.certTag || undefined,
           // the certificate face weight, a replacement's right anchor and
           // handwriting spacing survive undo/redo and auto-memory
-          weight: m.weight || undefined, anchorRight: m.anchorRight != null ? round(m.anchorRight) : undefined, tracking: m.tracking || undefined
+          weight: m.weight || undefined, anchorRight: m.anchorRight != null ? round(m.anchorRight) : undefined, tracking: m.tracking || undefined,
+          print: m.print || undefined
         };
       });
     }

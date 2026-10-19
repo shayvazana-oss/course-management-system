@@ -99,8 +99,11 @@
     const target = block === 'start'
       ? sc.scrollTop + (nr.top - sr.top) - 8
       : sc.scrollTop + (nr.top - sr.top) - (sc.clientHeight / 2) + (nr.height / 2);
-    try { sc.scrollTo({ top: Math.max(0, target), behavior: 'smooth' }); }
-    catch (e) { sc.scrollTop = Math.max(0, target); }
+    // sideways too, when the spot is off the visible strip (a zoomed-in page)
+    let left = sc.scrollLeft;
+    if (sc.scrollWidth > sc.clientWidth + 2 && (nr.left < sr.left || nr.right > sr.right)) left = sc.scrollLeft + (nr.left - sr.left) - (sc.clientWidth / 2) + (nr.width / 2);
+    try { sc.scrollTo({ top: Math.max(0, target), left: Math.max(0, left), behavior: 'smooth' }); }
+    catch (e) { sc.scrollTop = Math.max(0, target); sc.scrollLeft = Math.max(0, left); }
   }
   PFS.scrollToEl = scrollToEl;
 

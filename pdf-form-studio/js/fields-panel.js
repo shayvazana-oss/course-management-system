@@ -448,7 +448,7 @@
             const i = texts.indexOf(control);
             const next = (e.key === 'ArrowUp') ? texts[i - 1] : texts[i + 1];
             e.preventDefault();
-            if (next) { next.focus({ preventScroll: true }); next.select && next.select(); PFS.scrollToEl(next, 'center'); const ct = ctrlByKey[next.__fkey]; if (ct) PFS.scrollToEl(ct.node, 'center'); }
+            if (next) { next.focus({ preventScroll: true }); next.select && next.select(); PFS.scrollToEl(next, 'center'); if (!(opts.onFieldFocus)) { const ct = ctrlByKey[next.__fkey]; if (ct) PFS.scrollToEl(ct.node, 'center'); } }
             else control.blur();
           });
           // ADOPT a value already on the form. Auto-memory restore, Fill-All
@@ -515,7 +515,9 @@
         go.title = 'סמן על הטופס';
         go.addEventListener('click', () => {
           const c = ctrlByKey[f.fieldKey];
-          if (c) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); }
+          if (c) { overlay.selectCtrl(c); PFS.scrollToEl(c.node, 'center'); return; }
+          // an empty field: its hint on the form (the button used to do nothing)
+          if (opts.onFieldFocus) opts.onFieldFocus(f);
         });
         // voice fill (Chrome/Edge; he-IL). Feature-detected — absent elsewhere.
         const SR = root.SpeechRecognition || root.webkitSpeechRecognition;

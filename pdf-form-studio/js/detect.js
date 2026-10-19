@@ -222,7 +222,18 @@
       };
       if (isBlankRun(label)) {
         drawnBlank = true;
-        fx = b.x / W; fw = Math.max(b.w, 0.15 * W) / W;
+        // "label: ______" in ONE run: the blank is the underscores' part of
+        // it, at the run's reading END (RTL: its left end) — not the whole
+        // run. Given the whole run, the label's own letters sat inside the
+        // field, and the ink pass then moved it under the line.
+        const emb = label.match(/^(.*?[:：׃])\s*([_.．…]{2,})\s*$/);
+        if (emb && hasLetters(emb[1])) {
+          const em = b.fontH || 10;
+          const undW = Math.min(b.w * 0.85, [...emb[2]].reduce((t, ch) => t + (ch === '_' ? 0.5 : ch === '…' ? 1 : 0.3) * em, 0));
+          fx = (rtl ? b.x : b.x + b.w - undW) / W; fw = Math.max(20, undW) / W;
+        } else {
+          fx = b.x / W; fw = Math.max(b.w, 0.15 * W) / W;
+        }
       } else if (rtl) {
         // blank is to the LEFT of the label
         const labelLeft = b.x;

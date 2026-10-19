@@ -209,6 +209,12 @@
         }
         ctx.onChange && ctx.onChange();
       });
+      // Enter finishes the value (a form is filled one value at a time, and
+      // Enter in a replacement used to break it onto a second line); a line
+      // break inside a box is Shift+Enter
+      inner.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); inner.blur(); ctx.onDone && ctx.onDone(ctrl); }
+      });
       inner.addEventListener('blur', () => {
         inner.contentEditable = 'false'; node.dataset.editing = '0';
         // auto-remove an empty text box so no stray elements linger

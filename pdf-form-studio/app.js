@@ -144,7 +144,18 @@ const overlay = PFS.createOverlayManager({
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
-  onDelete: () => { setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0); },
+  onDelete: (c) => {
+    // a replacement that was never typed (the box emptied on blur, or
+    // deleted empty) takes its cover with it — a drag the clerk abandoned
+    // used to leave a white hole where the print had been
+    try {
+      if (c && c.model && c.model.__coverId && !String(c.model.text || '').trim()) {
+        const cv = overlay.getElements().find((x) => x.model.id === c.model.__coverId);
+        if (cv) overlay.deleteCtrl(cv);
+      }
+    } catch (e) {}
+    setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0);
+  },
   // click-to-fill: tapping an orange marker on the FORM opens a caret IN that
   // field, right on the page (a tick box still jumps to its panel row)
   onMarkerClick: (f) => {
@@ -211,6 +222,10 @@ const templates = PFS.createTemplates({
 const profiles = PFS.createDataProfiles();
 const fieldsPanel = PFS.createFieldsPanel({
   overlay,
+  // the page follows the panel: a row focused in the list brings its spot on
+  // the form into view (an empty field's hint, or the value already there) —
+  // "it doesn't jump to the marked places so I can fill them in"
+  onFieldFocus: (f) => { try { jumpToField(f); } catch (e) {} },
   ocrAvailable: () => !!(PFS.ocr && PFS.ocr.available()),
   onOcr: () => runOcr(),
   // learn choices the user makes by hand (gender, …) for future forms
@@ -693,7 +708,7 @@ function normalizeFontSizes(det) {
 // docs and per-element tweaks all drift, and a filled form with three text
 // sizes reads sloppy. Comb-spaced text and ✓/✗ glyphs are exempt.
 const isPlainTextEl = (c) => c.model && c.model.type === 'text' && !c.model.letterSpacing
-  && c.model.kind !== 'check' && c.model.kind !== 'cross';
+  && c.model.kind !== 'check' && c.model.kind !== 'cross' && !c.model.print;   // print: sized to the print it replaced
 function docUniformSize() {
   if (lastDet && lastDet.uniFontFrac) return lastDet.uniFontFrac;
   if (lastDet && lastDet.fields) {
@@ -1446,6 +1461,18 @@ $('stickyBtn') && $('stickyBtn').addEventListener('click', () => {
   PFS.toast(stickyTools ? 'מצב רצף פעיל — הכלי יישאר פעיל להנחה מרובה (Esc לעצירה)' : 'מצב רצף כבוי', 'ok', 1800);
 });
 
+// bring a field's spot on the form into view: its value if it has one, else
+// its hint. Vertically AND horizontally (a zoomed-in page scrolls sideways too).
+function jumpToField(f) {
+  if (!f || !f.fieldKey) return false;
+  const c = overlay.getElements().find((x) => x.model.fieldKey === f.fieldKey && x.model.page === f.page);
+  const node = (c && c.node) || document.querySelector('.field-marker[data-key="' + CSS.escape(f.fieldKey) + '"]');
+  if (!node) return false;
+  PFS.scrollToEl(node, 'center');
+  if (overlay.setFieldActive) overlay.setFieldActive(f.fieldKey);
+  return true;
+}
+PFS.jumpToField = jumpToField;
 function activateTool(btn, tool) {
   document.querySelectorAll('.rail-btn.tool').forEach((b) => b.classList.remove('active'));
   btn.classList.add('active');
@@ -1468,9 +1495,7 @@ function activateTool(btn, tool) {
     // covers and replacements come in runs (a form has several values to
     // fix): the tool stays armed until Esc or a second click on its button
     const stay = tool !== 'clip' ? true : stickyTools;
-    overlay.setPlacing({
-      rect: true, sticky: stay, defW: 0.2, defH: 0.03,
-      createRect: (pageIndex, fx, fy, fw, fh) => {
+    const createRect = (pageIndex, fx, fy, fw, fh) => {
         if (tool === 'clip') { copyRegion(pageIndex, fx, fy, fw, fh); return; }
         if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
         const extra = { fx, fy, fw, fh };
@@ -1489,9 +1514,34 @@ function activateTool(btn, tool) {
         }
         overlay.addModelAt(tool, pageIndex, extra);
         overlay.deselectAll();
+    };
+    // a CLICK (no drag) means the word under it. It used to drop a box a fifth
+    // of the page wide on the spot: a click on "חיפה" erased the label beside
+    // it; a click on blank paper to finish typing opened a stray box; a click
+    // on a value just typed (to fix it) erased it.
+    const onClick = tool === 'clip' ? undefined : async (pageIndex, fx, fy, info) => {
+      if (tool === 'replace') {
+        const mine = overlay.getElements().find((c) => c.model.type === 'text' && c.model.page === pageIndex && String(c.model.text || '').trim()
+          && fx >= c.model.fx - 0.003 && fx <= c.model.fx + (c.model.fw || 0) + 0.003 && fy >= c.model.fy - 0.002 && fy <= c.model.fy + (c.model.fh || 0.02) + 0.002);
+        if (mine) { overlay.selectCtrl(mine); mine.focusText(); return; }   // my own value: edit it
       }
-    });
-    if (stay && !PFS.store.get('hint_sticky_cover', false)) { PFS.store.set('hint_sticky_cover', true); PFS.toast('הכלי נשאר פעיל לכיסויים נוספים — Esc או לחיצה נוספת על הכלי מסיימת', 'ok', 4500); }
+      let w = null;
+      const gen = loadGen;
+      try {
+        const canvas = await hiResPage(pageIndex);
+        if (gen !== loadGen || !overlay.isPlacing()) return;
+        measureSrc = { page: pageIndex, canvas };
+        try { w = wordAt(pageIndex, fx, fy); } finally { measureSrc = null; }
+      } catch (e) { w = wordAt(pageIndex, fx, fy); }
+      if (w) { createRect(pageIndex, w.fx, w.fy, w.fw, w.fh); return; }
+      if (tool === 'replace') {
+        if (!info || !info.wasEditing) PFS.toast('אין כאן טקסט מודפס — לחצו על המילה להחלפה, או גררו מעל כמה מילים', 'ok', 3500);
+        return;
+      }
+      createRect(pageIndex, PFS.clamp(fx - 0.1, 0, 0.8), PFS.clamp(fy - 0.015, 0, 0.97), 0.2, 0.03);
+    };
+    overlay.setPlacing({ rect: true, sticky: stay, defW: 0.2, defH: 0.03, createRect, onClick });
+    if (stay && !PFS.store.get('hint_sticky_cover', false)) { PFS.store.set('hint_sticky_cover', true); PFS.toast(tool === 'replace' ? 'לחיצה על מילה או גרירה מעל כמה מילים — מקלידים את הערך החדש, Enter מסיים. הכלי נשאר פעיל להחלפות נוספות; Esc מסיים' : 'הכלי נשאר פעיל לכיסויים נוספים — Esc או לחיצה נוספת על הכלי מסיימת', 'ok', 5500); }
     return;
   }
   // text-like: arm placement — click on a page to drop it. In "repeat mode" the
@@ -1531,6 +1581,90 @@ async function hiResPage(pageIndex) {
   if (hiResPages.size > 3) hiResPages.clear();   // a few pages at most (memory)
   hiResPages.set(pageIndex, { key, canvas });
   return canvas;
+}
+/* wordGapPx — the white width that separates WORDS on this line, learned from
+ * the line itself: the gaps between ink runs are mostly letter gaps (a word
+ * has several letters, one space), so a low percentile of them is a letter
+ * gap and 1.8× that is more than any letter gap and less than a space.
+ * (A fixed fraction of the glyph band failed both ways: digits have a tall
+ * band and tiny gaps, Hebrew with ל and ק a tall band and a 0.3-em space.) */
+function wordGapPx(col, x0, x1, bh) {
+  const gaps = []; let x = x0, inRun = false, white = 0;
+  for (; x < x1; x++) {
+    if (col(x)) { if (inRun && white > 0) gaps.push(white); inRun = true; white = 0; }
+    else if (inRun) white++;
+  }
+  if (gaps.length >= 3) {
+    gaps.sort((a, b) => a - b);
+    const p35 = gaps[Math.floor(0.35 * (gaps.length - 1))];
+    return Math.max(3, Math.min(Math.round(bh * 0.6), Math.round(p35 * 1.8)));
+  }
+  return Math.max(3, Math.round(bh * 0.45));
+}
+/* wordAt — the printed word under a click: the glyph band the click sits in
+ * (or the nearest one), then the run of ink around the click column up to
+ * the first inter-word gap either side. Works on a scan as on a digital page.
+ * Null on blank paper. Returns {fx, fy, fw, fh} with a 2px margin. */
+function wordAt(pageIndex, fx, fy) {
+  const v = measureView(pageIndex);
+  if (!v || !v.canvas || !v.canvas.width) return null;
+  const cw = v.canvas.width, chh = v.canvas.height;
+  const cx = Math.round(fx * cw), cy = Math.round(fy * chh);
+  const x0 = Math.max(0, cx - Math.round(cw * 0.12)), x1 = Math.min(cw, cx + Math.round(cw * 0.12));
+  const y0 = Math.max(0, cy - Math.round(chh * 0.02)), y1 = Math.min(chh, cy + Math.round(chh * 0.02));
+  const w = x1 - x0, h = y1 - y0;
+  if (w < 8 || h < 6) return null;
+  let d; try { d = v.canvas.getContext('2d').getImageData(x0, y0, w, h).data; } catch (e) { return null; }
+  const inkAt = (x, y) => { const i = (y * w + x) * 4; return d[i + 3] > 200 && (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 170; };
+  const rows = new Array(h).fill(0);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (inkAt(x, y)) rows[y]++;
+  // glyph rows: some ink, not a rule across the window
+  const bands = [];
+  for (let y = 0; y < h; y++) {
+    if (!(rows[y] > 1 && rows[y] < w * 0.9)) continue;
+    if (bands.length && y - bands[bands.length - 1].bot <= 2) bands[bands.length - 1].bot = y; else bands.push({ top: y, bot: y });
+  }
+  const cyr = cy - y0;
+  let band = bands.find((b) => cyr >= b.top - 1 && cyr <= b.bot + 1) || null;
+  if (!band) {
+    const near = bands.map((b) => ({ b, dd: Math.min(Math.abs(b.top - cyr), Math.abs(b.bot - cyr)) })).sort((p, q) => p.dd - q.dd)[0];
+    if (near && near.dd <= chh * 0.012) band = near.b;
+  }
+  if (!band || band.bot - band.top + 1 < 3) return null;
+  const bh = band.bot - band.top + 1;
+  const col = (x) => { for (let y = band.top; y <= band.bot; y++) if (inkAt(x, y)) return true; return false; };
+  const gapPx = wordGapPx(col, 0, w, bh);
+  // the nearest ink column to the click (within a letter's reach)
+  const cxr = Math.max(0, Math.min(w - 1, cx - x0));
+  let seed = -1;
+  for (let k = 0; k <= Math.max(gapPx, bh); k++) { if (cxr + k < w && col(cxr + k)) { seed = cxr + k; break; } if (cxr - k >= 0 && col(cxr - k)) { seed = cxr - k; break; } }
+  if (seed < 0) return null;
+  let left = seed, right = seed;
+  for (let x = seed - 1, white = 0; x >= 0 && white < gapPx; x--) { if (col(x)) { left = x; white = 0; } else white++; }
+  for (let x = seed + 1, white = 0; x < w && white < gapPx; x++) { if (col(x)) { right = x; white = 0; } else white++; }
+  if (right - left + 1 < 2) return null;
+  return { fx: Math.max(0, x0 + left - 2) / cw, fy: Math.max(0, y0 + band.top - 2) / chh, fw: (right - left + 1 + 4) / cw, fh: (bh + 4) / chh };
+}
+/* blankRoom — how far a cover may grow along its line over BLANK paper (a
+ * longer value than the print it replaces then stays legible instead of
+ * running over the next printed word): the first ink column either side. */
+function blankRoom(pageIndex, kept, band) {
+  const v = measureView(pageIndex);
+  const out = { left: Math.max(0, kept.fx - 0.3), right: Math.min(1, kept.fx + kept.fw + 0.3) };
+  if (!v || !v.canvas || !v.canvas.width) return out;
+  const cw = v.canvas.width, chh = v.canvas.height;
+  const bt = Math.max(0, Math.round(band.top * chh) - 1), bhh = Math.max(3, Math.round(band.h * chh) + 2);
+  const reach = Math.round(cw * 0.3);
+  const gx0 = Math.max(0, Math.round(kept.fx * cw) - reach), gx1 = Math.min(cw, Math.round((kept.fx + kept.fw) * cw) + reach);
+  let d; try { d = v.canvas.getContext('2d').getImageData(gx0, bt, gx1 - gx0, bhh).data; } catch (e) { return out; }
+  const gw = gx1 - gx0;
+  const col = (x) => { for (let y = 0; y < bhh; y++) { const i = (y * gw + x) * 4; if (d[i + 3] > 200 && (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 160) return true; } return false; };
+  const l0 = Math.round(kept.fx * cw) - gx0, r0 = Math.round((kept.fx + kept.fw) * cw) - gx0;
+  const gap = wordGapPx(col, 0, gw, bhh);
+  for (let x = l0 - 1; x >= 0; x--) if (col(x)) { out.left = (gx0 + x + gap) / cw; break; }
+  for (let x = r0 + 1; x < gw; x++) if (col(x)) { out.right = (gx0 + x - gap) / cw; break; }
+  out.left = Math.min(out.left, kept.fx); out.right = Math.max(out.right, kept.fx + kept.fw);
+  return out;
 }
 function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
   const v = measureView(pageIndex);
@@ -1654,7 +1788,7 @@ function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
   };
   // the inter-word space is ~0.3 of the glyph height; inter-letter air is well
   // under it (same ratio the RTL line assembler uses to decide where words end)
-  const gapPx = Math.max(3, Math.round(band.h * chh * 0.30));
+  const gapPx = wordGapPx(colInk, 0, gw, band.h * chh);
   let left = Math.round(fx * cw), right = Math.round((fx + fw) * cw);
   // an edge that sits in blank paper cut nothing: it must not reach over to
   // the next word ("1,250" replaced, the "₪" beside it erased too)
@@ -1765,7 +1899,19 @@ function replacementPlan(pageIndex, fx, fy, fw, fh) {
   if (inkFull && ink) { ink.bodyFrac = inkFull.bodyFrac; ink.baseFrac = inkFull.baseFrac; ink.bodyTopFrac = inkFull.bodyTopFrac; if (inkFull.inkRightFrac != null) ink.inkRightFrac = inkFull.inkRightFrac; if (inkFull.color) ink.color = inkFull.color; }
   // the letters go, the underline / the cell's border stay
   const kept = keepRules(pageIndex, { fx: cover.fx, fy: vert.fy, fw: cover.fw, fh: vert.fh });
-  return { ink, kept };
+  const room = ink ? blankRoom(pageIndex, kept, { top: ink.bandTopFrac, h: ink.bandFrac }) : null;
+  return { ink, kept, room };
+}
+// a longer value than the print it replaced: the cover follows it over the
+// blank paper beside the print (never over the next printed word)
+function growCoverToText(ctrl) {
+  const m = ctrl && ctrl.model; if (!m || !m.__coverId || !String(m.text || '').trim()) return;   // (an empty box shows a placeholder: no value yet)
+  const cv = overlay.getElements().find((x) => x.model.id === m.__coverId);
+  if (!cv || cv.model.__userMoved || !cv.model.__room || !cv.model.__base) return;
+  const c = cv.model, room = c.__room, base = c.__base, pad = 0.003;
+  let x0 = Math.min(base.fx, Math.max(room.left, m.fx - pad));
+  let x1 = Math.max(base.x1, Math.min(room.right, m.fx + (m.fw || 0) + pad));
+  if (Math.abs(x0 - c.fx) > 1e-4 || Math.abs(x1 - (c.fx + c.fw)) > 1e-4) { c.fx = x0; c.fw = x1 - x0; cv.layout(); }
 }
 // the same plan on the page rendered at a fixed high resolution, applied to
 // the cover and the text just placed (unless the clerk already moved them)
@@ -1780,6 +1926,8 @@ async function refineReplacementHiRes(pageIndex, fx, fy, fw, fh, coverCtrl, ctrl
     if (!plan || !plan.ink) return;
     if (coverCtrl && coverCtrl.node && coverCtrl.node.isConnected && !coverCtrl.model.__userMoved) {
       Object.assign(coverCtrl.model, plan.kept);
+      coverCtrl.model.__base = { fx: plan.kept.fx, x1: plan.kept.fx + plan.kept.fw };
+      if (plan.room) coverCtrl.model.__room = plan.room;
       const bg = pdfView.sampleBg(pageIndex, plan.kept.fx, plan.kept.fy, plan.kept.fw, plan.kept.fh);
       if (bg) coverCtrl.model.color = bg;
       coverCtrl.layout();
@@ -1796,26 +1944,32 @@ async function refineReplacementHiRes(pageIndex, fx, fy, fw, fh, coverCtrl, ctrl
         m.fontFrac = g.fontFrac; m.fy = g.fy; m.fh = g.fh;
         seatReplacement(ctrl);
       }
+      growCoverToText(ctrl);
     }
     markDirty();
   } catch (e) { /* the on-screen estimate stands */ }
 }
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
-  const { ink, kept } = replacementPlan(pageIndex, fx, fy, fw, fh);
+  const { ink, kept, room } = replacementPlan(pageIndex, fx, fy, fw, fh);
   // a value already written at this spot (auto-filled, or typed earlier)
   // gives way to the replacement: half-covered, its ends peeked out on both
-  // sides of the new value ("1 987654321 2"). Ctrl+Z brings it back.
+  // sides of the new value ("1 987654321 2"). Ctrl+Z brings it back. Only a
+  // value on the SAME line: a tall drag must not take the row below with it.
   const overlapOf = (m) => {
     const mh = m.fh || (m.fontFrac || 0.02) * 1.15, mw = m.fw || 0;
     const ix = Math.min(m.fx + mw, kept.fx + kept.fw) - Math.max(m.fx, kept.fx);
     const iy = Math.min(m.fy + mh, kept.fy + kept.fh) - Math.max(m.fy, kept.fy);
-    return ix > 0 && iy > 0 && mw > 0 ? (ix * iy) / (mw * mh) : 0;
+    if (!(ix > 0 && iy > 0 && mw > 0) || iy < mh * 0.5) return 0;
+    return (ix * iy) / (mw * mh);
   };
   const inTheWay = overlay.getElements().filter((c) => c.model.type === 'text' && c.model.page === pageIndex && String(c.model.text || '').trim() && overlapOf(c.model) >= 0.3);
   if (inTheWay.length) { clearTimeout(snapT); snapshot(); inTheWay.forEach((c) => overlay.deleteCtrl(c)); }
   const bg = pdfView.sampleBg(pageIndex, kept.fx, kept.fy, kept.fw, kept.fh) || '#ffffff';
+  // the cover is provisional until its value is typed: abandoned, it goes
+  // (no white hole); Ctrl+Z later takes cover and value as one step
   const coverCtrl = overlay.addModelAt('whiteout', pageIndex, { fx: kept.fx, fy: kept.fy, fw: kept.fw, fh: kept.fh, color: bg, auto: true });
+  if (coverCtrl) { coverCtrl.model.__provisional = true; coverCtrl.model.__base = { fx: kept.fx, x1: kept.fx + kept.fw }; if (room) coverCtrl.model.__room = room; }
   let fontFrac, textH, ty;
   if (ink) {
     // match the print that was just covered: same glyph size (a Hebrew/digit
@@ -1831,7 +1985,7 @@ function placeReplacement(pageIndex, fx, fy, fw, fh) {
     textH = fontFrac * 1.2;
     ty = clamp(fy + (fh - textH) / 2, 0, 1 - textH);
   }
-  const extra = { fx, fy: ty, fw, fh: textH, fontFrac, align: 'right' };
+  const extra = { fx, fy: ty, fw, fh: textH, fontFrac, align: 'right', print: true, __coverId: coverCtrl ? coverCtrl.model.id : undefined };
   if (ink) {
     if (ink.color) extra.color = ink.color;
     extra.bold = ink.bold;
@@ -1918,10 +2072,17 @@ function attachReplacementTuner(ctrl) {
   if (!txtEl || typeof MutationObserver === 'undefined') return;
   let t = null;
   const obs = new MutationObserver(() => {
+    try {
+      if (String(ctrl.model.text || '').trim() && ctrl.model.__coverId) {
+        const cv = overlay.getElements().find((x) => x.model.id === ctrl.model.__coverId);
+        if (cv && cv.model.__provisional) { cv.model.__provisional = false; scheduleSnap(); }
+      }
+    } catch (e) {}
     clearTimeout(t);
     t = setTimeout(() => {
       if (!ctrl.node.isConnected) { obs.disconnect(); return; }
       tuneReplacementToInk(ctrl);
+      growCoverToText(ctrl);
     }, 250);
   });
   obs.observe(txtEl, { characterData: true, childList: true, subtree: true });

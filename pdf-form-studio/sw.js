@@ -20,7 +20,7 @@ const CORE = [
   './', './index.html', './styles.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-192-maskable.png', './icons/icon-512-maskable.png', './icons/apple-touch-icon.png', './icons/fillo.svg',
   './js/store.js', './js/ui.js', './js/vault.js', './js/patterns.js', './js/courses.js',
-  './js/merge.js', './js/detect.js', './js/fields-panel.js', './js/overlay.js',
+  './js/merge.js', './js/detect.js', './js/acroform.js', './js/fields-panel.js', './js/overlay.js',
   './js/element.js', './js/fontmatch.js', './js/library.js', './js/pwa.js'
 ];
 

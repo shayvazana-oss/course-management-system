@@ -938,7 +938,7 @@ function sweepNameLeaks() {
 // (ink-snapped, split, size-normalized, or OCR-produced) is stored per
 // document fingerprint and replayed instantly on the next open. The "זהה
 // שדות" button always forces a fresh run and overwrites the cache.
-const DET_CACHE_V = 2;   // 2: table-cell fields seated in their cell
+const DET_CACHE_V = 3;   // 2: table-cell fields seated in their cell · 3: fillable PDFs read from their widgets (read-only labels out)
 let lastDetFromCache = false;
 // currentFp is an OBJECT ({pages,w,h,textHash,ahash}) — flatten it to a
 // string key, or every document would share the "[object Object]" slot
@@ -987,14 +987,17 @@ async function runDetection(force) {
       try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
       const nCa = fieldsPanel.show(cached, vaultPrefill(cached));
       try { liftSmallFills('cached-detect'); } catch (e) {}
+      offerAcroValues(gen);
       try { if (certMode && certAnchorToDetected(true)) { if (certCard && certCard.__render) certCard.__render(); } } catch (e) {}
       PFS.toast(nCa
         ? `⚡ טופס מוכר — נפתח מיידית, ${nCa} שדות מולאו אוטומטית`
         : '⚡ טופס מוכר — נפתח מיידית (זיהוי מהזיכרון)', 'ok');
       return;
     }
-    const det = await PFS.detect.detectFields(pdfView.getDoc());
+    let det = await PFS.detect.detectFields(pdfView.getDoc());
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
+    // a fillable PDF: its own fields (exact boxes), named by the printed labels
+    if (acroState && acroState.gen === gen && acroState.fields.length) det = acroDetection(det);
     try { const n = await seatFieldsInCells(det); if (n) console.info('[cells] seated', n, 'fields in their table cells'); } catch (e) {}
     if (gen !== loadGen) return;
     try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
@@ -1013,6 +1016,7 @@ async function runDetection(force) {
     try { if (sweepNameLeaks()) fieldsPanel.syncValues(panelValueMap()); } catch (e) {}
     const nAuto = fieldsPanel.show(det, vaultPrefill(det));
     try { liftSmallFills('detect'); } catch (e) {}
+    offerAcroValues(gen);
     // certificate: the printed labels just found are the exact anchors for
     // the fields that were auto-stacked before detection finished
     try { if (certMode && certAnchorToDetected(true)) { if (certCard && certCard.__render) certCard.__render(); } } catch (e) {}
@@ -1036,6 +1040,64 @@ async function runDetection(force) {
     console.warn('detect failed', e); PFS.toast('זיהוי השדות נכשל', 'err');
   } finally { btn.disabled = false; btn.innerHTML = prev; }
 }
+
+// the fields of a fillable PDF: its widgets' exact boxes, each named by the
+// printed label beside it (field names are often "Text1" / "fill_3"; the
+// printed label is what the profile and the clerk understand)
+function acroDetection(textDet) {
+  const labels = (textDet && textDet.fields) || [];
+  const generic = (n) => !n || /^(text|fill|field|check|box|undefined|untitled|טקסט|שדה)?[\s_.\-]*\d*$/i.test(String(n).replace(/[\[\]0-9.]/g, '')) || !/[A-Za-z\u0590-\u05FF]{3,}/.test(n);
+  const fields = acroState.fields.map((w, wi) => {
+    const f = Object.assign({}, w, { inCell: true, best: true });
+    // the printed label whose blank IS this box (same line, overlapping)
+    let best = null, bestOv = 0;
+    labels.forEach((t) => {
+      if (t.page !== f.page || t.type !== f.type && f.type !== 'text') return;
+      const ox = Math.min(t.fx + (t.fw || 0), f.fx + f.fw) - Math.max(t.fx, f.fx);
+      const cy = Math.abs((t.fy + (t.fh || 0.02) / 2) - (f.fy + (f.fontFrac || 0.02) / 2));
+      if (ox <= 0 || cy > Math.max(f.fh, 0.02)) return;
+      const ov = ox / Math.min(f.fw, t.fw || f.fw);
+      if (ov > bestOv) { bestOv = ov; best = t; }
+    });
+    if (best && bestOv > 0.3 && best.label) f.label = best.label;
+    else if (generic(f.label)) f.label = 'שדה ' + (wi + 1);
+    return f;
+  });
+  return { tier: 'acroform', fields };
+}
+// the values that were in the fillable file's fields — back as ordinary,
+// editable values, when the clerk wants them (this is often the previous
+// person's data, so the form opens clean)
+function offerAcroValues(gen) {
+  const st = acroState;
+  if (!st || st.gen !== gen || st.offered || !lastDet) return;
+  const nVals = Object.keys(st.values || {}).length + Object.keys(st.checked || {}).length;
+  if (!nVals) return;
+  st.offered = true;
+  PFS.toast('הקובץ הזה היה ממולא (' + nVals + ' שדות) — הוא נפתח נקי, למילוי חדש.', 'ok', 12000, {
+    label: 'השארת הנתונים שהיו בקובץ',
+    fn: () => { if (gen === loadGen) restoreAcroValues(); }
+  });
+}
+function restoreAcroValues() {
+  const st = acroState; if (!st || !lastDet) return 0;
+  let n = 0;
+  const ctl = (k) => [...document.querySelectorAll('#fieldsBody input')].find((i) => i.__fkey === k);
+  lastDet.fields.forEach((f) => {
+    const name = f.acroName;
+    if (!name) return;
+    const c = ctl(f.fieldKey); if (!c) return;
+    if (f.type === 'text' && st.values[name] != null) {
+      c.value = st.values[name]; c.dispatchEvent(new Event('input', { bubbles: true })); c.dispatchEvent(new Event('change', { bubbles: true })); n++;
+    } else if (f.type === 'check') {
+      const want = f.radioValue != null ? st.checked[name] === f.radioValue : !!st.checked[name];
+      if (want && !c.checked) { c.click(); n++; }
+    }
+  });
+  if (n) { markDirty(); scheduleSnap(); PFS.toast('✓ ' + n + ' ערכים שהיו בקובץ הוחזרו — אפשר לשנות כל אחד מהם', 'ok'); }
+  return n;
+}
+PFS.__acro = { state: () => acroState, restore: () => restoreAcroValues() };
 
 // populate the suggested-keys datalist
 (function fillDatalist() {
@@ -1231,14 +1293,33 @@ $('compInput') && $('compInput').addEventListener('change', async (e) => {
   } catch (err) { PFS.toast(err.message || 'קישור הנספח נכשל', 'err'); }
 });
 
+// a FILLABLE PDF (AcroForm) opened here: its fill-in fields read from the
+// original file, the values that were in them, and for which document
+let acroState = null;
 async function openPdfFile(file) {
   if (!file || file.type !== 'application/pdf') { PFS.toast('בחר קובץ PDF', 'err'); return; }
-  const buf = await file.arrayBuffer();
+  let buf = await file.arrayBuffer();
+  // a fillable PDF someone already filled carries its values in its fields:
+  // the page showed them (grey boxes and all), nothing could change them and
+  // the export baked them in ("נספח מהמאגר נפתח עם נתונים קיימים ולא מאפשר
+  // לשנות"). It opens as plain paper; its old values are one click away.
+  let acro = null;
+  try {
+    const prep = PFS.acro ? await PFS.acro.prepare(buf.slice(0)) : null;
+    if (prep) {
+      const od = await pdfjsLib.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
+      let wf = [];
+      try { wf = await PFS.detect.widgetFields(od); } finally { try { od.destroy(); } catch (e) {} }
+      const fill = wf.filter((f) => !f.readOnly);
+      if (fill.length) { acro = { fields: PFS.detect.uniqueKeys(fill), values: prep.values, checked: prep.checked }; buf = prep.bytes; }
+    }
+  } catch (e) { console.warn('[acroform] left as is:', e && e.message); acro = null; }
   try {
     // start fresh: drop any elements/fields/merge state from a previous document
     loadGen++;
     const myGen = loadGen;
     lastDet = null;
+    acroState = acro ? Object.assign({ gen: myGen, offered: false }, acro) : null;
     if (!certOpening) { try { closeCertWizard(); } catch (e) {} }   // a plain open leaves certificate mode
     fieldsPanel.resetAutoFilled && fieldsPanel.resetAutoFilled();
     attachments = [];

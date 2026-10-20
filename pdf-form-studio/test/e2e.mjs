@@ -5088,6 +5088,61 @@ async function main() {
     check('🎯 a click on a field\'s hint writes IN that field: an underline blank, and a label | empty table cell — digital AND scanned (the OCR reads labels inside table cells)', why(verdict(dig, false) && verdict(scn, true) ? true : JSON.stringify({ geo, dig, scn })));
   }
 
+  // ---- a fillable appendix someone already filled (AcroForm) ----
+  // "נספחים מהמאגר נפתחים עם נתונים קיימים ולא מאפשרים לשנות": the file's own
+  // field values were drawn on the page (grey boxes and all), a typed value
+  // landed BESIDE the old one, nothing could change or remove the old one,
+  // and the export baked the old values in. Now: it opens as clean paper (its
+  // printed / read-only labels kept), the new value is the only one, the
+  // export carries no old value, and the old values come back on request as
+  // ordinary editable values.
+  check('📎 a filled fillable appendix opens clean: old values gone from page and export, labels (read-only fields) kept, typing fills the field, old values restorable and editable', why(await page.evaluate(async () => {
+    const T = window.PFS.__test, L = window.PDFLib;
+    const d = await L.PDFDocument.create(); const p = d.addPage([595, 842]); const f = await d.embedFont(L.StandardFonts.Helvetica);
+    p.drawText('APPENDIX H3', { x: 230, y: 790, size: 16, font: f });
+    const form = d.getForm();
+    const lab = form.createTextField('lbl_name'); lab.setText('Full name label'); lab.enableReadOnly(); lab.addToPage(p, { x: 400, y: 700, width: 150, height: 18, borderWidth: 0 });
+    const row = (name, y, value, grey) => { p.drawLine({ start: { x: 120, y }, end: { x: 390, y }, thickness: 0.8 }); const tf = form.createTextField(name); if (value) tf.setText(value); tf.addToPage(p, { x: 120, y, width: 270, height: 18, backgroundColor: grey ? L.rgb(0.85, 0.85, 0.85) : undefined, borderWidth: 0 }); };
+    row('full_name', 700, 'Dana Levi', true);
+    row('id_number', 660, '012345678', true);
+    row('course', 620, '', true);
+    const cb = form.createCheckBox('agree'); cb.addToPage(p, { x: 370, y: 580, width: 14, height: 14, borderWidth: 1, borderColor: L.rgb(0, 0, 0) }); cb.check();
+    const bytes = await d.save();
+    await T.openPdfFile(new File([bytes], 'נספח-ממולא.pdf', { type: 'application/pdf' }));
+    await new Promise((r) => setTimeout(r, 2000));
+    const out = {};
+    const viewText = async (doc) => (await (await doc.getPage(1)).getTextContent()).items.map((i) => i.str).join('|');
+    out.view = await viewText(T.pdfView.getDoc());
+    const det = T.getLastDet() || { fields: [] };
+    out.fields = det.fields.map((x) => x.fieldKey + ':' + x.type).join(',');
+    out.toast = [...document.querySelectorAll('.toast')].some((t) => /השארת הנתונים שהיו בקובץ/.test(t.textContent));
+    // grey field background gone from the page
+    const cv = document.querySelector('.page-wrap canvas.pdf'); const cx = cv.getContext('2d');
+    const px = cx.getImageData(Math.round(cv.width * 0.3), Math.round(cv.height * (1 - 668 / 842)), 1, 1).data;
+    out.grey = px[0] < 240;
+    // type a new ID in the panel: one value on the line
+    const inp = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === 'id_number');
+    inp.focus(); inp.value = '033440124'; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.blur();
+    await new Promise((r) => setTimeout(r, 300));
+    out.els = T.overlay.getElements().map((c) => c.model.text).join(',');
+    const ex = await window.PFS.exporter.exportPdf(T.pdfView.getBytes(), T.overlay.getElements().map((c) => c.model), { quality: 'standard' });
+    out.exportText = await viewText(await window.pdfjsLib.getDocument({ data: ex }).promise);
+    // a batch straight from the stored (filled) file gets no old values either
+    const exRaw = await window.PFS.exporter.exportPdf(bytes, [], { quality: 'standard' });
+    out.rawExportText = await viewText(await window.pdfjsLib.getDocument({ data: exRaw }).promise);
+    // the old values on request: editable, the box ticked
+    out.restored = window.PFS.__acro.restore();
+    await new Promise((r) => setTimeout(r, 300));
+    out.after = T.overlay.getElements().map((c) => c.model.text).sort().join(',');
+    T.overlay.clearElements();
+    const ok = !/Dana Levi|012345678/.test(out.view) && /Full name label/.test(out.view) && /APPENDIX H3/.test(out.view)
+      && out.fields === 'full_name:text,id_number:text,course:text,agree:check' && out.toast && !out.grey
+      && out.els.split(',').includes('033440124') && !/Dana Levi|012345678/.test(out.els) && !/Dana Levi|012345678/.test(out.exportText) && /Full name label/.test(out.exportText)
+      && !/Dana Levi|012345678/.test(out.rawExportText) && /Full name label/.test(out.rawExportText)
+      && out.restored === 3 && out.after === '012345678,Dana Levi,✓';
+    return ok ? true : JSON.stringify(out);
+  })));
+
   // ---- every new document opens clean ----
   // A LANDSCAPE certificate was once taken for a PORTRAIT registration form
   // (the 8×8 picture hash of two "mostly white" pages), and the certificate's

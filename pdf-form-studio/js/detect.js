@@ -494,8 +494,42 @@
     return { tier: 'scanned', fields: [] };
   }
 
+  /* widgetFields(pdfDoc) — the fill-in fields of a FILLABLE PDF, read from
+   * its widgets: exact boxes, kind, the value already in each, read-only
+   * flag (a read-only field is a printed label, not a blank). */
+  async function widgetFields(pdfDoc) {
+    const out = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const vp = page.getViewport({ scale: 1, rotation: ((page.rotate || 0) + (PFS.userRotOf ? PFS.userRotOf(i - 1) : 0)) % 360 });
+      const W = vp.width, H = vp.height;
+      let anns = [];
+      try { anns = await page.getAnnotations(); } catch (e) {}
+      anns.forEach((a) => {
+        if (a.subtype !== 'Widget' || !a.rect || !(a.fieldType === 'Tx' || a.fieldType === 'Btn' || a.fieldType === 'Ch')) return;
+        if (a.fieldType === 'Btn' && a.pushButton) return;
+        const r = vp.convertToViewportRectangle(a.rect);
+        const x1 = Math.min(r[0], r[2]), y1 = Math.min(r[1], r[3]);
+        const x2 = Math.max(r[0], r[2]), y2 = Math.max(r[1], r[3]);
+        const fh = (y2 - y1) / H;
+        const fontFrac = Math.min(0.03, fh * 0.6);
+        out.push({
+          page: i - 1,
+          fieldKey: (a.fieldName || ('field_' + (out.length + 1))).replace(/[^\w֐-׿.]+/g, '_'),
+          label: a.fieldName || ('שדה ' + (out.length + 1)),
+          acroName: a.fieldName || '', readOnly: !!a.readOnly,
+          radioValue: a.radioButton ? a.buttonValue : undefined,
+          radio: a.radioButton ? true : undefined, group: a.radioButton ? 'acro_' + (a.fieldName || i) : undefined,
+          fx: x1 / W, fy: y1 / H + Math.max(0, (fh - fontFrac) / 2), boxY: y1 / H,
+          fw: (x2 - x1) / W, fh, fontFrac, type: a.fieldType === 'Btn' ? 'check' : 'text'
+        });
+      });
+    }
+    return out;
+  }
+
   // heuristicForPage is exposed for the e2e suite (synthetic text items →
   // fields) so checkbox/label heuristics can be tested without a real PDF whose
   // embedded font carries glyphs the standard PDF fonts can't encode (e.g. ○).
-  PFS.detect = { detectFields, heuristicForPage, splitSharedBands };
+  PFS.detect = { detectFields, heuristicForPage, splitSharedBands, widgetFields, uniqueKeys };
 })(window);

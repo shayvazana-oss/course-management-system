@@ -379,6 +379,7 @@
           if (grouped) { control.name = 'fpg_' + f.group; (groups[f.group] = groups[f.group] || []).push({ f, control }); }
           control.style.width = '20px'; control.style.height = '20px'; control.style.accentColor = 'var(--brand)';
           control.title = grouped ? 'בחר/י אפשרות אחת' : 'סמן וי על הטופס';
+          control.__fkey = f.fieldKey;
           control.addEventListener('change', () => {
             // picking one radio clears the mark of its siblings on the form
             if (grouped && control.checked) groups[f.group].forEach((m) => { if (m.control !== control) { m.control.checked = false; ensureCheck(m.f, false); } });

@@ -262,6 +262,9 @@
     await ensureFonts();
 
     const imgMap = await preloadImages(models.map((m) => m.imgUrl));
+    // a FILLABLE file reaching here as stored (a batch straight from the
+    // library) keeps no old values: emptied exactly like an opened one
+    try { const prep = root.PFS.acro && await root.PFS.acro.prepare(originalBytes instanceof ArrayBuffer ? originalBytes.slice(0) : new Uint8Array(originalBytes).slice(0)); if (prep) originalBytes = prep.bytes; } catch (e) {}
     const pdfDoc = await PDFDocument.load(originalBytes);
 
     // If the PDF is a fillable form, flatten it first: interactive field widgets

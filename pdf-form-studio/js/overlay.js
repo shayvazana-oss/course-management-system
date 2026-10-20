@@ -224,7 +224,8 @@
         const p = pages[m.field.page]; if (!p) return;
         const { w, h } = overlaySizeFor(m.field.page); const f = m.field;
         m.el.style.left = (f.fx * w) + 'px';
-        m.el.style.top = (f.fy * h - 2) + 'px';
+        // a fillable PDF's field: its hint is the field's own box
+        m.el.style.top = ((f.boxY != null ? f.boxY : f.fy) * h - 2) + 'px';
         m.el.style.width = Math.max(26, (f.fw || 0.14) * w) + 'px';
         m.el.style.height = Math.max(15, (f.fh || 0.02) * h + 4) + 'px';
       });

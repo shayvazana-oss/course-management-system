@@ -1747,23 +1747,24 @@ async function main() {
       const els = T.overlay.getElements().filter((c) => c.model.type === 'text');
       els[0].model.fontFrac = 0.012; els[0].layout();
       els[1].model.fontFrac = 0.024; els[1].layout();
-      const rightEdgeBefore = els[0].model.fx + els[0].model.fw;
+      const centreBefore = els[0].model.fx + els[0].model.fw / 2;
       const n = T.uniformize(false);
       const list = T.overlay.getElements().filter((c) => c.model.type === 'text').map((c) => c.model.fontFrac);
       // harmony band, not a hard flatten: outliers pulled within ±15% of the
       // form size (a hard flatten oversized fills vs small-print lines)
       const uniform = list.every((v) => v >= 0.016 * 0.85 - 1e-9 && v <= 0.016 * 1.15 + 1e-9)
         && Math.max(...list) / Math.min(...list) <= 1.36;
-      // the right-aligned value kept its right edge planted
-      const rightEdgeAfter = els[0].model.fx + els[0].model.fw;
-      const anchored = Math.abs(rightEdgeAfter - rightEdgeBefore) < 0.002;
+      // a value centred in its field is centred on it again after evening
+      // (its field: fx 0.2, fw 0.25 → centre 0.325)
+      const centreAfter = els[0].model.fx + els[0].model.fw / 2;
+      const anchored = Math.abs(centreAfter - 0.325) < 0.002 && centreBefore != null;
       // the panel offers the one-click evener
       const btn = [...document.querySelectorAll('#fieldsBody button')].some((b) => /כתב אחיד/.test(b.textContent));
       T.overlay.clearElements(); T.fieldsPanel.clear();
       return { n, uniform, anchored, btn };
     });
     if (!(uniRes.n === 2 && uniRes.uniform && uniRes.anchored && uniRes.btn)) console.log('  [uni debug]', JSON.stringify(uniRes));
-    check('uniformizer evens all text to the form size, right edges stay planted', uniRes.n === 2 && uniRes.uniform && uniRes.anchored);
+    check('uniformizer evens all text to the form size, a value stays centred in its field', uniRes.n === 2 && uniRes.uniform && uniRes.anchored);
     check('the ✨ one-handwriting button is offered in the panel', uniRes.btn === true);
   }
 
@@ -2164,7 +2165,7 @@ async function main() {
   }) === true);
 
   // ---- click-to-fill: tapping a marker on the form opens a caret IN the field, on the page ----
-  check('clicking a field marker on the form opens a caret in that field on the page (panel row lit, synced on blur)', await page.evaluate(async () => {
+  check('clicking a field marker on the form leads to that field\'s row in the list (focused, lit); typing there fills the field', await page.evaluate(async () => {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const T = window.PFS.__test;
     // detection must know these fields — the marker tap resolves through it
@@ -2179,19 +2180,16 @@ async function main() {
     const clickable = getComputedStyle(marker).pointerEvents !== 'none';
     marker.click();
     await wait(350);
-    const el = T.overlay.getElements().find((c) => c.model.fieldKey === 'm_b');
-    if (!el) return 'marker tap created no element';
-    const caretOnPage = !!el && document.activeElement === el.node.querySelector('.txt');
-    const active = marker.classList.contains('active');
-    // type on the page, blur → the panel row carries the value
-    document.execCommand('insertText', false, 'ערך מהדף');
-    await wait(80);
-    el.node.querySelector('.txt').blur();
-    await wait(120);
     const row = [...document.querySelectorAll('#fieldsBody input[type=text]')].find((i) => i.__fkey === 'm_b');
-    const synced = row && row.value === 'ערך מהדף';
+    const rowFocused = document.activeElement === row;
+    const active = marker.classList.contains('active');
+    // type in the row → the value lands in the field on the page
+    document.execCommand('insertText', false, 'ערך מהרשימה');
+    await wait(120);
+    const el = T.overlay.getElements().find((c) => c.model.fieldKey === 'm_b');
+    const onPage = !!el && el.model.text === 'ערך מהרשימה';
     T.fieldsPanel.clear(); T.overlay.clearElements(); T.setLastDet(null);
-    return (clickable && caretOnPage && active && synced) ? true : JSON.stringify({ clickable, caretOnPage, active, synced, rowVal: row && row.value });
+    return (clickable && rowFocused && active && onPage) ? true : JSON.stringify({ clickable, rowFocused, active, onPage });
   }) === true);
 
   // ---- "לוחצים על המשבצת ומקלידים": a tap on empty paper opens a caret there ----
@@ -5086,6 +5084,65 @@ async function main() {
     const scn = await runCells(true);
     await page.evaluate(async () => { const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await window.PFS.__test.goHome(); } finally { window.PFS.ui.confirm = c; } window.PFS.store.set('profiles', [{ id: 'p', name: 'me', values: { 'שם משפחה': 'ישראלי', 'תעודת זהות': '123456782', 'טלפון': '0501234567' } }]); window.PFS.store.set('active_profile', 'p'); });
     check('🎯 a click on a field\'s hint writes IN that field: an underline blank, and a label | empty table cell — digital AND scanned (the OCR reads labels inside table cells)', why(verdict(dig, false) && verdict(scn, true) ? true : JSON.stringify({ geo, dig, scn })));
+  }
+
+  // ---- a field on the page ↔ its row in the list; a value sits centred ----
+  // "כשלוחצים על שדה הוא לא מעביר אותי לעמודה שבה אני מזין את הנתון" — a
+  // click on a field's hint opened a caret on the page and the list did not
+  // move; and every value was pushed to the field's right end (glued to the
+  // label's colon, against a cell's border) — "אני צריך למרכז, להגדיל
+  // ולהקטין ידנית". Now: hint / value click → the row, focused, text
+  // selected; a value sits centred in its blank or cell, sized to fit.
+  {
+    const pp = await browser.newPage({ viewport: { width: 794, height: 1123 } });
+    await pp.emulateMedia({ media: 'print' });
+    const css = base.replace('index.html', 'vendor/fonts/heebo.css');
+    await pp.goto(css);
+    await pp.setContent(`<html><head><link rel="stylesheet" href="${css}"><style>
+      body{margin:50px 60px;direction:rtl;font-family:'David Libre',serif;font-size:16px;color:#111}
+      .row{margin:16px 0}.val{display:inline-block;min-width:240px;border-bottom:1.2px solid #000}
+      table{border-collapse:collapse;width:100%;margin-top:20px}td{border:1.2px solid #000;padding:5px 8px;height:20px}td.l{width:30%;font-weight:bold}</style></head><body>
+      <h2 style="text-align:center">טופס הרשמה</h2>
+      <div class="row">שם פרטי: <span class="val" id="u">&nbsp;</span></div>
+      <table id="t"><tr><td class="l">עיר:</td><td></td></tr><tr><td class="l">שם הקורס:</td><td></td></tr></table></body></html>`, { waitUntil: 'load' });
+    await pp.evaluate(() => document.fonts.ready);
+    const geo = await pp.evaluate(() => { const u = document.getElementById('u').getBoundingClientRect(); const cells = [...document.querySelectorAll('#t td:not(.l)')].map((c) => { const b = c.getBoundingClientRect(); return { l: b.left / 794, r: b.right / 794, t: b.top / 1123, b: b.bottom / 1123 }; }); return { u: { l: u.left / 794, r: u.right / 794, b: u.bottom / 1123 }, cells }; });
+    const pdfBytes = Array.from(await pp.pdf({ width: '794px', height: '1123px', printBackground: true, margin: { top: 0, bottom: 0, left: 0, right: 0 } }));
+    await pp.close();
+    await page.evaluate(async (bytes) => {
+      window.PFS.store.set('profiles', [{ id: 'blank', name: 'blank', values: {} }]); window.PFS.store.set('active_profile', 'blank');
+      // zoomed far out: the hard case (thin lines read faint on screen; the
+      // ✕ of the row below used to lie over the value above)
+      window.PFS.__test.pdfView.setScale(0.4);
+      await window.PFS.__test.openPdfFile(new File([new Uint8Array(bytes)], 'מרכוז.pdf', { type: 'application/pdf' }));
+    }, pdfBytes);
+    for (let i = 0; i < 40; i++) { if (await page.evaluate(() => { const d = window.PFS.__test.getLastDet(); return !!d && d.fields.length >= 3; })) break; await page.waitForTimeout(250); }
+    await page.waitForTimeout(400);
+    const out = {};
+    const hint = (prefix) => page.evaluate((p) => { const m = [...document.querySelectorAll('.field-marker')].find((x) => x.dataset.key.startsWith(p)); if (!m) return null; m.scrollIntoView({ block: 'center' }); const r = m.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, prefix);
+    // hint click → its row, focused; typing fills the field
+    for (const [k, v] of [['שם_פרטי', 'נועה'], ['עיר', 'חיפה'], ['שם_הקורס', 'הנהלת חשבונות']]) {
+      const h = await hint(k);
+      if (!h) { out[k] = 'no hint'; continue; }
+      await page.mouse.click(h.x, h.y); await page.waitForTimeout(300);
+      const focused = await page.evaluate((k) => (document.activeElement.__fkey || '').startsWith(k), k);
+      await page.keyboard.type(v, { delay: 10 }); await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+      out[k] = await page.evaluate(({ v, focused }) => { const c = window.PFS.__test.overlay.getElements().find((x) => x.model.text === v); if (!c) return { focused, missing: true }; const m = c.model; return { focused, l: m.fx, r: m.fx + m.fw, cy: m.fy + m.fh / 2, b: m.fy + m.fh, ff: m.fontFrac }; }, { v, focused });
+    }
+    // a click on a value on the page → its row, text selected (type over it)
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    const vb = await page.evaluate(() => { const c = window.PFS.__test.overlay.getElements().find((x) => x.model.text === 'חיפה'); c.node.scrollIntoView({ block: 'center' }); const b = c.node.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+    await page.mouse.click(vb.x, vb.y); await page.waitForTimeout(300);
+    out.valueClick = await page.evaluate(() => ({ key: document.activeElement.__fkey || '', sel: (document.activeElement.selectionEnd || 0) - (document.activeElement.selectionStart || 0) }));
+    await page.evaluate(async () => { document.activeElement && document.activeElement.blur(); window.PFS.__test.overlay.clearElements(); window.PFS.store.set('profiles', [{ id: 'p', name: 'me', values: { 'שם משפחה': 'ישראלי', 'תעודת זהות': '123456782', 'טלפון': '0501234567' } }]); window.PFS.store.set('active_profile', 'p'); });
+    const centred = (o, l, r) => o && !o.missing && Math.abs((o.l + o.r) / 2 - (l + r) / 2) < 0.006;
+    const u = out['שם_פרטי'], c1 = out['עיר'], c2 = out['שם_הקורס'];
+    const ok = u && u.focused && centred(u, geo.u.l, geo.u.r) && Math.abs(u.b - geo.u.b) < 0.008
+      && c1 && c1.focused && centred(c1, geo.cells[0].l, geo.cells[0].r) && Math.abs(c1.cy - (geo.cells[0].t + geo.cells[0].b) / 2) < 0.004
+      && c2 && c2.focused && centred(c2, geo.cells[1].l, geo.cells[1].r) && Math.abs(c2.cy - (geo.cells[1].t + geo.cells[1].b) / 2) < 0.004
+      && Math.abs(c1.ff - u.ff) < 0.0012 && out.valueClick.key.startsWith('עיר') && out.valueClick.sel === 4;
+    await page.evaluate(() => window.PFS.__test.pdfView.setScale(1));
+    check('🎯 a field on the page leads to its row in the list (hint or value click; text selected to type over); a typed value sits centred in its blank / cell at one size — zoomed far out too', why(ok ? true : JSON.stringify({ geo, out })));
   }
 
   // ---- a fillable appendix someone already filled (AcroForm) ----

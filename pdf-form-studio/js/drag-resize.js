@@ -124,6 +124,8 @@
         node.removeEventListener('pointercancel', up);
         // the drop is the moment to settle onto whatever is printed underneath
         if (moved && opts.onDragEnd) opts.onDragEnd();
+        // a click (no drag) on it
+        if (!moved && opts.onTap) opts.onTap(ev);
       };
       node.addEventListener('pointermove', move);
       node.addEventListener('pointerup', up);

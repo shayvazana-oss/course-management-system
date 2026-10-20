@@ -511,10 +511,13 @@ kbd { font-family: var(--mono); font-size: 11px; background: var(--surface-3); b
 .handle { position: absolute; width: 13px; height: 13px; background: #fff; border: 2px solid var(--brand); border-radius: 50%; right: -7px; bottom: -7px; cursor: nwse-resize; box-shadow: var(--shadow-1); z-index: 3; display: none; }
 /* fully OUTSIDE the element — on small elements (a date box) an overlapping
  * button covers the very text being typed */
-.el .mini-del { position: absolute; top: -30px; right: -6px; width: 26px; height: 26px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
+/* BESIDE the value (its reading end), vertically centred — above it, it lay
+ * over the row above: in a dense table, or zoomed out, a click on one value
+ * landed on its neighbour's ✕ and deleted the WRONG value */
+.el .mini-del { position: absolute; top: 50%; margin-top: -12px; left: -30px; width: 24px; height: 24px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid #fff; display: none; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; z-index: 4; box-shadow: var(--shadow-1); }
 /* invisible hover bridge so the pointer can travel from the element up to the
  * detached button without dropping the :hover on the way */
-.el .mini-del::after { content: ''; position: absolute; top: 100%; left: -6px; right: -6px; height: 10px; }
+.el .mini-del::after { content: ''; position: absolute; top: 0; left: 100%; width: 8px; height: 100%; }   /* exactly the gap to the value — never over it */
 /* deletion must be one gesture: hovering ANY element reveals its ✕ —
  * selection-first was two clicks plus knowing you had to select */
 .el:hover .mini-del, .el.selected .mini-del { display: flex; }
@@ -5782,6 +5785,8 @@ body.gate-locked #loginModal { pointer-events: auto; }
         node.removeEventListener('pointercancel', up);
         // the drop is the moment to settle onto whatever is printed underneath
         if (moved && opts.onDragEnd) opts.onDragEnd();
+        // a click (no drag) on it
+        if (!moved && opts.onTap) opts.onTap(ev);
       };
       node.addEventListener('pointermove', move);
       node.addEventListener('pointerup', up);
@@ -6187,7 +6192,11 @@ body.gate-locked #loginModal { pointer-events: auto; }
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
         const rtlNow = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
-        if (model.anchorRight != null && !model.wrapW) {
+        if (model.centerX != null && !model.wrapW) {
+          // a value centred in its field stays centred while it grows
+          const nx = Math.max(0, model.centerX - model.fw / 2);
+          if (Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
+        } else if (model.anchorRight != null && !model.wrapW) {
           // a replacement starts where the print it replaced started — typed
           // digits or Hebrew alike grow away from that edge, never over it
           const nx = Math.max(0, model.anchorRight - model.fw);
@@ -6228,7 +6237,8 @@ body.gate-locked #loginModal { pointer-events: auto; }
         return false; // handled → skip default box resize
       },
       onChange: () => { layout(); ctx.onChange && ctx.onChange(); },
-      onDragEnd: () => { ctx.onDragEnd && ctx.onDragEnd(ctrl); }
+      onDragEnd: () => { ctx.onDragEnd && ctx.onDragEnd(ctrl); },
+      onTap: () => { ctx.onTap && ctx.onTap(ctrl); }
     });
 
     return ctrl;
@@ -6365,6 +6375,7 @@ body.gate-locked #loginModal { pointer-events: auto; }
         onSelect: (c, additive) => selectCtrl(c, additive),
         onChange: () => opts.onChange && opts.onChange(),
         onDragEnd: (c) => opts.onDragEnd && opts.onDragEnd(c),
+        onTap: (c) => opts.onElementTap && opts.onElementTap(c),
         onDelete: (c) => deleteCtrl(c),
         onDone: () => deselectAll(),
         // peer geometries on this page (excluding self) for drag snapping
@@ -6529,7 +6540,7 @@ body.gate-locked #loginModal { pointer-events: auto; }
           // the certificate face weight, a replacement's right anchor and
           // handwriting spacing survive undo/redo and auto-memory
           weight: m.weight || undefined, anchorRight: m.anchorRight != null ? round(m.anchorRight) : undefined, tracking: m.tracking || undefined,
-          print: m.print || undefined
+          print: m.print || undefined, centerX: m.centerX != null ? round(m.centerX) : undefined
         };
       });
     }
@@ -9531,12 +9542,17 @@ body.gate-locked #loginModal { pointer-events: auto; }
         if (ctrl) { overlay.deleteCtrl(ctrl); delete ctrlByKey[field.fieldKey]; }
         return null;
       }
-      const baseFont = field.fontFrac || 0.016;
+      // a box (table cell, a fillable PDF's field) caps the size by its own
+      // height — the value fits the box, no manual shrinking
+      const boxH = fieldBoxH(field);
+      const baseFont = Math.min(field.fontFrac || 0.016, boxH ? Math.max(0.0095, boxH * 0.68) : 1);
       if (!ctrl) {
-        const align = /[֐-׿؀-ۿ]/.test(field.label) ? 'right' : 'left';   // Hebrew or Arabic → right-align
+        // CENTRED in its field: pushed to the field's right edge it glued to
+        // the label's colon ("שם פרטי:נועה") and sat against a cell's border —
+        // every value was centred and resized by hand
         const model = PFS.element.makeModel('text', field.page, {
           fx: field.fx, fy: field.fy, fw: field.fw || 0.2,
-          fontFrac: baseFont, align,
+          fontFrac: baseFont, align: 'center',
           fieldKey: field.fieldKey, text: value
         });
         ctrl = overlay.instantiate(model);
@@ -9549,15 +9565,38 @@ body.gate-locked #loginModal { pointer-events: auto; }
         if (inner) inner.textContent = value;
         ctrl.layout();
       }
+      if (!ctrl) return null;   // a field with no place on a page (nothing to draw)
+      ctrl.model.align = 'center';
       fitFont(ctrl, field);
-      // text elements are content-sized and LEFT-anchored at fx; a Hebrew
-      // answer belongs at the RIGHT edge of its band (beside the label / at
-      // the cell's right). Re-anchor using the measured width.
-      if (ctrl && ctrl.model.align === 'right' && field.fw) {
-        const fx2 = field.fx + field.fw - ctrl.model.fw;
-        if (isFinite(fx2) && fx2 > field.fx - 0.001) { ctrl.model.fx = fx2; ctrl.layout(); }
-      }
+      centreInField(ctrl, field);
       return ctrl;
+    }
+    // the height of the field's BOX when it has one (a table cell, a
+    // fillable PDF's widget); null for a blank on a line
+    function fieldBoxH(field) {
+      if (!field) return null;
+      if (field.boxH) return field.boxH;
+      if (field.boxY != null) return field.fh || null;
+      return null;
+    }
+    // the value's middle on the field's middle: across the blank / cell, and
+    // down the box (a line's blank keeps its value sitting on the line)
+    function centreInField(ctrl, field) {
+      const m = ctrl.model;
+      if (!field || !field.fw) return;
+      const cx = field.fx + field.fw / 2;
+      m.centerX = cx;
+      if (!m.wrapW) m.fx = cx - (m.fw || 0) / 2;
+      else m.fx = field.fx;
+      const boxH = fieldBoxH(field);
+      if (boxH) {
+        const top = field.boxY != null ? field.boxY : field.fy;
+        m.fy = top + (boxH - (m.fh || 0)) / 2;
+      } else if (field.fh && m.fh) {
+        // on a line: the bottom of the value where the field's bottom is
+        m.fy = field.fy + field.fh - m.fh;
+      }
+      ctrl.layout();
     }
 
     // Shrink the font just enough for a long value to sit within the detected
@@ -9572,10 +9611,10 @@ body.gate-locked #loginModal { pointer-events: auto; }
       const base = ctrl.model.fontFrac || 0.016;
       // start clean: measure the natural single-line width at full size
       ctrl.model.cellW = null; ctrl.model.wrapW = null; ctrl.layout();
-      // a SMALL shrink (≤15%) that keeps the value on one line beats a line
+      // a shrink (to 75%) that keeps the value on ONE line beats a line
       // break; past that the value WRAPS at FULL size — "שורה מתחת לשורה"
       // inside the cell, never stretched past its border and never tiny
-      const floor = Math.max(0.0115, base * 0.85);
+      const floor = Math.max(0.0095, base * 0.75);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.95;
@@ -10263,7 +10302,7 @@ const overlay = PFS.createOverlayManager({
   // a tap on empty paper opens a caret right there ("לוחצים על המשבצת ומקלידים")
   onEmptyTap: (page, fx, fy) => { try { quickTextAt(page, fx, fy); } catch (e) { console.warn('quick text failed', e); } },
   // a certificate field dropped near a printed underline settles onto it
-  onDragEnd: (c) => { try { if (c && c.model) { c.model.__userMoved = true; if (c.model.anchorRight != null) c.model.anchorRight = c.model.fx + (c.model.fw || 0); } } catch (e) {} try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
+  onDragEnd: (c) => { try { if (c && c.model) { c.model.__userMoved = true; if (c.model.anchorRight != null) c.model.anchorRight = c.model.fx + (c.model.fw || 0); if (c.model.centerX != null) c.model.centerX = c.model.fx + (c.model.fw || 0) / 2; } } catch (e) {} try { if (certMode && typeof certSnapToInk === 'function' && !certSnapToInk(c)) certSnapToAxis(c); } catch (e) {} },
   // deleting from the canvas must clear the matching panel row too.
   // Deferred: radio exclusivity deletes a sibling MID-handler, and a sync at
   // that instant would see (and impose) a half-updated state.
@@ -10282,6 +10321,11 @@ const overlay = PFS.createOverlayManager({
   // click-to-fill: tapping an orange marker on the FORM opens a caret IN that
   // field, right on the page (a tick box still jumps to its panel row)
   onMarkerClick: (f) => {
+    // a wide screen: the field's row in the list beside the page — "לוחצים
+    // על שדה ועוברים לעמודה שבה מזינים את הנתון" (it opened a caret on the
+    // page; the list did not move). A phone keeps the caret on the page:
+    // the list is a drawer that would cover the form.
+    if (f && !isNarrow() && goToFieldRow(f.fieldKey)) return;
     if (f && f.type === 'text') {
       const c = quickTextAt(f.page, f.fx + (f.fw || 0) / 2, f.fy + (f.fh || 0.02) / 2);
       if (c) return;
@@ -10291,6 +10335,16 @@ const overlay = PFS.createOverlayManager({
     fieldsPanel.focusField(f.fieldKey);
   },
   onSelect: (ctrl, count) => { renderProps(ctrl); updateAlignBar(count); },
+  // a click on a value that belongs to a field → that field's row, ready to
+  // type over (a drag still just moves it; a double-click edits on the page)
+  onElementTap: (c) => {
+    try {
+      if (isNarrow() || overlay.isPlacing() || !c || !c.model || !c.model.fieldKey) return;
+      const t = c.node.querySelector('.txt');
+      if (t && t.isContentEditable && document.activeElement === t) return;   // being typed on the page
+      goToFieldRow(c.model.fieldKey);
+    } catch (e) {}
+  },
   onPlacingChange: (on) => {
     // clear tool highlight when placement ends
     if (!on) document.querySelectorAll('.rail-btn.tool.active').forEach((b) => b.classList.remove('active'));
@@ -10553,15 +10607,20 @@ function vaultPrefill(det) {
  * sat on the border under the label, and a click on it opened the caret
  * there — not in the cell ("לא מקפיץ אותי למקום הנכון"). Reads the drawn
  * page: the border between the cells, the far border, the row lines. */
-async function seatFieldsInCells(det) {
+// the pages a detection's text fields lie on, drawn at a FIXED resolution
+async function fixedPageCanvases(det) {
+  const pagesAt = new Map();
+  for (const f of (det && det.fields) || []) {
+    if (f.type !== 'text' || pagesAt.has(f.page)) continue;
+    try { pagesAt.set(f.page, (await renderBaseForFlatten(f.page, 2)).canvas); } catch (e) { pagesAt.set(f.page, null); }
+  }
+  return pagesAt;
+}
+async function seatFieldsInCells(det, shared) {
   if (!det || !det.fields || !det.fields.length) return 0;
   // measured on the page drawn at a FIXED resolution: the on-screen canvas
   // at a small zoom draws a 1pt border as a faint grey that reads as no line
-  const pagesAt = new Map();
-  for (const f of det.fields) {
-    if (f.type !== 'text' || f.inCell || pagesAt.has(f.page)) continue;
-    try { pagesAt.set(f.page, (await renderBaseForFlatten(f.page, 2)).canvas); } catch (e) { pagesAt.set(f.page, null); }
-  }
+  const pagesAt = shared || await fixedPageCanvases(det);
   let seated = 0;
   det.fields.forEach((f) => {
     if (f.type !== 'text' || f.inCell) return;
@@ -10611,20 +10670,24 @@ async function seatFieldsInCells(det) {
       const pad = Math.max(4, fhPx * 0.35);
       f.fx = (cx0 + pad) / W; f.fw = (cx1 - cx0 - 2 * pad) / W;
       f.fy = ((top + bot) / 2 - fhPx / 2) / H;
+      f.boxY = (top + 2) / H; f.boxH = Math.max(fhPx, bot - top - 4) / H;   // the cell's own box (value centred in it)
       f.inCell = true; seated++;
     } catch (e) {}
   });
-  pagesAt.forEach((c) => { if (c) { c.width = 0; c.height = 0; } });
+  if (!shared) pagesAt.forEach((c) => { if (c) { c.width = 0; c.height = 0; } });
   return seated;
 }
-function snapFieldsToInk(det) {
+// pagesAt (optional): page → canvas drawn at a FIXED resolution. The
+// on-screen canvas at a small zoom draws a thin underline as faint grey that
+// reads as no line (the blank then kept the heuristic's width, off the line).
+function snapFieldsToInk(det, pagesAt) {
   if (!det || !det.fields || !det.fields.length) return 0;
   const views = pdfView.viewList ? pdfView.viewList() : [];
   let snapped = 0;
   det.fields.forEach((f) => {
     if (f.type !== 'text' || f.inCell) return;   // a table cell was already seated
     const view = views[f.page];
-    const canvas = view && view.canvas;
+    const canvas = (pagesAt && pagesAt.get(f.page)) || (view && view.canvas);
     if (!canvas || !canvas.width) return;
     try {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -10710,6 +10773,23 @@ function snapFieldsToInk(det) {
           const newFy = (yTop + y) / H - fh - 2 / H;
           f.__snap = 'underline@' + y;
           if (newFy > 0 && Math.abs(newFy - f.fy) <= fh * 1.6 && Math.abs(newFy - f.fy) > 0.5 / H) { f.fy = newFy; snapped++; }
+          // the blank IS that line: its ends, not the label heuristic's
+          // default width (a value centred in the blank then sits in the
+          // middle of the line, not off towards one end)
+          try {
+            const yAbs = yTop + y, x0f = Math.round(f.fx * W), x1f = Math.round((f.fx + fw) * W);
+            const row = ctx.getImageData(0, yAbs, W, 1).data;
+            const dk = (x) => x >= 0 && x < W && (0.299 * row[x * 4] + 0.587 * row[x * 4 + 1] + 0.114 * row[x * 4 + 2]) < 130;
+            let seed = -1; const mid = Math.round((x0f + x1f) / 2);
+            for (let k = 0; k < (x1f - x0f) / 2; k++) { if (dk(mid + k)) { seed = mid + k; break; } if (dk(mid - k)) { seed = mid - k; break; } }
+            if (seed >= 0) {
+              let a0 = seed, a1 = seed;
+              for (let x = seed - 1, gap = 0; x >= 0 && gap <= 2; x--) { if (dk(x)) { a0 = x; gap = 0; } else gap++; }
+              for (let x = seed + 1, gap = 0; x < W && gap <= 2; x++) { if (dk(x)) { a1 = x; gap = 0; } else gap++; }
+              const ov = Math.min(a1, x1f) - Math.max(a0, x0f);
+              if (a1 - a0 > W * 0.04 && ov > (a1 - a0) * 0.6) { f.fx = a0 / W; f.fw = (a1 - a0 + 1) / W; f.lineX = true; }
+            }
+          } catch (e) {}
           return;
         }
       }
@@ -10869,8 +10949,10 @@ function uniformizeHandwriting(taggedOnly) {
     c.model.fontFrac = target;
     if (fontOff) c.model.font = docCss;
     c.layout();
-    // a right-aligned (Hebrew) value must keep its RIGHT edge planted
-    if (c.model.align === 'right' && isFinite(oldW)) { c.model.fx += (oldW - c.model.fw); c.layout(); }
+    // a right-aligned (Hebrew) value must keep its RIGHT edge planted; a
+    // centred one its centre
+    if (c.model.centerX != null && !c.model.wrapW) { c.model.fx = c.model.centerX - c.model.fw / 2; c.layout(); }
+    else if (c.model.align === 'right' && isFinite(oldW)) { c.model.fx += (oldW - c.model.fw); c.layout(); }
     changed++;
   });
   if (changed) { markDirty(); scheduleSnap(); }
@@ -10917,7 +10999,8 @@ function liftSmallFills(reason) {
     const oldW = m.fw, oldWrap = m.wrapW;
     m.fontFrac = cap;
     c.layout();
-    if (m.align === 'right' && isFinite(oldW) && !m.wrapW && !oldWrap) { m.fx += (oldW - m.fw); c.layout(); }
+    if (m.centerX != null && !m.wrapW) { m.fx = m.centerX - m.fw / 2; c.layout(); }
+    else if (m.align === 'right' && isFinite(oldW) && !m.wrapW && !oldWrap) { m.fx += (oldW - m.fw); c.layout(); }
     changed++;
   });
   if (changed) { console.info('[fills] lifted', changed, 'small values to readable size (' + (reason || '') + ')'); markDirty(); }
@@ -10980,6 +11063,8 @@ function quickTextAt(page, fx, fy) {
     if (inner) inner.addEventListener('blur', () => { setTimeout(() => { try { fieldsPanel.syncValues(panelValueMap()); } catch (e) {} }, 0); }, { once: true });
   };
   if (f) {
+    // a wide screen: the field is filled from its row in the list
+    if (!isNarrow() && goToFieldRow(f.fieldKey)) return null;
     const existing = overlay.getElements().find((c) => c.model.type === 'text' && c.model.fieldKey === f.fieldKey);
     if (existing) { overlay.selectCtrl(existing); existing.focusText(); return existing; }
     const size = Math.max(f.fontFrac || 0, MIN_FILL_FRAC * 0.85) || docUniformSize();
@@ -10994,12 +11079,14 @@ function quickTextAt(page, fx, fy) {
     const pv = pdfView.viewList().find((v) => v.idx === page);
     const hw = pv && pv.canvas && pv.canvas.width ? pv.canvas.height / pv.canvas.width : 1.414;
     const right = f.fx + (f.fw || 0) - (f.inCell ? 0 : Math.min((f.fw || 0) * 0.2, size * 0.4 * hw));
+    // centred in the field, like a value typed in the list
+    const cx = f.fx + (f.fw || 0) / 2;
     const ctrl = overlay.addModelAt('text', page, {
-      fx: align === 'right' ? Math.max(f.fx, right - 0.05) : f.fx, fy: f.fy + Math.max(0, ((f.fh || fh) - fh) / 2),
-      fontFrac: size, align, fieldKey: f.fieldKey, cellW: f.fw || null, cellX: f.fx, text: '', quick: true,
-      anchorRight: align === 'right' ? right : undefined
+      fx: Math.max(f.fx, cx - 0.025), fy: f.fy + Math.max(0, ((f.fh || fh) - fh) / 2),
+      fontFrac: size, align: 'center', fieldKey: f.fieldKey, cellW: f.fw || null, cellX: f.fx, text: '', quick: true,
+      centerX: f.fw ? cx : undefined
     }, true);
-    if (ctrl && align === 'right') { ctrl.model.fx = Math.max(f.fx, right - (ctrl.model.fw || 0)); ctrl.layout(); }
+    if (ctrl && f.fw) { ctrl.model.fx = Math.max(f.fx, cx - (ctrl.model.fw || 0) / 2); ctrl.layout(); }
     if (ctrl) { afterBlur(ctrl); overlay.setFieldActive && overlay.setFieldActive(f.fieldKey); }
     return ctrl;
   }
@@ -11061,7 +11148,7 @@ function sweepNameLeaks() {
 // (ink-snapped, split, size-normalized, or OCR-produced) is stored per
 // document fingerprint and replayed instantly on the next open. The "זהה
 // שדות" button always forces a fresh run and overwrites the cache.
-const DET_CACHE_V = 3;   // 2: table-cell fields seated in their cell · 3: fillable PDFs read from their widgets (read-only labels out)
+const DET_CACHE_V = 4;   // 2: table-cell fields seated in their cell · 3: fillable PDFs read from their widgets (read-only labels out)
 let lastDetFromCache = false;
 // currentFp is an OBJECT ({pages,w,h,textHash,ahash}) — flatten it to a
 // string key, or every document would share the "[object Object]" slot
@@ -11121,9 +11208,13 @@ async function runDetection(force) {
     if (gen !== loadGen) return; // another PDF loaded meanwhile — drop stale result
     // a fillable PDF: its own fields (exact boxes), named by the printed labels
     if (acroState && acroState.gen === gen && acroState.fields.length) det = acroDetection(det);
-    try { const n = await seatFieldsInCells(det); if (n) console.info('[cells] seated', n, 'fields in their table cells'); } catch (e) {}
+    let fixedPages = null;
+    try { fixedPages = await fixedPageCanvases(det); } catch (e) {}
     if (gen !== loadGen) return;
-    try { const n = snapFieldsToInk(det); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
+    try { const n = await seatFieldsInCells(det, fixedPages); if (n) console.info('[cells] seated', n, 'fields in their table cells'); } catch (e) {}
+    if (gen !== loadGen) return;
+    try { const n = snapFieldsToInk(det, fixedPages); if (n) console.info('[snap] aligned', n, 'fields to ruled lines'); } catch (e) {}
+    if (fixedPages) fixedPages.forEach((c) => { if (c) { c.width = 0; c.height = 0; } });
     // ink-snap expands a field until it meets a border — on a table row that
     // can swallow the neighbouring columns, leaving several fields sharing one
     // cell and their values stacked on top of each other. Re-partition by the
@@ -11665,14 +11756,23 @@ $('stickyBtn') && $('stickyBtn').addEventListener('click', () => {
   PFS.toast(stickyTools ? 'מצב רצף פעיל — הכלי יישאר פעיל להנחה מרובה (Esc לעצירה)' : 'מצב רצף כבוי', 'ok', 1800);
 });
 
+// the field's row in the list: shown, focused, its text selected to type over
+function goToFieldRow(key) {
+  if (!key || !fieldsPanel.focusField) return false;
+  activateTab('fill');
+  return !!fieldsPanel.focusField(key);
+}
 // bring a field's spot on the form into view: its value if it has one, else
-// its hint. Vertically AND horizontally (a zoomed-in page scrolls sideways too).
+// its hint. Vertically AND horizontally (a zoomed-in page scrolls sideways
+// too). A spot already in view stays put — the page does not jump around.
 function jumpToField(f) {
   if (!f || !f.fieldKey) return false;
   const c = overlay.getElements().find((x) => x.model.fieldKey === f.fieldKey && x.model.page === f.page);
   const node = (c && c.node) || document.querySelector('.field-marker[data-key="' + CSS.escape(f.fieldKey) + '"]');
   if (!node) return false;
-  PFS.scrollToEl(node, 'center');
+  const r = node.getBoundingClientRect(), v = $('viewport').getBoundingClientRect();
+  const inView = r.height > 0 && r.top >= v.top && r.bottom <= v.bottom && r.left >= v.left && r.right <= v.right;
+  if (!inView) PFS.scrollToEl(node, 'center');
   if (overlay.setFieldActive) overlay.setFieldActive(f.fieldKey);
   return true;
 }

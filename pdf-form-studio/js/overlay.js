@@ -124,6 +124,7 @@
         onSelect: (c, additive) => selectCtrl(c, additive),
         onChange: () => opts.onChange && opts.onChange(),
         onDragEnd: (c) => opts.onDragEnd && opts.onDragEnd(c),
+        onTap: (c) => opts.onElementTap && opts.onElementTap(c),
         onDelete: (c) => deleteCtrl(c),
         onDone: () => deselectAll(),
         // peer geometries on this page (excluding self) for drag snapping
@@ -288,7 +289,7 @@
           // the certificate face weight, a replacement's right anchor and
           // handwriting spacing survive undo/redo and auto-memory
           weight: m.weight || undefined, anchorRight: m.anchorRight != null ? round(m.anchorRight) : undefined, tracking: m.tracking || undefined,
-          print: m.print || undefined
+          print: m.print || undefined, centerX: m.centerX != null ? round(m.centerX) : undefined
         };
       });
     }

@@ -198,7 +198,11 @@
         model.text = inner.innerText.replace(/\n$/, '');
         layout();
         const rtlNow = /[֐-׿؀-ۿ]/.test((/[A-Za-z֐-׿؀-ۿ]/.exec(model.text || '') || [''])[0]);
-        if (model.anchorRight != null && !model.wrapW) {
+        if (model.centerX != null && !model.wrapW) {
+          // a value centred in its field stays centred while it grows
+          const nx = Math.max(0, model.centerX - model.fw / 2);
+          if (Math.abs(nx - model.fx) > 1e-5) { model.fx = nx; layout(); }
+        } else if (model.anchorRight != null && !model.wrapW) {
           // a replacement starts where the print it replaced started — typed
           // digits or Hebrew alike grow away from that edge, never over it
           const nx = Math.max(0, model.anchorRight - model.fw);
@@ -239,7 +243,8 @@
         return false; // handled → skip default box resize
       },
       onChange: () => { layout(); ctx.onChange && ctx.onChange(); },
-      onDragEnd: () => { ctx.onDragEnd && ctx.onDragEnd(ctrl); }
+      onDragEnd: () => { ctx.onDragEnd && ctx.onDragEnd(ctrl); },
+      onTap: () => { ctx.onTap && ctx.onTap(ctrl); }
     });
 
     return ctrl;

@@ -141,12 +141,17 @@
         if (ctrl) { overlay.deleteCtrl(ctrl); delete ctrlByKey[field.fieldKey]; }
         return null;
       }
-      const baseFont = field.fontFrac || 0.016;
+      // a box (table cell, a fillable PDF's field) caps the size by its own
+      // height — the value fits the box, no manual shrinking
+      const boxH = fieldBoxH(field);
+      const baseFont = Math.min(field.fontFrac || 0.016, boxH ? Math.max(0.0095, boxH * 0.68) : 1);
       if (!ctrl) {
-        const align = /[֐-׿؀-ۿ]/.test(field.label) ? 'right' : 'left';   // Hebrew or Arabic → right-align
+        // CENTRED in its field: pushed to the field's right edge it glued to
+        // the label's colon ("שם פרטי:נועה") and sat against a cell's border —
+        // every value was centred and resized by hand
         const model = PFS.element.makeModel('text', field.page, {
           fx: field.fx, fy: field.fy, fw: field.fw || 0.2,
-          fontFrac: baseFont, align,
+          fontFrac: baseFont, align: 'center',
           fieldKey: field.fieldKey, text: value
         });
         ctrl = overlay.instantiate(model);
@@ -159,15 +164,38 @@
         if (inner) inner.textContent = value;
         ctrl.layout();
       }
+      if (!ctrl) return null;   // a field with no place on a page (nothing to draw)
+      ctrl.model.align = 'center';
       fitFont(ctrl, field);
-      // text elements are content-sized and LEFT-anchored at fx; a Hebrew
-      // answer belongs at the RIGHT edge of its band (beside the label / at
-      // the cell's right). Re-anchor using the measured width.
-      if (ctrl && ctrl.model.align === 'right' && field.fw) {
-        const fx2 = field.fx + field.fw - ctrl.model.fw;
-        if (isFinite(fx2) && fx2 > field.fx - 0.001) { ctrl.model.fx = fx2; ctrl.layout(); }
-      }
+      centreInField(ctrl, field);
       return ctrl;
+    }
+    // the height of the field's BOX when it has one (a table cell, a
+    // fillable PDF's widget); null for a blank on a line
+    function fieldBoxH(field) {
+      if (!field) return null;
+      if (field.boxH) return field.boxH;
+      if (field.boxY != null) return field.fh || null;
+      return null;
+    }
+    // the value's middle on the field's middle: across the blank / cell, and
+    // down the box (a line's blank keeps its value sitting on the line)
+    function centreInField(ctrl, field) {
+      const m = ctrl.model;
+      if (!field || !field.fw) return;
+      const cx = field.fx + field.fw / 2;
+      m.centerX = cx;
+      if (!m.wrapW) m.fx = cx - (m.fw || 0) / 2;
+      else m.fx = field.fx;
+      const boxH = fieldBoxH(field);
+      if (boxH) {
+        const top = field.boxY != null ? field.boxY : field.fy;
+        m.fy = top + (boxH - (m.fh || 0)) / 2;
+      } else if (field.fh && m.fh) {
+        // on a line: the bottom of the value where the field's bottom is
+        m.fy = field.fy + field.fh - m.fh;
+      }
+      ctrl.layout();
     }
 
     // Shrink the font just enough for a long value to sit within the detected
@@ -182,10 +210,10 @@
       const base = ctrl.model.fontFrac || 0.016;
       // start clean: measure the natural single-line width at full size
       ctrl.model.cellW = null; ctrl.model.wrapW = null; ctrl.layout();
-      // a SMALL shrink (≤15%) that keeps the value on one line beats a line
+      // a shrink (to 75%) that keeps the value on ONE line beats a line
       // break; past that the value WRAPS at FULL size — "שורה מתחת לשורה"
       // inside the cell, never stretched past its border and never tiny
-      const floor = Math.max(0.0115, base * 0.85);
+      const floor = Math.max(0.0095, base * 0.75);
       let guard = 0;
       while (ctrl.node.offsetWidth > maxW && ctrl.model.fontFrac > floor && guard++ < 14) {
         ctrl.model.fontFrac *= 0.95;

@@ -348,6 +348,34 @@
       const res = await fetch(c.url + '/storage/v1/object/authenticated/' + BUCKET + '/dept/formats/' + id + '.pdf', { headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token } });
       if (!res.ok) return null;
       return new Uint8Array(await res.arrayBuffer());
+    },
+    // The team's signatures, stamps and clips: one JSON file in the
+    // department's folder — the same members-only storage rules as the
+    // formats, so nothing new is installed on the server.
+    // → {items:[…]}; nothing shared yet → {items: []}; unreadable → throws
+    // (a share that follows must never write over what it could not read)
+    async getAssets() {
+      await ensureFresh();
+      const c = cfg();
+      const res = await fetch(c.url + '/storage/v1/object/authenticated/' + BUCKET + '/dept/assets.json', { headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token }, cache: 'no-store' });
+      if (res.ok) {
+        const j = await res.json().catch(() => null);
+        if (!j || !Array.isArray(j.items)) throw new Error('BAD_ASSETS');
+        return j;
+      }
+      // storage answers a missing file with 400 {"statusCode":"404"} (older) or 404
+      const t = await res.text().catch(() => '');
+      if (res.status === 404 || (res.status === 400 && /not[_ ]?found|"404"/i.test(t))) return { items: [] };
+      throw new Error('HTTP_' + res.status);
+    },
+    async putAssets(doc) {
+      await ensureFresh();
+      const c = cfg();
+      const res = await fetch(c.url + '/storage/v1/object/' + BUCKET + '/dept/assets.json', {
+        method: 'POST', headers: { apikey: c.anonKey, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json', 'x-upsert': 'true' }, body: JSON.stringify(doc)
+      });
+      if (!res.ok) throw new Error('HTTP_' + res.status);
+      return true;
     }
   };
 

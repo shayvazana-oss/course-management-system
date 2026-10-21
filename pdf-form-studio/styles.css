@@ -1290,3 +1290,17 @@ body.gate-locked #loginModal { pointer-events: auto; }
   body:not(.home) #undoBtn { order: -2; }
   body:not(.home) #redoBtn { order: -1; }
 }
+
+/* the team's assets: tagged in the grid; the share picker */
+.asset .team-tag { position: absolute; bottom: 3px; inset-inline-start: 3px; font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 999px; background: var(--brand, #1e4e8c); color: #fff; pointer-events: none; }
+.asset.shared .team-tag { background: var(--surface-2, #eef); color: var(--ink-2, #333); border: 1px solid var(--line-2, #ccd); }
+.team-modal { max-width: 560px; }
+.team-modal .m-body { max-height: 70vh; overflow: auto; }
+.team-sec { font-weight: 700; font-size: 13px; margin-top: 4px; }
+.team-pick { grid-template-columns: repeat(3, 1fr); }
+.asset.pick { cursor: pointer; }
+.asset.pick input { position: absolute; top: 6px; inset-inline-start: 6px; width: 18px; height: 18px; margin: 0; accent-color: var(--brand, #1e4e8c); }
+.asset.pick:has(input:checked) { border-color: var(--brand, #1e4e8c); box-shadow: 0 0 0 2px rgba(30,78,140,.18); }
+.asset.pick:has(input:not(:checked)) img { opacity: .45; }
+@media (max-width: 520px) { .team-pick { grid-template-columns: 1fr 1fr; } }
+.dept-team { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; margin: 4px 0 8px; }

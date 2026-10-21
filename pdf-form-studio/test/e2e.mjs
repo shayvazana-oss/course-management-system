@@ -6251,6 +6251,191 @@ async function main() {
     check('🏢 department: the admin sets it up (her earlier batch moves in) and adds a clerk; the clerk sees and re-prints the admin\'s batches from the shared format, numbers never collide, she cannot delete the admin\'s batch, a duplicate is flagged; an outsider sees nothing', okD);
   }
 
+  // ===== the team's assets: "תעביר את החתימות והנכסים שלי לשאר היוזרים" =====
+  // The admin shares her signatures and stamp with the department in one
+  // click; a clerk signing in as herself finds them in her own נכסים tab
+  // (tagged "צוות", usable, starred by Fill-All — but not deletable by her,
+  // and never copied into her own cloud copy). The clerk shares one of hers
+  // without wiping the admin's; an outsider sees nothing (not even what the
+  // previous person on this computer had); the admin deleting a shared stamp
+  // takes it off everyone.
+  {
+    const users = {}, tokens = {}, vaults = {}, files = {};
+    const D = { members: {} };
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const who = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); return m && tokens[m[1]] ? tokens[m[1]] : null; };
+    const emailOf = (id) => (Object.values(users).find((x) => x.id === id) || {}).email || '';
+    const issue = (usr) => { const tok = 'tok_' + usr.id + '_' + Math.random().toString(36).slice(2); tokens[tok] = usr.id; return { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } }; };
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/signup') { const b = JSON.parse((await body(req)).toString() || '{}'); const id = 't' + (Object.keys(users).length + 1); users[b.email] = { id, password: b.password, email: b.email }; return json(res, 200, issue(users[b.email])); }
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (u.searchParams.get('grant_type') === 'refresh_token') { const id = String(b.refresh_token || '').replace(/^r_/, ''); return json(res, 200, issue({ id, email: emailOf(id) })); }
+        const usr = users[b.email]; if (!usr || usr.password !== b.password) return json(res, 400, { error_description: 'Invalid login credentials' });
+        return json(res, 200, issue(usr));
+      }
+      const meId = who(req); if (!meId) return json(res, 401, {});
+      const me = emailOf(meId).toLowerCase();
+      const member = !!D.members[me], admin = member && D.members[me].role === 'admin';
+      if (p === '/rest/v1/vaults') { if (req.method === 'GET') return json(res, 200, vaults[meId] ? [{ data: vaults[meId] }] : []); const b = JSON.parse((await body(req)).toString() || '{}'); vaults[meId] = b.data; return json(res, 201); }
+      if (p === '/rest/v1/rpc/dept_claim') { await body(req); if (Object.values(D.members).some((m) => m.role === 'admin')) return json(res, 200, admin); D.members[me] = { email: me, role: 'admin' }; return json(res, 200, true); }
+      if (p === '/rest/v1/rpc/dept_seed') { await body(req); return json(res, 200, 0); }
+      if (p === '/rest/v1/dept_members') {
+        if (req.method === 'GET') return json(res, 200, member ? Object.values(D.members) : []);
+        if (req.method === 'POST') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!admin) return json(res, 403, {}); D.members[b.email] = { email: b.email, role: b.role || 'member' }; return json(res, 201); }
+      }
+      if (p === '/rest/v1/dept_batches' || p === '/rest/v1/dept_formats') return json(res, 200, []);
+      if (p.startsWith('/storage/v1/object/')) {
+        const rest = p.replace('/storage/v1/object/', '');
+        const own = (path) => path.startsWith(meId + '/') || (path.startsWith('dept/') && member);
+        // (real storage: a missing object is HTTP 400 {"statusCode":"404"})
+        if (req.method === 'POST' && rest.startsWith('docs/')) { const path = decodeURIComponent(rest.slice(5)); if (!own(path)) return json(res, 403, { statusCode: '403', error: 'Unauthorized' }); files[path] = await body(req); return json(res, 200, { Key: path }); }
+        if (req.method === 'GET' && rest.startsWith('authenticated/docs/')) { const path = decodeURIComponent(rest.slice('authenticated/docs/'.length)); if (!own(path) || !files[path]) return json(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' }); res.writeHead(200, { 'content-type': 'application/octet-stream', 'access-control-allow-origin': '*' }); return res.end(files[path]); }
+        if (req.method === 'DELETE') { await body(req); return json(res, 200, {}); }
+      }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const R = {};
+    const signIn = async (email, pass, up) => {
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      await page.fill('#loginBody #acctEmail', email); await page.fill('#loginBody #acctPass', pass);
+      await page.click(up ? '#loginBody #acctUp' : '#loginBody #acctIn');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      await page.waitForTimeout(500);
+    };
+    const signOut = async () => { await page.evaluate(() => window.PFS.__test.acct.signOut()); };
+    const shared = () => { try { return JSON.parse(files['dept/assets.json'].toString()).items; } catch (e) { return null; } };
+    // what the person sees in their נכסים tab (inside an open document)
+    const grid = () => page.evaluate(async () => {
+      const T = window.PFS.__test;
+      if (!T.pdfView.hasDoc()) {
+        const { PDFDocument } = window.PDFLib; const d = await PDFDocument.create(); d.addPage([595, 842]);
+        await T.openPdfFile(new File([await d.save()], 'צוות.pdf', { type: 'application/pdf' }));
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+      document.querySelector('.tab[data-tab="assets"]').click();
+      const cells = (id) => [...document.querySelectorAll('#' + id + ' .asset:not(.empty)')].map((c) => ({ team: c.classList.contains('team'), shared: c.classList.contains('shared'), tag: (c.querySelector('.team-tag') || {}).textContent || '', del: !!c.querySelector('.del') }));
+      const card = document.getElementById('teamCard');
+      return { sig: cells('sigGrid'), stamp: cells('stampGrid'), card: !card.classList.contains('hidden'), status: document.getElementById('teamStatus').textContent };
+    });
+    const errMark = jsErrors.length;   // "nothing shared yet" is storage's 400 — expected
+    const draw = (txt) => page.evaluate((t) => { const c = document.createElement('canvas'); c.width = 240; c.height = 80; const g = c.getContext('2d'); g.font = '34px serif'; g.fillText(t, 12, 52); return c.toDataURL('image/png'); }, txt);
+    try {
+      await page.evaluate(async (url) => {
+        const T = window.PFS.__test; T.overlay.clearElements();
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+        await T.acct.wipe();
+        T.acct.gate();
+      }, mockUrl);
+      // the admin: sets the department up, adds the clerk, has two signatures and a stamp
+      await signIn('boss@fillo.test', 'pw-boss', true);
+      const sigA = await draw('Boss A'), sigB = await draw('Boss B'), stampA = await draw('STAMP');
+      R.adminSetup = await page.evaluate(async ({ sigA, sigB, stampA }) => {
+        const T = window.PFS.__test, A = window.PFS.account;
+        await A.dept.claim(); await A.dept.addMember('clerk@fillo.test'); await T.deptRefresh();
+        T.assets.add('signature', { url: sigA, w: 240, h: 80 }); T.assets.add('signature', { url: sigB, w: 240, h: 80 }); T.assets.add('stamp', { url: stampA, w: 240, h: 80 });
+        return { role: T.deptState().role, members: T.deptState().members.length };
+      }, { sigA, sigB, stampA });
+      R.adminBefore = await grid();
+      // one click: share → the picker (everything ticked the first time) → שיתוף
+      await page.click('#teamShareBtn');
+      await page.waitForSelector('#teamModal.show', { timeout: 5000 });
+      R.picker = await page.evaluate(() => ({ boxes: document.querySelectorAll('#teamBody input[type=checkbox]').length, ticked: document.querySelectorAll('#teamBody input[type=checkbox]:checked').length }));
+      await page.click('#teamOk');
+      await page.waitForFunction(() => !document.getElementById('teamModal').classList.contains('show'), { timeout: 8000 });
+      R.serverAfterShare = (shared() || []).map((x) => x.kind + ':' + x.by).sort();
+      R.adminAfter = await grid();
+      await signOut();
+      // the clerk: her own user — the team's assets are in her tab, ready
+      await signIn('clerk@fillo.test', 'pw-clerk', true);
+      R.clerk = await grid();
+      R.clerkUse = await page.evaluate(({ sigA, sigB, stampA }) => {
+        const T = window.PFS.__test;
+        const d = T.assets.getDefault('signature'), st = T.assets.getDefault('stamp');
+        return { ownSig: T.assets.own('signature').length, ownStamp: T.assets.own('stamp').length, defSig: !!d && d.url === sigA, defStamp: !!st && st.url === stampA };
+      }, { sigA, sigB, stampA });
+      // Fill-All on a form reaches the team's signature + stamp
+      R.clerkFill = await page.evaluate(async () => {
+        const T = window.PFS.__test;
+        T.overlay.clearElements(); T.fillAll();
+        const kinds = T.overlay.getElements().map((c) => c.model.kind).sort();
+        T.overlay.clearElements();
+        return kinds;
+      });
+      // her own cloud copy does not carry the team's images
+      R.clerkVaultClean = await page.evaluate(async () => { await window.PFS.account.saveVault(); return true; }) && !JSON.stringify(vaults[users['clerk@fillo.test'].id] || {}).includes(sigA.slice(60, 160));
+      // she shares one of hers: the admin's stay
+      const sigC = await draw('Clerk C');
+      await page.evaluate(async (u) => { const T = window.PFS.__test; T.assets.add('signature', { url: u, w: 240, h: 80 }); const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; } await T.openMe(); }, sigC);
+      await page.click('#meBody #deptShareAssets');
+      await page.waitForSelector('#teamModal.show', { timeout: 5000 });
+      R.clerkPicker = await page.evaluate(() => document.querySelectorAll('#teamBody input[type=checkbox]').length);
+      await page.click('#teamOk');
+      await page.waitForFunction(() => !document.getElementById('teamModal').classList.contains('show'), { timeout: 8000 });
+      R.serverAfterClerk = (shared() || []).map((x) => x.kind + ':' + x.by).sort();
+      R.clerkMeAfter = await page.evaluate(() => { const t = (document.querySelector('#meBody .dept-team') || {}).textContent || ''; document.getElementById('meModal').classList.remove('show'); return t; });
+      await signOut();
+      // an outsider on the same computer: nothing of the team
+      await signIn('outsider@fillo.test', 'pw-out', true);
+      R.outsider = await grid();
+      R.outsiderTeam = await page.evaluate(() => (window.PFS.__test.assets.team() ? window.PFS.__test.assets.team().items.length : 0) + window.PFS.__test.assets.list('signature').length);
+      await signOut();
+      // the admin deletes her shared stamp → off the team for everyone
+      await signIn('boss@fillo.test', 'pw-boss', false);
+      R.adminBack = await grid();
+      await page.evaluate(async () => {
+        const c0 = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true;
+        try {
+          const del = document.querySelector('#stampGrid .asset.shared .del'); del && del.click();
+          for (let i = 0; i < 40 && window.PFS.__test.assets.own('stamp').length; i++) await new Promise((r) => setTimeout(r, 100));
+        } finally { window.PFS.ui.confirm = c0; }
+      });
+      R.serverAfterDelete = (shared() || []).map((x) => x.kind + ':' + x.by).sort();
+      await signOut();
+      await signIn('clerk@fillo.test', 'pw-clerk', false);
+      R.clerkLater = await grid();
+      await signOut();
+    } catch (e) { R.error = String(e && e.message || e); }
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      window.PFS.store.remove('acct:cfg'); window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+      T.assets && T.assets.setTeam(null);
+      document.getElementById('loginModal').classList.remove('show');
+      document.getElementById('teamModal') && document.getElementById('teamModal').classList.remove('show');
+      const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; }
+      T.acct.render();
+      document.querySelector('.tab[data-tab="fill"]').click();
+    });
+    mock.close();
+    for (let i = jsErrors.length - 1; i >= errMark; i--) if (/Failed to load resource: the server responded with a status of 400/.test(jsErrors[i])) jsErrors.splice(i, 1);
+    const J = (v) => JSON.stringify(v);
+    const okT = !R.error && R.adminSetup.role === 'admin' && R.adminSetup.members === 2
+      && R.adminBefore.card && R.adminBefore.sig.length === 2 && !R.adminBefore.sig.some((c) => c.shared)
+      && R.picker.boxes === 3 && R.picker.ticked === 3
+      && J(R.serverAfterShare) === J(['signature:boss@fillo.test', 'signature:boss@fillo.test', 'stamp:boss@fillo.test'])
+      && R.adminAfter.sig.length === 2 && R.adminAfter.sig.every((c) => c.shared && c.tag === 'משותף') && R.adminAfter.stamp.every((c) => c.shared)
+      && R.clerk.card && R.clerk.sig.length === 2 && R.clerk.sig.every((c) => c.team && c.tag === 'צוות' && !c.del) && R.clerk.stamp.length === 1 && R.clerk.stamp[0].team && !R.clerk.stamp[0].del
+      && R.clerkUse.ownSig === 0 && R.clerkUse.ownStamp === 0 && R.clerkUse.defSig && R.clerkUse.defStamp
+      && J(R.clerkFill) === J(['signature', 'stamp']) && R.clerkVaultClean
+      && R.clerkPicker === 1 && /עדכון הנכסים ששיתפתי/.test(R.clerkMeAfter) && /4 נכסים משותפים/.test(R.clerkMeAfter)
+      && J(R.serverAfterClerk) === J(['signature:boss@fillo.test', 'signature:boss@fillo.test', 'signature:clerk@fillo.test', 'stamp:boss@fillo.test'])
+      && R.outsider.sig.length === 0 && R.outsider.stamp.length === 0 && R.outsiderTeam === 0 && R.outsider.card && /חבר\/ה במחלקה/.test(R.outsider.status)
+      && R.adminBack.sig.length === 3 && R.adminBack.sig.filter((c) => c.team).length === 1 && R.adminBack.sig.find((c) => c.team).del
+      && J(R.serverAfterDelete) === J(['signature:boss@fillo.test', 'signature:boss@fillo.test', 'signature:clerk@fillo.test'])
+      && R.clerkLater.stamp.length === 0 && R.clerkLater.sig.length === 3;
+    if (!okT) console.log('  [team assets debug]', JSON.stringify(R));
+    check('👥 team assets: the admin shares her signatures + stamp in one click; a clerk signed in as herself finds them ready (tagged, Fill-All uses them, she cannot delete them, her own cloud copy stays clean); her share keeps the admin\'s; an outsider sees nothing; a deleted shared stamp leaves everyone', okT);
+  }
+
   // ===== the first sign-in on a computer that already holds work =====
   // The desktop holds layouts, a profile, certificates and a serial counter;
   // the account already holds others in the cloud. Signing in must keep

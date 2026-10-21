@@ -55,7 +55,7 @@ async function main() {
   await page.addInitScript(() => { window.__PFS_NO_GATE = true; });
   const jsErrors = [];
   page.on('pageerror', (e) => jsErrors.push('PAGEERROR: ' + e.message));
-  page.on('console', (m) => { if (m.type() === 'error') jsErrors.push('CONSOLE: ' + m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error') { const at = m.location && m.location() && m.location().url; jsErrors.push('CONSOLE: ' + m.text() + (at && /Failed to load resource/.test(m.text()) ? ' @ ' + at : '')); } });
 
   await page.goto(base, { waitUntil: 'load' }); await page.waitForTimeout(700);
   check('app + libraries load', await page.evaluate(() => !!(window.PFS && window.pdfjsLib && window.PDFLib)));
@@ -6323,7 +6323,6 @@ async function main() {
       const card = document.getElementById('teamCard');
       return { sig: cells('sigGrid'), stamp: cells('stampGrid'), card: !card.classList.contains('hidden'), status: document.getElementById('teamStatus').textContent };
     });
-    const errMark = jsErrors.length;   // "nothing shared yet" is storage's 400 — expected
     const draw = (txt) => page.evaluate((t) => { const c = document.createElement('canvas'); c.width = 240; c.height = 80; const g = c.getContext('2d'); g.font = '34px serif'; g.fillText(t, 12, 52); return c.toDataURL('image/png'); }, txt);
     try {
       await page.evaluate(async (url) => {
@@ -6416,7 +6415,6 @@ async function main() {
       document.querySelector('.tab[data-tab="fill"]').click();
     });
     mock.close();
-    for (let i = jsErrors.length - 1; i >= errMark; i--) if (/Failed to load resource: the server responded with a status of 400/.test(jsErrors[i])) jsErrors.splice(i, 1);
     const J = (v) => JSON.stringify(v);
     const okT = !R.error && R.adminSetup.role === 'admin' && R.adminSetup.members === 2
       && R.adminBefore.card && R.adminBefore.sig.length === 2 && !R.adminBefore.sig.some((c) => c.shared)
@@ -6632,6 +6630,9 @@ async function main() {
   }
 
   check('exporter library present', await page.evaluate(() => !!(window.PFS.exporter && window.PFS.exporter.exportPdf)));
+  // a department where nobody shared assets yet: storage answers the team's
+  // file with "not found" (400 / 404) — expected, the app reads it as empty
+  for (let i = jsErrors.length - 1; i >= 0; i--) if (/Failed to load resource: the server responded with a status of 40[04].* @ .*\/dept\/assets\.json/.test(jsErrors[i])) jsErrors.splice(i, 1);
   if (jsErrors.length) console.log('  [js errors]', JSON.stringify(jsErrors.slice(0, 6)));
   check('no uncaught JS errors during run', jsErrors.length === 0);
   jsErrors.forEach((e) => console.log('    ! ' + e));

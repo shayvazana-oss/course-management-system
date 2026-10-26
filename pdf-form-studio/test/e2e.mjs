@@ -6434,6 +6434,194 @@ async function main() {
     check('👥 team assets: the admin shares her signatures + stamp in one click; a clerk signed in as herself finds them ready (tagged, Fill-All uses them, she cannot delete them, her own cloud copy stays clean); her share keeps the admin\'s; an outsider sees nothing; a deleted shared stamp leaves everyone', okT);
   }
 
+  // ===== passwords: "אין אופציה של שכחתי סיסמא?" =====
+  // The sign-in screen has "שכחתי סיסמה": with the address typed, the server
+  // is asked to e-mail a link back to this very page; when the project's
+  // mailer refuses (the built-in one reaches only the Supabase team), the
+  // screen says who resets it instead. The admin resets a member's password
+  // from the department panel (the server function is offered for a one-time
+  // install when missing); the member signs in with it and changes it in the
+  // personal area. A reset link that comes back signs the person in, asks
+  // for a new password and leaves no token in the address bar; an expired
+  // link says so.
+  {
+    const users = {}, tokens = {}, vaults = {}, recovers = [];
+    const D = { members: {}, pwInstalled: false, blocked: new Set(['nomail@fillo.test']) };
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const who = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); return m && tokens[m[1]] ? tokens[m[1]] : null; };
+    const byId = (id) => Object.values(users).find((x) => x.id === id) || null;
+    const issue = (usr) => { const tok = 'tok_' + usr.id + '_' + Math.random().toString(36).slice(2); tokens[tok] = usr.id; return { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } }; };
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/signup') { const b = JSON.parse((await body(req)).toString() || '{}'); const id = 'p' + (Object.keys(users).length + 1); users[b.email] = { id, password: b.password, email: b.email }; return json(res, 200, issue(users[b.email])); }
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (u.searchParams.get('grant_type') === 'refresh_token') { const usr = byId(String(b.refresh_token || '').replace(/^r_/, '')); return usr ? json(res, 200, issue(usr)) : json(res, 400, {}); }
+        const usr = users[b.email]; if (!usr || usr.password !== b.password) return json(res, 400, { error: 'invalid_grant', error_description: 'Invalid login credentials' });
+        return json(res, 200, issue(usr));
+      }
+      if (p === '/auth/v1/recover') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        recovers.push({ email: b.email, redirect: u.searchParams.get('redirect_to') });
+        if (D.blocked.has(b.email)) return json(res, 400, { code: 400, error_code: 'email_address_not_authorized', msg: 'Email address not authorized' });
+        return json(res, 200, {});
+      }
+      const meId = who(req); if (!meId) return json(res, 401, { msg: 'invalid JWT' });
+      const meU = byId(meId); const me = (meU && meU.email || '').toLowerCase();
+      const member = !!D.members[me], admin = member && D.members[me].role === 'admin';
+      if (p === '/auth/v1/user') {
+        if (req.method === 'GET') return json(res, 200, { id: meU.id, email: meU.email, aud: 'authenticated' });
+        if (req.method === 'PUT') { const b = JSON.parse((await body(req)).toString() || '{}'); if ((b.password || '').length < 6) return json(res, 422, { error_code: 'weak_password' }); if (b.password === meU.password) return json(res, 422, { error_code: 'same_password' }); meU.password = b.password; return json(res, 200, { id: meU.id, email: meU.email }); }
+      }
+      if (p === '/rest/v1/vaults') { if (req.method === 'GET') return json(res, 200, vaults[meId] ? [{ data: vaults[meId] }] : []); const b = JSON.parse((await body(req)).toString() || '{}'); vaults[meId] = b.data; return json(res, 201); }
+      if (p === '/rest/v1/rpc/dept_claim') { await body(req); if (Object.values(D.members).some((m) => m.role === 'admin')) return json(res, 200, admin); D.members[me] = { email: me, role: 'admin' }; return json(res, 200, true); }
+      if (p === '/rest/v1/rpc/dept_seed') { await body(req); return json(res, 200, 0); }
+      if (p === '/rest/v1/rpc/dept_set_password') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (!D.pwInstalled) return json(res, 404, { code: 'PGRST202', message: 'Could not find the function public.dept_set_password' });
+        if (!admin) return json(res, 400, { message: 'only the department admin can reset passwords' });
+        if (!D.members[b.p_email]) return json(res, 400, { message: 'not a department member' });
+        const t = users[b.p_email]; if (!t) return json(res, 200, false);
+        t.password = b.p_password; return json(res, 200, true);
+      }
+      if (p === '/rest/v1/dept_members') {
+        if (req.method === 'GET') return json(res, 200, member ? Object.values(D.members) : []);
+        if (req.method === 'POST') { const b = JSON.parse((await body(req)).toString() || '{}'); if (!admin) return json(res, 403, {}); D.members[b.email] = { email: b.email, role: b.role || 'member' }; return json(res, 201); }
+      }
+      if (p === '/rest/v1/dept_batches' || p === '/rest/v1/dept_formats') return json(res, 200, []);
+      if (p.startsWith('/storage/v1/object/')) { await body(req); return json(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' }); }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const R = {};
+    const signIn = async (email, pass, up) => {
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      await page.fill('#loginBody #acctEmail', email); await page.fill('#loginBody #acctPass', pass);
+      await page.click(up ? '#loginBody #acctUp' : '#loginBody #acctIn');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      await page.waitForTimeout(500);
+    };
+    const signOut = async () => { await page.evaluate(() => window.PFS.__test.acct.signOut()); };
+    const gateStatus = () => page.evaluate(() => (document.querySelector('#loginBody .acct-status') || {}).textContent || '');
+    const pwStatus = () => page.evaluate(() => (document.querySelector('#pwBody .pw-status') || {}).textContent || '');
+    // a page of its own (another computer): the link from the e-mail opens there
+    const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+    await ctx2.addInitScript((url) => { try { localStorage.setItem('pfs:acct:cfg', JSON.stringify({ url, anonKey: 'test' })); localStorage.setItem('pfs:onboarded', 'true'); localStorage.setItem('pfs:tour_done', '1'); } catch (e) {} window.PFS_SUPA_BASE = url; }, mockUrl);
+    const page2 = await ctx2.newPage();
+    const errs2 = []; page2.on('pageerror', (e) => errs2.push(e.message));
+    const errMark = jsErrors.length;   // the refused mail and the missing function below are this test's own doing
+    try {
+      await page.evaluate(async (url) => {
+        const T = window.PFS.__test; T.overlay.clearElements();
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+        await T.acct.wipe();
+        T.acct.gate();
+      }, mockUrl);
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      // "שכחתי סיסמה" with no address yet → asks for it
+      R.forgotLink = await page.evaluate(() => !!document.querySelector('#loginBody #acctForgot'));
+      await page.click('#loginBody #acctForgot'); await page.waitForTimeout(200);
+      R.askEmail = await gateStatus();
+      // a team address: the link is sent, back to this very page
+      await page.fill('#loginBody #acctEmail', 'boss@fillo.test');
+      await page.click('#loginBody #acctForgot'); await page.waitForTimeout(500);
+      R.sent = await gateStatus(); R.recover0 = recovers[0];
+      R.pageUrl = await page.evaluate(() => location.origin + location.pathname);
+      // the mailer refuses → the screen says who resets it instead
+      await page.fill('#loginBody #acctEmail', 'nomail@fillo.test');
+      await page.click('#loginBody #acctForgot'); await page.waitForTimeout(500);
+      R.refused = await gateStatus();
+      // the admin, the department, a clerk who has an account
+      users['clerk@fillo.test'] = { id: 'pc', password: 'forgotten-1', email: 'clerk@fillo.test' };
+      await signIn('boss@fillo.test', 'pw-boss', true);
+      await page.evaluate(async () => { const A = window.PFS.account; await A.dept.claim(); await A.dept.addMember('clerk@fillo.test'); await A.dept.addMember('nouser@fillo.test'); await window.PFS.__test.deptRefresh(); await window.PFS.__test.openMe(); });
+      await page.waitForSelector('#meBody [data-pw="clerk@fillo.test"]', { timeout: 8000 });
+      R.adminButtons = await page.evaluate(() => [...document.querySelectorAll('#meBody [data-pw]')].map((b) => b.dataset.pw).sort());
+      // the server function is not installed yet → the one-time setup, with the code to paste
+      await page.click('#meBody [data-pw="clerk@fillo.test"]');
+      await page.waitForSelector('#pwModal.show', { timeout: 5000 });
+      await page.fill('#pwBody #pw1', 'Temp-1234'); await page.click('#pwOk');
+      await page.waitForSelector('#pwSetupModal.show', { timeout: 5000 });
+      R.setup = await page.evaluate(() => { const v = document.getElementById('pwSql').value; document.getElementById('pwSetupModal').classList.remove('show'); return { sql: /create or replace function public\.dept_set_password/.test(v) && /dept_is_admin\(\)/.test(v) && /extensions\.crypt/.test(v), steps: /SQL Editor/.test(document.querySelector('#pwSetupModal .pw-steps').textContent) }; });
+      // installed → the reset goes through
+      D.pwInstalled = true;
+      await page.click('#meBody [data-pw="clerk@fillo.test"]');
+      await page.waitForSelector('#pwModal.show', { timeout: 5000 });
+      R.adminFieldVisible = await page.evaluate(() => document.querySelector('#pwBody #pw1').type === 'text' && !document.querySelector('#pwBody #pw2'));
+      await page.fill('#pwBody #pw1', 'Temp-1234'); await page.click('#pwOk');
+      await page.waitForFunction(() => !document.getElementById('pwModal').classList.contains('show'), { timeout: 5000 });
+      R.clerkPwAfterReset = users['clerk@fillo.test'].password;
+      // a member with no account yet: said plainly
+      await page.click('#meBody [data-pw="nouser@fillo.test"]');
+      await page.waitForSelector('#pwModal.show', { timeout: 5000 });
+      await page.fill('#pwBody #pw1', 'Temp-5555'); await page.click('#pwOk'); await page.waitForTimeout(500);
+      R.noUser = await pwStatus();
+      await page.evaluate(() => { document.getElementById('pwModal').classList.remove('show'); document.getElementById('meModal').classList.remove('show'); });
+      await signOut();
+      // the clerk signs in with the temporary password, then picks her own
+      await signIn('clerk@fillo.test', 'Temp-1234', false);
+      await page.evaluate(() => window.PFS.__test.openMe());
+      await page.waitForSelector('#meBody #mePw', { timeout: 5000 });
+      R.clerkNoResetButtons = await page.evaluate(() => document.querySelectorAll('#meBody [data-pw]').length === 0);
+      await page.click('#meBody #mePw');
+      await page.waitForSelector('#pwModal.show', { timeout: 5000 });
+      R.ownMasked = await page.evaluate(() => document.querySelector('#pwBody #pw1').type === 'password' && !!document.querySelector('#pwBody #pw2'));
+      await page.fill('#pwBody #pw1', 'Mine-5678'); await page.fill('#pwBody #pw2', 'Mine-567'); await page.click('#pwOk'); await page.waitForTimeout(300);
+      R.mismatch = await pwStatus();
+      await page.fill('#pwBody #pw2', 'Mine-5678'); await page.click('#pwOk');
+      await page.waitForFunction(() => !document.getElementById('pwModal').classList.contains('show'), { timeout: 5000 });
+      R.clerkPwOwn = users['clerk@fillo.test'].password;
+      await page.evaluate(() => document.getElementById('meModal').classList.remove('show'));
+      await signOut();
+      await signIn('clerk@fillo.test', 'Mine-5678', false);
+      R.clerkSignedIn = await page.evaluate(() => (window.PFS.account.user() || {}).email);
+      await signOut();
+      // the e-mailed link, on another computer: signed in, a new password, no token left in the address bar
+      const link = issue(users['clerk@fillo.test']);
+      await page2.goto(base + '#access_token=' + link.access_token + '&expires_at=9999999999&expires_in=3600&refresh_token=' + link.refresh_token + '&token_type=bearer&type=recovery', { waitUntil: 'load' });
+      await page2.waitForSelector('#pwModal.show', { timeout: 15000 });
+      R.link = await page2.evaluate(() => ({ hash: location.hash, user: (window.PFS.account.user() || {}).email, gate: document.getElementById('loginModal').classList.contains('show'), head: document.getElementById('pwHead').textContent }));
+      await page2.fill('#pwBody #pw1', 'Reset-9999'); await page2.fill('#pwBody #pw2', 'Reset-9999'); await page2.click('#pwOk');
+      await page2.waitForFunction(() => !document.getElementById('pwModal').classList.contains('show'), { timeout: 5000 });
+      R.clerkPwLink = users['clerk@fillo.test'].password;
+      // an expired link: the sign-in screen says so
+      await page2.evaluate(() => { window.PFS.account.signOut(); });
+      await page2.goto('about:blank');   // (a link from the mail opens a fresh page)
+      await page2.goto(base + '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired', { waitUntil: 'load' });
+      await page2.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      await page2.waitForTimeout(400);
+      R.expired = await page2.evaluate(() => ({ status: (document.querySelector('#loginBody .acct-status') || {}).textContent || '', hash: location.hash }));
+    } catch (e) { R.error = String(e && e.message || e); }
+    await ctx2.close();
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      window.PFS.store.remove('acct:cfg'); window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+      ['loginModal', 'pwModal', 'pwSetupModal', 'meModal'].forEach((id) => { const m = document.getElementById(id); m && m.classList.remove('show'); });
+      const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; }
+      T.acct.render();
+    });
+    mock.close();
+    for (let i = jsErrors.length - 1; i >= errMark; i--) if (/Failed to load resource: the server responded with a status of 40[04].* @ .*\/(auth\/v1\/recover|rpc\/dept_set_password)/.test(jsErrors[i])) jsErrors.splice(i, 1);
+    const okP = !R.error && R.forgotLink && /כתבו קודם את כתובת המייל/.test(R.askEmail)
+      && /נשלח אליו קישור/.test(R.sent) && R.recover0 && R.recover0.email === 'boss@fillo.test' && R.recover0.redirect === R.pageUrl
+      && /מנהל\/ת המחלקה/.test(R.refused) && /איפוס סיסמה/.test(R.refused)
+      && JSON.stringify(R.adminButtons) === JSON.stringify(['clerk@fillo.test', 'nouser@fillo.test'])
+      && R.setup.sql && R.setup.steps && R.adminFieldVisible && R.clerkPwAfterReset === 'Temp-1234'
+      && /עוד אין משתמש/.test(R.noUser)
+      && R.clerkNoResetButtons && R.ownMasked && /לא זהות/.test(R.mismatch) && R.clerkPwOwn === 'Mine-5678' && R.clerkSignedIn === 'clerk@fillo.test'
+      && R.link.hash === '' && R.link.user === 'clerk@fillo.test' && !R.link.gate && /סיסמה חדשה/.test(R.link.head) && R.clerkPwLink === 'Reset-9999'
+      && /פג תוקף/.test(R.expired.status) && R.expired.hash === '' && !errs2.length;
+    if (!okP) console.log('  [passwords debug]', JSON.stringify(R), JSON.stringify(errs2));
+    check('🔑 passwords: "שכחתי סיסמה" sends a link back to this page (or says the admin resets it when mail is refused); the admin resets a member\'s password (one-time setup offered); the member changes it in the personal area; a reset link signs in, asks for a new password, leaves no token behind; an expired link says so', okP);
+  }
+
   // ===== the first sign-in on a computer that already holds work =====
   // The desktop holds layouts, a profile, certificates and a serial counter;
   // the account already holds others in the cloud. Signing in must keep

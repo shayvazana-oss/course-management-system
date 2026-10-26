@@ -1304,3 +1304,9 @@ body.gate-locked #loginModal { pointer-events: auto; }
 .asset.pick:has(input:not(:checked)) img { opacity: .45; }
 @media (max-width: 520px) { .team-pick { grid-template-columns: 1fr 1fr; } }
 .dept-team { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; margin: 4px 0 8px; }
+
+/* passwords: "שכחתי סיסמה", the admin's reset, the one-time setup */
+.acct-forgot { align-self: flex-start; margin-top: 8px; background: none; border: none; padding: 2px 0; color: var(--brand, #1e4e8c); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
+.acct-forgot:hover { color: var(--ink, #111); }
+.pw-steps { margin: 0; padding-inline-start: 20px; font-size: 13px; line-height: 1.7; }
+.pw-sql { width: 100%; min-height: 170px; font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; resize: vertical; border: 1px solid var(--line-2, #ccd); border-radius: 8px; padding: 8px; background: var(--surface-2, #f6f6f8); color: var(--ink, #111); }

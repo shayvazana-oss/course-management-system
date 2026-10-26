@@ -114,6 +114,45 @@
   }
   function signOut() { saveSession(null); loadedFor = null; }
 
+  // ---- "שכחתי סיסמה" ------------------------------------------------------
+  // The server e-mails a one-time link that comes back to this page as
+  // #access_token=…&type=recovery (or #error=… when it expired). NB: the
+  // project's built-in mailer only reaches the Supabase team's own addresses
+  // (2 an hour) — for clerks the department admin resets the password
+  // instead (dept.setPassword), or a custom SMTP is set up (SUPABASE.md §5).
+  async function recover(email, redirectTo) {
+    const res = await api('/auth/v1/recover' + (redirectTo ? '?redirect_to=' + encodeURIComponent(redirectTo) : ''), { method: 'POST', body: { email } });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error_code || j.msg || j.error_description || ('HTTP_' + res.status)); }
+    return true;
+  }
+  // → null | {error, description} | {type, access_token, refresh_token, expires_in}
+  // (the tokens leave the address bar at once — never in history or a bookmark)
+  function readRedirect() {
+    const h = String(root.location.hash || '').replace(/^#/, '');
+    if (!/(^|&)(access_token|error|error_code)=/.test(h)) return null;
+    const p = new URLSearchParams(h);
+    try { root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) {}
+    if (p.get('error') || p.get('error_code')) return { error: p.get('error_code') || p.get('error'), description: p.get('error_description') || '' };
+    return { type: p.get('type') || '', access_token: p.get('access_token'), refresh_token: p.get('refresh_token'), expires_in: +p.get('expires_in') || 3600 };
+  }
+  async function adoptTokens(t) {
+    if (!t || !t.access_token) throw new Error('BAD_LINK');
+    const c = cfg();
+    const res = await fetch(c.url + '/auth/v1/user', { headers: { apikey: c.anonKey, Authorization: 'Bearer ' + t.access_token } });
+    const u = await res.json().catch(() => null);
+    if (!res.ok || !u || !u.id) throw new Error('BAD_LINK');
+    saveSession({ access_token: t.access_token, refresh_token: t.refresh_token, expires_at: Date.now() + (t.expires_in || 3600) * 1000, user: u });
+    loadedFor = null;
+    return true;
+  }
+  async function updatePassword(password) {
+    if (!(await ensureFresh())) throw new Error('NO_SESSION');
+    const res = await api('/auth/v1/user', { method: 'PUT', auth: true, body: { password } });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error_code || j.msg || j.error_description || ('HTTP_' + res.status));
+    return true;
+  }
+
   // ---- vault (the user's data row) ---------------------------------------
   // Everything the app persists locally (the pfs: store) is mirrored as one
   // jsonb blob per user. Excludes account/session keys themselves.
@@ -318,6 +357,10 @@
       return rest('/rest/v1/dept_members', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: { email: String(email).trim().toLowerCase(), role: 'member', added_by: me() } });
     },
     async removeMember(email) { return rest('/rest/v1/dept_members?email=eq.' + encodeURIComponent(String(email).toLowerCase()), { method: 'DELETE' }); },
+    // the admin sets a new password for a member who forgot theirs (no e-mail
+    // needed); the server function checks that the caller is the admin and
+    // the person is in the department — SUPABASE.md §5
+    async setPassword(email, password) { return !!(await rest('/rest/v1/rpc/dept_set_password', { method: 'POST', body: { p_email: String(email).trim().toLowerCase(), p_password: password } })); },
     async listBatches() {
       const rows = await rest('/rest/v1/dept_batches?select=id,data,created_by,created_at&order=created_at.asc', { headers: { Accept: 'application/json' } });
       return (rows || []).map((r) => Object.assign({}, r.data || {}, { id: r.id, by: r.created_by, shared: true }));
@@ -380,5 +423,5 @@
   };
 
   PFS.account = {
-    dept, _mergeData: mergeData, cfg, configured, authed, user, signUp, signIn, signOut, refresh, loadVault, saveVault, vaultLoaded: () => vaultLoaded(), noteLocalChange: () => noteLocalChange(), hasUnsynced: () => hasUnsynced(), putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
+    dept, _mergeData: mergeData, cfg, configured, authed, user, signUp, signIn, signOut, refresh, recover, readRedirect, adoptTokens, updatePassword, loadVault, saveVault, vaultLoaded: () => vaultLoaded(), noteLocalChange: () => noteLocalChange(), hasUnsynced: () => hasUnsynced(), putFile, getFile, deleteFile, fileIndex, _localData: localData, _saveSessionCfg: (o) => store.set(OVER, o) };
 })(window);

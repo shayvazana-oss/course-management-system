@@ -326,7 +326,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certWrapLines: (m, t, r) => certWrapLines(m, t, r), certPageRatio: (p) => certPageRatio(p), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveRecords: (b) => certArchiveRecords(b), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), assets, teamRefresh: () => teamRefresh(), openTeamShare: () => openTeamShare(), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certWrapLines: (m, t, r) => certWrapLines(m, t, r), certPageRatio: (p) => certPageRatio(p), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveRecords: (b) => certArchiveRecords(b), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), assets, teamRefresh: () => teamRefresh(), openTeamShare: () => openTeamShare(), openPasswordDialog: (o) => openPasswordDialog(o), acctFromLink: (l) => acctFromLink(l), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -4777,7 +4777,7 @@ function renderDeptPanel(host) {
   else {
     h += '<div class="hint" style="color:var(--ok,#1a7f4b);font-weight:600">✓ ' + (dept.role === 'admin' ? 'מנהל/ת המחלקה' : 'חבר/ה במחלקה') + ' · ' + dept.batches.length + ' מחזורים במאגר המשותף</div>';
     h += '<div class="dept-members">' + dept.members.map((m) => '<div class="dept-m"><bdi dir="ltr">' + esc(m.email) + '</bdi><span>' + (m.role === 'admin' ? 'מנהל/ת' : 'חבר/ה') + '</span>' +
-      (dept.role === 'admin' && m.email !== deptMe() ? '<button class="btn sm ghost" data-rm="' + esc(m.email) + '" title="הסרה מהמחלקה">הסר</button>' : '') + '</div>').join('') + '</div>';
+      (dept.role === 'admin' && m.email !== deptMe() ? '<button class="btn sm ghost" data-pw="' + esc(m.email) + '" title="סיסמה חדשה למי ששכח/ה — בלי מייל">איפוס סיסמה</button><button class="btn sm ghost" data-rm="' + esc(m.email) + '" title="הסרה מהמחלקה">הסר</button>' : '') + '</div>').join('') + '</div>';
     const tN = teamCount(), tMine = teamCount(deptMe());
     h += '<div class="dept-team"><button class="btn sm" id="deptShareAssets">👥 ' + (tMine ? 'עדכון הנכסים ששיתפתי עם הצוות' : 'שיתוף החתימות והנכסים שלי עם הצוות') + '</button>' +
       '<span class="hint muted">' + (tN ? tN + ' נכסים משותפים לצוות' : 'חתימות, חותמות וקטעים — יופיעו אצל כל חברי המחלקה') + '</span></div>';
@@ -4801,6 +4801,7 @@ function renderDeptPanel(host) {
     try { await ACCT().dept.addMember(em); PFS.toast('✓ ' + em + ' נוסף/ה למחלקה', 'ok'); } catch (e) { PFS.toast('ההוספה נכשלה: ' + (e.message || e), 'err'); }
     await deptRefresh(); renderDeptPanel(host);
   });
+  host.querySelectorAll('[data-pw]').forEach((b) => b.addEventListener('click', () => openPasswordDialog({ mode: 'admin', email: b.dataset.pw })));
   host.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', async () => {
     if (!(await PFS.ui.confirm('הסרה מהמחלקה', 'להסיר את ' + b.dataset.rm + ' מהמחלקה? המחזורים שהפיק/ה נשארים במאגר.'))) return;
     try { await ACCT().dept.removeMember(b.dataset.rm); } catch (e) { PFS.toast('ההסרה נכשלה: ' + (e.message || e), 'err'); }
@@ -4875,12 +4876,13 @@ async function openMe() {
     '<div class="me-sec">ההפקות האחרונות שלי</div>' +
     (recentB.length ? '<div class="me-list">' + recentB.map((b) => '<button type="button" class="me-row" data-key="' + esc(String(certBatchCourse(b) || '').trim() + '|' + String(b.code || '').trim()) + '"><b>' + esc(certBatchCourse(b) || 'ללא שם קורס') + '</b><span>' + certBidiJoin([b.code || '', certDateHe(certBatchDate(b)), (b.count || 0) + ' תעודות']) + '</span></button>').join('') + '</div>'
       : '<div class="hint muted">עדיין לא הפקת תעודות.</div>') +
-    '<div class="me-actions"><button type="button" class="btn sm" id="meCert">הנפקת תעודות</button><button type="button" class="btn sm" id="meArch">מאגר התעודות</button><button type="button" class="btn sm" id="meLib">המאגר שלי</button></div>' +
+    '<div class="me-actions"><button type="button" class="btn sm" id="meCert">הנפקת תעודות</button><button type="button" class="btn sm" id="meArch">מאגר התעודות</button><button type="button" class="btn sm" id="meLib">המאגר שלי</button><button type="button" class="btn sm ghost" id="mePw">שינוי סיסמה</button></div>' +
     '<div class="dept-panel me-dept"></div>';
   body.querySelector('#meRename').addEventListener('click', meAskName);
   body.querySelectorAll('.me-row').forEach((r) => r.addEventListener('click', () => { back.classList.remove('show'); openCertArchive(r.dataset.key); }));
   body.querySelector('#meCert').addEventListener('click', () => { back.classList.remove('show'); showCertIntro(); });
   body.querySelector('#meArch').addEventListener('click', () => { back.classList.remove('show'); openCertArchive(); });
+  body.querySelector('#mePw').addEventListener('click', () => openPasswordDialog({ mode: 'change' }));
   body.querySelector('#meLib').addEventListener('click', () => { back.classList.remove('show'); const b = $('libBtn'); b && b.click(); });
   const dh = body.querySelector('.me-dept'); renderDeptPanel(dh);
   if (!dept.loaded) deptRefresh().then(() => renderDeptPanel(dh));
@@ -6845,8 +6847,21 @@ function renderAccount(target) {
   body.innerHTML = '<div class="field"><label>אימייל</label><input id="acctEmail" type="email" dir="ltr" placeholder="you@email.com" autocomplete="username" /></div>' +
     '<div class="field"><label>סיסמה</label><input id="acctPass" type="password" dir="ltr" placeholder="לפחות 6 תווים" autocomplete="current-password" /></div>' +
     '<div class="row"><button class="btn sm primary" id="acctIn" style="flex:1">התחבר</button><button class="btn sm" id="acctUp" style="flex:1">הרשמה</button></div>' +
+    '<button type="button" class="acct-forgot" id="acctForgot">שכחתי סיסמה</button>' +
     '<div class="hint acct-status" style="margin-top:6px"></div>';
   const email = () => q('acctEmail').value.trim(), pass = () => q('acctPass').value;
+  q('acctForgot').addEventListener('click', async () => {
+    const em = email();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { acctStatus('כתבו קודם את כתובת המייל שלכם, ואז לחצו שוב על "שכחתי סיסמה".', 'err'); q('acctEmail').focus(); return; }
+    if (acctBusy) return; acctBusy = true; acctStatus('שולח קישור לאיפוס…');
+    try {
+      await ACCT().recover(em, location.origin + location.pathname);
+      acctStatus('✓ אם קיים חשבון עם המייל הזה, נשלח אליו קישור לבחירת סיסמה חדשה. לא הגיע בתוך כמה דקות? מנהל/ת המחלקה יכול/ה לאפס לך סיסמה מתוך Fillo.', 'ok');
+    } catch (e) {
+      // the built-in mailer reaches only the Supabase team's own addresses
+      acctStatus('לא ניתן לשלוח מייל איפוס כרגע. בקשו ממנהל/ת המחלקה לאפס לכם סיסמה: באזור האישי ← מחלקת תעודות ← "איפוס סיסמה" ליד המייל שלכם.', 'err');
+    } finally { acctBusy = false; }
+  });
   q('acctIn').addEventListener('click', async () => {
     if (acctBusy) return; acctBusy = true; acctStatus('מתחבר…');
     try { await ACCT().signIn(email(), pass()); await acctAfterAuth(); }
@@ -6860,6 +6875,102 @@ function renderAccount(target) {
     catch (e) { acctStatus(/already/i.test(e.message) ? 'האימייל כבר רשום — התחברו' : ('ההרשמה נכשלה: ' + e.message), 'err'); }
     finally { acctBusy = false; }
   });
+}
+/* ---- passwords: a new one after a reset link, a change, or the admin's
+ * reset of a member who forgot theirs (no e-mail needed). The admin types a
+ * temporary password in plain sight — it is said aloud or sent to the person —
+ * whose own entry is masked and typed twice. */
+const PW_ERR = {
+  same_password: 'זו הסיסמה הקיימת — בחרו סיסמה אחרת.',
+  weak_password: 'הסיסמה חלשה מדי — לפחות 6 תווים.',
+  reauthentication_needed: 'מטעמי אבטחה: התנתקו, התחברו שוב ואז שנו את הסיסמה.',
+  NO_SESSION: 'החיבור פג — התחברו שוב.'
+};
+function openPasswordDialog(opts) {
+  const o = opts || {}, forOther = o.mode === 'admin';
+  let back = $('pwModal');
+  if (!back) {
+    back = document.createElement('div'); back.className = 'modal-back'; back.id = 'pwModal';
+    back.innerHTML = '<div class="modal" style="max-width:420px"><header id="pwHead"></header><div class="m-body" id="pwBody"></div>' +
+      '<footer><button class="btn primary" id="pwOk">שמירה</button><button class="btn ghost" id="pwCancel">ביטול</button></footer></div>';
+    back.addEventListener('pointerdown', (e) => { if (e.target === back) back.classList.remove('show'); });
+    back.querySelector('#pwCancel').addEventListener('click', () => back.classList.remove('show'));
+  }
+  document.body.appendChild(back);   // above the window it was opened from
+  const me = deptMe();
+  back.querySelector('#pwHead').textContent = forOther ? '🔑 איפוס סיסמה' : o.mode === 'recovery' ? '🔑 בחירת סיסמה חדשה' : '🔑 שינוי סיסמה';
+  const body = back.querySelector('#pwBody');
+  body.innerHTML = (forOther
+    ? '<div class="hint">סיסמה חדשה ל־<b dir="ltr">' + escH(o.email) + '</b>. מסרו לה/לו את הסיסמה — אחרי הכניסה אפשר להחליף אותה באזור האישי.</div>' +
+      '<div class="field"><label>סיסמה זמנית</label><input id="pw1" type="text" dir="ltr" autocomplete="off" placeholder="לפחות 6 תווים" /></div>'
+    : '<div class="hint">' + (o.mode === 'recovery' ? 'נכנסת דרך הקישור לאיפוס' : 'מחובר/ת') + ' כ־<b dir="ltr">' + escH(me) + '</b>. בחרו סיסמה חדשה:</div>' +
+      '<div class="field"><label>סיסמה חדשה</label><input id="pw1" type="password" dir="ltr" autocomplete="new-password" placeholder="לפחות 6 תווים" /></div>' +
+      '<div class="field"><label>שוב, לאימות</label><input id="pw2" type="password" dir="ltr" autocomplete="new-password" /></div>') +
+    '<div class="hint pw-status"></div>';
+  const st = (t, kind) => { const el = body.querySelector('.pw-status'); el.textContent = t; el.style.color = kind === 'err' ? 'var(--warn)' : 'var(--ink-3)'; };
+  const ok = back.querySelector('#pwOk');
+  ok.onclick = async () => {
+    const p1 = body.querySelector('#pw1').value, p2 = body.querySelector('#pw2') ? body.querySelector('#pw2').value : p1;
+    if (p1.length < 6) { st('לפחות 6 תווים.', 'err'); return; }
+    if (p1 !== p2) { st('שתי הסיסמאות לא זהות.', 'err'); return; }
+    ok.disabled = true; st('שומר…');
+    try {
+      if (forOther) {
+        const done = await ACCT().dept.setPassword(o.email, p1);
+        if (!done) { st('ל־' + o.email + ' עוד אין משתמש. פותחים אותו ב־Supabase: Authentication ← Users ← Add user.', 'err'); return; }
+        back.classList.remove('show');
+        PFS.toast('✓ הסיסמה של ' + o.email + ' עודכנה. מסרו לה/לו את הסיסמה החדשה', 'ok', 7000);
+      } else {
+        await ACCT().updatePassword(p1);
+        back.classList.remove('show');
+        PFS.toast('✓ הסיסמה עודכנה — מעכשיו נכנסים איתה', 'ok', 5000);
+      }
+    } catch (e) {
+      const m = e.message || String(e);
+      if (forOther && m === 'DEPT_NOT_INSTALLED') { back.classList.remove('show'); openPwSetup(); return; }
+      st(PW_ERR[m] || ('השמירה נכשלה (' + m + ') — בדקו חיבור ונסו שוב.'), 'err');
+    } finally { ok.disabled = false; }
+  };
+  body.querySelectorAll('input').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok.click(); }));
+  back.classList.add('show');
+  setTimeout(() => { const f = body.querySelector('#pw1'); f && f.focus(); }, 50);
+}
+// the admin's reset needs one server function, installed once (SUPABASE.md §5)
+const PW_SQL = `-- Fillo: the department's admin resets a member's password (no e-mail needed)
+create or replace function public.dept_set_password(p_email text, p_password text) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare n int;
+begin
+  if not public.dept_is_admin() then raise exception 'only the department admin can reset passwords'; end if;
+  if length(coalesce(p_password, '')) < 6 then raise exception 'password too short'; end if;
+  if not exists (select 1 from public.dept_members where email = lower(p_email)) then raise exception 'not a department member'; end if;
+  update auth.users set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')), updated_at = now()
+    where lower(email) = lower(p_email);
+  get diagnostics n = row_count;
+  return n > 0;
+end $$;
+revoke all on function public.dept_set_password(text, text) from public, anon;
+grant execute on function public.dept_set_password(text, text) to authenticated;`;
+function openPwSetup() {
+  let back = $('pwSetupModal');
+  if (!back) {
+    back = document.createElement('div'); back.className = 'modal-back'; back.id = 'pwSetupModal';
+    back.innerHTML = '<div class="modal" style="max-width:560px"><header>🔑 הפעלת איפוס סיסמה — פעם אחת</header><div class="m-body">' +
+      '<div class="hint">כדי שתוכלו לאפס סיסמה לעובד/ת בלי מייל, צריך להוסיף לשרת פונקציה אחת. זה נעשה פעם אחת בלבד:</div>' +
+      '<ol class="pw-steps"><li>נכנסים ל־<b dir="ltr">supabase.com</b> ← הפרויקט של Fillo ← <b dir="ltr">SQL Editor</b> ← <b dir="ltr">New query</b></li><li>לוחצים כאן "העתקת הקוד", מדביקים שם ולוחצים <b dir="ltr">Run</b></li><li>חוזרים לכאן ולוחצים שוב "איפוס סיסמה"</li></ol>' +
+      '<textarea id="pwSql" class="pw-sql" dir="ltr" readonly></textarea></div>' +
+      '<footer><button class="btn primary" id="pwSqlCopy">העתקת הקוד</button><button class="btn ghost" id="pwSqlClose">סגור</button></footer></div>';
+    back.addEventListener('pointerdown', (e) => { if (e.target === back) back.classList.remove('show'); });
+    back.querySelector('#pwSqlClose').addEventListener('click', () => back.classList.remove('show'));
+    back.querySelector('#pwSqlCopy').addEventListener('click', async () => {
+      const ta = back.querySelector('#pwSql');
+      try { await navigator.clipboard.writeText(ta.value); } catch (e) { ta.select(); try { document.execCommand('copy'); } catch (e2) {} }
+      PFS.toast('✓ הקוד הועתק — הדביקו אותו ב־SQL Editor ולחצו Run', 'ok', 5000);
+    });
+  }
+  back.querySelector('#pwSql').value = PW_SQL;
+  document.body.appendChild(back);
+  back.classList.add('show');
 }
 // after sign-in: a DIFFERENT person than the last one on this computer gets
 // a clean slate first (never inherit someone else's forms or history), then
@@ -6950,12 +7061,35 @@ async function acctSignOut() {
 }
 async function acctAutoLoadOnStart() {
   if (!ACCT().configured()) { renderAccount(); return; }
+  const link = ACCT().readRedirect();
+  if (link) { await acctFromLink(link); return; }
   if (!ACCT().authed()) { renderAccount(); if (loginRequired()) showLoginGate(); return; }
   try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {}
   await cloudHydrate();
   await cloudBackfill();
   await deptRefresh();
   renderAccount();
+}
+// a link from an e-mail (password reset, account confirmation) came back here
+async function acctFromLink(link) {
+  if (link.error) {
+    if (ACCT().authed()) { try { if (await ACCT().loadVault()) refreshAllFromStore(); } catch (e) {} await deptRefresh(); renderAccount(); }
+    else { renderAccount(); showLoginGate(); }
+    const msg = /expired|otp/i.test(link.error + ' ' + link.description) ? 'הקישור לאיפוס הסיסמה פג תוקף או כבר נוצל — בקשו קישור חדש ("שכחתי סיסמה").' : 'הקישור לא תקין — בקשו קישור חדש ("שכחתי סיסמה").';
+    acctStatus(msg, 'err'); PFS.toast(msg, 'err', 8000);
+    return;
+  }
+  // whoever was signed in on this computer keeps what they had not saved yet
+  if (ACCT().authed() && ACCT().hasUnsynced()) { try { await ACCT().loadVault({ merge: true }); await ACCT().saveVault(); } catch (e) {} }
+  try { await ACCT().adoptTokens(link); }
+  catch (e) {
+    renderAccount(); if (loginRequired()) showLoginGate();
+    acctStatus('הקישור לא תקין או שפג תוקפו — בקשו קישור חדש ("שכחתי סיסמה").', 'err');
+    return;
+  }
+  await acctAfterAuth();
+  // (an invitation sent from Supabase lands the same way: the person picks their password)
+  if (link.type === 'recovery' || link.type === 'invite') openPasswordDialog({ mode: 'recovery' });
 }
 acctAutoLoadOnStart();
 

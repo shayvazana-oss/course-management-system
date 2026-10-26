@@ -170,6 +170,42 @@ create policy "dept docs: update" on storage.objects for update
 המנהל/ת"**, ומוסיפים שם את המייל של כל עובד. עובד שנכנס עם המשתמש שלו רואה מיד
 את המאגר המשותף. מחזורים שהופקו קודם במחשב של המנהל עוברים למאגר המחלקה לבד.
 
+## 5. סיסמאות — "שכחתי סיסמה" ואיפוס על ידי המנהל/ת
+במסך הכניסה יש **"שכחתי סיסמה"**: השרת שולח למייל קישור שחוזר לפילו, ושם
+בוחרים סיסמה חדשה. שני תנאים בצד של Supabase:
+- **Authentication → URL Configuration**: ב־**Site URL** ובתוך **Redirect URLs**
+  שמים את הכתובת של פילו (`https://shayvazana-oss.github.io/course-management-system/`).
+  בלי זה הקישור שבמייל מוביל לכתובת שגויה.
+- שירות המייל המובנה של Supabase שולח **רק לחברי הצוות של הפרויקט ב־Supabase,
+  ועד 2 מיילים בשעה**. כדי שגם עובדים יקבלו מייל איפוס, מחברים שירות מייל משלכם:
+  **Authentication → Emails → SMTP Settings** (למשל Brevo או SendGrid).
+
+גם בלי מייל: **מנהל/ת המחלקה מאפס/ת סיסמה מתוך פילו**. באזור האישי, ליד כל
+חבר/ת מחלקה, יש "איפוס סיסמה": מקלידים סיסמה זמנית ומוסרים אותה לעובד/ת, ואחרי
+הכניסה הוא/היא מחליף/ה אותה ("שינוי סיסמה" באזור האישי). לשם כך מריצים פעם
+אחת ב־**SQL Editor** את הקוד הבא. פילו גם מציע להעתיק אותו בלחיצה ראשונה על
+"איפוס סיסמה":
+
+```sql
+-- Fillo: the department's admin resets a member's password (no e-mail needed)
+create or replace function public.dept_set_password(p_email text, p_password text) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare n int;
+begin
+  if not public.dept_is_admin() then raise exception 'only the department admin can reset passwords'; end if;
+  if length(coalesce(p_password, '')) < 6 then raise exception 'password too short'; end if;
+  if not exists (select 1 from public.dept_members where email = lower(p_email)) then raise exception 'not a department member'; end if;
+  update auth.users set encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')), updated_at = now()
+    where lower(email) = lower(p_email);
+  get diagnostics n = row_count;
+  return n > 0;
+end $$;
+revoke all on function public.dept_set_password(text, text) from public, anon;
+grant execute on function public.dept_set_password(text, text) to authenticated;
+```
+
+הפונקציה עובדת רק כשמי שמפעיל אותה הוא מנהל/ת המחלקה, ורק על מי שחבר/ה במחלקה.
+
 ## מה נשמר לכל משתמש
 - כל מה שפילו לומד: פרטי המכללה/פרופילים, מיקומי שדות לכל טופס, חתימות וחותמות,
   קורסים ותיקי קורס, יומן התעודות ומספור התעודות.

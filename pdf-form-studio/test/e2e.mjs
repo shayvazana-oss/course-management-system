@@ -6254,6 +6254,88 @@ async function main() {
     check('🏢 department: the admin sets it up (her earlier batch moves in) and adds a clerk; the clerk sees and re-prints the admin\'s batches from the shared format, numbers never collide, she cannot delete the admin\'s batch, a duplicate is flagged; an outsider sees nothing', okD);
   }
 
+  // ===== handing signatures + stamps to a colleague as a FILE (no account) =====
+  // "איך אני מעביר את זה לאביה?" — the full backup file carried the sign-in
+  // session (restoring it on her computer signed her in AS the sender, and
+  // replaced her own profile and layouts). The assets file carries only
+  // signatures and stamps; importing adds to hers (nothing replaced, her ⭐
+  // stays, duplicates and bad items skipped, the cap respected); and the
+  // backup no longer carries — or restores — a session.
+  {
+    const png = (txt) => page.evaluate((t) => { const c = document.createElement('canvas'); c.width = 240; c.height = 80; const g = c.getContext('2d'); g.font = '34px serif'; g.fillText(t, 12, 52); return c.toDataURL('image/png'); }, txt);
+    const [s1, s2, st1, mine1] = [await png('Sig One'), await png('Sig Two'), await png('STAMP'), await png('Avia own')];
+    const R = {};
+    const grab = () => page.evaluate(() => { window.__out = []; window.__toasts = []; window.PFS.__realDeliver = window.PFS.__realDeliver || window.PFS.deliver.file; window.PFS.deliver.file = (d, n, m) => { window.__out.push({ d: String(d), n, m }); }; window.PFS.__realToast = window.PFS.__realToast || window.PFS.toast; window.PFS.toast = (m, k) => { window.__toasts.push(m); }; });
+    const state = () => page.evaluate(() => ({ sig: window.PFS.__test.assets.own('signature').map((x) => x.url.slice(-40)), stamp: window.PFS.__test.assets.own('stamp').length, defSig: (window.PFS.__test.assets.getDefault('signature') || {}).url, lastToast: (window.__toasts || []).slice(-1)[0] || '' }));
+    const feed = async (sel, name, text) => { await page.setInputFiles(sel, { name, mimeType: 'application/json', buffer: Buffer.from(text) }); await page.waitForTimeout(350); };
+    try {
+      // the sender: two signatures (the second is ⭐), a stamp — and, in the same browser, a session, a sync code and a profile
+      await page.evaluate(async ({ s1, s2, st1 }) => {
+        const T = window.PFS.__test, A = T.assets, S = window.PFS.store;
+        ['signatures', 'stamps', 'clips', 'default_signature', 'default_stamp', 'default_clip'].forEach((k) => S.remove(k));
+        A.add('signature', { url: s1, w: 240, h: 80 }); const b = A.add('signature', { url: s2, w: 240, h: 80 }); A.setDefault('signature', b.id);
+        A.add('stamp', { url: st1, w: 240, h: 80 });
+        S.set('acct:session', { access_token: 'SECRET-ACCESS-TOKEN', refresh_token: 'SECRET-REFRESH-TOKEN', user: { id: 'u1', email: 'me@x.test' } });
+        S.set('sync:cfg', { code: 'SECRET-SYNC-CODE' });
+        S.set('profiles', [{ id: 'p', name: 'me', values: { 'תעודת זהות': '123456782' } }]);
+      }, { s1, s2, st1 });
+      await grab();
+      await page.evaluate(() => document.getElementById('assetsExportBtn').click()); await page.waitForTimeout(300);
+      R.file = await page.evaluate(() => window.__out[0] || null);
+      const parsed = R.file ? JSON.parse(R.file.d) : null;
+      R.exp = parsed && { type: parsed.type, kinds: parsed.items.map((x) => x.kind).sort().join(), def: parsed.items.filter((x) => x.def).length, name: R.file.n, leak: /SECRET|123456782|acct:|access_token|profiles/.test(R.file.d) };
+      // the full backup: no session, no sync code — but the assets and the profile are in
+      await page.evaluate(() => document.getElementById('backupExportBtn').click()); await page.waitForTimeout(300);
+      const bk = await page.evaluate(() => window.__out[1] || null);
+      const bkd = bk && JSON.parse(bk.d).data;
+      R.backup = bkd && { session: 'pfs:acct:session' in bkd, sync: 'pfs:sync:cfg' in bkd, sig: 'pfs:signatures' in bkd, prof: 'pfs:profiles' in bkd, leak: /SECRET/.test(bk.d) };
+      // an old backup file that DOES hold a session must not sign this browser in as someone else
+      await page.evaluate(() => window.PFS.store.set('acct:session', { access_token: 'MINE', refresh_token: 'MINE', user: { id: 'mine' } }));
+      await feed('#backupFile', 'old.json', JSON.stringify({ app: 'pdf-form-studio', type: 'backup', data: { 'pfs:acct:session': JSON.stringify({ access_token: 'SOMEONE-ELSE', user: { id: 'x' } }), 'pfs:sync:cfg': JSON.stringify({ code: 'THEIRS' }), 'pfs:note_kept': JSON.stringify('ok') } }));
+      R.restore = await page.evaluate(() => ({ session: (window.PFS.store.get('acct:session', {}) || {}).access_token, sync: (window.PFS.store.get('sync:cfg', null) || {}).code || null, other: window.PFS.store.get('note_kept', null) }));
+      // the receiver (Avia): her own signature (⭐) and nothing else
+      await page.evaluate(async ({ mine1 }) => {
+        const A = window.PFS.__test.assets, S = window.PFS.store;
+        ['signatures', 'stamps', 'clips', 'default_signature', 'default_stamp', 'default_clip'].forEach((k) => S.remove(k));
+        S.remove('acct:session'); S.remove('sync:cfg'); S.set('profiles', [{ id: 'q', name: 'Avia', values: {} }]);
+        A.add('signature', { url: mine1, w: 240, h: 80 });
+      }, { mine1 });
+      R.avia0 = await state();
+      await feed('#assetsImportFile', 'fillo.json', R.file.d);
+      R.avia1 = await state();
+      R.profileKept = await page.evaluate(() => (window.PFS.store.get('profiles', [])[0] || {}).name);
+      await feed('#assetsImportFile', 'fillo.json', R.file.d);        // again: nothing twice
+      R.avia2 = await state();
+      // bad files
+      await feed('#assetsImportFile', 'junk.json', 'not json at all'); R.junk = (await state()).lastToast;
+      await feed('#assetsImportFile', 'bk.json', JSON.stringify({ type: 'backup', data: {} })); R.asBackup = (await state()).lastToast;
+      await feed('#assetsImportFile', 'evil.json', JSON.stringify({ type: 'assets', items: [{ kind: 'signature', url: 'javascript:alert(1)' }, { kind: 'signature', url: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' }, { kind: 'signature', url: 'https://evil.test/x.png' }, { kind: 'script', url: s1 }] }));
+      R.evil = await state();
+      // a full shelf: the receiver's own are never pushed out
+      await page.evaluate(() => {
+        const A = window.PFS.__test.assets, S = window.PFS.store;
+        ['signatures', 'stamps', 'default_signature', 'default_stamp'].forEach((k) => S.remove(k));
+        for (let i = 0; i < 24; i++) { const c = document.createElement('canvas'); c.width = i + 2; c.height = 2; A.add('signature', { url: c.toDataURL('image/png'), w: i + 2, h: 2 }); }
+      });
+      R.fullBefore = await page.evaluate(() => ({ n: window.PFS.__test.assets.own('signature').length, first: window.PFS.__test.assets.own('signature')[0].url.slice(-30) }));
+      await feed('#assetsImportFile', 'fillo.json', R.file.d);
+      R.full = await state(); R.fullToast = R.full.lastToast;
+      R.fullFirst = await page.evaluate(() => window.PFS.__test.assets.own('signature')[0].url.slice(-30));
+    } catch (e) { R.error = String(e && e.message || e); }
+    await page.evaluate(() => { if (window.PFS.__realDeliver) window.PFS.deliver.file = window.PFS.__realDeliver; if (window.PFS.__realToast) window.PFS.toast = window.PFS.__realToast; const S = window.PFS.store; ['signatures', 'stamps', 'clips', 'default_signature', 'default_stamp', 'default_clip', 'acct:session', 'sync:cfg', 'note_kept'].forEach((k) => S.remove(k)); S.set('profiles', []); window.PFS.__test.assets.renderAll(); });
+    const okA = !R.error && R.exp && R.exp.type === 'assets' && R.exp.kinds === 'signature,signature,stamp' && R.exp.def === 2 && /\.json$/.test(R.exp.name) && !R.exp.leak
+      && R.backup && !R.backup.session && !R.backup.sync && R.backup.sig && R.backup.prof && !R.backup.leak
+      && R.restore.session === 'MINE' && R.restore.sync === 'SECRET-SYNC-CODE' && R.restore.other === 'ok'   // the file's own session / sync code are ignored, the rest is restored
+      && R.avia0.sig.length === 1 && R.avia0.stamp === 0
+      && R.avia1.sig.length === 3 && R.avia1.stamp === 1 && R.avia1.sig[0] === R.avia0.sig[0] && R.avia1.defSig === R.avia0.defSig && R.profileKept === 'Avia'
+      && R.avia2.sig.length === 3 && R.avia2.stamp === 1 && /כבר היו אצלך/.test(R.avia2.lastToast)
+      && /לא קובץ חתימות|לא קובץ/.test(R.junk) && /גיבוי מלא/.test(R.asBackup)
+      && R.evil.sig.length === 3 && R.evil.stamp === 1 && /לא תקינים/.test(R.evil.lastToast)
+      && R.fullBefore.n === 24 && R.full.sig.length === 24 && R.full.stamp === 1 && R.fullFirst === R.fullBefore.first && /לא נכנסו/.test(R.fullToast);
+    if (!okA) console.log('  [assets file debug]', JSON.stringify(Object.assign({}, R, { file: R.file && { n: R.file.n, len: R.file.d.length } }), (k, v) => (typeof v === 'string' && v.length > 70 ? v.slice(-30) : v)));
+    check('📤 signatures + stamps go to a colleague as a file: only assets in it, importing adds to hers (her ⭐ and own stay, duplicates / bad items / a full shelf handled, nothing else touched); the full backup no longer carries or restores a sign-in session', okA);
+  }
+
   // ===== the team's assets: "תעביר את החתימות והנכסים שלי לשאר היוזרים" =====
   // The admin shares her signatures and stamp with the department in one
   // click; a clerk signing in as herself finds them in her own נכסים tab

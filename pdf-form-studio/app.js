@@ -6625,16 +6625,55 @@ function fillAll() {
   });
   PFS.toast(did.length ? ('מולא: ' + did.join(' + ')) : 'אין תבנית/פרופיל/חתימה תואמים', did.length ? 'ok' : 'err');
 }
+// what a backup file may carry: never the sign-in session (the refresh token
+// signs in as that person) nor the personal-sync code — same rule as the
+// account's own cloud copy and the personal sync
+const backupKeyOk = (k) => k.indexOf('pfs:acct:') !== 0 && k !== 'pfs:sync:cfg';
+// ---- signatures + stamps to a colleague, as a file (no account needed) ----
+function assetsExportFile() {
+  const items = assets.exportable();
+  if (!items.length) { PFS.toast('אין עדיין חתימות או חותמות שמורות לייצוא', 'err', 4500); return; }
+  const data = { app: 'pdf-form-studio', type: 'assets', version: 1, ts: new Date().toISOString(), from: deptMe() || '', items };
+  PFS.deliver.file(JSON.stringify(data), 'fillo-חתימות-וחותמות.json', 'application/json');
+  const s = items.filter((x) => x.kind === 'signature').length, t = items.length - s;
+  PFS.toast('✓ נוצר קובץ עם ' + s + ' חתימות ו־' + t + ' חותמות. שלחו אותו לעמית/ה — זה שימוש בחתימה שלך, כדאי לשלוח רק למי שמורשה', 'ok', 8000);
+}
+async function assetsImportFile(file) {
+  let obj;
+  try {
+    if (file.size > 25 * 1024 * 1024) throw new Error('big');
+    obj = JSON.parse(await file.text());
+  } catch (e) { PFS.toast('זה לא קובץ חתימות וחותמות של Fillo', 'err', 5000); return; }
+  if (!obj || obj.type !== 'assets' || !Array.isArray(obj.items)) {
+    PFS.toast(obj && obj.type === 'backup' ? 'זה קובץ גיבוי מלא, לא קובץ חתימות. את הקובץ הזה מייבאים דרך "גיבוי ושחזור".' : 'זה לא קובץ חתימות וחותמות של Fillo', 'err', 6000);
+    return;
+  }
+  const r = assets.importItems(obj.items);
+  const bits = [];
+  if (r.duplicate) bits.push(r.duplicate + ' כבר היו אצלך');
+  if (r.full) bits.push(r.full + ' לא נכנסו (המאגר מלא — מחקו ישנים)');
+  if (r.invalid) bits.push(r.invalid + ' לא תקינים ודולגו');
+  if (!r.added && !bits.length) { PFS.toast('בקובץ אין חתימות או חותמות', 'err', 4500); return; }
+  PFS.toast((r.added ? '✓ נוספו ' + r.added + ' חתימות/חותמות' : 'לא נוספו נכסים חדשים') + (bits.length ? ' · ' + bits.join(' · ') : ''), r.added ? 'ok' : 'err', 8000);
+}
+$('assetsExportBtn') && $('assetsExportBtn').addEventListener('click', assetsExportFile);
+$('assetsImportBtn') && $('assetsImportBtn').addEventListener('click', () => $('assetsImportFile').click());
+$('assetsImportFile') && $('assetsImportFile').addEventListener('change', (e) => { if (e.target.files[0]) assetsImportFile(e.target.files[0]); e.target.value = ''; });
 function backupExport() {
-  const data = { app: 'pdf-form-studio', type: 'backup', version: 1, ts: new Date().toISOString(), data: PFS.store.dump() };
+  const all = PFS.store.dump(), safe = {};
+  Object.keys(all).forEach((k) => { if (backupKeyOk(k)) safe[k] = all[k]; });
+  const data = { app: 'pdf-form-studio', type: 'backup', version: 1, ts: new Date().toISOString(), data: safe };
   PFS.deliver.file(JSON.stringify(data), 'pdf-form-studio-backup.json', 'application/json');
   PFS.toast('הגיבוי נוצר', 'ok');
 }
 async function backupImport(file) {
   try {
     const obj = JSON.parse(await file.text());
-    const d = obj && obj.data ? obj.data : obj;
-    if (!d || typeof d !== 'object' || !PFS.store.restore(d)) throw new Error('bad');
+    const raw = obj && obj.data ? obj.data : obj;
+    if (!raw || typeof raw !== 'object') throw new Error('bad');
+    // (an older backup may hold a session: restoring it would sign in as someone else)
+    const d = {}; Object.keys(raw).forEach((k) => { if (backupKeyOk(k)) d[k] = raw[k]; });
+    if (!PFS.store.restore(d)) throw new Error('bad');
     assets.renderAll(); templates.render(); renderProfileSelect(); updateHwStatus();
     PFS.toast('השחזור הושלם', 'ok');
   } catch (e) { PFS.toast('קובץ גיבוי לא תקין', 'err'); }

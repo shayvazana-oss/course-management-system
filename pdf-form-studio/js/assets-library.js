@@ -141,10 +141,60 @@
       });
     }
 
+    /* Handing assets to a colleague WITHOUT an account: a small file holding
+     * only signatures and stamps (never the profile, the session or anything
+     * else). Importing ADDS to the receiver's own — duplicates (same image)
+     * are skipped, nothing of theirs is replaced, their ⭐ stays; a ⭐ comes
+     * along only when they have none. */
+    const CAP = { signature: 24, stamp: 24, clip: 8 };
+    const IMG = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+    function exportable() {
+      const out = [];
+      ['signature', 'stamp'].forEach((kind) => {
+        const def = defaultId(kind);
+        own(kind).forEach((x) => {
+          if (!x || typeof x.url !== 'string' || x.url.indexOf('data:image/') !== 0) return;
+          const it = { kind, url: x.url, w: x.w, h: x.h, aspect: x.aspect };
+          if (x.fw && x.fh) { it.fw = x.fw; it.fh = x.fh; }
+          if (x.id === def) it.def = true;
+          out.push(it);
+        });
+      });
+      return out;
+    }
+    // → {added, duplicate, invalid, full}
+    function importItems(items) {
+      const r = { added: 0, duplicate: 0, invalid: 0, full: 0 };
+      if (!Array.isArray(items)) { r.invalid = 1; return r; }
+      ['signature', 'stamp'].forEach((kind) => {
+        const arr = own(kind).slice();
+        let newDef = null;
+        items.filter((x) => x && x.kind === kind).forEach((x) => {
+          if (typeof x.url !== 'string' || !IMG.test(x.url) || x.url.length > 4000000) { r.invalid++; return; }
+          if (arr.some((a) => a.url === x.url)) { r.duplicate++; return; }
+          if (arr.length >= CAP[kind]) { r.full++; return; }
+          const w = +x.w > 0 ? +x.w : 0, h = +x.h > 0 ? +x.h : 0;
+          const item = { id: uid(), url: x.url, w, h, aspect: (w && h) ? w / h : (+x.aspect > 0 ? +x.aspect : 1), ts: Date.now() };
+          if (+x.fw > 0 && +x.fh > 0) { item.fw = +x.fw; item.fh = +x.fh; }
+          arr.push(item);                      // after the receiver's own
+          if (x.def && !newDef) newDef = item.id;
+          r.added++;
+        });
+        save(kind, arr);
+        // the receiver's own ⭐ stays; only with none (or a dangling one) does the sender's come along
+        const cur = defaultId(kind);
+        if (arr.length && !(cur && arr.some((x) => x.id === cur))) store.set(DEF[kind], newDef || arr[0].id);
+      });
+      // items of an unknown kind are not assets
+      items.forEach((x) => { if (!x || (x.kind !== 'signature' && x.kind !== 'stamp')) r.invalid++; });
+      renderAll();
+      return r;
+    }
+
     function renderAll() { render('signature'); render('stamp'); render('clip'); }
     renderAll();
 
-    return { add, remove, list, own, render, renderAll, getDefault, setDefault, setTeam, team: () => team };
+    return { add, remove, list, own, render, renderAll, getDefault, setDefault, setTeam, team: () => team, exportable, importItems };
   }
 
   PFS.createAssetsLibrary = createAssetsLibrary;

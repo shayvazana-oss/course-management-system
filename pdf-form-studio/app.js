@@ -6865,10 +6865,17 @@ function renderAccount(target) {
   q('acctIn').addEventListener('click', async () => {
     if (acctBusy) return; acctBusy = true; acctStatus('מתחבר…');
     try { await ACCT().signIn(email(), pass()); await acctAfterAuth(); }
-    catch (e) { acctStatus((e.message === 'BAD_CREDENTIALS') ? 'אימייל או סיסמה שגויים' : 'ההתחברות נכשלה', 'err'); }
+    catch (e) { acctStatus(signInError(e, email(), pass()), 'err'); }
     finally { acctBusy = false; }
   });
-  q('acctPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') q('acctIn').click(); });
+  q('acctPass').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { q('acctIn').click(); return; }
+    // Caps Lock: said while typing, before a failed attempt
+    const caps = e.getModifierState && e.getModifierState('CapsLock');
+    const st = body.querySelector('.acct-status');
+    if (caps) acctStatus('שימו לב: Caps Lock דלוק', 'err');
+    else if (st && /Caps Lock דלוק/.test(st.textContent)) acctStatus('');
+  });
   q('acctUp').addEventListener('click', async () => {
     if (acctBusy) return; acctBusy = true; acctStatus('יוצר חשבון…');
     try { const r = await ACCT().signUp(email(), pass()); if (r.needsConfirm) { acctStatus('נשלח אליך מייל אימות — אשרו ואז התחברו.', 'ok'); } else { await acctAfterAuth(); } }
@@ -6971,6 +6978,21 @@ function openPwSetup() {
   back.querySelector('#pwSql').value = PW_SQL;
   document.body.appendChild(back);
   back.classList.add('show');
+}
+// "ההתחברות נכשלה" said nothing: every refusal now says what to do
+function signInError(e, email, pass) {
+  const code = (e && e.message) || '';
+  if (code === 'invalid_credentials') {
+    // the commonest cause here: the keyboard was on Hebrew
+    if (/[\u0590-\u05FF]/.test(pass || '')) return 'הסיסמה הוקלדה באותיות עבריות — החליפו את המקלדת לאנגלית (Alt+Shift) והקלידו שוב.';
+    if (/[\u0590-\u05FF]/.test(email || '')) return 'המייל הוקלד באותיות עבריות — החליפו את המקלדת לאנגלית (Alt+Shift).';
+    return 'אימייל או סיסמה שגויים. בדקו שהמקלדת באנגלית ושה־Caps Lock כבוי. שכחתם? "שכחתי סיסמה" למטה.';
+  }
+  if (code === 'email_not_confirmed') return 'הסיסמה נכונה, אבל כתובת המייל עוד לא אושרה. פתחו את מייל האישור שקיבלתם, או בקשו ממנהל/ת המערכת לאשר אותה ב־Supabase.';
+  if (code === 'RATE_LIMIT') return 'יותר מדי ניסיונות התחברות — חכו כמה דקות ונסו שוב.';
+  if (code === 'user_banned') return 'המשתמש הזה חסום — פנו למנהל/ת המערכת.';
+  if (code === 'NETWORK') return 'אין חיבור לשרת — בדקו את האינטרנט ונסו שוב.';
+  return 'ההתחברות נכשלה (' + code + ') — נסו שוב בעוד רגע.';
 }
 // after sign-in: a DIFFERENT person than the last one on this computer gets
 // a clean slate first (never inherit someone else's forms or history), then

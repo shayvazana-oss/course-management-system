@@ -16,7 +16,7 @@ const ROOT = path.resolve(HERE, '..');
 const DIST = path.join(ROOT, 'dist', 'pdf-form-studio.html');
 
 function findChromium() {
-  const cands = [process.env.PW_CHROMIUM, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  const cands = [process.env.PW_CHROMIUM, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium',
     '/opt/pw-browsers/chromium/chrome-linux/chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome'].filter(Boolean);
   for (const c of cands) { try { if (fs.existsSync(c)) return c; } catch (e) {} }
   return null;

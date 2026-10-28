@@ -23,6 +23,9 @@ function findChromium() {
   const cands = [
     process.env.PW_CHROMIUM,
     '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    // the environment's own Chromium, whatever its version
+    '/opt/pw-browsers/chromium',
+    ...(() => { try { return fs.readdirSync('/opt/pw-browsers').filter((d) => /^chromium-\d+$/.test(d)).sort().reverse().flatMap((d) => ['/opt/pw-browsers/' + d + '/chrome-linux64/chrome', '/opt/pw-browsers/' + d + '/chrome-linux/chrome']); } catch (e) { return []; } })(),
     '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
   ].filter(Boolean);
@@ -6620,6 +6623,81 @@ async function main() {
       && /פג תוקף/.test(R.expired.status) && R.expired.hash === '' && !errs2.length;
     if (!okP) console.log('  [passwords debug]', JSON.stringify(R), JSON.stringify(errs2));
     check('🔑 passwords: "שכחתי סיסמה" sends a link back to this page (or says the admin resets it when mail is refused); the admin resets a member\'s password (one-time setup offered); the member changes it in the personal area; a reset link signs in, asks for a new password, leaves no token behind; an expired link says so', okP);
+  }
+
+  // ===== a refused sign-in says why: "ההתחברות נכשלה" said nothing =====
+  // The live server answers a wrong password with
+  // {"code":400,"error_code":"invalid_credentials","msg":"Invalid login credentials"}
+  // (no error_description) — the screen said only "ההתחברות נכשלה". Each
+  // refusal now says what to do: wrong address/password (and a Hebrew
+  // keyboard, Caps Lock), an unconfirmed address, too many tries, no server.
+  {
+    const users = { 'me@fillo.test': { id: 's1', password: 'Right-123', email: 'me@fillo.test', confirmed: true }, 'new@fillo.test': { id: 's2', password: 'Right-456', email: 'new@fillo.test', confirmed: false } };
+    let tries = 0, limitAfter = Infinity;
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        if (++tries > limitAfter) return json(res, 429, { code: 429, error_code: 'over_request_rate_limit', msg: 'Request rate limit reached' });
+        const usr = users[b.email];
+        if (!usr || usr.password !== b.password) return json(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
+        if (!usr.confirmed) return json(res, 400, { code: 400, error_code: 'email_not_confirmed', msg: 'Email not confirmed' });
+        return json(res, 200, { access_token: 'tok_' + usr.id, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } });
+      }
+      if (p === '/rest/v1/vaults') { if (req.method === 'GET') return json(res, 200, []); await body(req); return json(res, 201); }
+      if (p === '/rest/v1/dept_members') return json(res, 200, []);
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const R = {};
+    const errMark = jsErrors.length;   // the refusals below are this test's own doing
+    const attempt = async (email, pass) => {
+      await page.fill('#loginBody #acctEmail', email); await page.fill('#loginBody #acctPass', pass);
+      await page.click('#loginBody #acctIn');
+      await page.waitForFunction(() => !/מתחבר…/.test((document.querySelector('#loginBody .acct-status') || {}).textContent || ''), { timeout: 8000 });
+      await page.waitForTimeout(150);
+      return page.evaluate(() => (document.querySelector('#loginBody .acct-status') || {}).textContent || '');
+    };
+    try {
+      await page.evaluate(async (url) => {
+        const T = window.PFS.__test; T.overlay.clearElements();
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: true };
+        window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+        await T.acct.wipe();
+        T.acct.gate();
+      }, mockUrl);
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      R.wrong = await attempt('me@fillo.test', 'Wrong-999');
+      R.hebrew = await attempt('me@fillo.test', 'שלום123');
+      R.unconfirmed = await attempt('new@fillo.test', 'Right-456');
+      limitAfter = tries; R.limited = await attempt('me@fillo.test', 'Right-123'); limitAfter = Infinity;
+      R.right = await page.evaluate(async () => { document.querySelector('#loginBody #acctPass').value = 'Right-123'; document.querySelector('#loginBody #acctIn').click(); for (let i = 0; i < 60 && document.getElementById('loginModal').classList.contains('show'); i++) await new Promise((r) => setTimeout(r, 100)); return { in: !document.getElementById('loginModal').classList.contains('show'), who: (window.PFS.account.user() || {}).email }; });
+      await page.evaluate(() => window.PFS.__test.acct.signOut());
+      await page.waitForFunction(() => document.getElementById('loginModal').classList.contains('show'), { timeout: 10000 });
+      mock.close(); await new Promise((r) => setTimeout(r, 200));
+      R.offline = await attempt('me@fillo.test', 'Right-123');
+    } catch (e) { R.error = String(e && e.message || e); }
+    try { mock.close(); } catch (e) {}
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      window.PFS.store.remove('acct:cfg'); window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user');
+      document.getElementById('loginModal').classList.remove('show');
+      T.acct.render();
+    });
+    for (let i = jsErrors.length - 1; i >= errMark; i--) if (/Failed to load resource|ERR_CONNECTION_REFUSED/.test(jsErrors[i]) && /auth\/v1\/token|ERR_CONNECTION_REFUSED|status of (400|429)/.test(jsErrors[i])) jsErrors.splice(i, 1);
+    const okS = !R.error && /אימייל או סיסמה שגויים/.test(R.wrong) && /Caps Lock/.test(R.wrong)
+      && /אותיות עבריות/.test(R.hebrew) && /Alt\+Shift/.test(R.hebrew)
+      && /לא אושרה/.test(R.unconfirmed) && /יותר מדי ניסיונות/.test(R.limited)
+      && R.right.in && R.right.who === 'me@fillo.test' && /אין חיבור לשרת/.test(R.offline);
+    if (!okS) console.log('  [sign-in errors debug]', JSON.stringify(R));
+    check('🔐 a refused sign-in says why (the live server\'s invalid_credentials → "אימייל או סיסמה שגויים"; a Hebrew-keyboard password; an unconfirmed address; too many tries; no server) — the right password still signs in', okS);
   }
 
   // ===== the first sign-in on a computer that already holds work =====

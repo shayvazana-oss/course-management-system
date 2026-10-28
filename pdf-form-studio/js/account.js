@@ -78,10 +78,24 @@
     if (j.access_token) storeAuth(j);
     return { needsConfirm: !j.access_token, user: j.user };
   }
+  // → true | throws Error(code): invalid_credentials, email_not_confirmed,
+  // RATE_LIMIT, user_banned, NETWORK, HTTP_<n>. (The server answers a wrong
+  // password with {error_code:'invalid_credentials', msg} — older servers
+  // with {error:'invalid_grant', error_description}; both read the same.)
   async function signIn(email, password) {
-    const res = await api('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
+    let res;
+    try { res = await api('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } }); }
+    catch (e) { throw new Error('NETWORK'); }
     const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.access_token) throw new Error(j.error_description || j.msg || 'BAD_CREDENTIALS');
+    if (!res.ok || !j.access_token) {
+      const text = String(j.error_description || j.msg || j.message || '');
+      let code = j.error_code || '';
+      if (!code && /invalid login credentials/i.test(text)) code = 'invalid_credentials';
+      if (!code && /email not confirmed/i.test(text)) code = 'email_not_confirmed';
+      if (res.status === 429 || /rate.?limit/i.test(code)) code = 'RATE_LIMIT';
+      if (!code && res.status === 400) code = 'invalid_credentials';
+      const e = new Error(code || ('HTTP_' + res.status)); e.detail = text; throw e;
+    }
     storeAuth(j);
     return true;
   }

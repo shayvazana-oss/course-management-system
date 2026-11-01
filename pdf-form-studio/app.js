@@ -4832,8 +4832,15 @@ function renderMe() {
   if (av) av.textContent = meInitial();
   if (badge) badge.textContent = authed ? '🔒 מחובר/ת — הכול נשמר בחשבון הפרטי שלך וזמין בכל מחשב' : '🔒 הכול מקומי בדפדפן — הקבצים לא עוזבים את המחשב';
   if (hello) {
-    hello.classList.toggle('hidden', !authed);
+    // signed out, with accounts available but not required: a way in on the home screen
+    const canSignIn = !authed && !!(PFS.account && PFS.account.configured && PFS.account.configured()) && !loginRequired();
+    hello.classList.toggle('hidden', !authed && !canSignIn);
     hello.innerHTML = '';
+    if (canSignIn) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'hero-name'; b.id = 'heroSignIn';
+      b.textContent = 'התחברות לחשבון — שמירה בענן, מחלקת התעודות, נכסים משותפים';
+      b.addEventListener('click', showLoginGate); hello.appendChild(b);
+    }
     if (authed) {
       hello.append(meGreeting() + (meName() ? ', ' + meName() : '') + ' 👋');
       if (!meName()) {
@@ -7040,7 +7047,23 @@ async function acctAfterAuth() {
   acctStatus('טוען את הנתונים שלך…');
   const uid = (ACCT().user() || {}).id || '';
   const last = PFS.store.get('acct:last_user', '');
-  if (last && last !== uid) await wipeLocalForUserSwitch();
+  if (last && last !== uid) {
+    // this computer still holds the previous account's work. When that work
+    // never reached its cloud, entering another account would wipe it with
+    // no way back — ask first (a backup file, go on without, or stay)
+    if (ACCT().hasUnsynced()) {
+      const choice = await askUserSwitch();
+      if (choice === 'cancel') {
+        ACCT().signOut();
+        renderAccount();
+        acctStatus('לא נכנסת: העבודה שבמחשב נשארה כמו שהיא. כדי לשמור אותה, התחברו לחשבון הקודם.', 'err');
+        if (loginRequired()) showLoginGate();
+        return false;
+      }
+      if (choice === 'backup') backupExport();
+    }
+    await wipeLocalForUserSwitch();
+  }
   PFS.store.set('acct:last_user', uid);
   // the first sign-in on this computer MERGES its work with the account's —
   // nothing on either side is lost; after that the cloud leads
@@ -7063,6 +7086,28 @@ async function acctAfterAuth() {
   hideLoginGate();
   if (onboardingAfterSignIn) { onboardingAfterSignIn = false; showOnboarding(); }
   renderAccount(); acctStatus('מחובר ✓', 'ok'); PFS.toast('מחובר — הפרטים וההיסטוריה שלך זמינים', 'ok');
+}
+// → 'backup' | 'wipe' | 'cancel' (Escape or a click outside = cancel)
+function askUserSwitch() {
+  return new Promise((resolve) => {
+    let back = $('switchModal');
+    if (!back) {
+      back = document.createElement('div'); back.className = 'modal-back'; back.id = 'switchModal';
+      back.innerHTML = '<div class="modal sw-modal" style="max-width:480px"><header>⚠️ במחשב הזה נשארה עבודה שלא נשמרה</header><div class="m-body">' +
+        '<div class="hint">נשארו כאן שינויים של חשבון אחר שלא הגיעו לענן (למשל מהפעם שההתחברות נותקה). כניסה לחשבון הזה מנקה את המחשב, והשינויים האלה יימחקו.</div>' +
+        '<div class="hint muted">הגיבוי כולל את כל מה שיש כאן: חתימות, חותמות, פרופיל ותבניות. שמרו אותו בפרטיות.</div></div>' +
+        '<footer><button class="btn primary" id="swBackup">שמירת גיבוי לקובץ והמשך</button><button class="btn" id="swWipe">המשך בלי גיבוי</button><button class="btn ghost" id="swCancel">ביטול, להישאר עם מה שיש</button></footer></div>';
+    }
+    document.body.appendChild(back);   // above the sign-in window
+    const mo = new MutationObserver(() => { if (!back.classList.contains('show')) { mo.disconnect(); resolve('cancel'); } });
+    mo.observe(back, { attributes: true, attributeFilter: ['class'] });
+    const done = (v) => { mo.disconnect(); back.classList.remove('show'); resolve(v); };
+    back.querySelector('#swBackup').onclick = () => done('backup');
+    back.querySelector('#swWipe').onclick = () => done('wipe');
+    back.querySelector('#swCancel').onclick = () => done('cancel');
+    back.onpointerdown = (e) => { if (e.target === back) done('cancel'); };
+    back.classList.add('show');
+  });
 }
 // "כל ההיסטוריה והפיתוחים יישמרו כשאני מעביר אותו לאדם אחר": a computer that
 // already holds work (history, certificate formats, appendices) hands ALL of
@@ -7162,7 +7207,9 @@ acctAutoLoadOnStart();
   PFS.store.set = function (k, v) {
     const r = _set(k, v);
     if (k !== 'sync:cfg') { try { syncAutoPush(); } catch (e) {} }
-    if (k.indexOf('acct:') !== 0) { try { if (ACCT().authed()) ACCT().noteLocalChange(); scheduleAccountSave(); } catch (e) {} }
+    // (also while signed OUT after a lost session: that work is not in the
+    // cloud either — the next sign-in must merge it, never overwrite it)
+    if (k.indexOf('acct:') !== 0) { try { if (ACCT().authed() || PFS.store.get('acct:last_user', '')) ACCT().noteLocalChange(); scheduleAccountSave(); } catch (e) {} }
     return r;
   };
 })();

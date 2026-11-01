@@ -6782,6 +6782,130 @@ async function main() {
     check('🔐 a refused sign-in says why (the live server\'s invalid_credentials → "אימייל או סיסמה שגויים"; a Hebrew-keyboard password; an unconfirmed address; too many tries; no server) — the right password still signs in', okS);
   }
 
+  // ===== work done while signed out is never overwritten or wiped silently =====
+  // "אתה מחקת לי את כל החתימות": a session that ended (not a sign-out) leaves
+  // the account's work on the computer; what was added after that was never
+  // flagged as "not in the cloud", so signing in again OVERWROTE it with the
+  // cloud copy, and another account signing in wiped it with no question.
+  // Now: that work is flagged; the same account signing in merges it; another
+  // account signing in asks first (backup file / go on / stay) — and says
+  // nothing when everything had reached the cloud. A sign-in entry sits on
+  // the home screen (login is no longer a gate).
+  {
+    const users = { 'a@fillo.test': { id: 'ua', password: 'pw-a', email: 'a@fillo.test' }, 'b@fillo.test': { id: 'ub', password: 'pw-b', email: 'b@fillo.test' } };
+    const tokens = {}; const vaults = {};
+    const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' }); res.end(obj === undefined ? '' : JSON.stringify(obj)); };
+    const body = (req) => new Promise((r) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => r(Buffer.concat(c))); });
+    const who = (req) => { const m = /^Bearer (.+)$/.exec(req.headers.authorization || ''); return m && tokens[m[1]] ? tokens[m[1]] : null; };
+    const mock = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://x'); const p = u.pathname;
+      if (req.method === 'OPTIONS') return json(res, 204);
+      if (p === '/auth/v1/token') {
+        const b = JSON.parse((await body(req)).toString() || '{}');
+        const usr = users[b.email]; if (!usr || usr.password !== b.password) return json(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
+        const tok = 'tok_' + usr.id + '_' + Math.random().toString(36).slice(2); tokens[tok] = usr.id;
+        return json(res, 200, { access_token: tok, refresh_token: 'r_' + usr.id, expires_in: 3600, user: { id: usr.id, email: usr.email } });
+      }
+      const meId = who(req); if (!meId) return json(res, 401, {});
+      if (p === '/rest/v1/vaults') { if (req.method === 'GET') return json(res, 200, vaults[meId] ? [{ data: vaults[meId] }] : []); const b = JSON.parse((await body(req)).toString() || '{}'); vaults[meId] = b.data; return json(res, 201); }
+      if (p === '/rest/v1/dept_members') return json(res, 200, []);
+      if (p.startsWith('/storage/v1/object/')) { await body(req); return json(res, 400, { statusCode: '404', error: 'not_found' }); }
+      json(res, 404, {});
+    });
+    await new Promise((r) => mock.listen(0, r));
+    const mockUrl = 'http://localhost:' + mock.address().port;
+    const R = {};
+    const errMark = jsErrors.length;
+    const png = (txt) => page.evaluate((t) => { const c = document.createElement('canvas'); c.width = 240; c.height = 80; const g = c.getContext('2d'); g.font = '34px serif'; g.fillText(t, 12, 52); return c.toDataURL('image/png'); }, txt);
+    const sigs = () => page.evaluate(() => window.PFS.__test.assets.own('signature').length);
+    const cloudSigs = (id) => { try { return JSON.parse(vaults[id]['pfs:signatures']).length; } catch (e) { return -1; } };
+    // sign in through the window; resolves when it closed OR the switch question opened
+    const signInUi = async (email, pass) => {
+      await page.evaluate(() => { window.PFS.__test.acct.render(); window.PFS.__test.acct.gate(); });
+      await page.waitForSelector('#loginBody #acctEmail', { timeout: 8000 });
+      await page.fill('#loginBody #acctEmail', email); await page.fill('#loginBody #acctPass', pass);
+      await page.click('#loginBody #acctIn');
+      await page.waitForFunction(() => { const sw = document.getElementById('switchModal'); return (sw && sw.classList.contains('show')) || !document.getElementById('loginModal').classList.contains('show') || /לא נכנסת/.test((document.querySelector('#loginBody .acct-status') || {}).textContent || ''); }, { timeout: 15000 });
+      await page.waitForTimeout(300);
+    };
+    const switchOpen = () => page.evaluate(() => { const sw = document.getElementById('switchModal'); return !!(sw && sw.classList.contains('show')); });
+    const sessionLost = () => page.evaluate(() => { window.PFS.account.signOut(); window.PFS.__test.acct.render(); });
+    try {
+      const sigCloud = await png('Cloud A'), sigOff1 = await png('Offline 1'), sigOff2 = await png('Offline 2');
+      vaults.ua = { 'pfs:signatures': JSON.stringify([{ id: 'cloud1', url: sigCloud, w: 240, h: 80, aspect: 3, ts: 1 }]), 'pfs:default_signature': JSON.stringify('cloud1') };
+      await page.evaluate(async (url) => {
+        const T = window.PFS.__test; T.overlay.clearElements();
+        const c = window.PFS.ui.confirm; window.PFS.ui.confirm = async () => true; try { await T.goHome(); } finally { window.PFS.ui.confirm = c; }
+        window.PFS_SUPA_BASE = url; window.PFS.account._saveSessionCfg({ url, anonKey: 'test' });
+        window.PFS_SUPABASE = { url, anonKey: 'test', requireLogin: false };
+        window.PFS.store.remove('acct:session'); window.PFS.store.remove('acct:last_user'); window.PFS.store.remove('acct:unsynced');
+        ['signatures', 'stamps', 'default_signature'].forEach((k) => window.PFS.store.remove(k));
+        T.acct.render();
+      }, mockUrl);
+      // the home screen offers the sign-in (no gate); it opens the window
+      R.heroOut = await page.evaluate(() => { const b = document.getElementById('heroSignIn'); const h = document.getElementById('heroHello'); return { btn: !!b, visible: !!b && !h.classList.contains('hidden') }; });
+      await page.evaluate(() => document.getElementById('heroSignIn').click());
+      R.heroOpens = await page.evaluate(() => document.getElementById('loginModal').classList.contains('show') && !!document.querySelector('#loginBody #acctEmail'));
+      await page.evaluate(() => document.getElementById('loginModal').classList.remove('show'));
+      // account A signs in: the cloud signature arrives; the home button gives way to the greeting
+      await signInUi('a@fillo.test', 'pw-a');
+      R.a1 = { sigs: await sigs(), btnGone: await page.evaluate(() => !document.getElementById('heroSignIn')), who: await page.evaluate(() => (window.PFS.account.user() || {}).email) };
+      // the session ends (not a sign-out); work is added meanwhile → flagged as not in the cloud
+      await sessionLost();
+      await page.evaluate((u) => window.PFS.__test.assets.add('signature', { url: u, w: 240, h: 80 }), sigOff1);
+      R.flag1 = await page.evaluate(() => window.PFS.store.get('acct:unsynced', false));
+      // the SAME account signs in again: the work done meanwhile is merged, not overwritten
+      await signInUi('a@fillo.test', 'pw-a');
+      await page.waitForTimeout(500);
+      R.a2 = { sigs: await sigs(), cloud: cloudSigs('ua'), ask: await switchOpen() };
+      // again: session ends, more work; ANOTHER account signs in → asked first
+      await sessionLost();
+      await page.evaluate((u) => window.PFS.__test.assets.add('signature', { url: u, w: 240, h: 80 }), sigOff2);
+      await signInUi('b@fillo.test', 'pw-b');
+      R.ask1 = await switchOpen();
+      await page.click('#swCancel'); await page.waitForTimeout(500);
+      R.cancel = await page.evaluate(() => ({ authed: window.PFS.account.authed(), sigs: window.PFS.__test.assets.own('signature').length, last: window.PFS.store.get('acct:last_user', ''), status: (document.querySelector('#loginBody .acct-status') || {}).textContent || '' }));
+      R.bVaultUntouched = vaults.ub === undefined;
+      // the same again, this time "backup and continue": the file holds the work, then the computer is cleaned
+      await page.evaluate(() => { window.__out = []; window.PFS.__realDeliver = window.PFS.__realDeliver || window.PFS.deliver.file; window.PFS.deliver.file = (d, n) => { window.__out.push({ d: String(d), n }); }; });
+      await page.evaluate(() => document.getElementById('loginModal').classList.remove('show'));
+      await signInUi('b@fillo.test', 'pw-b');
+      R.ask2 = await switchOpen();
+      await page.click('#swBackup');
+      await page.waitForFunction(() => !document.getElementById('loginModal').classList.contains('show'), { timeout: 15000 });
+      await page.waitForTimeout(500);
+      const bk = await page.evaluate(() => window.__out[0] || null);
+      const bkd = bk && JSON.parse(bk.d).data;
+      R.backup = bk && { name: bk.n, sigs: bkd && bkd['pfs:signatures'] ? JSON.parse(bkd['pfs:signatures']).length : -1, hasOff2: !!bkd && String(bkd['pfs:signatures']).includes(sigOff2.slice(-60)), session: !!bkd && 'pfs:acct:session' in bkd };
+      R.b = { who: await page.evaluate(() => (window.PFS.account.user() || {}).email), sigs: await sigs() };
+      R.aCloudKept = cloudSigs('ua');
+      // nothing unsynced → no question: B's session ends with no new work, A signs in: cleaned silently, A's cloud loads
+      await sessionLost();
+      await signInUi('a@fillo.test', 'pw-a');
+      R.quiet = { ask: await switchOpen(), sigs: await sigs(), who: await page.evaluate(() => (window.PFS.account.user() || {}).email) };
+    } catch (e) { R.error = String(e && e.message || e); }
+    await page.evaluate(async () => {
+      const T = window.PFS.__test;
+      if (window.PFS.__realDeliver) window.PFS.deliver.file = window.PFS.__realDeliver;
+      try { window.PFS.account.signOut(); } catch (e) {}
+      window.PFS_SUPABASE = { url: '', anonKey: '', requireLogin: false }; window.PFS_SUPA_BASE = undefined;
+      ['acct:cfg', 'acct:session', 'acct:last_user', 'acct:unsynced', 'signatures', 'stamps', 'default_signature', 'default_stamp'].forEach((k) => window.PFS.store.remove(k));
+      ['loginModal', 'switchModal'].forEach((id) => { const m = document.getElementById(id); m && m.classList.remove('show'); });
+      T.acct.render();
+    });
+    mock.close();
+    for (let i = jsErrors.length - 1; i >= errMark; i--) if (/Failed to load resource/.test(jsErrors[i]) && /(storage\/v1|status of (400|404))/.test(jsErrors[i])) jsErrors.splice(i, 1);
+    const okW = !R.error && R.heroOut.btn && R.heroOut.visible && R.heroOpens
+      && R.a1.sigs === 1 && R.a1.btnGone && R.a1.who === 'a@fillo.test'
+      && R.flag1 === true && R.a2.sigs === 2 && R.a2.cloud === 2 && !R.a2.ask
+      && R.ask1 && R.cancel.authed === false && R.cancel.sigs === 3 && R.cancel.last === 'ua' && /לא נכנסת/.test(R.cancel.status) && R.bVaultUntouched
+      && R.ask2 && R.backup && R.backup.sigs === 3 && R.backup.hasOff2 && !R.backup.session && /\.json$/.test(R.backup.name)
+      && R.b.who === 'b@fillo.test' && R.b.sigs === 0 && R.aCloudKept === 2
+      && !R.quiet.ask && R.quiet.sigs === 2 && R.quiet.who === 'a@fillo.test';
+    if (!okW) console.log('  [signed-out work debug]', JSON.stringify(R, (k, v) => (typeof v === 'string' && v.length > 90 ? v.slice(0, 40) + '…' : v)));
+    check('🛟 work done while signed out is never lost silently: it is flagged, the same account merges it on sign-in (not overwritten), another account is asked first (backup file / go on / stay), nothing asked when all had reached the cloud; the home screen offers the sign-in', okW);
+  }
+
   // ===== the first sign-in on a computer that already holds work =====
   // The desktop holds layouts, a profile, certificates and a serial counter;
   // the account already holds others in the cloud. Signing in must keep

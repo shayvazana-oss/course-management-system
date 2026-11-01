@@ -1305,6 +1305,9 @@ body.gate-locked #loginModal { pointer-events: auto; }
 @media (max-width: 520px) { .team-pick { grid-template-columns: 1fr 1fr; } }
 .dept-team { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; margin: 4px 0 8px; }
 
+/* a different account on a computer that holds unsaved work */
+#switchModal { z-index: 1100; }   /* above the sign-in window it is asked from (that one is 1000) */
+.sw-modal footer { flex-wrap: wrap; }
 /* passwords: "שכחתי סיסמה", the admin's reset, the one-time setup */
 .acct-forgot { align-self: flex-start; margin-top: 8px; background: none; border: none; padding: 2px 0; color: var(--brand, #1e4e8c); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
 .acct-forgot:hover { color: var(--ink, #111); }

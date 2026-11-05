@@ -779,6 +779,48 @@ async function main() {
     return ok;
   }));
 
+  // "הכיסוי מתפרס הרבה מעבר לגבולות שהגדרתי לו": a value printed ON an
+  // underline (or on a cell's bottom border) — the rule touches the glyph
+  // band, so "finish the word the drag cut" read the rule as ink with no gap
+  // and ran along it for a quarter of the page. Both tools: the cover must
+  // finish the token it touched and nothing more, with the rule left intact.
+  check('a cover drawn over a value on an underline / cell border stays on that value (both tools), the rule stays', await page.evaluate(() => {
+    const T = window.PFS.__test, ov = T.overlay;
+    const c = document.querySelector('canvas.pdf'), cx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    const out = {};
+    const scene = (yFrac, withCell) => {
+      cx.fillStyle = '#fff'; cx.fillRect(0.05 * W, (yFrac - 0.03) * H, 0.9 * W, 0.08 * H);
+      const bandTop = Math.round(yFrac * H), bandH = 13;
+      cx.fillStyle = '#222';
+      // three tokens on ONE long underline that touches the glyph band
+      [[0.62, 0.72], [0.42, 0.52], [0.18, 0.30]].forEach(([a, b]) => { for (let x = Math.round(a * W); x < b * W; x += 4) cx.fillRect(x, bandTop, 2, bandH); });
+      cx.fillRect(Math.round(0.10 * W), bandTop + bandH, Math.round(0.70 * W), 2);          // the underline, right under the letters
+      if (withCell) { cx.fillRect(Math.round(0.10 * W), bandTop - 12, 2, bandH + 26); cx.fillRect(Math.round(0.80 * W), bandTop - 12, 2, bandH + 26); }
+      return { bandTop, bandH };
+    };
+    const judge = (cover, g) => cover && {
+      l: cover.model.fx, r: cover.model.fx + cover.model.fw,
+      onToken: cover.model.fx <= 0.422 && cover.model.fx >= 0.39 && (cover.model.fx + cover.model.fw) >= 0.518 && (cover.model.fx + cover.model.fw) <= 0.56,
+      ruleKept: (cover.model.fy + cover.model.fh) * H <= g.bandTop + g.bandH + 1.5
+    };
+    // replace: the drag grazes the middle token only
+    ov.clearElements(); let g = scene(0.60, false);
+    T.placeReplacement(0, 0.44, 0.585, 0.06, 0.05);
+    out.replace = judge(ov.getElements().find((e) => e.model.kind === 'whiteout'), g);
+    // whiteout tool ("כיסוי חלק"): the same drag, through the tool's own path
+    ov.clearElements(); g = scene(0.60, false);
+    ov.addModelAt && T.whiteoutAt(0, 0.44, 0.585, 0.06, 0.05);
+    out.whiteout = judge(ov.getElements().find((e) => e.model.kind === 'whiteout'), g);
+    // inside a table cell (borders on both sides, bottom border under the letters)
+    ov.clearElements(); g = scene(0.60, true);
+    T.placeReplacement(0, 0.44, 0.585, 0.06, 0.05);
+    out.cell = judge(ov.getElements().find((e) => e.model.kind === 'whiteout'), g);
+    ov.clearElements();
+    const ok = ['replace', 'whiteout', 'cell'].every((k) => out[k] && out[k].onToken && out[k].ruleKept);
+    return ok ? true : JSON.stringify(out);
+  }) === true);
+
   // inpaint polarity: on a DARK banner with light lettering, the cover must
   // fill with the dark background — not with the white of the letters
   // ("ככה זה נראה שאני מייצא": a glowing wedge on the dark header)

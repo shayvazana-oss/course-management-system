@@ -10725,7 +10725,7 @@ function openCoursePicker(e) {
 }
 
 // test handle: the e2e suite drives these module-scoped singletons directly.
-PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certWrapLines: (m, t, r) => certWrapLines(m, t, r), certPageRatio: (p) => certPageRatio(p), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveRecords: (b) => certArchiveRecords(b), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), assets, teamRefresh: () => teamRefresh(), openTeamShare: () => openTeamShare(), openPasswordDialog: (o) => openPasswordDialog(o), acctFromLink: (l) => acctFromLink(l), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
+PFS.__test = { overlay, fieldsPanel, pdfView, fillAll, loadErrorMessage, setLastDet: (d) => { lastDet = d; }, snapshotNow: () => snapshot(), undo: () => undo(), redo: () => redoAction(), buildFlattenedBytes: () => buildFlattenedBytes(), rememberTextStyle: (m) => rememberTextStyle(m), getLastTextStyle: () => lastTextStyle, recomputeFormulas: () => recomputeFormulas(), resetForm: () => resetForm(), hasPageOps: () => hasPageOps(), placeReplacement: (p, fx, fy, fw, fh) => placeReplacement(p, fx, fy, fw, fh), whiteoutAt: (p, fx, fy, fw, fh) => whiteoutAt(p, fx, fy, fw, fh), replacementPlan: (p, fx, fy, fw, fh) => replacementPlan(p, fx, fy, fw, fh), planHiRes: async (p, fx, fy, fw, fh) => { const canvas = await hiResPage(p); measureSrc = { page: p, canvas }; try { return Object.assign(replacementPlan(p, fx, fy, fw, fh), { cw: canvas.width, chh: canvas.height }); } finally { measureSrc = null; } }, renderBaseForFlatten: (i, s) => renderBaseForFlatten(i, s), openPdfFile: (f) => openPdfFile(f), openCompanion: (l) => openCompanion(l), goHome: () => goHome(), getFp: () => currentFp, setCarry: (v) => { pendingCarry = v; }, clampDocScroll: () => clampDocScroll(), vaultPrefillFor: (d) => vaultPrefill(d), setStudent: (v) => { pendingStudent = v; }, snapFieldsToInk: (d) => snapFieldsToInk(d), copyRegion: (p, a, b, c, d2) => copyRegion(p, a, b, c, d2), runOcr: () => runOcr(), tuneReplacement: (c) => tuneReplacementToInk(c), normalizeFontSizes: (d) => normalizeFontSizes(d), uniformize: (t) => uniformizeHandwriting(t), produceCourseForm: (c, f, d) => produceCourseForm(c, f, d), setActiveCourse: (id) => setActiveCourse(id), activeCourseId: () => activeCourseId(), getLastDet: () => lastDet, buildPersonAndCarry: (k, f, p) => buildPersonAndCarry(k, f, p), autoSaveNow: () => templates.autoSave(currentFp, currentFileName), runDetection: (f) => runDetection(f), wasDetCached: () => lastDetFromCache, detCacheGet: (fp) => detCacheGet(fp), autoExportName: () => autoExportName(), exFileName: () => exFileName(), setFileName: (n) => { currentFileName = n; }, renderRecent, renderLibrary, saveFilledToHistory, studentNameNow, liftSmallFills, templates, quickTextAt, inkCellAt, coverBandVertically: (p, a, b, c, d) => coverBandVertically(p, a, b, c, d), measureReplacedInk: (p, a, b, c, d) => measureReplacedInk(p, a, b, c, d), centerBatchModels: (m) => centerBatchModels(m), openMerge: () => openMerge(), startCertFlow: (f) => startCertFlow(f), certPlace: (p, x, y, k) => certPlace(p, x, y, k), certLoadList: (p, n) => certLoadList(p, n), certProduce: (k, o) => certProduce(k, o), certPlaceSentence: (p, x, y) => certPlaceSentence(p, x, y), certPreflightNow: () => certPreflightNow(), certKeys: () => certKeys(), certRegistry: () => certRegistry(), certNextSerial: (o) => certNextSerial(o), certRegistryCsv: () => certRegistryCsv(), certAutoFromList: (p, n) => certAutoFromList(p, n), certAnchorToDetected: (u) => certAnchorToDetected(u), certSnapToInk: (c) => certSnapToInk(c), certAlignAll: () => certAlignAll(), certKeyForLabel: (l) => certKeyForLabel(l), hebrewAcademicYear: (d) => hebrewAcademicYear(d), hebrewYearLetters: (y) => hebrewYearLetters(y), certLayoutModels: (b, r) => certLayoutModels(b, r), certWrapLines: (m, t, r) => certWrapLines(m, t, r), certPageRatio: (p) => certPageRatio(p), certSampleIssues: () => certSampleIssues(), certApplyFont: (id) => certApplyFont(id), ensureCertFonts: (id) => ensureCertFonts(id), certFontCss: (id) => certFontCss(id), certDetectFont: () => certDetectFont(), certFontId: () => certFontId(), certFontList: () => certFontList(), certMatchNow: () => certMatchNow(), certFpKey: () => certFpKey(), certAutoCompose: (c, o) => certAutoCompose(c, o), certReadFormat: () => certReadFormat(), certInkSpan: (m) => certInkSpan(m), certInkOffset: (m, t, r) => certInkOffset(m, t, r), certFormatModel: () => certFormatModel(), certMetaNow: () => certMetaNow(), certArchiveFolders: () => certArchiveFolders(), certArchiveRecords: (b) => certArchiveRecords(b), certArchiveBuild: (b, k, i) => certArchiveBuild(b, k, i), openCertArchive: (k) => openCertArchive(k), renderCertArchiveHome: () => renderCertArchiveHome(), certParseDate: (v) => certParseDate(v), certSnapToAxis: (c) => certSnapToAxis(c), deptRefresh: () => deptRefresh(), assets, teamRefresh: () => teamRefresh(), openTeamShare: () => openTeamShare(), openPasswordDialog: (o) => openPasswordDialog(o), acctFromLink: (l) => acctFromLink(l), showOnboarding: () => showOnboarding(), renderMe: () => renderMe(), openMe: () => openMe(), meGreeting: (d) => meGreeting(d), deptState: () => dept, acct: { wipe: () => wipeLocalForUserSwitch(), hydrate: () => cloudHydrate(), gate: () => showLoginGate(), cloudPut: (k, i, b, m) => cloudPutDoc(k, i, b, m), afterAuth: () => acctAfterAuth(), signOut: () => acctSignOut(), render: () => renderAccount(), loginRequired: () => loginRequired() }, certState: () => ({ mode: certMode, card: !!certCard, step: certCard ? +(certCard.querySelector('.gd-count').textContent.match(/שלב (\d)/) || [0, 0])[1] : 0, listN: certList ? certList.records.length : 0, map: Object.assign({}, certMap) }) };
 
 async function runOcr() {
   if (!pdfView.hasDoc() || !(PFS.ocr && PFS.ocr.available())) return;
@@ -12041,21 +12041,8 @@ function activateTool(btn, tool) {
     const createRect = (pageIndex, fx, fy, fw, fh) => {
         if (tool === 'clip') { copyRegion(pageIndex, fx, fy, fw, fh); return; }
         if (tool === 'replace') { placeReplacement(pageIndex, fx, fy, fw, fh); return; }
-        const extra = { fx, fy, fw, fh };
-        // whiteout is a background-matched erase: remember that, so the export
-        // reconstructs the paper from its surroundings instead of stamping a
-        // flat colour (which shows as a rectangle at full resolution)
-        if (tool === 'whiteout') {
-          extra.auto = true;
-          // finish the word/number the drag only grazed, and the whole glyph band
-          try {
-            const ink = measureReplacedInk(pageIndex, fx, fy, fw, fh);
-            if (ink) { const c = extendCoverToInk(pageIndex, fx, fy, fw, fh, { top: ink.bandTopFrac, h: ink.bandFrac }); extra.fx = c.fx; extra.fw = c.fw; }
-            const vv = coverBandVertically(pageIndex, extra.fx, fy, extra.fw, fh); extra.fy = vv.fy; extra.fh = vv.fh;
-          } catch (e) {}
-          const bg = pdfView.sampleBg(pageIndex, extra.fx, extra.fy, extra.fw, extra.fh); if (bg) extra.color = bg;
-        }
-        overlay.addModelAt(tool, pageIndex, extra);
+        if (tool === 'whiteout') { whiteoutAt(pageIndex, fx, fy, fw, fh); return; }
+        overlay.addModelAt(tool, pageIndex, { fx, fy, fw, fh });
         overlay.deselectAll();
     };
     // a CLICK (no drag) means the word under it. It used to drop a box a fifth
@@ -12140,9 +12127,12 @@ function wordGapPx(col, x0, x1, bh) {
   if (gaps.length >= 3) {
     gaps.sort((a, b) => a - b);
     const p35 = gaps[Math.floor(0.35 * (gaps.length - 1))];
-    return Math.max(3, Math.min(Math.round(bh * 0.6), Math.round(p35 * 1.8)));
+    // never below a third of the glyph height: anti-aliasing quantises letter
+    // gaps to 1–2px, and 1.8× that split "033440124" at the air around its 1
+    // (digit gaps reach 0.29 of the band; a word space starts at ~0.36)
+    return Math.max(3, bh * 0.35, Math.min(bh * 0.6, p35 * 1.8));
   }
-  return Math.max(3, Math.round(bh * 0.45));
+  return Math.max(3, bh * 0.45);
 }
 /* wordAt — the printed word under a click: the glyph band the click sits in
  * (or the nearest one), then the run of ink around the click column up to
@@ -12175,16 +12165,15 @@ function wordAt(pageIndex, fx, fy) {
   }
   if (!band || band.bot - band.top + 1 < 3) return null;
   const bh = band.bot - band.top + 1;
-  const col = (x) => { for (let y = band.top; y <= band.bot; y++) if (inkAt(x, y)) return true; return false; };
+  const isRule = ruleRows(d, w, h, bh);
+  const col = (x) => { for (let y = band.top; y <= band.bot; y++) if (!isRule[y] && inkAt(x, y)) return true; return false; };
   const gapPx = wordGapPx(col, 0, w, bh);
   // the nearest ink column to the click (within a letter's reach)
   const cxr = Math.max(0, Math.min(w - 1, cx - x0));
   let seed = -1;
   for (let k = 0; k <= Math.max(gapPx, bh); k++) { if (cxr + k < w && col(cxr + k)) { seed = cxr + k; break; } if (cxr - k >= 0 && col(cxr - k)) { seed = cxr - k; break; } }
   if (seed < 0) return null;
-  let left = seed, right = seed;
-  for (let x = seed - 1, white = 0; x >= 0 && white < gapPx; x--) { if (col(x)) { left = x; white = 0; } else white++; }
-  for (let x = seed + 1, white = 0; x < w && white < gapPx; x++) { if (col(x)) { right = x; white = 0; } else white++; }
+  const left = tokenEdge(col, seed, -1, 0, w, gapPx, w), right = tokenEdge(col, seed, 1, 0, w, gapPx, w);
   if (right - left + 1 < 2) return null;
   return { fx: Math.max(0, x0 + left - 2) / cw, fy: Math.max(0, y0 + band.top - 2) / chh, fw: (right - left + 1 + 4) / cw, fh: (bh + 4) / chh };
 }
@@ -12201,7 +12190,8 @@ function blankRoom(pageIndex, kept, band) {
   const gx0 = Math.max(0, Math.round(kept.fx * cw) - reach), gx1 = Math.min(cw, Math.round((kept.fx + kept.fw) * cw) + reach);
   let d; try { d = v.canvas.getContext('2d').getImageData(gx0, bt, gx1 - gx0, bhh).data; } catch (e) { return out; }
   const gw = gx1 - gx0;
-  const col = (x) => { for (let y = 0; y < bhh; y++) { const i = (y * gw + x) * 4; if (d[i + 3] > 200 && (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 160) return true; } return false; };
+  const isRule = ruleRows(d, gw, bhh, band.h * chh);
+  const col = (x) => { for (let y = 0; y < bhh; y++) { if (isRule[y]) continue; const i = (y * gw + x) * 4; if (d[i + 3] > 200 && (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 160) return true; } return false; };
   const l0 = Math.round(kept.fx * cw) - gx0, r0 = Math.round((kept.fx + kept.fw) * cw) - gx0;
   const gap = wordGapPx(col, 0, gw, bhh);
   for (let x = l0 - 1; x >= 0; x--) if (col(x)) { out.left = (gx0 + x + gap) / cw; break; }
@@ -12243,9 +12233,12 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
     }
     if (run && run < w) runs.push(run);
   }
-  // glyph rows: some ink, but not a solid rule/border row
+  // glyph rows: some ink, but not a solid rule/border row — by coverage, and
+  // by run length (an underline the drag is wider than covers < 90% of the
+  // window, yet it is still a rule)
+  const isRule = ruleRows(data, w, h, Math.max(6, Math.round(h * 0.4)));
   const glyph = [];
-  rows.forEach((n, y) => { if (n > 1 && n < w * 0.9) glyph.push(y); });
+  rows.forEach((n, y) => { if (n > 1 && n < w * 0.9 && !isRule[y]) glyph.push(y); });
   if (!glyph.length) return null;
   // the ink-heaviest contiguous row-run (tolerating anti-alias gaps) — so a
   // drag that caught two lines still measures ONE line, not a giant band
@@ -12305,6 +12298,42 @@ function measureReplacedInk(pageIndex, fx, fy, fw, fh) {
   };
 }
 
+/* ruleRows — which rows of a window are a RULE (an underline, a cell's
+ * border) rather than letters: a row holding one unbroken dark run longer
+ * than any glyph stroke could be (3× the band height, at least 14px). Such a
+ * row must not count as ink when walking along a line for word gaps: a value
+ * printed ON an underline otherwise had "ink" in every column and the cover
+ * ran along the line for a quarter of the page. */
+function ruleRows(data, w, h, bandH) {
+  const limit = Math.max(14, Math.round(bandH * 3));
+  const out = new Array(h).fill(false);
+  for (let y = 0; y < h; y++) {
+    let run = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const dark = data[i + 3] > 200 && (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) < 170;
+      run = dark ? run + 1 : 0;
+      if (run >= limit) { out[y] = true; break; }
+    }
+  }
+  return out;
+}
+/* tokenEdge — walk from x along a glyph band (dir ±1) to the end of the
+ * token: over ink, and over air narrower than a word space (gapPx, a real
+ * number of columns). col(x) says whether column x holds glyph ink; returns
+ * the last ink column. */
+function tokenEdge(col, x, dir, lo, hi, gapPx, maxExt) {
+  let edge = x, xx = x;
+  for (;;) {
+    while (xx >= lo && xx < hi && col(xx)) { edge = xx; xx += dir; }
+    if (xx < lo || xx >= hi || Math.abs(xx - x) > maxExt) break;
+    let gap = 0, g = xx;
+    while (g >= lo && g < hi && !col(g) && gap < gapPx) { gap++; g += dir; }
+    if (g < lo || g >= hi || !col(g)) break;                 // a word space, or nothing within reach
+    xx = g;
+  }
+  return edge;
+}
 /* extendCoverToInk — finish the token the drag touched.
  * A hand-drawn rectangle over "320" routinely clips half a digit; the sliver
  * that survives the cover is what screams "edited". Walk outward from the drag
@@ -12318,12 +12347,15 @@ function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
   let data, gx0, gw;
   const bandTop = Math.max(0, Math.round(band.top * chh) - 1);
   const bandH = Math.max(3, Math.round(band.h * chh) + 2);
-  const maxExt = Math.round(cw * 0.25);            // never run away across the page
+  // never run away across the page: a token is a few glyph heights at most
+  const maxExt = Math.min(Math.round(cw * 0.25), Math.max(Math.round(band.h * chh * 12), 40));
   gx0 = Math.max(0, Math.round(fx * cw) - maxExt);
   gw = Math.min(cw - gx0, Math.round(fw * cw) + 2 * maxExt);
   try { data = v.canvas.getContext('2d').getImageData(gx0, bandTop, gw, bandH).data; } catch (e) { return { fx, fw }; }
+  const isRule = ruleRows(data, gw, bandH, band.h * chh);
   const colInk = (x) => {                          // x relative to gx0
     for (let y = 0; y < bandH; y++) {
+      if (isRule[y]) continue;
       const i = (y * gw + x) * 4;
       if (data[i + 3] > 200 && (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) < 160) return true;
     }
@@ -12336,16 +12368,9 @@ function extendCoverToInk(pageIndex, fx, fy, fw, fh, band) {
   // an edge that sits in blank paper cut nothing: it must not reach over to
   // the next word ("1,250" replaced, the "₪" beside it erased too)
   const cuts = (x) => { for (let d = -1; d <= 1; d++) { const xx = x + d - gx0; if (xx >= 0 && xx < gw && colInk(xx)) return true; } return false; };
-  if (cuts(left)) {
-    for (let x = left - 1, white = 0; x >= gx0 && left - x <= maxExt && white < gapPx; x--) {
-      if (colInk(x - gx0)) { left = x; white = 0; } else white++;
-    }
-  }
-  if (cuts(right - 1)) {
-    for (let x = right + 1, white = 0; x < gx0 + gw && x - right <= maxExt && white < gapPx; x++) {
-      if (colInk(x - gx0)) { right = x + 1; white = 0; } else white++;
-    }
-  }
+  const colAbs = (x) => colInk(x - gx0);
+  if (cuts(left)) left = Math.min(left, tokenEdge(colAbs, left, -1, gx0, gx0 + gw, gapPx, maxExt));
+  if (cuts(right - 1)) right = Math.max(right, tokenEdge(colAbs, right - 1, 1, gx0, gx0 + gw, gapPx, maxExt) + 1);
   return { fx: Math.max(0, left - 2) / cw, fw: Math.min(cw, right + 2 - left + 4) / cw };
 }
 
@@ -12491,6 +12516,22 @@ async function refineReplacementHiRes(pageIndex, fx, fy, fw, fh, coverCtrl, ctrl
     }
     markDirty();
   } catch (e) { /* the on-screen estimate stands */ }
+}
+// "כיסוי חלק": a background-matched erase. The drag finishes the token it
+// touched and takes the whole glyph band; the underline / the cell's border
+// under the letters stay (the same reading of the print as "replace")
+function whiteoutAt(pageIndex, fx, fy, fw, fh) {
+  const extra = { fx, fy, fw, fh, auto: true };
+  try {
+    const { kept } = replacementPlan(pageIndex, fx, fy, fw, fh);
+    Object.assign(extra, kept);
+  } catch (e) {}
+  const bg = pdfView.sampleBg(pageIndex, extra.fx, extra.fy, extra.fw, extra.fh); if (bg) extra.color = bg;
+  const ctrl = overlay.addModelAt('whiteout', pageIndex, extra);
+  overlay.deselectAll();
+  // the same plan on the page at a fixed high resolution (zoom-independent)
+  if (ctrl) refineReplacementHiRes(pageIndex, fx, fy, fw, fh, ctrl, null);
+  return ctrl;
 }
 function placeReplacement(pageIndex, fx, fy, fw, fh) {
   const clamp = PFS.clamp;
